@@ -19,102 +19,157 @@ class PlaylistCard extends ConsumerWidget {
     this.onDelete,
   });
 
+  String _relativeTime(BuildContext context, String dateStr) {
+    if (dateStr.isEmpty) return '';
+    try {
+      final date = DateTime.parse(dateStr);
+      final diff = DateTime.now().difference(date);
+      final s = S.of(context);
+      if (diff.inMinutes < 1) return s.justNow;
+      if (diff.inHours < 1) return s.minutesAgo(diff.inMinutes);
+      if (diff.inDays < 1) return s.hoursAgo(diff.inHours);
+      if (diff.inDays < 30) return s.daysAgo(diff.inDays);
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  IconData _privacyIcon(int privacy) {
+    switch (privacy) {
+      case 0: return Icons.lock;
+      case 1: return Icons.link;
+      case 2: return Icons.public;
+      default: return Icons.lock;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Gunakan select() agar kartu tidak rebuild saat field auth lain berubah
     final host = ref.watch(authProvider.select((s) => s.host ?? ''));
     final token = ref.watch(authProvider.select((s) => s.token ?? ''));
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final s = S.of(context);
 
     final httpHeaders = StorageService.serverCookieHeaders;
+    final isSystem = playlist.isSystemPlaylist;
+    final relativeTime = _relativeTime(context, playlist.updatedAt.isNotEmpty ? playlist.updatedAt : playlist.createdAt);
+    final privacyIcon = _privacyIcon(playlist.privacy);
 
     return Card(
       elevation: 1,
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
+      ),
       child: InkWell(
         onTap: onTap,
         child: SizedBox(
-          height: 88,
+          height: 96,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 封面图片 - 固定宽度，圆角
+              // Cover image
               Container(
-                width: 88,
-                height: 88,
+                width: 96,
+                height: 96,
                 clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
+                decoration: const BoxDecoration(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    bottomLeft: Radius.circular(12),
+                  ),
                 ),
                 child: PrivacyBlurCover(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(0),
                   child: CachedNetworkImage(
                     imageUrl: playlist.getFullCoverUrl(host, token: token),
                     httpHeaders: httpHeaders,
                     cacheKey: 'playlist_cover_${playlist.id}',
-                    memCacheWidth: (88 * MediaQuery.devicePixelRatioOf(context)).round(),
+                    memCacheWidth: (96 * MediaQuery.devicePixelRatioOf(context)).round(),
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: const Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                      color: colorScheme.surfaceContainerHighest,
+                      child: Center(
+                        child: Icon(
+                          Icons.playlist_play,
+                          size: 32,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(
-                      color: theme.colorScheme.surfaceContainerHighest,
+                      color: colorScheme.surfaceContainerHighest,
                       child: Icon(
                         Icons.playlist_play,
                         size: 32,
-                        color: theme.colorScheme.onSurfaceVariant,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
                 ),
               ),
 
-              // 播放列表信息
+              // Info area
               Expanded(
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // 标题
-                      Text(
-                        playlist.displayName,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          height: 1.2,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      // Title row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              isSystem ? playlist.displayName : playlist.name,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                height: 1.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          // Privacy badge
+                          Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Icon(
+                              privacyIcon,
+                              size: 14,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
 
                       const SizedBox(height: 6),
 
-                      // 作者和作品数量
+                      // Username + works count
                       Row(
                         children: [
                           Icon(
                             Icons.person_outline,
                             size: 12,
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.7),
+                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                           ),
                           const SizedBox(width: 3),
                           Flexible(
                             child: Text(
                               playlist.userName,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.8),
+                                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                                 fontSize: 11,
                               ),
                               maxLines: 1,
@@ -126,8 +181,7 @@ class PlaylistCard extends ConsumerWidget {
                             child: Text(
                               '•',
                               style: TextStyle(
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.5),
+                                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                                 fontSize: 11,
                               ),
                             ),
@@ -135,31 +189,64 @@ class PlaylistCard extends ConsumerWidget {
                           Icon(
                             Icons.audiotrack,
                             size: 12,
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.7),
+                            color: colorScheme.primary.withValues(alpha: 0.7),
                           ),
                           const SizedBox(width: 3),
                           Text(
                             '${playlist.worksCount}',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.8),
+                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                               fontSize: 11,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
 
-                      // 描述（如果有且非空）
+                      // Bottom info row: play count + relative time
+                      Row(
+                        children: [
+                          if (playlist.playbackCount > 0) ...[
+                            Icon(
+                              Icons.play_circle_outline,
+                              size: 12,
+                              color: colorScheme.primary.withValues(alpha: 0.6),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              s.nPlaysCount(playlist.playbackCount),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                                fontSize: 10,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Icon(
+                            Icons.schedule,
+                            size: 12,
+                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            relativeTime,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Description (if present)
                       if (playlist.description.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
                           playlist.description,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.6),
-                            fontSize: 11,
-                            height: 1.3,
+                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                            fontSize: 10,
+                            height: 1.2,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -170,7 +257,7 @@ class PlaylistCard extends ConsumerWidget {
                 ),
               ),
 
-              // 右侧删除按钮或箭头指示器
+              // Delete or chevron
               Padding(
                 padding: const EdgeInsets.only(right: 4),
                 child: onDelete != null
@@ -178,18 +265,17 @@ class PlaylistCard extends ConsumerWidget {
                         icon: Icon(
                           Icons.delete_outline,
                           size: 20,
-                          color: theme.colorScheme.error.withValues(alpha: 0.7),
+                          color: colorScheme.error.withValues(alpha: 0.7),
                         ),
                         onPressed: onDelete,
-                        tooltip: S.of(context).delete,
+                        tooltip: s.delete,
                       )
                     : Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: Icon(
                           Icons.chevron_right,
                           size: 20,
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.4),
+                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                         ),
                       ),
               ),

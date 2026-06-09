@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/playlist_detail_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/works_provider.dart';
 import '../models/work.dart';
 import '../services/storage_service.dart';
 import '../widgets/pagination_bar.dart';
@@ -12,6 +13,8 @@ import '../screens/work_detail_screen.dart';
 import '../widgets/overscroll_next_page_detector.dart';
 import '../utils/string_utils.dart';
 import '../widgets/privacy_blur_cover.dart';
+import '../widgets/va_chip.dart';
+import '../widgets/tag_chip.dart';
 import '../utils/scroll_optimization.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -32,6 +35,7 @@ class PlaylistDetailScreen extends ConsumerStatefulWidget {
 
 class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   final ScrollController _scrollController = ScrollController();
+  LayoutType _detailLayout = LayoutType.list;
 
   @override
   void initState() {
@@ -680,6 +684,23 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
       appBar: ScrollableAppBar(
         actions: [
           IconButton(
+            icon: Icon(
+              _detailLayout == LayoutType.list
+                  ? Icons.grid_view
+                  : Icons.view_list,
+            ),
+            onPressed: () {
+              setState(() {
+                _detailLayout = _detailLayout == LayoutType.list
+                    ? LayoutType.bigGrid
+                    : LayoutType.list;
+              });
+            },
+            tooltip: _detailLayout == LayoutType.list
+                ? S.of(context).switchToSmallGrid
+                : S.of(context).switchToList,
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
               ref
@@ -754,7 +775,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             .refresh(),
         child: CustomScrollView(
           slivers: [
-            if (state.metadata != null) _buildMetadataSection(state.metadata!),
+            if (state.metadata != null) _buildMetadataSection(state.metadata!, state),
             SliverFillRemaining(
               child: Center(
                 child: Column(
@@ -810,34 +831,59 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           physics: ScrollOptimization.physics,
           slivers: [
             // 元数据信息
-            if (state.metadata != null) _buildMetadataSection(state.metadata!),
+            if (state.metadata != null) _buildMetadataSection(state.metadata!, state),
+
+            // Listening stats
+            if (state.works.isNotEmpty) _buildListeningStatsSection(state),
 
             // 作品列表
-            SliverPadding(
-              padding: const EdgeInsets.all(8),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final work = state.works[index];
-                    final currentUserName =
-                        ref.watch(currentUserProvider.select((u) => u?.name ?? ''));
-                    final isOwner = state.metadata?.userName == currentUserName;
-
-                    return RepaintBoundary(
-                      key: ValueKey(work.id),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
+            if (_detailLayout == LayoutType.list) ...[
+              SliverPadding(
+                padding: const EdgeInsets.all(8),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final work = state.works[index];
+                      final currentUserName = ref.watch(currentUserProvider.select((u) => u?.name ?? ''));
+                      final isOwner = state.metadata?.userName == currentUserName;
+                      return RepaintBoundary(
+                        key: ValueKey(work.id),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          child: _buildPlaylistWorkCard(work, isOwner),
                         ),
-                        child: _buildPlaylistWorkCard(work, isOwner),
-                      ),
-                    );
-                  },
-                  childCount: state.works.length,
+                      );
+                    },
+                    childCount: state.works.length,
+                  ),
                 ),
               ),
-            ),
+            ] else ...[
+              // Grid view
+              SliverPadding(
+                padding: const EdgeInsets.all(4),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.75,
+                    crossAxisSpacing: 4,
+                    mainAxisSpacing: 4,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final work = state.works[index];
+                      final currentUserName = ref.watch(currentUserProvider.select((u) => u?.name ?? ''));
+                      final isOwner = state.metadata?.userName == currentUserName;
+                      return RepaintBoundary(
+                        key: ValueKey(work.id),
+                        child: _buildPlaylistWorkCard(work, isOwner),
+                      );
+                    },
+                    childCount: state.works.length,
+                  ),
+                ),
+              ),
+            ],
 
             // 分页控件
             SliverPadding(
@@ -879,328 +925,1044 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     );
   }
 
-  Widget _buildMetadataSection(metadata) {
-    // 获取更新时间，如果没有则使用创建时间
+  Widget _buildMetadataSection(metadata, PlaylistDetailState state) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final s = S.of(context);
+
+    // Compute aggregate data from works
+    final totalDur = totalDurationFromWorks(state.works);
+    final allFormats = <String>{};
+    for (final work in state.works) {
+      if (work.children != null) {
+        allFormats.addAll(extractAudioFormats(work.children));
+      }
+    }
+    final formatsStr = allFormats.isNotEmpty ? allFormats.join('+') : '';
+
+    // Date display
     final displayDate = metadata.updatedAt.isNotEmpty &&
             metadata.updatedAt != metadata.createdAt
         ? _formatDate(metadata.updatedAt)
         : _formatDate(metadata.createdAt);
-
     final dateLabel = metadata.updatedAt.isNotEmpty &&
             metadata.updatedAt != metadata.createdAt
-        ? S.of(context).lastUpdated
-        : S.of(context).createdTime;
+        ? s.lastUpdated
+        : s.createdTime;
 
     return SliverToBoxAdapter(
       child: Container(
         margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          border: Border(
-            bottom: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
-              width: 1,
+        child: Card(
+          elevation: 0,
+          color: colorScheme.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
             ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 标题栏
-            Row(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        metadata.displayName,
-                        style:
-                            Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        metadata.userName,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 操作按钮
-                Builder(
-                  builder: (context) {
-                    final currentUserName =
-                        ref.watch(currentUserProvider.select((u) => u?.name ?? ''));
-                    final isOwner = metadata.userName == currentUserName;
-
-                    if (isOwner) {
-                      return Row(
-                        mainAxisSize: MainAxisSize.min,
+                // Title row with actions
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          IconButton(
-                            onPressed: () => _showEditDialog(metadata),
-                            icon: const Icon(Icons.edit_outlined),
-                            tooltip: S.of(context).edit,
-                            visualDensity: VisualDensity.compact,
+                          Text(
+                            metadata.displayName,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                          IconButton(
-                            onPressed: _showDeleteConfirmDialog,
-                            icon: const Icon(Icons.delete_outline),
-                            tooltip: S.of(context).delete,
-                            visualDensity: VisualDensity.compact,
-                            color: Theme.of(context).colorScheme.error,
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.person_outline, size: 14, color: colorScheme.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Text(
+                                metadata.userName,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Privacy badge
+                              _buildPrivacyBadge(metadata.privacy),
+                            ],
                           ),
                         ],
-                      );
-                    } else {
-                      return IconButton(
-                        onPressed: _showDeleteConfirmDialog,
-                        icon: const Icon(Icons.delete_outline),
-                        tooltip: S.of(context).unfavorite,
-                        visualDensity: VisualDensity.compact,
-                        color: Theme.of(context).colorScheme.error,
-                      );
-                    }
-                  },
-                ),
-              ],
-            ),
-
-            // 描述（如果有）
-            if (metadata.description.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                metadata.description,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ],
-
-            // 底部信息栏
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                // 统计信息
-                Icon(
-                  Icons.music_note,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  S.of(context).nWorksCount(metadata.worksCount),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
+                    ),
+                    // Edit/delete actions
+                    Builder(
+                      builder: (context) {
+                        final currentUserName = ref.watch(currentUserProvider.select((u) => u?.name ?? ''));
+                        final isOwner = metadata.userName == currentUserName;
+                        if (isOwner) {
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                onPressed: () => _showEditDialog(metadata),
+                                icon: const Icon(Icons.edit_outlined),
+                                tooltip: s.edit,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              IconButton(
+                                onPressed: _showDeleteConfirmDialog,
+                                icon: const Icon(Icons.delete_outline),
+                                tooltip: s.delete,
+                                visualDensity: VisualDensity.compact,
+                                color: colorScheme.error,
+                              ),
+                            ],
+                          );
+                        }
+                        return IconButton(
+                          onPressed: _showDeleteConfirmDialog,
+                          icon: const Icon(Icons.delete_outline),
+                          tooltip: s.unfavorite,
+                          visualDensity: VisualDensity.compact,
+                          color: colorScheme.error,
+                        );
+                      },
+                    ),
+                  ],
                 ),
 
-                if (metadata.playbackCount > 0) ...[
-                  const SizedBox(width: 16),
-                  Icon(
-                    Icons.play_circle_outline,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 4),
+                // Description
+                if (metadata.description.isNotEmpty) ...[
+                  const SizedBox(height: 12),
                   Text(
-                    S.of(context).nPlaysCount(metadata.playbackCount),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                    metadata.description,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
 
-                const Spacer(),
+                const SizedBox(height: 16),
 
-                // 时间信息
-                if (displayDate.isNotEmpty)
-                  Text(
-                    '$dateLabel: $displayDate',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                // Stats row: works, plays, duration
+                Row(
+                  children: [
+                    _buildStatChip(Icons.music_note, s.nWorksCount(metadata.worksCount), colorScheme.primary),
+                    if (metadata.playbackCount > 0) ...[
+                      const SizedBox(width: 8),
+                      _buildStatChip(Icons.play_circle_outline, s.nPlaysCount(metadata.playbackCount), colorScheme.primary),
+                    ],
+                    if (totalDur > 0) ...[
+                      const SizedBox(width: 8),
+                      _buildStatChip(Icons.access_time, formatDurationShort(totalDur), Colors.blue[700]!),
+                    ],
+                  ],
+                ),
+
+                if (formatsStr.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.audio_file, size: 14, color: colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Text(
+                        formatsStr,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                const SizedBox(height: 8),
+
+                // Date
+                if (displayDate.isNotEmpty)
+                  Row(
+                    children: [
+                      Icon(Icons.schedule, size: 14, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$dateLabel: $displayDate',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
-            const SizedBox(height: 16),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  // 扁平播放列表风格的作品卡片
+  /// Aggregate listening statistics section for this playlist.
+  Widget _buildListeningStatsSection(PlaylistDetailState state) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final s = S.of(context);
+    final works = state.works;
+    if (works.isEmpty) return const SliverToBoxAdapter();
+
+    // --- Compute aggregates ---
+
+    // Average rating (weighted by rateCount)
+    double totalWeightedRating = 0;
+    int totalRatings = 0;
+    for (final w in works) {
+      if (w.rateAverage != null && w.rateCount != null && w.rateCount! > 0) {
+        totalWeightedRating += w.rateAverage! * w.rateCount!;
+        totalRatings += w.rateCount!;
+      }
+    }
+    final avgRating = totalRatings > 0 ? (totalWeightedRating / totalRatings) : 0.0;
+
+    // Total dlCount (sales)
+    int totalDlCount = 0;
+    for (final w in works) {
+      if (w.dlCount != null) totalDlCount += w.dlCount!;
+    }
+
+    // Top VAs: count occurrences
+    final vaCount = <String, int>{};
+    for (final w in works) {
+      if (w.vas != null) {
+        for (final va in w.vas!) {
+          vaCount[va.name] = (vaCount[va.name] ?? 0) + 1;
+        }
+      }
+    }
+    final sortedVas = vaCount.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final topVas = sortedVas.take(3).toList();
+
+    // Top tags: count occurrences
+    final tagCount = <String, int>{};
+    for (final w in works) {
+      if (w.tags != null) {
+        for (final tag in w.tags!) {
+          tagCount[tag.name] = (tagCount[tag.name] ?? 0) + 1;
+        }
+      }
+    }
+    final sortedTags = tagCount.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final topTags = sortedTags.take(6).toList();
+
+    return SliverToBoxAdapter(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+        child: Card(
+          elevation: 0,
+          color: colorScheme.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Icon(Icons.analytics_outlined, size: 18, color: colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      s.listeningStatsTitle,
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Row 1: Avg Rating + Total Sales
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatTile(
+                        icon: Icons.star,
+                        iconColor: Colors.amber[700]!,
+                        value: avgRating > 0 ? avgRating.toStringAsFixed(1) : '—',
+                        label: s.ratingLabel,
+                        subtitle: totalRatings > 0 ? s.ratingsCount(totalRatings) : null,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatTile(
+                        icon: Icons.trending_up,
+                        iconColor: Colors.green[700]!,
+                        value: totalDlCount > 0 ? '${totalDlCount}' : '—',
+                        label: s.salesLabel,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatTile(
+                        icon: Icons.access_time,
+                        iconColor: Colors.blue[700]!,
+                        value: formatDurationShort(totalDurationFromWorks(works)),
+                        label: s.durationLabel,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Top VAs
+                if (topVas.isNotEmpty) ...[
+                  const SizedBox(height: 16),                    Text(
+                    s.vaLabel,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: topVas.map((entry) => _buildTopVaChip(entry.key, entry.value, works.length)),
+                  ),
+                ],
+
+                // Top tags
+                if (topTags.isNotEmpty) ...[
+                  const SizedBox(height: 16),                    Text(
+                    s.tagLabel,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: topTags.map((entry) => _buildTopTagChip(entry.key, entry.value, works.length)),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatTile({
+    required IconData icon,
+    required Color iconColor,
+    required String value,
+    required String label,
+    String? subtitle,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: iconColor),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopVaChip(String name, int count, int totalWorks) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final pct = (count / totalWorks * 100).round();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.blue.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.mic, size: 12, color: Colors.blue[700]),
+          const SizedBox(width: 4),
+          Text(
+            name,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: Colors.blue[800],
+            ),
+          ),
+          const SizedBox(width: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: Colors.blue.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '$pct%',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: Colors.blue[700],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopTagChip(String name, int count, int totalWorks) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final pct = (count / totalWorks * 100).round();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.indigo.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.indigo.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            name,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: Colors.indigo[800],
+            ),
+          ),
+          const SizedBox(width: 3),
+          Text(
+            '$pct%',
+            style: TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.w600,
+              color: Colors.indigo[400],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatChip(IconData icon, String label, Color color) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrivacyBadge(int privacy) {
+    final colorScheme = Theme.of(context).colorScheme;
+    IconData icon;
+    String label;
+    switch (privacy) {
+      case 0:
+        icon = Icons.lock;
+        label = S.of(context).playlistPrivacyPrivate;
+        break;
+      case 1:
+        icon = Icons.link;
+        label = S.of(context).playlistPrivacyUnlisted;
+        break;
+      case 2:
+        icon = Icons.public;
+        label = S.of(context).playlistPrivacyPublic;
+        break;
+      default:
+        icon = Icons.lock;
+        label = '';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Enhanced playlist work card with rich metadata.
   Widget _buildPlaylistWorkCard(Work work, bool isOwner) {
     final host = ref.watch(serverHostProvider) ?? '';
     final token = ref.watch(authTokenProvider) ?? '';
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final s = S.of(context);
 
     final httpHeaders = StorageService.serverCookieHeaders;
 
-    return InkWell(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => WorkDetailScreen(work: work),
-          ),
-        );
-      },
-      child: Container(
+    // Extract audio formats from work children
+    final formats = work.children != null ? extractAudioFormats(work.children) : <String>{};
+    final formatsList = formats.take(2).toList();
+    final hasMoreFormats = formats.length > 2;
+
+    // Progress icon
+    Widget? progressIcon;
+    if (work.progress != null) {
+      switch (work.progress) {
+        case 'listening':
+          progressIcon = Icon(Icons.headphones, size: 12, color: Colors.green[600]);
+        case 'listened':
+          progressIcon = Icon(Icons.check_circle, size: 12, color: Colors.blue[600]);
+        case 'marked':
+          progressIcon = Icon(Icons.bookmark, size: 12, color: Colors.orange[600]);
+        case 'replay':
+          progressIcon = Icon(Icons.replay, size: 12, color: Colors.purple[600]);
+        case 'postponed':
+          progressIcon = Icon(Icons.snooze, size: 12, color: Colors.grey[600]);
+      }
+    }
+
+    // Age rating badge
+    Widget? ageBadge;
+    if (work.age != null && work.age!.isNotEmpty && work.age != 'general' && work.age != 'all') {
+      final isAdult = work.age == 'adult' || work.age == 'r18' || work.age == 'R-18';
+      ageBadge = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
         decoration: BoxDecoration(
-          color: colorScheme.surface,
-          border: Border(
-            bottom: BorderSide(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-              width: 1,
-            ),
+          color: isAdult ? Colors.red.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(3),
+        ),
+        child: Text(
+          work.age!.toUpperCase(),
+          style: TextStyle(
+            fontSize: 8,
+            fontWeight: FontWeight.bold,
+            color: isAdult ? Colors.red[700] : Colors.orange[700],
           ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 封面图 - 使用 Hero 动画和统一的图片源
-            Hero(
-              tag: 'work_cover_${work.id}',
-              child: PrivacyBlurCover(
-                borderRadius: BorderRadius.circular(4),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: CachedNetworkImage(
-                    imageUrl: work.getCoverImageUrl(host, token: token),
-                    httpHeaders: httpHeaders,
-                    cacheKey: 'work_cover_${work.id}',
-                    memCacheWidth: (56 * MediaQuery.devicePixelRatioOf(context)).round(),
-                    width: 56,
-                    height: 56,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: colorScheme.surfaceContainerHighest,
-                      child: Center(
-                        child: Icon(
-                          Icons.image,
-                          color: colorScheme.onSurfaceVariant,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: colorScheme.surfaceContainerHighest,
-                      child: Center(
-                        child: Icon(
-                          Icons.broken_image,
-                          color: colorScheme.onSurfaceVariant,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
+      );
+    }
 
-            // 信息区域
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 标题
-                  Text(
-                    work.title,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      height: 1.3,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-
-                  // RJ号、社团名和用户评分
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        formatRJCode(work.id),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.w500,
+    if (_detailLayout == LayoutType.list) {
+      return InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => WorkDetailScreen(work: work)),
+        ),
+        child: Card(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          color: colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top row: cover + info
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Cover
+                    Hero(
+                      tag: 'work_cover_${work.id}',
+                      child: PrivacyBlurCover(
+                        borderRadius: BorderRadius.circular(6),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: CachedNetworkImage(
+                            imageUrl: work.getCoverImageUrl(host, token: token),
+                            httpHeaders: httpHeaders,
+                            cacheKey: 'work_cover_${work.id}',
+                            memCacheWidth: (64 * MediaQuery.devicePixelRatioOf(context)).round(),
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              color: colorScheme.surfaceContainerHighest,
+                              child: Center(child: Icon(Icons.image, color: colorScheme.onSurfaceVariant, size: 24)),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              color: colorScheme.surfaceContainerHighest,
+                              child: Center(child: Icon(Icons.broken_image, color: colorScheme.onSurfaceVariant, size: 24)),
+                            ),
+                          ),
                         ),
                       ),
-                      if (work.name != null && work.name!.isNotEmpty)
-                        Text(
-                          work.name!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 10),
+
+                    // Info column
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Title
+                          Text(
+                            work.title,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              height: 1.2,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      if (work.userRating != null && work.userRating! > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          const SizedBox(height: 4),
+
+                          // RJ + Circle + Age badge row
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 3,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              Icon(
-                                Icons.person,
-                                color: colorScheme.onPrimaryContainer,
-                                size: 12,
-                              ),
-                              const SizedBox(width: 2),
-                              Icon(
-                                Icons.star,
-                                size: 12,
-                                color: Colors.amber[700],
-                              ),
-                              const SizedBox(width: 2),
                               Text(
-                                '${work.userRating}',
+                                formatRJCode(work.id),
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onPrimaryContainer,
-                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w500,
                                   fontSize: 11,
                                 ),
                               ),
+                              if (work.name != null && work.name!.isNotEmpty)
+                                Text(
+                                  work.name!,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              if (ageBadge != null) ageBadge,
                             ],
                           ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
 
-            // 移除按钮（仅作者可见）
-            if (isOwner) ...[
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.remove_circle_outline, size: 20),
-                color: colorScheme.error,
-                visualDensity: VisualDensity.compact,
-                onPressed: () => _showRemoveWorkConfirmDialog(work),
-                tooltip: S.of(context).removeFromPlaylist,
+                          const SizedBox(height: 4),
+
+                          // Rating & Duration & Price row
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 3,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              // Rating stars
+                              if (work.rateAverage != null && work.rateCount != null && work.rateCount! > 0)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.star, size: 13, color: Colors.amber[700]),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      work.rateAverage!.toStringAsFixed(1),
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: Colors.amber[700],
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    Text(
+                                      ' (${work.rateCount})',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                              // Duration
+                              if (work.duration != null && work.duration! > 0)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.access_time, size: 12, color: Colors.blue[600]),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      formatDurationShort(work.duration!),
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: Colors.blue[700],
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                              // Price
+                              if (work.price != null && work.price! > 0)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.monetization_on, size: 12, color: Colors.red[600]),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      s.priceInYen(work.price!),
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: Colors.red[700],
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            ],
+                          ),
+
+                          // Format badges + Subtitle + Progress row
+                          if (formatsList.isNotEmpty || work.hasSubtitle == true || work.userRating != null && work.userRating! > 0 || progressIcon != null) ...[
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 4,
+                              runSpacing: 3,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                // Format badges
+                                ...formatsList.map((fmt) => _buildFormatTag(fmt)),
+                                if (hasMoreFormats)
+                                  Text(
+                                    '+${formats.length - 2}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                      fontSize: 9,
+                                    ),
+                                  ),
+
+                                // Subtitle badge
+                                if (work.hasSubtitle == true)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: Colors.teal.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: Icon(Icons.closed_caption, size: 12, color: Colors.teal[700]),
+                                  ),
+
+                                // User rating
+                                if (work.userRating != null && work.userRating! > 0)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.person, size: 9, color: colorScheme.onPrimaryContainer),
+                                        const SizedBox(width: 1),
+                                        Icon(Icons.star, size: 9, color: Colors.amber[700]),
+                                        const SizedBox(width: 1),
+                                        Text(
+                                          '${work.userRating}',
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: colorScheme.onPrimaryContainer,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 9,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                // Progress icon
+                                if (progressIcon != null) progressIcon!,
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    // Remove button (owner only)
+                    if (isOwner)
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline, size: 18),
+                        color: colorScheme.error,
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _showRemoveWorkConfirmDialog(work),
+                        tooltip: s.removeFromPlaylist,
+                      ),
+                  ],
+                ),
+
+                // VA chips
+                if (work.vas != null && work.vas!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 2,
+                    children: work.vas!.take(3).map((va) {
+                      return VaChip(
+                        va: va,
+                        fontSize: 10,
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        borderRadius: 6,
+                        fontWeight: FontWeight.w500,
+                      );
+                    }).toList(),
+                  ),
+                  if (work.vas!.length > 3)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '+${work.vas!.length - 3} more',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 9,
+                        ),
+                      ),
+                    ),
+                ],
+
+                // Tag chips
+                if (work.tags != null && work.tags!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 3,
+                    runSpacing: 2,
+                    children: work.tags!.take(4).map((tag) {
+                      return TagChip(
+                        tag: tag,
+                        fontSize: 9,
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        borderRadius: 5,
+                        fontWeight: FontWeight.w400,
+                      );
+                    }).toList(),
+                  ),
+                  if (work.tags!.length > 4)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '+${work.tags!.length - 4} more',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 9,
+                        ),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    } else {
+      // Grid layout - compact version
+      return InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => WorkDetailScreen(work: work)),
+        ),
+        child: Card(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          color: colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Cover
+              AspectRatio(
+                aspectRatio: 1.3,
+                child: Stack(
+                  children: [
+                    PrivacyBlurCover(
+                      borderRadius: BorderRadius.circular(0),
+                      child: CachedNetworkImage(
+                        imageUrl: work.getCoverImageUrl(host, token: token),
+                        httpHeaders: httpHeaders,
+                        cacheKey: 'work_cover_${work.id}',
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        placeholder: (context, url) => Container(
+                          color: colorScheme.surfaceContainerHighest,
+                          child: Center(child: Icon(Icons.image, color: colorScheme.onSurfaceVariant)),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: colorScheme.surfaceContainerHighest,
+                          child: Center(child: Icon(Icons.broken_image, color: colorScheme.onSurfaceVariant)),
+                        ),
+                      ),
+                    ),
+                    // RJ tag
+                    Positioned(
+                      top: 4, left: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(
+                          formatRJCode(work.id),
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    // CC badge
+                    if (work.hasSubtitle == true)
+                      Positioned(
+                        bottom: 4, left: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: const Icon(Icons.closed_caption, size: 12, color: Colors.white),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Info
+              Padding(
+                padding: const EdgeInsets.all(6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      work.title,
+                      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        if (work.rateAverage != null && work.rateCount != null && work.rateCount! > 0) ...[
+                          Icon(Icons.star, size: 10, color: Colors.amber[700]),
+                          const SizedBox(width: 2),
+                          Text(
+                            work.rateAverage!.toStringAsFixed(1),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.amber[700], fontWeight: FontWeight.w600, fontSize: 10,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        if (work.duration != null && work.duration! > 0)
+                          Text(
+                            formatDurationShort(work.duration!),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.blue[700], fontSize: 9,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
-          ],
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Build a small format tag like [MP3] [FLAC]
+  Widget _buildFormatTag(String format) {
+    final colorScheme = Theme.of(context).colorScheme;
+    Color color;
+    switch (format) {
+      case 'FLAC':
+        color = Colors.purple;
+        break;
+      case 'WAV':
+        color = Colors.blue;
+        break;
+      case 'MP3':
+        color = Colors.orange;
+        break;
+      case 'AAC':
+        color = Colors.teal;
+        break;
+      default:
+        color = colorScheme.onSurfaceVariant;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.5),
+      ),
+      child: Text(
+        format,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: color,
         ),
       ),
     );
