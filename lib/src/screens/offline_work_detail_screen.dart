@@ -57,6 +57,7 @@ class _OfflineWorkDetailScreenState
     if (_isTranslating) return;
 
     final work = widget.work;
+    final s = S.of(context);
 
     // 如果已有翻译，直接切换显示
     if (_translatedTitle != null) {
@@ -88,7 +89,8 @@ class _OfflineWorkDetailScreenState
           _isTranslating = false;
         });
 
-        SnackBarUtil.showError(context, S.of(context).translationFailed(e.toString()));
+        if (!mounted) return;
+        SnackBarUtil.showError(context, s.translationFailed(e.toString()));
       }
     }
   }
@@ -171,18 +173,22 @@ class _OfflineWorkDetailScreenState
       // 生成文件名
       final fileName = '${formatRJCode(widget.work.id)}.zip';
 
+      if (!mounted) return;
+
       if (Platform.isIOS) {
         // iOS: 通过分享面板导出
         final tempDir = await getTemporaryDirectory();
         final tempFile = File('${tempDir.path}/$fileName');
         await tempFile.writeAsBytes(zipBytes);
         try {
+          if (!mounted) return;
           final box = context.findRenderObject() as RenderBox?;
+          final mediaQuerySize = MediaQuery.of(context).size;
           await Share.shareXFiles(
             [XFile(tempFile.path)],
             sharePositionOrigin: box != null
                 ? box.localToGlobal(Offset.zero) & box.size
-                : Rect.fromLTWH(0, 0, MediaQuery.of(context).size.width, 80),
+                : Rect.fromLTWH(0, 0, mediaQuerySize.width, 80),
           );
         } finally {
           if (await tempFile.exists()) {
@@ -258,6 +264,7 @@ class _OfflineWorkDetailScreenState
   Widget _buildNetworkCover(Work work, String host, String token) {
     return CachedNetworkImage(
       imageUrl: '$host/api/cover/${work.id}',
+      cacheKey: 'work_cover_${work.id}',
       httpHeaders: {'Authorization': 'Bearer $token'},
       fit: BoxFit.contain,
       placeholder: (context, url) => Container(
@@ -316,7 +323,7 @@ class _OfflineWorkDetailScreenState
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.2),
+                        color: Colors.orange.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(color: Colors.orange, width: 1),
                       ),
@@ -328,7 +335,7 @@ class _OfflineWorkDetailScreenState
                           const SizedBox(width: 2),
                           Text(
                             S.of(context).offlineBadge,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 10,
                               color: Colors.orange,
                               fontWeight: FontWeight.bold,
@@ -351,11 +358,11 @@ class _OfflineWorkDetailScreenState
   }
 
   Widget _buildBody() {
-    final authState = ref.watch(authProvider);
-    final host = authState.host ?? '';
-    final token = authState.token ?? '';
+    final (host, token) = ref.watch(authProvider.select(
+      (s) => (s.host ?? '', s.token ?? ''),
+    ));
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     final work = widget.work;
 
@@ -409,6 +416,7 @@ class _OfflineWorkDetailScreenState
                       Image.file(
                         File(widget.localCoverPath!),
                         fit: BoxFit.contain,
+                        cacheWidth: 1080,
                         errorBuilder: (context, error, stackTrace) {
                           // 如果本地图片加载失败，回退到网络图片
                           return _buildNetworkCover(work, host, token);
@@ -477,7 +485,7 @@ class _OfflineWorkDetailScreenState
                                       : Theme.of(context)
                                           .colorScheme
                                           .onSurface
-                                          .withOpacity(0.6),
+                                          .withValues(alpha: 0.6),
                                 ),
                         ),
                       ),
@@ -530,7 +538,7 @@ class _OfflineWorkDetailScreenState
                       fontWeight: FontWeight.w500,
                       onLongPress: () => _copyToClipboard(va.name, S.of(context).vaLabel),
                     );
-                  }).toList(),
+                  }),
               ],
             ),
             const SizedBox(height: 16),
@@ -586,15 +594,13 @@ class _OfflineWorkDetailScreenState
           // 文件浏览器
           OfflineFileExplorerWidget(
             work: work,
-            fileTree: work.children != null
-                ? work.children!.map((e) {
+            fileTree: work.children?.map((e) {
                     if (e is Map<String, dynamic>) {
                       return e;
                     }
                     // 如果是 AudioFile 对象，转换为 Map
                     return e.toJson();
-                  }).toList()
-                : null,
+                  }).toList(),
           ),
         ],
       ),

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as p;
+import '../services/log_service.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../models/work.dart';
@@ -121,7 +122,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       });
     } catch (e) {
       setState(() {
-        _errorMessage = '${S.of(context).loadFilesFailed(e.toString())}';
+        _errorMessage = S.of(context).loadFilesFailed(e.toString());
         _isLoading = false;
       });
     }
@@ -253,10 +254,10 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         }
       }
 
-      print(
-          '[FileExplorer] 字幕库匹配: ${_audioWithLibrarySubtitles.length} 个音频文件有字幕');
+      LogService.instance.debug(
+          '[FileExplorer] 字幕库匹配: ${_audioWithLibrarySubtitles.length} 个音频文件有字幕', tag: 'UI');
     } catch (e) {
-      print('[FileExplorer] 检查字幕库失败: $e');
+      LogService.instance.warning('[FileExplorer] 检查字幕库失败: $e', tag: 'UI');
     }
   }
 
@@ -342,8 +343,8 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       _mainFolderPath = mainFolder;
       // 展开主文件夹路径上的所有父文件夹
       _expandPathToFolder(mainFolder);
-      print(
-          '[FileExplorer] 识别到主文件夹 $_mainFolderPath (音频:$maxAudioCount, 文本:$maxTextCount)');
+      LogService.instance.debug(
+          '[FileExplorer] 识别到主文件夹 $_mainFolderPath (音频:$maxAudioCount, 文本:$maxTextCount)', tag: 'UI');
     }
   }
 
@@ -572,11 +573,12 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     try {
       final apiService = ref.read(kikoeruApiServiceProvider);
       final allFiles = await apiService.getWorkTracks(widget.work.id);
+      if (!mounted) return;
 
       // 只在播放音频时更新全局文件列表，这样字幕才能正确关联
       ref.read(fileListControllerProvider.notifier).updateFiles(allFiles);
     } catch (e) {
-      print('获取完整文件树失败 $e');
+      LogService.instance.warning('获取完整文件树失败 $e', tag: 'UI');
       // 即使获取失败也继续播放，只是可能没有字幕
     }
 
@@ -598,10 +600,11 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     // 构建播放队列
     final downloadService = DownloadService.instance;
     final List<AudioTrack> audioTracks = [];
+    final unknownLabel = S.of(context).unknown;
 
     for (final file in audioFiles) {
       final fileHash = file['hash'];
-      final fileTitle = file['title'] ?? file['name'] ?? S.of(context).unknown;
+      final fileTitle = file['title'] ?? file['name'] ?? unknownLabel;
 
       // 优先级: 本地下载文件 → 缓存文件 → 网络URL
       String audioUrl = '';
@@ -615,7 +618,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         if (localPath != null) {
           // 使用本地文件（file:// 协议）
           audioUrl = 'file://$localPath';
-          print('[FileExplorer] 使用本地下载的音频: $fileHash');
+          LogService.instance.debug('[FileExplorer] 使用本地下载的音频: $fileHash', tag: 'Playback');
         } else if (_downloadedFiles[fileHash] == true) {
           // 检查是否是手动复制的本地文件
           final relativePath = _fileRelativePaths[fileHash];
@@ -625,7 +628,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                 downloadDir.path, widget.work.id.toString(), relativePath));
             if (await localFile.exists()) {
               audioUrl = 'file://${localFile.path}';
-              print('[FileExplorer] 使用手动复制的音频: $fileHash');
+              LogService.instance.debug('[FileExplorer] 使用手动复制的音频: $fileHash', tag: 'Playback');
             }
           }
         }
@@ -635,14 +638,41 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           final cachedPath = await CacheService.getCachedAudioFile(fileHash);
           if (cachedPath != null) {
             audioUrl = 'file://$cachedPath';
-            print('[FileExplorer] 使用缓存的音频: $fileHash');
+            LogService.instance.debug('[FileExplorer] 使用缓存的音频: $fileHash', tag: 'Playback');
           }
         }
       }
 
       // 3. 如果缓存也没有，使用网络URL
       if (audioUrl.isEmpty) {
-        if (file['mediaStreamUrl'] != null &&
+        if (file['mediaDownloadUrl'] != null &&
+            file['mediaDownloadUrl'].toString().isNotEmpty) {
+          audioUrl = file['mediaDownloadUrl'];
+
+          // 如果是相对路径，拼接 Host
+          if (audioUrl.startsWith('/') && host.isNotEmpty) {
+            String normalizedHost = host;
+            if (!host.startsWith('http://') && !host.startsWith('https://')) {
+              if (host.contains('localhost') ||
+                  host.startsWith('127.0.0.1') ||
+                  host.startsWith('192.168.')) {
+                normalizedHost = 'http://$host';
+              } else {
+                normalizedHost = 'https://$host';
+              }
+            }
+            audioUrl = '$normalizedHost$audioUrl';
+          }
+
+          // 如果 URL 中没有 token 且 token 存在，追加 token
+          if (token.isNotEmpty && !audioUrl.contains('token=')) {
+            if (audioUrl.contains('?')) {
+              audioUrl = '$audioUrl&token=$token';
+            } else {
+              audioUrl = '$audioUrl?token=$token';
+            }
+          }
+        } else if (file['mediaStreamUrl'] != null &&
             file['mediaStreamUrl'].toString().isNotEmpty) {
           audioUrl = file['mediaStreamUrl'];
 
@@ -700,6 +730,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     }
 
     if (audioTracks.isEmpty) {
+      if (!mounted) return;
       _showSnackBar(
         SnackBar(
           content: Text(S.of(context).noPlayableAudioFiles),
@@ -710,8 +741,8 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       return;
     }
 
-    print('播放音频: $title');
-    print('播放队列包含 ${audioTracks.length} 个文件');
+    LogService.instance.debug('播放音频: $title', tag: 'Playback');
+    LogService.instance.debug('播放队列包含 ${audioTracks.length} 个文件', tag: 'Playback');
 
     // 播放音频队列，从当前选择的文件开始
     final adjustedIndex =
@@ -897,7 +928,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                   color: Theme.of(context)
                       .colorScheme
                       .secondaryContainer
-                      .withOpacity(0.3),
+                      .withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -945,7 +976,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       SnackBar(
         content: Row(
           children: [
-            SizedBox(
+            const SizedBox(
               width: 16,
               height: 16,
               child: CircularProgressIndicator(
@@ -953,7 +984,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text(S.of(context).loadingSubtitle),
           ],
         ),
@@ -968,7 +999,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
             workId: widget.work.id,
           );
 
-      if (mounted) {
+      if (!mounted) return;
         _showSnackBar(
           SnackBar(
             content: Row(
@@ -984,7 +1015,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
             duration: const Duration(seconds: 3),
           ),
         );
-      }
     } catch (e) {
       if (mounted) {
         _showSnackBar(
@@ -1044,9 +1074,10 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     // 构建图片URL列表，优先使用本地文件，否则使用网络URL
     final imageItems = <Map<String, String>>[];
 
+    final unknownLabel2 = S.of(context).unknown;
     for (final f in imageFiles) {
       final hash = f['hash'] ?? '';
-      final title = f['title'] ?? f['name'] ?? S.of(context).unknown;
+      final title = f['title'] ?? f['name'] ?? unknownLabel2;
       String imageUrl;
 
       // 1. 先检查是否已下载到本地
@@ -1066,7 +1097,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
             imageUrl = '$normalizedUrl/api/media/stream/$hash?token=$token';
           }
         } catch (e) {
-          print('[FileExplorer] 检查本地图片文件失败: $e');
+          LogService.instance.warning('[FileExplorer] 检查本地图片文件失败: $e', tag: 'UI');
           imageUrl = '$normalizedUrl/api/media/stream/$hash?token=$token';
         }
       } else {
@@ -1153,7 +1184,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           textUrl = '$normalizedUrl/api/media/stream/$hash?token=$token';
         }
       } catch (e) {
-        print('[FileExplorer] 检查本地文本文件失败: $e');
+        LogService.instance.warning('[FileExplorer] 检查本地文本文件失败: $e', tag: 'UI');
         String normalizedUrl = host;
         if (!host.startsWith('http://') && !host.startsWith('https://')) {
           normalizedUrl = 'https://$host';
@@ -1225,7 +1256,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           return;
         }
       } catch (e) {
-        print('[FileExplorer] 检查本地PDF文件失败: $e');
+        LogService.instance.warning('[FileExplorer] 检查本地PDF文件失败: $e', tag: 'UI');
       }
     }
 
@@ -1236,6 +1267,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     }
     final pdfUrl = '$normalizedUrl/api/media/stream/$hash?token=$token';
 
+    if (!mounted) return;
     if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -1284,7 +1316,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         if (await localFile.exists()) {
           // 使用本地文件 - 通过 open_filex 打开
           uriString = localPath;
-          print('[FileExplorer] 使用本地视频文件: $localPath');
+          LogService.instance.debug('[FileExplorer] 使用本地视频文件: $localPath', tag: 'Playback');
 
           try {
             final result = await OpenFilex.open(localPath);
@@ -1331,7 +1363,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           uriString = videoUrl;
         }
       } catch (e) {
-        print('[FileExplorer] 检查本地视频文件失败: $e');
+        LogService.instance.warning('[FileExplorer] 检查本地视频文件失败: $e', tag: 'UI');
         if (host.isEmpty || token.isEmpty) {
           if (mounted) {
             _showSnackBar(
@@ -1455,45 +1487,116 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
 
   Widget _buildFileList() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSkeletonRow(width: 140, height: 16, bottomPadding: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            _buildSkeletonRow(width: double.infinity, height: 20, bottomPadding: 12),
+            _buildSkeletonRow(width: 200, height: 18, bottomPadding: 12),
+            _buildSkeletonRow(width: double.infinity, height: 20, bottomPadding: 12),
+            Padding(
+              padding: const EdgeInsets.only(left: 24),
+              child: _buildSkeletonRow(width: 180, height: 18, bottomPadding: 12),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 24),
+              child: _buildSkeletonRow(width: 160, height: 18, bottomPadding: 12),
+            ),
+            _buildSkeletonRow(width: double.infinity, height: 20, bottomPadding: 12),
+            _buildSkeletonRow(width: 120, height: 18, bottomPadding: 0),
+          ],
+        ),
       );
     }
 
     if (_errorMessage != null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              _errorMessage!,
-              style: const TextStyle(color: Colors.red),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadWorkTree,
-              child: Text(S.of(context).retry),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .errorContainer
+                      .withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.cloud_off_rounded,
+                  size: 40,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                S.of(context).loadFailed,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.tonalIcon(
+                onPressed: _loadWorkTree,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(S.of(context).retry),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     if (_rootFiles.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.folder_open, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text(
-              S.of(context).noFiles,
-              style: const TextStyle(color: Colors.grey),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primaryContainer
+                      .withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.folder_open_rounded,
+                  size: 40,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                S.of(context).noFiles,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -1504,18 +1607,16 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 翻译按钮栏
-          Container(
-            padding: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: Theme.of(context).dividerColor,
-                  width: 1,
-                ),
-              ),
-            ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
             child: Row(
               children: [
+                Icon(
+                  Icons.folder_outlined,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     _showTranslation
@@ -1542,11 +1643,11 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                               ? Theme.of(context)
                                   .colorScheme
                                   .primary
-                                  .withOpacity(0.3)
+                                  .withValues(alpha: 0.3)
                               : Theme.of(context)
                                   .colorScheme
                                   .onSurface
-                                  .withOpacity(0.2),
+                                  .withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
@@ -1571,7 +1672,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                                       : Theme.of(context)
                                           .colorScheme
                                           .onSurface
-                                          .withOpacity(0.7),
+                                          .withValues(alpha: 0.7),
                                 ),
                           if (!_isTranslating) ...[
                             const SizedBox(width: 4),
@@ -1585,7 +1686,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                                     : Theme.of(context)
                                         .colorScheme
                                         .onSurface
-                                        .withOpacity(0.7),
+                                        .withValues(alpha: 0.7),
                               ),
                             ),
                           ],
@@ -1597,6 +1698,8 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
               ],
             ),
           ),
+          const Divider(height: 1),
+          const SizedBox(height: 4),
           // 翻译进度显示
           if (_isTranslating)
             Container(
@@ -1647,6 +1750,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       widgets.add(
         InkWell(
           onTap: () {
+            HapticFeedback.lightImpact();
             if (isFolder) {
               // 文件夹点击展开/折叠
               _toggleFolder(itemPath);
@@ -1698,7 +1802,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                           right: 0,
                           bottom: 0,
                           child: Container(
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               color: Colors.white,
                               shape: BoxShape.circle,
                             ),
@@ -1716,7 +1820,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                           left: 0,
                           top: 0,
                           child: Container(
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               color: Colors.white,
                               shape: BoxShape.circle,
                             ),
@@ -1932,7 +2036,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           );
           translatedChunks.add(translated);
         } catch (e) {
-          print('[FileExplorer] 翻译块 $i 失败: $e');
+          LogService.instance.warning('[FileExplorer] 翻译块 $i 失败: $e', tag: 'UI');
           // 翻译失败时保留原文
           translatedChunks.add(chunks[i]);
         }
@@ -1958,26 +2062,30 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         _translationProgress = '';
       });
 
-      _showSnackBar(
-        SnackBar(
-          content: Text(S.of(context).translationComplete(_translationCache.length)),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        _showSnackBar(
+          SnackBar(
+            content: Text(S.of(context).translationComplete(_translationCache.length)),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
       setState(() {
         _isTranslating = false;
         _translationProgress = '';
       });
 
-      _showSnackBar(
-        SnackBar(
-          content: Text(S.of(context).translationFailed(e.toString())),
+      if (mounted) {
+        _showSnackBar(
+          SnackBar(
+            content: Text(S.of(context).translationFailed(e.toString())),
           backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -1987,6 +2095,33 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       return _translationCache[originalName]!;
     }
     return originalName;
+  }
+
+  Widget _buildSkeletonRow({
+    required double width,
+    required double height,
+    double bottomPadding = 0,
+  }) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0.3, end: 0.7),
+        duration: const Duration(milliseconds: 1000),
+        builder: (context, value, child) {
+          return Container(
+            width: width,
+            height: height,
+            decoration: BoxDecoration(
+              color: Theme.of(context)
+                  .colorScheme
+                  .surfaceContainerHighest
+                  .withValues(alpha: value),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   // 处理文件点击

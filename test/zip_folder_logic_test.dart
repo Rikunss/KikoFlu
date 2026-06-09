@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// 测试智能路径判断逻辑
@@ -24,7 +25,7 @@ void main() {
   group('ZIP智能路径判断测试', () {
     test('多个根目录项 - 需要创建文件夹', () {
       final rootItems = ['folder1', 'folder2', 'file.txt'];
-      final zipName = 'archive';
+      const zipName = 'archive';
 
       expect(shouldCreateNewFolder(rootItems, zipName), true,
           reason: '多个根目录项应该创建文件夹');
@@ -32,7 +33,7 @@ void main() {
 
     test('单个文件夹且名称与ZIP相同 - 不需要创建文件夹', () {
       final rootItems = ['RJ123456'];
-      final zipName = 'RJ123456';
+      const zipName = 'RJ123456';
 
       expect(shouldCreateNewFolder(rootItems, zipName), false,
           reason: '文件夹名与ZIP名相同，应该直接解压');
@@ -40,7 +41,7 @@ void main() {
 
     test('单个文件夹但名称与ZIP不同 - 需要创建文件夹', () {
       final rootItems = ['subfolder'];
-      final zipName = 'RJ123456';
+      const zipName = 'RJ123456';
 
       expect(shouldCreateNewFolder(rootItems, zipName), true,
           reason: '文件夹名与ZIP名不同，应该创建ZIP命名的文件夹');
@@ -48,7 +49,7 @@ void main() {
 
     test('实际场景1: RJ123456.zip包含RJ123456文件夹', () {
       final rootItems = ['RJ123456'];
-      final zipName = 'RJ123456';
+      const zipName = 'RJ123456';
 
       expect(shouldCreateNewFolder(rootItems, zipName), false);
       // 结果: 直接解压到 已解析/RJ123456/
@@ -56,7 +57,7 @@ void main() {
 
     test('实际场景2: RJ123456.zip包含data文件夹', () {
       final rootItems = ['data'];
-      final zipName = 'RJ123456';
+      const zipName = 'RJ123456';
 
       expect(shouldCreateNewFolder(rootItems, zipName), true);
       // 结果: 创建 已解析/RJ123456/data/
@@ -64,7 +65,7 @@ void main() {
 
     test('实际场景3: collection.zip包含多个文件夹', () {
       final rootItems = ['RJ123456', 'RJ234567', 'readme.txt'];
-      final zipName = 'collection';
+      const zipName = 'collection';
 
       expect(shouldCreateNewFolder(rootItems, zipName), true);
       // 结果: 创建 未知作品/collection/ 然后递归处理内部
@@ -72,7 +73,7 @@ void main() {
 
     test('实际场景4: RJ123456.zip包含Album文件夹', () {
       final rootItems = ['Album'];
-      final zipName = 'RJ123456';
+      const zipName = 'RJ123456';
 
       expect(shouldCreateNewFolder(rootItems, zipName), true);
       // 结果: 创建 已解析/RJ123456/Album/
@@ -80,7 +81,7 @@ void main() {
 
     test('实际场景5: MyMusic.zip包含MyMusic文件夹', () {
       final rootItems = ['MyMusic'];
-      final zipName = 'MyMusic';
+      const zipName = 'MyMusic';
 
       expect(shouldCreateNewFolder(rootItems, zipName), false);
       // 结果: 直接解压到 未知作品/MyMusic/
@@ -88,7 +89,7 @@ void main() {
 
     test('边界情况: 空根目录', () {
       final rootItems = <String>[];
-      final zipName = 'archive';
+      const zipName = 'archive';
 
       expect(shouldCreateNewFolder(rootItems, zipName), true,
           reason: '空根目录视为需要创建文件夹');
@@ -96,7 +97,7 @@ void main() {
 
     test('大小写敏感测试', () {
       final rootItems = ['rj123456'];
-      final zipName = 'RJ123456';
+      const zipName = 'RJ123456';
 
       expect(shouldCreateNewFolder(rootItems, zipName), true,
           reason: '大小写不同视为不同名称');
@@ -111,11 +112,11 @@ void main() {
       //       └── track2.srt
 
       final rootItems = ['RJ123456'];
-      final zipName = 'RJ123456';
+      const zipName = 'RJ123456';
       final needFolder = shouldCreateNewFolder(rootItems, zipName);
 
       expect(needFolder, false);
-      print('✓ RJ123456.zip → 已解析/RJ123456/ (直接解压)');
+      debugPrint('✓ RJ123456.zip → 已解析/RJ123456/ (直接解压)');
     });
 
     test('场景B: 包含子文件夹的RJ压缩包', () {
@@ -124,11 +125,11 @@ void main() {
       //       └── track.lrc
 
       final rootItems = ['Audio'];
-      final zipName = 'RJ234567';
+      const zipName = 'RJ234567';
       final needFolder = shouldCreateNewFolder(rootItems, zipName);
 
       expect(needFolder, true);
-      print('✓ RJ234567.zip → 已解析/RJ234567/Audio/ (创建文件夹)');
+      debugPrint('✓ RJ234567.zip → 已解析/RJ234567/Audio/ (创建文件夹)');
     });
 
     test('场景C: 多个RJ的集合包', () {
@@ -138,11 +139,11 @@ void main() {
       //   └── RJ333333/
 
       final rootItems = ['RJ111111', 'RJ222222', 'RJ333333'];
-      final zipName = 'Collection';
+      const zipName = 'Collection';
       final needFolder = shouldCreateNewFolder(rootItems, zipName);
 
       expect(needFolder, true);
-      print('✓ Collection.zip → 临时解压 → 递归识别各个RJ目录');
+      debugPrint('✓ Collection.zip → 临时解压 → 递归识别各个RJ目录');
     });
   });
 }

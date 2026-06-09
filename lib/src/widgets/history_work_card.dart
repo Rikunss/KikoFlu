@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../services/log_service.dart';
+import 'blur_hash_widget.dart';
 import '../models/history_record.dart';
 import '../models/audio_track.dart';
 import '../models/download_task.dart';
@@ -11,10 +14,29 @@ import '../services/download_service.dart';
 import '../services/cache_service.dart';
 import '../screens/work_detail_screen.dart';
 import '../services/storage_service.dart';
+import '../services/blurhash_service.dart';
 import '../utils/string_utils.dart';
 import '../providers/lyric_provider.dart';
+import '../utils/snackbar_util.dart';
 import '../../l10n/app_localizations.dart';
+import 'add_to_playlist_dialog.dart';
 import 'privacy_blur_cover.dart';
+
+/// Helper untuk membangun cover placeholder dengan dukungan BlurHash
+Widget _buildCoverPlaceholder(BuildContext context, String? blurHash) {
+  if (blurHash != null && blurHash.isNotEmpty) {
+    return BlurHashWidget(
+      hash: blurHash,
+      imageFit: BoxFit.cover,
+    );
+  }
+  return Container(
+    color: Colors.grey[200],
+    child: const Center(
+      child: Icon(Icons.image, color: Colors.grey),
+    ),
+  );
+}
 
 class HistoryWorkCard extends ConsumerWidget {
   final HistoryRecord record;
@@ -28,9 +50,9 @@ class HistoryWorkCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authProvider);
-    final host = authState.host ?? '';
-    final token = authState.token ?? '';
+    // Gunakan select() agar kartu tidak rebuild saat field auth lain berubah
+    final host = ref.watch(authProvider.select((s) => s.host ?? ''));
+    final token = ref.watch(authProvider.select((s) => s.token ?? ''));
     final work = record.work;
 
     final httpHeaders = StorageService.serverCookieHeaders;
@@ -50,28 +72,7 @@ class HistoryWorkCard extends ConsumerWidget {
             ),
           );
         },
-        onLongPress: () {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text(S.of(context).deleteRecord),
-              content: Text(S.of(context).deletePlayRecordConfirm(work.title)),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(S.of(context).cancel),
-                ),
-                TextButton(
-                  onPressed: () {
-                    ref.read(historyProvider.notifier).remove(work.id);
-                    Navigator.pop(context);
-                  },
-                  child: Text(S.of(context).delete),
-                ),
-              ],
-            ),
-          );
-        },
+        onLongPress: () => _showContextMenu(context, ref),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -89,17 +90,17 @@ class HistoryWorkCard extends ConsumerWidget {
                           imageUrl: work.getCoverImageUrl(host, token: token),
                           httpHeaders: httpHeaders,
                           cacheKey: 'work_cover_${work.id}',
+                          memCacheWidth: (210 * MediaQuery.devicePixelRatioOf(context)).round(),
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            color: Colors.grey[200],
-                            child: const Center(
-                                child: Icon(Icons.image, color: Colors.grey)),
+                          placeholder: (context, url) => _buildCoverPlaceholder(
+                            context,
+                            work.blurHash ??
+                                BlurHashService.instance.getBlurHash(work.id),
                           ),
-                          errorWidget: (context, url, error) => Container(
-                            color: Colors.grey[200],
-                            child: const Center(
-                                child: Icon(Icons.broken_image,
-                                    color: Colors.grey)),
+                          errorWidget: (context, url, error) => _buildCoverPlaceholder(
+                            context,
+                            work.blurHash ??
+                                BlurHashService.instance.getBlurHash(work.id),
                           ),
                         ),
                       ),
@@ -118,7 +119,7 @@ class HistoryWorkCard extends ConsumerWidget {
                           end: Alignment.bottomCenter,
                           colors: [
                             Colors.transparent,
-                            Colors.black.withOpacity(0.7),
+                            Colors.black.withValues(alpha: 0.7),
                           ],
                         ),
                       ),
@@ -246,129 +247,98 @@ class HistoryWorkCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _resumePlayback(BuildContext context, WidgetRef ref) async {
+  /// Build AudioTrack list for the work. Returns null on failure.
+  static Future<List<AudioTrack>?> _buildTracks({
+    required HistoryRecord record,
+    required BuildContext context,
+    required WidgetRef ref,
+  }) async {
     final work = record.work;
     final authState = ref.read(authProvider);
     final host = authState.host ?? '';
     final token = authState.token ?? '';
+    final s = S.of(context);
 
-    // 1. Get all files
     final apiService = ref.read(kikoeruApiServiceProvider);
     List<dynamic> allFiles = [];
     try {
       allFiles = await apiService.getWorkTracks(work.id);
       ref.read(fileListControllerProvider.notifier).updateFiles(allFiles);
     } catch (e) {
-      print('Failed to update file list: $e');
-
-      // 尝试从已下载的任务中构建文件列表
+      LogService.instance.warning('Failed to update file list: $e', tag: 'Playback');
       try {
         final tasks = await DownloadService.instance.getWorkTasks(work.id);
         if (tasks.isNotEmpty) {
           final downloadedFiles = tasks
               .where((t) => t.status == DownloadStatus.completed)
-              .map((t) => {
+              .map((t) => ({
                     'title': t.fileName,
                     'name': t.fileName,
                     'hash': t.hash,
                     'type': 'file',
-                  })
+                  }))
               .toList();
-
           if (downloadedFiles.isNotEmpty) {
             allFiles = downloadedFiles;
             ref.read(fileListControllerProvider.notifier).updateFiles(allFiles);
           }
         }
       } catch (e2) {
-        print('Failed to load downloaded files: $e2');
+        LogService.instance.warning('Failed to load downloaded files: $e2', tag: 'Playback');
       }
     }
 
-    if (allFiles.isEmpty) {
-      // Fallback to single track if list fetch fails
-      if (record.lastTrack != null) {
-        try {
-          await AudioPlayerService.instance.updateQueue([record.lastTrack!]);
-          await AudioPlayerService.instance
-              .seek(Duration(milliseconds: record.lastPositionMs));
-          await AudioPlayerService.instance.play();
-          ref.read(historyProvider.notifier).addOrUpdate(work);
-        } catch (e) {
-          print('Failed to resume playback: $e');
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(S.of(context).playbackFailed(e.toString()))),
-            );
-          }
-        }
-      }
-      return;
+    if (allFiles.isEmpty) return null;
+
+    // Helper: check if a file matches the last track
+    bool isTargetFile(dynamic file, HistoryRecord rec) {
+      if (file['type'] == 'folder') return false;
+      final fileHash = file['hash'];
+      final fileName = file['title'] ?? file['name'];
+      if (rec.lastTrack?.hash != null && fileHash == rec.lastTrack!.hash) return true;
+      return fileName == rec.lastTrack?.title;
     }
 
-    // 2. Find the directory containing the last track and get its audio files
-    List<dynamic> getSiblingAudioFiles(List<dynamic> files) {
-      // Helper to check if a file matches the last track
-      bool isTargetFile(dynamic file) {
+    // Helper: extract audio files from a list
+    List<dynamic> extractAudioFiles(List<dynamic> list) {
+      return list.where((file) {
         if (file['type'] == 'folder') return false;
-        final fileHash = file['hash'];
-        final fileName = file['title'] ?? file['name'];
+        final name = file['title'] ?? file['name'] ?? '';
+        final ext = name.split('.').last.toLowerCase();
+        return ['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg'].contains(ext);
+      }).toList();
+    }
 
-        if (record.lastTrack!.hash != null &&
-            fileHash == record.lastTrack!.hash) {
-          return true;
-        }
-        // Fallback to title match if hash is missing
-        return fileName == record.lastTrack!.title;
-      }
-
-      // Helper to extract audio files from a list
-      List<dynamic> extractAudioFiles(List<dynamic> list) {
-        return list.where((file) {
-          if (file['type'] == 'folder') return false;
-          final name = file['title'] ?? file['name'] ?? '';
-          final ext = name.split('.').last.toLowerCase();
-          return ['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg'].contains(ext);
-        }).toList();
-      }
-
-      // Recursive search
+    // Find sibling audio files of the last track
+    List<dynamic> findSiblingAudioFiles(List<dynamic> files, HistoryRecord rec) {
       for (final file in files) {
         if (file['type'] == 'folder') {
           if (file['children'] != null) {
-            // Check if target is in this folder's children (direct siblings)
             final children = file['children'] as List<dynamic>;
-            if (children.any(isTargetFile)) {
+            if (children.any((f) => isTargetFile(f, rec))) {
               return extractAudioFiles(children);
             }
-            // If not found directly, recurse deeper
-            final result = getSiblingAudioFiles(children);
+            final result = findSiblingAudioFiles(children, rec);
             if (result.isNotEmpty) return result;
           }
         } else {
-          // Check if target is in the root list
-          if (isTargetFile(file)) {
+          if (isTargetFile(file, rec)) {
             return extractAudioFiles(files);
           }
         }
       }
-
       return [];
     }
 
-    List<dynamic> audioFiles = getSiblingAudioFiles(allFiles);
+    List<dynamic> audioFiles = findSiblingAudioFiles(allFiles, record);
 
-    // If we couldn't find the specific directory (e.g. file moved/renamed),
-    // fallback to flattening all files to ensure playback works
+    // Fallback: flatten all audio files
     if (audioFiles.isEmpty) {
-      List<dynamic> flattenAudioFiles(List<dynamic> files) {
-        final List<dynamic> result = [];
+      List<dynamic> flatten(List<dynamic> files) {
+        final result = <dynamic>[];
         for (final file in files) {
-          if (file['type'] == 'folder') {
-            if (file['children'] != null) {
-              result.addAll(flattenAudioFiles(file['children']));
-            }
+          if (file['type'] == 'folder' && file['children'] != null) {
+            result.addAll(flatten(file['children']));
           } else {
             final name = file['title'] ?? file['name'] ?? '';
             final ext = name.split('.').last.toLowerCase();
@@ -379,15 +349,13 @@ class HistoryWorkCard extends ConsumerWidget {
         }
         return result;
       }
-
-      audioFiles = flattenAudioFiles(allFiles);
+      audioFiles = flatten(allFiles);
     }
 
-    // 3. Build AudioTracks
+    // Build AudioTracks
     final List<AudioTrack> tracks = [];
     final downloadService = DownloadService.instance;
 
-    // Current work cover URL
     String? coverUrl;
     if (host.isNotEmpty) {
       String normalizedUrl = host;
@@ -401,21 +369,14 @@ class HistoryWorkCard extends ConsumerWidget {
 
     for (final file in audioFiles) {
       final fileHash = file['hash'];
-      final fileTitle = file['title'] ?? file['name'] ?? S.of(context).unknown;
-
-      // 优先级: 本地下载文件 → 缓存文件 → 网络URL
+      final fileTitle = file['title'] ?? file['name'] ?? s.unknown;
       String audioUrl = '';
-      if (fileHash != null) {
-        // 1. 检查是否有本地下载的文件
-        final localPath = await downloadService.getDownloadedFilePath(
-          work.id,
-          fileHash,
-        );
 
+      if (fileHash != null) {
+        final localPath = await downloadService.getDownloadedFilePath(work.id, fileHash);
         if (localPath != null) {
           audioUrl = 'file://$localPath';
         } else {
-          // 2. 如果没有本地文件，检查缓存
           final cachedPath = await CacheService.getCachedAudioFile(fileHash);
           if (cachedPath != null) {
             audioUrl = 'file://$cachedPath';
@@ -423,9 +384,11 @@ class HistoryWorkCard extends ConsumerWidget {
         }
       }
 
-      // 3. 如果缓存也没有，使用网络URL
       if (audioUrl.isEmpty) {
-        if (file['mediaStreamUrl'] != null &&
+        if (file['mediaDownloadUrl'] != null &&
+            file['mediaDownloadUrl'].toString().isNotEmpty) {
+          audioUrl = file['mediaDownloadUrl'];
+        } else if (file['mediaStreamUrl'] != null &&
             file['mediaStreamUrl'].toString().isNotEmpty) {
           audioUrl = file['mediaStreamUrl'];
         } else if (host.isNotEmpty && fileHash != null) {
@@ -440,7 +403,6 @@ class HistoryWorkCard extends ConsumerWidget {
       if (audioUrl.isNotEmpty) {
         final vaNames = work.vas?.map((va) => va.name).toList() ?? [];
         final artistInfo = vaNames.isNotEmpty ? vaNames.join(', ') : null;
-
         tracks.add(AudioTrack(
           id: fileHash ?? fileTitle,
           url: audioUrl,
@@ -461,35 +423,192 @@ class HistoryWorkCard extends ConsumerWidget {
       tracks.add(record.lastTrack!);
     }
 
-    // 4. Find index
-    final lastTrackId = record.lastTrack?.id;
-    int index = 0;
-    if (lastTrackId != null) {
-      index = tracks.indexWhere((t) => t.id == lastTrackId);
-      if (index == -1) {
-        // Try matching by title if ID/hash mismatch
-        index = tracks.indexWhere((t) => t.title == record.lastTrack!.title);
-      }
-      if (index == -1) index = 0;
-    }
+    return tracks.isNotEmpty ? tracks : null;
+  }
 
-    // 5. Play
-    if (tracks.isNotEmpty) {
-      try {
-        await AudioPlayerService.instance
-            .updateQueue(tracks, startIndex: index);
-        await AudioPlayerService.instance
-            .seek(Duration(milliseconds: record.lastPositionMs));
-        await AudioPlayerService.instance.play();
-        ref.read(historyProvider.notifier).addOrUpdate(work);
-      } catch (e) {
-        print('Failed to resume playback: $e');
-        if (context.mounted) {
+  /// Resume playback from where the user left off.
+  Future<void> _resumePlayback(BuildContext context, WidgetRef ref) async {
+    final work = record.work;
+    final s = S.of(context);
+
+    final tracks = await _buildTracks(record: record, context: context, ref: ref);
+
+    if (tracks == null) {
+      // Fallback to single track
+      if (record.lastTrack != null) {
+        try {
+          await AudioPlayerService.instance.updateQueue([record.lastTrack!]);
+          await AudioPlayerService.instance
+              .seek(Duration(milliseconds: record.lastPositionMs));
+          await AudioPlayerService.instance.play();
+          ref.read(historyProvider.notifier).addOrUpdate(work);
+        } catch (e) {
+          LogService.instance.error('Failed to resume playback: $e', tag: 'Playback');
+          if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(S.of(context).playbackFailed(e.toString()))),
           );
         }
       }
+      return;
     }
+
+    // Find index
+    final lastTrackId = record.lastTrack?.id;
+    int index = 0;
+    if (lastTrackId != null) {
+      index = tracks.indexWhere((t) => t.id == lastTrackId);
+      if (index == -1) {
+        index = tracks.indexWhere((t) => t.title == record.lastTrack!.title);
+      }
+      if (index == -1) index = 0;
+    }
+
+    if (tracks.isNotEmpty) {
+      try {
+        await AudioPlayerService.instance.updateQueue(tracks, startIndex: index);
+        await AudioPlayerService.instance
+            .seek(Duration(milliseconds: record.lastPositionMs));
+        await AudioPlayerService.instance.play();
+        ref.read(historyProvider.notifier).addOrUpdate(work);
+      } catch (e) {
+        LogService.instance.error('Failed to resume playback: $e', tag: 'Playback');
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(S.of(context).playbackFailed(e.toString()))),
+        );
+      }
+    }
+  }
+
+  /// Show context menu on long press.
+  void _showContextMenu(BuildContext context, WidgetRef ref) {
+    HapticFeedback.mediumImpact();
+    final s = S.of(context);
+    final work = record.work;
+
+    showModalBottomSheet<Map<String, String>>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                work.title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Icon(Icons.playlist_play, color: Theme.of(context).colorScheme.primary),
+              title: Text(s.playNext),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pop(ctx, {'action': 'play_next'}),
+            ),
+            ListTile(
+              leading: Icon(Icons.playlist_add, color: Theme.of(context).colorScheme.primary),
+              title: Text(s.addToPlaylist),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pop(ctx, {'action': 'add_to_playlist'}),
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
+              title: Text(s.deleteRecord, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              trailing: Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.error),
+              onTap: () => Navigator.pop(ctx, {'action': 'delete_record'}),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    ).then((result) {
+      if (result == null || !context.mounted) return;
+
+      switch (result['action']) {
+        case 'play_next':
+          _handlePlayNext(context, ref);
+          break;
+        case 'add_to_playlist':
+          AddToPlaylistDialog.show(
+            context: context,
+            workId: work.id,
+            workTitle: work.title,
+          );
+          break;
+        case 'delete_record':
+          _showDeleteConfirm(context, ref);
+          break;
+      }
+    });
+  }
+
+  /// Handle "Play Next" from context menu.
+  Future<void> _handlePlayNext(BuildContext context, WidgetRef ref) async {
+    final s = S.of(context);
+
+    final tracks = await _buildTracks(record: record, context: context, ref: ref);
+
+    if (tracks == null) {
+      if (context.mounted) {
+        SnackBarUtil.showWarning(context, s.noAudioTracks);
+      }
+      return;
+    }
+
+    try {
+      await AudioPlayerService.instance.insertTracksAfterCurrent(tracks);
+      if (context.mounted) {
+        SnackBarUtil.showSuccess(context, s.playingNextTracks(tracks.length));
+      }
+    } catch (e) {
+      LogService.instance.error('Play Next failed: $e', tag: 'Playback');
+      if (context.mounted) {
+        SnackBarUtil.showError(context, s.playbackFailed(e.toString()));
+      }
+    }
+  }
+
+  /// Show delete confirmation dialog.
+  void _showDeleteConfirm(BuildContext context, WidgetRef ref) {
+    final work = record.work;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(S.of(context).deleteRecord),
+        content: Text(S.of(context).deletePlayRecordConfirm(work.title)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(S.of(context).cancel),
+          ),
+          TextButton(
+            onPressed: () {
+              ref.read(historyProvider.notifier).remove(work.id);
+              Navigator.pop(ctx);
+            },
+            child: Text(S.of(context).delete),
+          ),
+        ],
+      ),
+    );
   }
 }

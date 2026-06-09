@@ -5,6 +5,7 @@ import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/log_service.dart';
 import '../services/cache_service.dart';
 import '../services/storage_service.dart';
 import '../../l10n/app_localizations.dart';
@@ -54,6 +55,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
+    final s = S.of(context);
 
     try {
       // 优先检查是否是本地文件（file:// 协议）
@@ -73,14 +75,16 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
             }
           }
 
+          if (!mounted) return;
           setState(() {
             _localFilePath = localPath;
             _isLoading = false;
           });
           return;
         } else {
+          if (!mounted) return;
           setState(() {
-            _errorMessage = S.of(context).localPdfNotExist;
+            _errorMessage = s.localPdfNotExist;
             _isLoading = false;
           });
           return;
@@ -160,7 +164,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
         ),
         onReceiveProgress: (received, total) {
           if (total != -1) {
-            debugPrint('下载进度: ${(received / total * 100).toStringAsFixed(0)}%');
+            LogService.instance.debug('PDF下载进度: ${(received / total * 100).toStringAsFixed(0)}%', tag: 'Download');
           }
         },
       );
@@ -173,8 +177,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
             Navigator.of(context).pop();
           }
           return;
-        } else {
-          throw Exception(S.of(context).cannotOpenPdf);
+        } else {              throw Exception(s.cannotOpenPdf);
         }
       }
 

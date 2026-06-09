@@ -27,7 +27,7 @@ class AddToPlaylistDialog extends ConsumerStatefulWidget {
     required String workTitle,
   }) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     if (isLandscape) {
       return showDialog<bool>(
@@ -271,7 +271,7 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
   @override
   Widget build(BuildContext context) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     Widget content = Column(
       mainAxisSize: MainAxisSize.min,
@@ -303,7 +303,7 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSurface
-                                .withOpacity(0.6),
+                                .withValues(alpha: 0.6),
                           ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

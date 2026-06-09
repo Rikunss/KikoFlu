@@ -54,6 +54,8 @@ class _PlayerButtonsSettingsScreenState
         return Icons.tune;
       case PlayerButtonType.floatingLyric:
         return Icons.picture_in_picture_alt;
+      case PlayerButtonType.equalizer:
+        return Icons.equalizer;
     }
   }
 
@@ -179,7 +181,7 @@ class _PlayerButtonsSettingsScreenState
                   child: ReorderableListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: _buttonOrder.length,
-                    onReorder: (oldIndex, newIndex) {
+                    onReorderItem: (oldIndex, newIndex) {
                       setState(() {
                         if (newIndex > oldIndex) {
                           newIndex -= 1;

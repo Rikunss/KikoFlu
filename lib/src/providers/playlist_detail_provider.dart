@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:equatable/equatable.dart';
 import '../models/playlist.dart';
 import '../models/work.dart';
 import '../services/kikoeru_api_service.dart' hide kikoeruApiServiceProvider;
@@ -6,7 +7,7 @@ import 'auth_provider.dart' show kikoeruApiServiceProvider;
 import 'settings_provider.dart';
 
 /// 播放列表详情状态
-class PlaylistDetailState {
+class PlaylistDetailState extends Equatable {
   final Playlist? metadata;
   final List<Work> works;
   final bool isLoading;
@@ -25,7 +26,7 @@ class PlaylistDetailState {
     this.pageSize = 12,
     this.totalCount = 0,
     this.hasMore = false,
-  });
+  }  );
 
   PlaylistDetailState copyWith({
     Playlist? metadata,
@@ -48,6 +49,18 @@ class PlaylistDetailState {
       hasMore: hasMore ?? this.hasMore,
     );
   }
+
+  @override
+  List<Object?> get props => [
+        metadata,
+        works,
+        isLoading,
+        error,
+        currentPage,
+        pageSize,
+        totalCount,
+        hasMore,
+      ];
 }
 
 /// 播放列表详情 Notifier

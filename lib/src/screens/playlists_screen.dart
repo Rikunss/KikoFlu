@@ -3,12 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../providers/playlists_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/smart_playlists_provider.dart';
 import '../utils/l10n_extensions.dart';
 import '../utils/scroll_optimization.dart';
 import '../widgets/playlist_card.dart';
 import '../widgets/pagination_bar.dart';
 import '../models/playlist.dart' show PlaylistPrivacy;
+import '../models/smart_playlist.dart';
 import 'playlist_detail_screen.dart';
+import 'smart_playlist_detail_screen.dart';
+import 'smart_playlist_editor_screen.dart';
 
 class PlaylistsScreen extends ConsumerStatefulWidget {
   const PlaylistsScreen({super.key});
@@ -20,21 +24,11 @@ class PlaylistsScreen extends ConsumerStatefulWidget {
 class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
     with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
+  bool _hasVisited = false;
 
   @override
   bool get wantKeepAlive => true; // 保持状态不被销毁
 
-  @override
-  void initState() {
-    super.initState();
-    // 首次加载数据
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final playlistsState = ref.read(playlistsProvider);
-      if (playlistsState.playlists.isEmpty && !playlistsState.isLoading) {
-        ref.read(playlistsProvider.notifier).load(refresh: true);
-      }
-    });
-  }
 
   @override
   void dispose() {
@@ -49,6 +43,50 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
       );
+    }
+  }
+
+  /// Show FAB menu: create playlist, create smart playlist
+  void _showFabMenu() {
+    final s = S.of(context);
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.playlist_add),
+              title: Text(s.createPlaylist),
+              subtitle: Text(s.regularPlaylist),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showCreatePlaylistDialog();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_awesome, color: Colors.amber),
+              title: Text(s.smartPlaylist),
+              subtitle: Text(s.smartPlaylistSubtitle),
+              onTap: () {
+                Navigator.pop(ctx);
+                _navigateToSmartPlaylistEditor();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _navigateToSmartPlaylistEditor() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => const SmartPlaylistEditorScreen(),
+      ),
+    );
+    if (result == true && mounted) {
+      setState(() {}); // Refresh widget
     }
   }
 
@@ -145,7 +183,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
 
                                 // 隐私设置
                                 DropdownButtonFormField<PlaylistPrivacy>(
-                                  value: selectedPrivacy,
+                                  initialValue: selectedPrivacy,
                                   decoration: InputDecoration(
                                     labelText: S.of(context).privacySetting,
                                     border: const OutlineInputBorder(),
@@ -465,6 +503,16 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
 
     final state = ref.watch(playlistsProvider);
 
+    // Defer data loading to first visit
+    if (!_hasVisited) {
+      _hasVisited = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && state.playlists.isEmpty && !state.isLoading) {
+          ref.read(playlistsProvider.notifier).load(refresh: true);
+        }
+      });
+    }
+
     // 错误状态
     if (state.error != null && state.playlists.isEmpty) {
       return Center(
@@ -511,7 +559,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
     if (state.playlists.isEmpty) {
       return Scaffold(
         floatingActionButton: FloatingActionButton(
-          onPressed: _showCreatePlaylistDialog,
+          onPressed: _showFabMenu,
           tooltip: S.of(context).createPlaylist,
           child: const Icon(Icons.add),
         ),
@@ -545,24 +593,121 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
-        onPressed: _showCreatePlaylistDialog,
+        onPressed: _showFabMenu,
         tooltip: S.of(context).createPlaylist,
         child: const Icon(Icons.add),
       ),
       body: RefreshIndicator(
-        onRefresh: () async => ref.read(playlistsProvider.notifier).refresh(),
+        onRefresh: () async {
+          ref.read(playlistsProvider.notifier).refresh();
+          if (mounted) setState(() {});
+        },
         child: _buildListView(state),
       ),
     );
   }
 
+  Widget _buildSmartPlaylistCard(SmartPlaylist sp) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.amber.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(Icons.auto_awesome, color: Colors.amber),
+        ),
+        title: Text(
+          sp.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          sp.rulesSummary,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.refresh, size: 16, color: colorScheme.onSurfaceVariant),
+            const SizedBox(width: 4),
+            Text(
+              'Auto',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: Colors.amber.shade700,
+              ),
+            ),
+          ],
+        ),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => SmartPlaylistDetailScreen(playlist: sp),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildListView(PlaylistsState state) {
+    final smartPlaylists = ref.watch(smartPlaylistsProvider);
+
     return CustomScrollView(
-      controller: _scrollController,
-      cacheExtent: ScrollOptimization.cacheExtent,
+      // ignore: deprecated_member_use
+      cacheExtent: ScrollOptimization.cacheExtent, controller: _scrollController,
       physics: ScrollOptimization.physics,
       slivers: [
-        // 顶部标题栏
+        // Smart Playlists section
+        if (smartPlaylists.isNotEmpty) ...[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            sliver: SliverToBoxAdapter(
+              child: Row(
+                children: [
+                  Icon(Icons.auto_awesome,
+                      size: 20, color: Colors.amber.shade600),
+                  const SizedBox(width: 8),
+                  Text(
+                    S.of(context).smartPlaylists,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.amber.shade700,
+                        ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${smartPlaylists.length}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final sp = smartPlaylists[index];
+                return _buildSmartPlaylistCard(sp);
+              },
+              childCount: smartPlaylists.length,
+            ),
+          ),
+        ],
+
+        // Regular playlists header
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           sliver: SliverToBoxAdapter(
@@ -570,21 +715,20 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
               children: [
                 Icon(
                   Icons.playlist_play,
-                  size: 28,
+                  size: 20,
                   color: Theme.of(context).colorScheme.primary,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Text(
                   S.of(context).myPlaylists,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
                 ),
                 const Spacer(),
                 Text(
                   S.of(context).totalNItems(state.totalCount),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 ),
@@ -600,6 +744,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
               final playlist = state.playlists[index];
               return RepaintBoundary(
                 child: PlaylistCard(
+                  key: ValueKey(playlist.id),
                   playlist: playlist,
                   onTap: () async {
                     // 导航到播放列表详情页

@@ -19,7 +19,7 @@ class GlobalAudioPlayerWrapper extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentTrack = ref.watch(currentTrackProvider);
 
-    return Scaffold(
+    Widget body = Scaffold(
       body: Column(
         children: [
           Expanded(child: child),
@@ -35,5 +35,7 @@ class GlobalAudioPlayerWrapper extends ConsumerWidget {
         ],
       ),
     );
+
+    return body;
   }
 }

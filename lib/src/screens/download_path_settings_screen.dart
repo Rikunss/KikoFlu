@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../src/services/log_service.dart';
 import '../services/download_path_service.dart';
 import '../services/download_service.dart';
 import '../providers/settings_provider.dart';
@@ -273,7 +274,7 @@ class _DownloadPathSettingsScreenState
         SnackBarUtil.showInfo(context, message, duration: const Duration(seconds: 2));
       }
     } catch (e) {
-      print('[DownloadPathSettings] 无法显示 SnackBar: $e');
+      LogService.instance.error('[DownloadPathSettings] 无法显示 SnackBar: $e');
     }
   }
 
@@ -417,7 +418,7 @@ class _DownloadPathSettingsScreenState
                     color: Theme.of(context)
                         .colorScheme
                         .errorContainer
-                        .withOpacity(0.3),
+                        .withValues(alpha: 0.3),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Text(

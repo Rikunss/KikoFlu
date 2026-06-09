@@ -155,9 +155,17 @@ class ReviewProgressDialog {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
+                                RadioGroup<String>(
+                                  groupValue: selectedProgress,
+                                  onChanged: (String? value) {
+                                    setState(() {
+                                      selectedProgress = value;
+                                    });
+                                  },
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
                                     // 左列：前3个选项
                                     Expanded(
                                       child: Column(
@@ -168,12 +176,6 @@ class ReviewProgressDialog {
                                           return RadioListTile<String>(
                                             title: Text(filter.localizedLabel(context)),
                                             value: filter.value!,
-                                            groupValue: selectedProgress,
-                                            onChanged: (value) {
-                                              setState(() {
-                                                selectedProgress = value;
-                                              });
-                                            },
                                             selected: isSelected,
                                             contentPadding:
                                                 const EdgeInsets.symmetric(
@@ -195,12 +197,6 @@ class ReviewProgressDialog {
                                             return RadioListTile<String>(
                                               title: Text(filter.localizedLabel(context)),
                                               value: filter.value!,
-                                              groupValue: selectedProgress,
-                                              onChanged: (value) {
-                                                setState(() {
-                                                  selectedProgress = value;
-                                                });
-                                              },
                                               selected: isSelected,
                                               contentPadding:
                                                   const EdgeInsets.symmetric(
@@ -254,6 +250,7 @@ class ReviewProgressDialog {
                                     ),
                                   ],
                                 ),
+                              ),
                               ],
                             ),
                           ),
@@ -406,7 +403,7 @@ class ReviewProgressDialog {
                           });
                         },
                       );
-                    }).toList(),
+                    }),
                     const SizedBox(height: 8),
                     if (currentProgress != null || currentRating != null)
                       ListTile(

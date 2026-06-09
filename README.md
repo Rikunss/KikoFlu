@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="assets/icons/app_icon_opaque.png" alt="KikoFlu" width="120" height="120">
+  <img src="assets/icons/app_icon_opaque.png" alt="KikoFlu Edge" width="120" height="120">
 
-  # KikoFlu
+  # KikoFlu Edge
 
   [English](README_EN.md) | [日本語](README_JA.md) | 简体中文
   

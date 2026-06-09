@@ -9,6 +9,7 @@ import '../models/audio_track.dart';
 import '../services/cache_service.dart';
 import '../services/subtitle_library_service.dart';
 import '../services/subtitle_database.dart';
+import '../services/log_service.dart';
 import '../utils/encoding_utils.dart';
 import '../services/translation_service.dart';
 import '../services/storage_service.dart';
@@ -134,8 +135,8 @@ class LyricController extends StateNotifier<LyricState> {
   // 根据音频轨道查找并加载字幕
   Future<void> loadLyricForTrack(
       AudioTrack track, List<dynamic> allFiles) async {
-    print(
-        '[Lyric] 尝试加载: track="${track.title}", workId=${track.workId}, 文件数=${allFiles.length}');
+    LogService.instance.debug(
+        '[Lyric] 尝试加载: track="${track.title}", workId=${track.workId}, 文件数=${allFiles.length}', tag: 'Playback');
     state = state.copyWith(isLoading: true, error: null);
 
     try {
@@ -143,14 +144,14 @@ class LyricController extends StateNotifier<LyricState> {
       final libraryPriority = ref.read(subtitleLibraryPriorityProvider);
       final isLibraryFirst = libraryPriority == SubtitleLibraryPriority.highest;
 
-      print('[Lyric] 字幕库优先级: ${libraryPriority.displayName}');
+      LogService.instance.debug('[Lyric] 字幕库优先级: ${libraryPriority.displayName}', tag: 'Playback');
 
       // 根据设置决定查找顺序
       if (isLibraryFirst) {
         // 优先级1：从字幕库查找匹配的字幕文件
         final libraryLyricPath = await _findLyricInLibrary(track);
         if (libraryLyricPath != null) {
-          print('[Lyric] 从字幕库加载: $libraryLyricPath');
+          LogService.instance.debug('[Lyric] 从字幕库加载: $libraryLyricPath', tag: 'Playback');
           await loadLyricFromLocalFile(libraryLyricPath);
           return;
         }
@@ -162,22 +163,22 @@ class LyricController extends StateNotifier<LyricState> {
       if (lyricFile == null) {
         // 如果文件树未找到且优先级为最后，尝试字幕库
         if (!isLibraryFirst) {
-          print('[Lyric] 文件树未找到，尝试字幕库');
+          LogService.instance.debug('[Lyric] 文件树未找到，尝试字幕库', tag: 'Playback');
           final libraryLyricPath = await _findLyricInLibrary(track);
           if (libraryLyricPath != null) {
-            print('[Lyric] 从字幕库加载: $libraryLyricPath');
+            LogService.instance.debug('[Lyric] 从字幕库加载: $libraryLyricPath', tag: 'Playback');
             await loadLyricFromLocalFile(libraryLyricPath);
             return;
           }
         }
 
-        print('[Lyric] 未找到匹配字幕: track="${track.title}"');
+        LogService.instance.debug('[Lyric] 未找到匹配字幕: track="${track.title}"', tag: 'Playback');
         state = LyricState(lyrics: [], isLoading: false);
         return;
       }
 
-      print(
-          '[Lyric] 找到匹配字幕: title="${lyricFile['title']}", type="${lyricFile['type']}", hash=${lyricFile['hash']}');
+      LogService.instance.debug(
+          '[Lyric] 找到匹配字幕: title="${lyricFile['title']}", type="${lyricFile['type']}", hash=${lyricFile['hash']}', tag: 'Playback');
 
       // 获取认证信息
       final authState = ref.read(authProvider);
@@ -209,11 +210,11 @@ class LyricController extends StateNotifier<LyricState> {
       );
 
       if (cachedContent != null) {
-        print('[Lyric] 从缓存加载字幕: $hash');
+        LogService.instance.debug('[Lyric] 从缓存加载字幕: $hash', tag: 'Playback');
         content = cachedContent;
       } else {
         // 2. 缓存未命中，从网络下载
-        print('[Lyric] 从网络下载字幕: $hash');
+        LogService.instance.debug('[Lyric] 从网络下载字幕: $hash', tag: 'Playback');
         final dio = Dio();
         final response = await dio.get<List<int>>(
           lyricUrl,
@@ -228,7 +229,7 @@ class LyricController extends StateNotifier<LyricState> {
           // 使用智能编码检测解码字节
           final (decodedContent, encoding) =
               EncodingUtils.decodeBytes(response.data!);
-          print('[Lyric] 网络字幕编码: $encoding');
+          LogService.instance.debug('[Lyric] 网络字幕编码: $encoding', tag: 'Playback');
           content = decodedContent;
 
           // 3. 缓存字幕内容
@@ -249,19 +250,38 @@ class LyricController extends StateNotifier<LyricState> {
 
       // 4. 解析字幕
       final lyrics = LyricParser.parse(content); // 自动检测格式
-      print('[Lyric] 解析完成: ${lyrics.length} 行字幕');
+      LogService.instance.debug('[Lyric] 解析完成: ${lyrics.length} 行字幕', tag: 'Playback');
       state = LyricState(
         lyrics: lyrics,
         isLoading: false,
         lyricUrl: lyricUrl,
       );
+
+      // 5. 自动翻译（如果启用）
+      if (lyrics.isNotEmpty) {
+        _autoTranslateIfEnabled();
+      }
     } catch (e) {
-      print('[Lyric] 加载失败: $e');
+      LogService.instance.error('[Lyric] 加载失败: $e', tag: 'Playback');
       state = LyricState(
         lyrics: [],
         isLoading: false,
         error: '加载字幕失败: $e',
       );
+    }
+  }
+
+  /// 如果启用了自动翻译，触发歌词翻译
+  Future<void> _autoTranslateIfEnabled() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final enabled = prefs.getBool('auto_translate_lyrics') ?? false;
+      if (enabled && state.lyrics.isNotEmpty && !state.isTranslated) {
+        LogService.instance.debug('[Lyric] 自动翻译已启用，开始翻译歌词', tag: 'Playback');
+        await toggleTranslation();
+      }
+    } catch (e) {
+      LogService.instance.debug('[Lyric] 自动翻译失败（静默）: $e', tag: 'Playback');
     }
   }
 
@@ -271,7 +291,7 @@ class LyricController extends StateNotifier<LyricState> {
       final trackTitle = track.title;
       final workId = track.workId;
 
-      print('[Lyric] 在字幕库中查找: track="$trackTitle", workId=$workId');
+      LogService.instance.debug('[Lyric] 在字幕库中查找: track="$trackTitle", workId=$workId', tag: 'Playback');
 
       // 确保数据库已初始化
       await SubtitleLibraryService.ensureInitialized();
@@ -299,15 +319,15 @@ class LyricController extends StateNotifier<LyricState> {
               bestScore = score;
               bestMatchPath = absolutePath;
               if (score == 1.0) {
-                print(
-                    '[Lyric] 在数据库中找到完美匹配 (workId=$workId): ${record.fileName}');
+                LogService.instance.debug(
+                    '[Lyric] 在数据库中找到完美匹配 (workId=$workId): ${record.fileName}', tag: 'Playback');
                 return absolutePath;
               }
             }
           }
 
           if (bestMatchPath != null) {
-            print('[Lyric] 在数据库中找到最佳匹配 (workId=$workId, score=$bestScore)');
+            LogService.instance.debug('[Lyric] 在数据库中找到最佳匹配 (workId=$workId, score=$bestScore)', tag: 'Playback');
             return bestMatchPath;
           }
         }
@@ -329,22 +349,22 @@ class LyricController extends StateNotifier<LyricState> {
             bestScore = score;
             bestMatchPath = absolutePath;
             if (score == 1.0) {
-              print('[Lyric] 在"已保存"中找到完美匹配: ${record.fileName}');
+              LogService.instance.debug('[Lyric] 在"已保存"中找到完美匹配: ${record.fileName}', tag: 'Playback');
               return absolutePath;
             }
           }
         }
 
         if (bestMatchPath != null) {
-          print('[Lyric] 在"已保存"中找到最佳匹配 (score=$bestScore)');
+          LogService.instance.debug('[Lyric] 在"已保存"中找到最佳匹配 (score=$bestScore)', tag: 'Playback');
           return bestMatchPath;
         }
       }
 
-      print('[Lyric] 字幕库中未找到匹配的字幕');
+      LogService.instance.debug('[Lyric] 字幕库中未找到匹配的字幕', tag: 'Playback');
       return null;
     } catch (e) {
-      print('[Lyric] 字幕库查找出错: $e');
+      LogService.instance.error('[Lyric] 字幕库查找出错: $e', tag: 'Playback');
       return null;
     }
   }
@@ -389,7 +409,7 @@ class LyricController extends StateNotifier<LyricState> {
     }
 
     audioParentPath = findAudioPath(allFiles, '');
-    // print('[Lyric] 音频文件路径: $audioParentPath');
+    // debugPrint('[Lyric] 音频文件路径: $audioParentPath');
 
     dynamic bestMatchFile;
     double bestScore = 0.0;
@@ -425,7 +445,7 @@ class LyricController extends StateNotifier<LyricState> {
             bestScore = 1.0;
             bestMatchFile = file;
             foundTruePerfectMatch = true;
-            print('[Lyric] 找到真完美匹配(同目录): $fileName');
+            LogService.instance.debug('[Lyric] 找到真完美匹配(同目录): $fileName', tag: 'Playback');
             return;
           }
 
@@ -435,7 +455,7 @@ class LyricController extends StateNotifier<LyricState> {
           if (score > bestScore) {
             bestScore = score;
             bestMatchFile = file;
-            print('[Lyric] 找到更佳匹配: lyric="$fileName", score=$score');
+            LogService.instance.debug('[Lyric] 找到更佳匹配: lyric="$fileName", score=$score', tag: 'Playback');
           } else if (score == 1.0 && bestScore == 1.0) {
             // 已经有一个完美匹配了，但不是同目录的（否则上面就return了）
             // 当前这个也是完美匹配，也不是同目录的（否则上面就return了）
@@ -448,8 +468,8 @@ class LyricController extends StateNotifier<LyricState> {
     searchInFiles(allFiles, '');
 
     if (bestMatchFile != null) {
-      print(
-          '[Lyric] 最终匹配: track="${track.title}", lyric="${bestMatchFile['title'] ?? bestMatchFile['name']}", score=$bestScore, isTruePerfect=$foundTruePerfectMatch');
+      LogService.instance.debug(
+          '[Lyric] 最终匹配: track="${track.title}", lyric="${bestMatchFile['title'] ?? bestMatchFile['name']}", score=$bestScore, isTruePerfect=$foundTruePerfectMatch', tag: 'Playback');
     }
 
     return bestMatchFile;
@@ -597,7 +617,7 @@ class LyricController extends StateNotifier<LyricState> {
         isTranslating: false,
       );
     } catch (e) {
-      print('[Lyric] 翻译失败: $e');
+      LogService.instance.error('[Lyric] 翻译失败: $e', tag: 'Playback');
       state = state.copyWith(isTranslating: false);
       rethrow;
     }
@@ -636,9 +656,7 @@ class LyricController extends StateNotifier<LyricState> {
       buffer.writeln('WEBVTT\n');
       for (final lyric in adjustedLyrics) {
         if (lyric.text.isEmpty) continue; // 跳过占位符
-        buffer.writeln(_formatWebVTTTime(lyric.startTime) +
-            ' --> ' +
-            _formatWebVTTTime(lyric.endTime));
+        buffer.writeln('${_formatWebVTTTime(lyric.startTime)} --> ${_formatWebVTTTime(lyric.endTime)}');
         buffer.writeln(lyric.text);
         buffer.writeln();
       }
@@ -661,7 +679,7 @@ class LyricController extends StateNotifier<LyricState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      print('[Lyric] 从本地文件加载字幕: $filePath');
+      LogService.instance.debug('[Lyric] 从本地文件加载字幕: $filePath', tag: 'Playback');
 
       // 读取文件内容
       final file = File(filePath);
@@ -677,7 +695,7 @@ class LyricController extends StateNotifier<LyricState> {
       // 使用智能编码检测读取文件
       final (content, encoding) =
           await EncodingUtils.readFileWithEncoding(file);
-      print('[Lyric] 检测到文件编码: $encoding');
+      LogService.instance.debug('[Lyric] 检测到文件编码: $encoding', tag: 'Playback');
 
       // 解析字幕
       final lyrics = LyricParser.parse(content);
@@ -687,9 +705,9 @@ class LyricController extends StateNotifier<LyricState> {
         lyricUrl: 'file://$filePath',
       );
 
-      print('[Lyric] 成功从本地文件加载字幕，共 ${lyrics.length} 行');
+      LogService.instance.debug('[Lyric] 成功从本地文件加载字幕，共 ${lyrics.length} 行', tag: 'Playback');
     } catch (e) {
-      print('[Lyric] 从本地文件加载字幕失败: $e');
+      LogService.instance.error('[Lyric] 从本地文件加载字幕失败: $e', tag: 'Playback');
       state = LyricState(
         lyrics: [],
         isLoading: false,
@@ -752,11 +770,11 @@ class LyricController extends StateNotifier<LyricState> {
           : null;
 
       if (cachedContent != null) {
-        print('[Lyric] 手动加载 - 从缓存加载字幕: $hash');
+        LogService.instance.debug('[Lyric] 手动加载 - 从缓存加载字幕: $hash', tag: 'Playback');
         content = cachedContent;
       } else {
         // 2. 缓存未命中，从网络下载
-        print('[Lyric] 手动加载 - 从网络下载字幕: $hash');
+        LogService.instance.debug('[Lyric] 手动加载 - 从网络下载字幕: $hash', tag: 'Playback');
         final dio = Dio();
         final response = await dio.get<List<int>>(
           lyricUrl,
@@ -771,7 +789,7 @@ class LyricController extends StateNotifier<LyricState> {
           // 使用智能编码检测解码字节
           final (decodedContent, encoding) =
               EncodingUtils.decodeBytes(response.data!);
-          print('[Lyric] 手动加载 - 网络字幕编码: $encoding');
+          LogService.instance.debug('[Lyric] 手动加载 - 网络字幕编码: $encoding', tag: 'Playback');
           content = decodedContent;
 
           // 3. 缓存字幕内容

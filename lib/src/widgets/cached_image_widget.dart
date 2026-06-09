@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 
+import '../services/log_service.dart';
 import '../services/cache_service.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -47,7 +48,7 @@ class _CachedImageWidgetState extends State<CachedImageWidget> {
         });
         return;
       } else {
-        debugPrint('[Cache] 本地图片文件不存在: $localPath');
+        LogService.instance.warning('[Cache] 本地图片文件不存在: $localPath', tag: 'UI');
         setState(() => _isLoading = false);
         return;
       }
@@ -91,7 +92,7 @@ class _CachedImageWidgetState extends State<CachedImageWidget> {
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint('[Cache] 图片缓存加载失败: $e');
+      LogService.instance.error('[Cache] 图片缓存加载失败: $e', tag: 'UI');
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -104,14 +105,19 @@ class _CachedImageWidgetState extends State<CachedImageWidget> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // Decode at a reasonable max size — file explorer thumbnails don't need full res
+    const int cacheSize = 400;
+
     if (_cachedFilePath != null) {
       return Image.file(
         File(_cachedFilePath!),
         fit: widget.fit,
+        cacheWidth: cacheSize,
         errorBuilder: (context, error, stackTrace) {
           return Image.network(
             widget.imageUrl,
             fit: widget.fit,
+            cacheWidth: cacheSize,
             errorBuilder: (context, error, stackTrace) =>
                 _buildErrorWidget(error.toString()),
           );
@@ -122,6 +128,7 @@ class _CachedImageWidgetState extends State<CachedImageWidget> {
     return Image.network(
       widget.imageUrl,
       fit: widget.fit,
+      cacheWidth: cacheSize,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
         return Center(

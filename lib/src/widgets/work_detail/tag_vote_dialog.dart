@@ -190,11 +190,11 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: isActive
-              ? activeColor.withOpacity(0.1)
-              : Colors.grey.withOpacity(0.05),
+              ? activeColor.withValues(alpha: 0.1)
+              : Colors.grey.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isActive ? activeColor : Colors.grey.withOpacity(0.3),
+            color: isActive ? activeColor : Colors.grey.withValues(alpha: 0.3),
             width: isActive ? 2 : 1,
           ),
         ),
@@ -220,7 +220,7 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: activeColor.withOpacity(0.2),
+                  color: activeColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -284,24 +284,24 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.05),
+          color: Colors.grey.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: Colors.grey.withOpacity(0.3),
+            color: Colors.grey.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
           children: [
-            Icon(
+            const Icon(
               Icons.block,
               color: Colors.red,
               size: 22,
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 S.of(context).blockThisTag,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 15,
                   color: Colors.red,
                 ),

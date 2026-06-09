@@ -87,7 +87,7 @@ class _SleepTimerDialogState extends ConsumerState<SleepTimerDialog> {
                           color: Theme.of(context)
                               .colorScheme
                               .surface
-                              .withOpacity(0.2),
+                              .withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Row(

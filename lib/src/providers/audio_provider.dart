@@ -5,8 +5,12 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../models/audio_track.dart';
 import '../models/work.dart';
+import '../services/log_service.dart';
 import '../services/audio_player_service.dart';
 import '../services/playback_history_service.dart';
+import '../services/progress_sync_service.dart';
+import '../services/home_widget_service.dart';
+import '../utils/audio_format_parser.dart';
 import 'settings_provider.dart';
 import 'history_provider.dart';
 import 'auth_provider.dart' show kikoeruApiServiceProvider;
@@ -57,6 +61,24 @@ final isPlayingProvider = Provider<bool>((ref) {
   );
 });
 
+// Audio Format Info Provider — yields cached value first, then forwards stream
+// This ensures the fullscreen player gets the format info even if it opens
+// AFTER the format was already detected and emitted to the stream.
+final audioFormatInfoProvider = StreamProvider<AudioFormatInfo?>((ref) {
+  final service = ref.watch(audioPlayerServiceProvider);
+
+  // Stream that starts with cached value (if available) then forwards live events
+  Stream<AudioFormatInfo?> createStream() async* {
+    final cached = service.lastAudioFormat;
+    if (cached != null) {
+      yield cached;
+    }
+    yield* service.audioFormatStream;
+  }
+
+  return createStream();
+});
+
 // Track Loading Provider (true while audio source is being loaded)
 final isTrackLoadingProvider = StreamProvider<bool>((ref) {
   final service = ref.watch(audioPlayerServiceProvider);
@@ -103,6 +125,8 @@ final canSkipNextProvider = Provider<bool>((ref) {
 class AudioPlayerController extends StateNotifier<AudioPlayerState> {
   final AudioPlayerService _service;
   final Ref _ref;
+  StreamSubscription? _playerStateSub;
+  StreamSubscription? _trackSub;
 
   AudioPlayerController(this._service, this._ref)
       : super(const AudioPlayerState()) {
@@ -129,6 +153,18 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
         }
       },
     );
+
+    // 监听 crossfade 时长设置变化
+    _ref.listen<int>(
+      crossfadeDurationProvider,
+      (previous, next) {
+        if (previous != next) {
+          _service.setCrossfadeDuration(Duration(milliseconds: next));
+          state = state.copyWith(crossfadeDuration: Duration(milliseconds: next));
+        }
+      },
+    );
+
   }
 
   Future<void> initialize() async {
@@ -146,10 +182,26 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
       customTitle: privacySettings.customTitle,
     );
 
+    // 初始化时应用当前的 crossfade 设置
+    final crossfadeMs = _ref.read(crossfadeDurationProvider);
+    await _service.setCrossfadeDuration(Duration(milliseconds: crossfadeMs));
+    state = state.copyWith(crossfadeDuration: Duration(milliseconds: crossfadeMs));
+
     // Listen to player state changes
-    _service.playerStateStream.listen((playerState) {
+    _playerStateSub = _service.playerStateStream.listen((playerState) {
       // Force a state update to trigger UI rebuild
       state = state.copyWith();
+    });
+
+    // Listen for track changes to trigger progress sync + widget update
+    _trackSub = _service.currentTrackStream.listen((track) {
+      if (track?.workId != null) {
+        ProgressSyncService.instance.onTrackStarted(track!.workId!);
+      }
+      HomeWidgetService.instance.updateTrackState(
+        track: track,
+        isPlaying: _service.playing,
+      );
     });
   }
 
@@ -176,18 +228,19 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
         _ref.read(historyProvider.notifier).addOrUpdate(work,
             track: track, positionMs: _service.position.inMilliseconds);
       } catch (e) {
-        print(
-            'Failed to record history for playTrack (id=${track.workId}): $e');
+        LogService.instance.warning(
+            'Failed to record history for playTrack (id=${track.workId}): $e', tag: 'Playback');
+
       }
     }
   }
 
   Future<void> playTracks(List<AudioTrack> tracks,
       {int startIndex = 0, Work? work}) async {
-    print(
-        '[AudioController] playTracks调用: ${tracks.length}个轨道, startIndex=$startIndex');
-    print(
-        '[AudioController] 第一个轨道: title="${tracks.first.title}", url="${tracks.first.url}"');
+    LogService.instance.debug(
+        '[AudioController] playTracks调用: ${tracks.length}个轨道, startIndex=$startIndex', tag: 'Playback');
+    LogService.instance.debug(
+        '[AudioController] 第一个轨道: title="${tracks.first.title}", url="${tracks.first.url}"', tag: 'Playback');
 
     final shouldAppend = state.appendMode && queue.isNotEmpty;
 
@@ -200,9 +253,9 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
       }
     } else {
       await _service.updateQueue(tracks, startIndex: startIndex);
-      print('[AudioController] updateQueue完成');
+      LogService.instance.debug('[AudioController] updateQueue完成', tag: 'Playback');
       await _service.play();
-      print('[AudioController] play完成');
+      LogService.instance.debug('[AudioController] play完成', tag: 'Playback');
     }
 
     if (work != null) {
@@ -212,12 +265,16 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
 
   Future<void> play() async {
     await _service.play();
+    _updateWidget();
   }
 
   Future<void> pause() async {
     await _service.pause();
+    _updateWidget();
     // 暂停时立即落盘历史
     PlaybackHistoryService.instance.onPaused();
+    // 暂停时同步进度到服务器
+    await ProgressSyncService.instance.onPaused();
   }
 
   Future<void> stop() async {
@@ -234,6 +291,8 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
   Future<void> seekAndPersist(Duration position) async {
     await _service.seek(position);
     await PlaybackHistoryService.instance.onSeekCommitted(position);
+    // seek 时同步进度到服务器
+    await ProgressSyncService.instance.onSeekCommitted(position);
   }
 
   Future<void> seekForward(Duration duration) async {
@@ -262,6 +321,36 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
 
   Future<void> moveTrack(int oldIndex, int newIndex) async {
     await _service.moveTrack(oldIndex, newIndex);
+  }
+
+  /// Clear all tracks from the queue and stop playback.
+  Future<void> clearQueue() async {
+    await _service.clearQueue();
+  }
+
+  /// Save current queue as a new playlist on the server.
+  /// Collects unique work IDs from all tracks, then calls createPlaylist.
+  Future<void> saveQueueAsPlaylist({
+    required String name,
+    int privacy = 0,
+    String? description,
+  }) async {
+    final tracks = _service.queue;
+    // Collect unique, non-null work IDs
+    final workIds = tracks
+        .map((t) => t.workId)
+        .where((id) => id != null)
+        .cast<int>()
+        .toSet()
+        .toList();
+
+    final api = _ref.read(kikoeruApiServiceProvider);
+    await api.createPlaylist(
+      name: name,
+      privacy: privacy,
+      description: description,
+      works: workIds.isNotEmpty ? workIds : null,
+    );
   }
 
   Future<void> setRepeatMode(LoopMode mode) async {
@@ -294,6 +383,19 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
     state = state.copyWith(speed: speed);
   }
 
+  Future<void> setCrossfadeDuration(Duration duration) async {
+    await _service.setCrossfadeDuration(duration);
+    state = state.copyWith(crossfadeDuration: duration);
+  }
+
+  @override
+  void dispose() {
+    _playerStateSub?.cancel();
+    _trackSub?.cancel();
+    ProgressSyncService.instance.onTrackEnded();
+    super.dispose();
+  }
+
   // Getters to expose service state
   bool get isPlaying => _service.playing;
   PlayerState get playerState => _service.playerState;
@@ -301,6 +403,14 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
   List<AudioTrack> get queue => _service.queue;
   Stream<PlayerState> get playerStateStream => _service.playerStateStream;
   Stream<AudioTrack?> get currentTrackStream => _service.currentTrackStream;
+
+  /// Update the Android home screen widget with current track state.
+  void _updateWidget() {
+    HomeWidgetService.instance.updateTrackState(
+      track: _service.currentTrack,
+      isPlaying: _service.playing,
+    );
+  }
 }
 
 // Audio Player State
@@ -311,6 +421,7 @@ class AudioPlayerState {
   final double speed;
   final bool appendMode;
   final bool hasShownAppendHint;
+  final Duration crossfadeDuration;
 
   const AudioPlayerState({
     this.repeatMode = LoopMode.off,
@@ -319,6 +430,7 @@ class AudioPlayerState {
     this.speed = 1.0,
     this.appendMode = false,
     this.hasShownAppendHint = false,
+    this.crossfadeDuration = Duration.zero,
   });
 
   AudioPlayerState copyWith({
@@ -328,6 +440,7 @@ class AudioPlayerState {
     double? speed,
     bool? appendMode,
     bool? hasShownAppendHint,
+    Duration? crossfadeDuration,
   }) {
     return AudioPlayerState(
       repeatMode: repeatMode ?? this.repeatMode,
@@ -336,6 +449,7 @@ class AudioPlayerState {
       speed: speed ?? this.speed,
       appendMode: appendMode ?? this.appendMode,
       hasShownAppendHint: hasShownAppendHint ?? this.hasShownAppendHint,
+      crossfadeDuration: crossfadeDuration ?? this.crossfadeDuration,
     );
   }
 }
@@ -360,6 +474,12 @@ final miniPlayerVisibilityProvider =
     StateNotifierProvider<MiniPlayerVisibilityController, bool>((ref) {
   return MiniPlayerVisibilityController();
 });
+
+/// Provider to track when the fullscreen player route is active.
+final isFullscreenPlayerActiveProvider = StateProvider<bool>((ref) => false);
+
+/// Provider to toggle the blurred cover background in the fullscreen player.
+final showBlurredBackgroundProvider = StateProvider<bool>((ref) => true);
 
 // Sleep Timer Controller
 class SleepTimerController extends StateNotifier<SleepTimerState> {
@@ -535,9 +655,9 @@ class SleepTimerState {
     final seconds = remainingTime!.inSeconds.remainder(60);
 
     if (hours > 0) {
-      return '${hours}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
     } else {
-      return '${minutes}:${seconds.toString().padLeft(2, '0')}';
+      return '$minutes:${seconds.toString().padLeft(2, '0')}';
     }
   }
 }

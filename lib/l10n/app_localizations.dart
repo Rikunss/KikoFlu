@@ -105,7 +105,7 @@ abstract class S {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'KikoFlu'**
+  /// **'KikoFlu Edge'**
   String get appTitle;
 
   /// No description provided for @navHome.
@@ -360,18 +360,6 @@ abstract class S {
   /// **'Google Translate'**
   String get translationSourceGoogle;
 
-  /// No description provided for @translationSourceYoudao.
-  ///
-  /// In en, this message translates to:
-  /// **'Youdao Translate'**
-  String get translationSourceYoudao;
-
-  /// No description provided for @translationSourceMicrosoft.
-  ///
-  /// In en, this message translates to:
-  /// **'Microsoft Translate'**
-  String get translationSourceMicrosoft;
-
   /// No description provided for @translationSourceLlm.
   ///
   /// In en, this message translates to:
@@ -496,7 +484,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Account \"{username}\" has been added'**
-  String accountAdded(String username);
+  String accountAdded(Object username);
 
   /// No description provided for @testConnection.
   ///
@@ -520,7 +508,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{ms}ms'**
-  String latencyMs(String ms);
+  String latencyMs(Object ms);
 
   /// No description provided for @connectionFailed.
   ///
@@ -658,7 +646,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{stars} stars'**
-  String minRatingStars(String stars);
+  String minRatingStars(Object stars);
 
   /// No description provided for @searchHistory.
   ///
@@ -724,7 +712,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Load failed: {error}'**
-  String loadFailedWithError(String error);
+  String loadFailedWithError(Object error);
 
   /// No description provided for @loading.
   ///
@@ -910,7 +898,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Current cache: {size}'**
-  String currentCache(String size);
+  String currentCache(Object size);
 
   /// No description provided for @themeSettings.
   ///
@@ -988,7 +976,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{version} available (current: {current})'**
-  String newVersionAvailable(String version, String current);
+  String newVersionAvailable(Object current, Object version);
 
   /// No description provided for @versionInfo.
   ///
@@ -1000,7 +988,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Current version: {version}'**
-  String currentVersion(String version);
+  String currentVersion(Object version);
 
   /// No description provided for @checkUpdate.
   ///
@@ -1036,13 +1024,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to open link: {error}'**
-  String openLinkFailed(String error);
+  String openLinkFailed(Object error);
 
   /// No description provided for @foundNewVersion.
   ///
   /// In en, this message translates to:
   /// **'Found new version {version}'**
-  String foundNewVersion(String version);
+  String foundNewVersion(Object version);
 
   /// No description provided for @view.
   ///
@@ -1210,7 +1198,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{count} selected'**
-  String selectedCount(int count);
+  String selectedCount(Object count);
 
   /// No description provided for @selectAll.
   ///
@@ -1240,13 +1228,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{count} files'**
-  String nFiles(int count);
+  String nFiles(Object count);
 
   /// No description provided for @errorWithMessage.
   ///
   /// In en, this message translates to:
   /// **'Error: {error}'**
-  String errorWithMessage(String error);
+  String errorWithMessage(Object error);
 
   /// No description provided for @pause.
   ///
@@ -1270,13 +1258,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Are you sure you want to delete {count} selected download tasks? Downloaded files will also be removed.'**
-  String deletionConfirmMessage(int count);
+  String deletionConfirmMessage(Object count);
 
   /// No description provided for @deletedNFiles.
   ///
   /// In en, this message translates to:
   /// **'Deleted {count} files'**
-  String deletedNFiles(int count);
+  String deletedNFiles(Object count);
 
   /// No description provided for @downloadStatusPending.
   ///
@@ -1312,13 +1300,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Translation failed: {error}'**
-  String translationFailed(String error);
+  String translationFailed(Object error);
 
   /// No description provided for @copiedToClipboard.
   ///
   /// In en, this message translates to:
   /// **'Copied {label}: {text}'**
-  String copiedToClipboard(String label, String text);
+  String copiedToClipboard(Object label, Object text);
 
   /// No description provided for @loadingFileList.
   ///
@@ -1330,7 +1318,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to load file list: {error}'**
-  String loadFileListFailed(String error);
+  String loadFileListFailed(Object error);
 
   /// No description provided for @playlistTitle.
   ///
@@ -1438,7 +1426,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'+{min} min'**
-  String addMinutes(int min);
+  String addMinutes(Object min);
 
   /// No description provided for @cancelTimer.
   ///
@@ -1552,13 +1540,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Are you sure you want to switch to account \"{username}\"?'**
-  String switchAccountConfirm(String username);
+  String switchAccountConfirm(Object username);
 
   /// No description provided for @switchedToAccount.
   ///
   /// In en, this message translates to:
   /// **'Switched to account: {username}'**
-  String switchedToAccount(String username);
+  String switchedToAccount(Object username);
 
   /// No description provided for @switchFailed.
   ///
@@ -1570,7 +1558,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Switch failed: {error}'**
-  String switchFailedWithError(String error);
+  String switchFailedWithError(Object error);
 
   /// No description provided for @noAccounts.
   ///
@@ -1606,7 +1594,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Are you sure you want to delete account \"{username}\"? This action cannot be undone.'**
-  String deleteAccountConfirm(String username);
+  String deleteAccountConfirm(Object username);
 
   /// No description provided for @accountDeleted.
   ///
@@ -1618,7 +1606,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Deletion failed: {error}'**
-  String deletionFailedWithError(String error);
+  String deletionFailedWithError(Object error);
 
   /// No description provided for @subtitleLibraryPriority.
   ///
@@ -1834,7 +1822,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Vote failed: {error}'**
-  String voteFailed(String error);
+  String voteFailed(Object error);
 
   /// No description provided for @blockThisTag.
   ///
@@ -1858,7 +1846,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to load tags: {error}'**
-  String loadTagsFailed(String error);
+  String loadTagsFailed(Object error);
 
   /// No description provided for @selectAtLeastOneTag.
   ///
@@ -1882,7 +1870,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Selected {count} tags:'**
-  String selectedNTags(int count);
+  String selectedNTags(Object count);
 
   /// No description provided for @noMatchingTags.
   ///
@@ -1936,13 +1924,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{count} works'**
-  String totalNWorks(int count);
+  String totalNWorks(Object count);
 
   /// No description provided for @pageNOfTotal.
   ///
   /// In en, this message translates to:
   /// **'Page {current} / {total}'**
-  String pageNOfTotal(int current, int total);
+  String pageNOfTotal(Object current, Object total);
 
   /// No description provided for @translateTitle.
   ///
@@ -1966,7 +1954,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Translation failed, auto-switched to {source}'**
-  String translationFallbackNotice(String source);
+  String translationFallbackNotice(Object source);
 
   /// No description provided for @tagLabel.
   ///
@@ -2118,6 +2106,12 @@ abstract class S {
   /// **'Follow System'**
   String get themeModeSystem;
 
+  /// No description provided for @themeModeTrueBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'True Black'**
+  String get themeModeTrueBlack;
+
   /// No description provided for @colorSchemeOceanBlue.
   ///
   /// In en, this message translates to:
@@ -2147,6 +2141,24 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Sakura Pink'**
   String get colorSchemeSakuraPink;
+
+  /// No description provided for @colorSchemeCrimsonRed.
+  ///
+  /// In en, this message translates to:
+  /// **'Crimson Red'**
+  String get colorSchemeCrimsonRed;
+
+  /// No description provided for @colorSchemeAmberGold.
+  ///
+  /// In en, this message translates to:
+  /// **'Amber Gold'**
+  String get colorSchemeAmberGold;
+
+  /// No description provided for @colorSchemeSlateGray.
+  ///
+  /// In en, this message translates to:
+  /// **'Slate Gray'**
+  String get colorSchemeSlateGray;
 
   /// No description provided for @colorSchemeDynamic.
   ///
@@ -2260,7 +2272,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Found {count} subtitle files'**
-  String subtitleFilesFound(int count);
+  String subtitleFilesFound(Object count);
 
   /// No description provided for @selectDirectory.
   ///
@@ -2514,6 +2526,12 @@ abstract class S {
   /// **'Related Works'**
   String get relatedRecommendations;
 
+  /// No description provided for @moreFromCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'More from {circle}'**
+  String moreFromCircle(Object circle);
+
   /// No description provided for @myTabsDisplaySettings.
   ///
   /// In en, this message translates to:
@@ -2650,13 +2668,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{count} reviews'**
-  String reviewsCount(int count);
+  String reviewsCount(Object count);
 
   /// No description provided for @ratingsCount.
   ///
   /// In en, this message translates to:
   /// **'{count} ratings total'**
-  String ratingsCount(int count);
+  String ratingsCount(Object count);
 
   /// No description provided for @myReviews.
   ///
@@ -2728,7 +2746,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Review failed: {error}'**
-  String reviewFailed(String error);
+  String reviewFailed(Object error);
 
   /// No description provided for @notificationPermission.
   ///
@@ -2818,7 +2836,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Operation failed: {error}'**
-  String operationFailedWithError(String error);
+  String operationFailedWithError(Object error);
 
   /// No description provided for @aboutSubtitle.
   ///
@@ -2836,7 +2854,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Limit: {size}MB'**
-  String cacheLimitLabelMB(int size);
+  String cacheLimitLabelMB(Object size);
 
   /// No description provided for @cacheUsagePercent.
   ///
@@ -2878,7 +2896,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Clear cache failed: {error}'**
-  String clearCacheFailedWithError(String error);
+  String clearCacheFailedWithError(Object error);
 
   /// No description provided for @hasNewVersion.
   ///
@@ -2952,6 +2970,24 @@ abstract class S {
   /// **'Green, green, green'**
   String get colorSchemeForestGreenDesc;
 
+  /// No description provided for @colorSchemeCrimsonRedDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Red, red, red! 🔴'**
+  String get colorSchemeCrimsonRedDesc;
+
+  /// No description provided for @colorSchemeAmberGoldDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Golden and bright!'**
+  String get colorSchemeAmberGoldDesc;
+
+  /// No description provided for @colorSchemeSlateGrayDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Neutral, elegant, cool'**
+  String get colorSchemeSlateGrayDesc;
+
   /// No description provided for @colorSchemeDynamicDesc.
   ///
   /// In en, this message translates to:
@@ -3022,19 +3058,19 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Current: {size} items/page'**
-  String pageSizeCurrent(int size);
+  String pageSizeCurrent(Object size);
 
   /// No description provided for @currentSettingLabel.
   ///
   /// In en, this message translates to:
   /// **'Current: {value}'**
-  String currentSettingLabel(String value);
+  String currentSettingLabel(Object value);
 
   /// No description provided for @setToValue.
   ///
   /// In en, this message translates to:
   /// **'Set to: {value}'**
-  String setToValue(String value);
+  String setToValue(Object value);
 
   /// No description provided for @llmConfigRequiredMessage.
   ///
@@ -3053,18 +3089,6 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Requires network access to Google services'**
   String get translationDescGoogle;
-
-  /// No description provided for @translationDescYoudao.
-  ///
-  /// In en, this message translates to:
-  /// **'Works with default network'**
-  String get translationDescYoudao;
-
-  /// No description provided for @translationDescMicrosoft.
-  ///
-  /// In en, this message translates to:
-  /// **'Works with default network'**
-  String get translationDescMicrosoft;
 
   /// No description provided for @translationDescLlm.
   ///
@@ -3142,7 +3166,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to request notification permission: {error}'**
-  String requestNotificationFailed(String error);
+  String requestNotificationFailed(Object error);
 
   /// No description provided for @backgroundPermissionGranted.
   ///
@@ -3160,19 +3184,19 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to request background permission: {error}'**
-  String requestBackgroundFailed(String error);
+  String requestBackgroundFailed(Object error);
 
   /// No description provided for @permissionRequired.
   ///
   /// In en, this message translates to:
   /// **'{permission} Required'**
-  String permissionRequired(String permission);
+  String permissionRequired(Object permission);
 
   /// No description provided for @permissionPermanentlyDenied.
   ///
   /// In en, this message translates to:
   /// **'{permission} has been permanently denied. Please enable it manually in system settings.'**
-  String permissionPermanentlyDenied(String permission);
+  String permissionPermanentlyDenied(Object permission);
 
   /// No description provided for @openSettings.
   ///
@@ -3202,13 +3226,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Are you sure you want to delete \"{fileName}\"?'**
-  String deleteFileConfirm(String fileName);
+  String deleteFileConfirm(Object fileName);
 
   /// No description provided for @deleteSelectedFilesConfirm.
   ///
   /// In en, this message translates to:
   /// **'Are you sure you want to delete {count} selected files?'**
-  String deleteSelectedFilesConfirm(int count);
+  String deleteSelectedFilesConfirm(Object count);
 
   /// No description provided for @deleted.
   ///
@@ -3220,13 +3244,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Cannot open folder: {path}'**
-  String cannotOpenFolder(String path);
+  String cannotOpenFolder(Object path);
 
   /// No description provided for @openFolderFailed.
   ///
   /// In en, this message translates to:
   /// **'Failed to open folder: {error}'**
-  String openFolderFailed(String error);
+  String openFolderFailed(Object error);
 
   /// No description provided for @reloadingFromDisk.
   ///
@@ -3244,31 +3268,31 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Refresh failed: {error}'**
-  String refreshFailed(String error);
+  String refreshFailed(Object error);
 
   /// No description provided for @deleteSelectedWorksConfirm.
   ///
   /// In en, this message translates to:
   /// **'Are you sure you want to delete {count} selected works?'**
-  String deleteSelectedWorksConfirm(int count);
+  String deleteSelectedWorksConfirm(Object count);
 
   /// No description provided for @partialDeleteFailed.
   ///
   /// In en, this message translates to:
   /// **'Partial deletion failed: {error}'**
-  String partialDeleteFailed(String error);
+  String partialDeleteFailed(Object error);
 
   /// No description provided for @deletedNOfTotal.
   ///
   /// In en, this message translates to:
   /// **'Deleted {success}/{total} tasks'**
-  String deletedNOfTotal(int success, int total);
+  String deletedNOfTotal(Object success, Object total);
 
   /// No description provided for @deleteFailedWithError.
   ///
   /// In en, this message translates to:
   /// **'Deletion failed: {error}'**
-  String deleteFailedWithError(String error);
+  String deleteFailedWithError(Object error);
 
   /// No description provided for @noWorkMetadataForOffline.
   ///
@@ -3280,7 +3304,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to open work detail: {error}'**
-  String openWorkDetailFailed(String error);
+  String openWorkDetailFailed(Object error);
 
   /// No description provided for @noLocalDownloads.
   ///
@@ -3364,7 +3388,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Add failed: {error}'**
-  String addFailedWithError(String error);
+  String addFailedWithError(Object error);
 
   /// No description provided for @creatingPlaylist.
   ///
@@ -3376,13 +3400,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Playlist \"{name}\" created successfully'**
-  String playlistCreatedSuccess(String name);
+  String playlistCreatedSuccess(Object name);
 
   /// No description provided for @createFailedWithError.
   ///
   /// In en, this message translates to:
   /// **'Creation failed: {error}'**
-  String createFailedWithError(String error);
+  String createFailedWithError(Object error);
 
   /// No description provided for @noPlaylists.
   ///
@@ -3406,7 +3430,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{count} items total'**
-  String totalNItems(int count);
+  String totalNItems(Object count);
 
   /// No description provided for @systemPlaylistCannotDelete.
   ///
@@ -3436,7 +3460,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Are you sure you want to unfavorite \"{name}\"?'**
-  String unfavoritePlaylistConfirm(String name);
+  String unfavoritePlaylistConfirm(Object name);
 
   /// No description provided for @unfavorite.
   ///
@@ -3520,13 +3544,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Detected {count} work IDs'**
-  String detectedNWorkIds(int count);
+  String detectedNWorkIds(Object count);
 
   /// No description provided for @addNWorks.
   ///
   /// In en, this message translates to:
   /// **'Add {count}'**
-  String addNWorks(int count);
+  String addNWorks(Object count);
 
   /// No description provided for @noValidWorkIds.
   ///
@@ -3538,13 +3562,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Adding {count} works...'**
-  String addingNWorks(int count);
+  String addingNWorks(Object count);
 
   /// No description provided for @addedNWorksSuccess.
   ///
   /// In en, this message translates to:
   /// **'Successfully added {count} works'**
-  String addedNWorksSuccess(int count);
+  String addedNWorksSuccess(Object count);
 
   /// No description provided for @removeWork.
   ///
@@ -3556,7 +3580,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Are you sure you want to remove \"{title}\" from the playlist?'**
-  String removeWorkConfirm(String title);
+  String removeWorkConfirm(Object title);
 
   /// No description provided for @removeSuccess.
   ///
@@ -3568,7 +3592,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Remove failed: {error}'**
-  String removeFailedWithError(String error);
+  String removeFailedWithError(Object error);
 
   /// No description provided for @saving.
   ///
@@ -3586,7 +3610,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Save failed: {error}'**
-  String saveFailedWithError(String error);
+  String saveFailedWithError(Object error);
 
   /// No description provided for @noWorks.
   ///
@@ -3616,13 +3640,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{count} works'**
-  String nWorksCount(int count);
+  String nWorksCount(Object count);
 
   /// No description provided for @nPlaysCount.
   ///
   /// In en, this message translates to:
   /// **'{count} plays'**
-  String nPlaysCount(int count);
+  String nPlaysCount(Object count);
 
   /// No description provided for @removeFromPlaylist.
   ///
@@ -3646,13 +3670,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Excluded {count} works'**
-  String excludedNWorks(int count);
+  String excludedNWorks(Object count);
 
   /// No description provided for @pageExcludedNWorks.
   ///
   /// In en, this message translates to:
   /// **'This page excluded {count} works'**
-  String pageExcludedNWorks(int count);
+  String pageExcludedNWorks(Object count);
 
   /// No description provided for @noSubtitlesAvailable.
   ///
@@ -3738,6 +3762,30 @@ abstract class S {
   /// **'Playlist is empty'**
   String get playlistEmpty;
 
+  /// No description provided for @clearQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Queue'**
+  String get clearQueue;
+
+  /// No description provided for @clearQueueConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to clear the playback queue?'**
+  String get clearQueueConfirm;
+
+  /// No description provided for @saveAsPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as Playlist'**
+  String get saveAsPlaylist;
+
+  /// No description provided for @newPlaylistNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter playlist name'**
+  String get newPlaylistNameHint;
+
   /// No description provided for @appendModeEnabled.
   ///
   /// In en, this message translates to:
@@ -3760,13 +3808,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{count} min'**
-  String nMinutes(int count);
+  String nMinutes(Object count);
 
   /// No description provided for @nHours.
   ///
   /// In en, this message translates to:
   /// **'{count} hr'**
-  String nHours(int count);
+  String nHours(Object count);
 
   /// No description provided for @titleLabel.
   ///
@@ -3790,13 +3838,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{price} Yen'**
-  String priceInYen(int price);
+  String priceInYen(Object price);
 
   /// No description provided for @soldCount.
   ///
   /// In en, this message translates to:
   /// **'Sold: {count}'**
-  String soldCount(String count);
+  String soldCount(Object count);
 
   /// No description provided for @circleAndVaSection.
   ///
@@ -3820,7 +3868,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{count}k'**
-  String tenThousandSuffix(String count);
+  String tenThousandSuffix(Object count);
 
   /// No description provided for @packingWork.
   ///
@@ -3844,13 +3892,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Export successful: {path}'**
-  String exportSuccess(String path);
+  String exportSuccess(Object path);
 
   /// No description provided for @exportFailed.
   ///
   /// In en, this message translates to:
   /// **'Export failed: {error}'**
-  String exportFailed(String error);
+  String exportFailed(Object error);
 
   /// No description provided for @exportAsZip.
   ///
@@ -3868,7 +3916,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to load files: {error}'**
-  String loadFilesFailed(String error);
+  String loadFilesFailed(Object error);
 
   /// No description provided for @unknown.
   ///
@@ -3886,13 +3934,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Cannot find audio file: {title}'**
-  String cannotFindAudioFile(String title);
+  String cannotFindAudioFile(Object title);
 
   /// No description provided for @nowPlayingNOfTotal.
   ///
   /// In en, this message translates to:
   /// **'Now playing: {title} ({current}/{total})'**
-  String nowPlayingNOfTotal(String title, int current, int total);
+  String nowPlayingNOfTotal(Object current, Object title, Object total);
 
   /// No description provided for @noAudioCannotLoadSubtitle.
   ///
@@ -3946,13 +3994,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Subtitle loaded: {title}'**
-  String subtitleLoadSuccess(String title);
+  String subtitleLoadSuccess(Object title);
 
   /// No description provided for @subtitleLoadFailed.
   ///
   /// In en, this message translates to:
   /// **'Subtitle load failed: {error}'**
-  String subtitleLoadFailed(String error);
+  String subtitleLoadFailed(Object error);
 
   /// No description provided for @cannotPreviewImageMissingInfo.
   ///
@@ -4024,7 +4072,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Error playing video: {error}'**
-  String playVideoError(String error);
+  String playVideoError(Object error);
 
   /// No description provided for @noFiles.
   ///
@@ -4042,7 +4090,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Resource Files (translated {count} items)'**
-  String resourceFilesTranslated(int count);
+  String resourceFilesTranslated(Object count);
 
   /// No description provided for @translationOriginal.
   ///
@@ -4060,13 +4108,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Copied name: {title}'**
-  String copiedName(String title);
+  String copiedName(Object title);
 
   /// No description provided for @translationComplete.
   ///
   /// In en, this message translates to:
   /// **'Translation complete: {count} items'**
-  String translationComplete(int count);
+  String translationComplete(Object count);
 
   /// No description provided for @noContentToTranslate.
   ///
@@ -4084,13 +4132,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Translating {current}/{total}'**
-  String translatingProgress(int current, int total);
+  String translatingProgress(Object current, Object total);
 
   /// No description provided for @nItems.
   ///
   /// In en, this message translates to:
   /// **'{count} items'**
-  String nItems(int count);
+  String nItems(Object count);
 
   /// No description provided for @loadAsSubtitle.
   ///
@@ -4108,13 +4156,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Error opening video file: {error}'**
-  String openVideoFileError(String error);
+  String openVideoFileError(Object error);
 
   /// No description provided for @cannotOpenVideoFile.
   ///
   /// In en, this message translates to:
   /// **'Cannot open video file: {message}'**
-  String cannotOpenVideoFile(String message);
+  String cannotOpenVideoFile(Object message);
 
   /// No description provided for @noFileTreeInfo.
   ///
@@ -4162,7 +4210,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'File does not exist: {title}'**
-  String fileNotExist(String title);
+  String fileNotExist(Object title);
 
   /// No description provided for @cannotPreviewPdfMissingId.
   ///
@@ -4186,7 +4234,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Error: {message}'**
-  String errorInfo(String message);
+  String errorInfo(Object message);
 
   /// No description provided for @installVideoPlayerApp.
   ///
@@ -4216,7 +4264,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'This file type is not supported: {title}'**
-  String unsupportedFileType(String title);
+  String unsupportedFileType(Object title);
 
   /// No description provided for @deleteFilePrompt.
   ///
@@ -4228,7 +4276,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Deleted: {title}'**
-  String deletedItem(String title);
+  String deletedItem(Object title);
 
   /// No description provided for @selectAtLeastOneFile.
   ///
@@ -4240,19 +4288,19 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Added {count} files to download queue'**
-  String addedNFilesToDownloadQueue(int count);
+  String addedNFilesToDownloadQueue(Object count);
 
   /// No description provided for @downloadedAndSelected.
   ///
   /// In en, this message translates to:
   /// **'Downloaded {downloaded} · Selected {selected}'**
-  String downloadedAndSelected(int downloaded, int selected);
+  String downloadedAndSelected(Object downloaded, Object selected);
 
   /// No description provided for @downloadN.
   ///
   /// In en, this message translates to:
   /// **'Download ({count})'**
-  String downloadN(int count);
+  String downloadN(Object count);
 
   /// No description provided for @checkingDownloadedFiles.
   ///
@@ -4276,13 +4324,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{count} downloaded'**
-  String downloadedNCount(int count);
+  String downloadedNCount(Object count);
 
   /// No description provided for @selectedNCount.
   ///
   /// In en, this message translates to:
   /// **'{count} selected'**
-  String selectedNCount(int count);
+  String selectedNCount(Object count);
 
   /// No description provided for @pleaseEnterServerAddress.
   ///
@@ -4312,13 +4360,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Latency {latency} ({status})'**
-  String latencyResultDetail(String latency, String status);
+  String latencyResultDetail(Object latency, Object status);
 
   /// No description provided for @connectionFailedWithDetail.
   ///
   /// In en, this message translates to:
   /// **'Connection failed: {error}'**
-  String connectionFailedWithDetail(String error);
+  String connectionFailedWithDetail(Object error);
 
   /// No description provided for @noAccountTapToRegister.
   ///
@@ -4366,25 +4414,25 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Last used: {time}'**
-  String lastUsedTime(String time);
+  String lastUsedTime(Object time);
 
   /// No description provided for @daysAgo.
   ///
   /// In en, this message translates to:
   /// **'{count} days ago'**
-  String daysAgo(int count);
+  String daysAgo(Object count);
 
   /// No description provided for @hoursAgo.
   ///
   /// In en, this message translates to:
   /// **'{count} hours ago'**
-  String hoursAgo(int count);
+  String hoursAgo(Object count);
 
   /// No description provided for @minutesAgo.
   ///
   /// In en, this message translates to:
   /// **'{count} minutes ago'**
-  String minutesAgo(int count);
+  String minutesAgo(Object count);
 
   /// No description provided for @justNow.
   ///
@@ -4402,13 +4450,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Delete {count} selected items?'**
-  String deleteSelectedConfirm(int count);
+  String deleteSelectedConfirm(Object count);
 
   /// No description provided for @deletedNOfTotalItems.
   ///
   /// In en, this message translates to:
   /// **'Deleted {success}/{total} items'**
-  String deletedNOfTotalItems(int success, int total);
+  String deletedNOfTotalItems(Object success, Object total);
 
   /// No description provided for @importingSubtitleFile.
   ///
@@ -4540,7 +4588,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Delete \"{title}\"?'**
-  String deleteItemConfirm(String title);
+  String deleteItemConfirm(Object title);
 
   /// No description provided for @deleteFolderContentsWarning.
   ///
@@ -4558,7 +4606,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Subtitle loaded: {title}'**
-  String subtitleLoaded(String title);
+  String subtitleLoaded(Object title);
 
   /// No description provided for @moveSuccess.
   ///
@@ -4576,13 +4624,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Preview failed: {error}'**
-  String previewFailed(String error);
+  String previewFailed(Object error);
 
   /// No description provided for @openFailed.
   ///
   /// In en, this message translates to:
   /// **'Open failed: {error}'**
-  String openFailed(String error);
+  String openFailed(Object error);
 
   /// No description provided for @back.
   ///
@@ -4684,43 +4732,43 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'No blocked {type}'**
-  String noBlockedItemsOfType(String type);
+  String noBlockedItemsOfType(Object type);
 
   /// No description provided for @unblockedItem.
   ///
   /// In en, this message translates to:
   /// **'Unblocked: {item}'**
-  String unblockedItem(String item);
+  String unblockedItem(Object item);
 
   /// No description provided for @addBlockedItem.
   ///
   /// In en, this message translates to:
   /// **'Add Blocked {type}'**
-  String addBlockedItem(String type);
+  String addBlockedItem(Object type);
 
   /// No description provided for @blockedItemName.
   ///
   /// In en, this message translates to:
   /// **'{type} name'**
-  String blockedItemName(String type);
+  String blockedItemName(Object type);
 
   /// No description provided for @enterBlockedItemHint.
   ///
   /// In en, this message translates to:
   /// **'Enter {type} to block'**
-  String enterBlockedItemHint(String type);
+  String enterBlockedItemHint(Object type);
 
   /// No description provided for @blockedItemAdded.
   ///
   /// In en, this message translates to:
   /// **'Blocked: {item}'**
-  String blockedItemAdded(String item);
+  String blockedItemAdded(Object item);
 
   /// No description provided for @workCountLabel.
   ///
   /// In en, this message translates to:
   /// **'Works: {count}'**
-  String workCountLabel(int count);
+  String workCountLabel(Object count);
 
   /// No description provided for @miniPlayer.
   ///
@@ -4840,7 +4888,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Delete ({count})'**
-  String deleteWithCount(int count);
+  String deleteWithCount(Object count);
 
   /// No description provided for @searchSubtitles.
   ///
@@ -4852,7 +4900,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{count} files • {size}'**
-  String nFilesWithSize(int count, String size);
+  String nFilesWithSize(Object count, Object size);
 
   /// No description provided for @rootDirectory.
   ///
@@ -4870,7 +4918,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Move to: {name}'**
-  String moveToTarget(String name);
+  String moveToTarget(Object name);
 
   /// No description provided for @noSubfoldersHere.
   ///
@@ -4882,13 +4930,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Added to playlist \"{name}\"'**
-  String addedToPlaylist(String name);
+  String addedToPlaylist(Object name);
 
   /// No description provided for @removedFromPlaylist.
   ///
   /// In en, this message translates to:
   /// **'Removed from playlist \"{name}\"'**
-  String removedFromPlaylist(String name);
+  String removedFromPlaylist(Object name);
 
   /// No description provided for @alreadyFavorited.
   ///
@@ -4900,7 +4948,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to load image\n{error}'**
-  String loadImageFailedWithError(String error);
+  String loadImageFailedWithError(Object error);
 
   /// No description provided for @noImageAvailable.
   ///
@@ -4930,7 +4978,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Saved to: {path}'**
-  String savedToPath(String path);
+  String savedToPath(Object path);
 
   /// No description provided for @doubleTapToZoom.
   ///
@@ -4942,7 +4990,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to get status: {error}'**
-  String getStatusFailed(String error);
+  String getStatusFailed(Object error);
 
   /// No description provided for @deleteRecord.
   ///
@@ -4954,7 +5002,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Are you sure you want to delete the play record for \"{title}\"?'**
-  String deletePlayRecordConfirm(String title);
+  String deletePlayRecordConfirm(Object title);
 
   /// No description provided for @notPlayedYet.
   ///
@@ -4966,7 +5014,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Playback failed: {error}'**
-  String playbackFailed(String error);
+  String playbackFailed(Object error);
 
   /// No description provided for @storagePermissionRequired.
   ///
@@ -4996,7 +5044,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Image saved to: {path}'**
-  String imageSavedToPath(String path);
+  String imageSavedToPath(Object path);
 
   /// No description provided for @pullDownForNextPage.
   ///
@@ -5026,7 +5074,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Page (1-{max})'**
-  String pageNumberRange(int max);
+  String pageNumberRange(Object max);
 
   /// No description provided for @enterPageNumber.
   ///
@@ -5038,7 +5086,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Please enter a valid page number (1-{max})'**
-  String enterValidPageNumber(int max);
+  String enterValidPageNumber(Object max);
 
   /// No description provided for @previousPage.
   ///
@@ -5068,13 +5116,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to load PDF: {error}'**
-  String loadPdfFailed(String error);
+  String loadPdfFailed(Object error);
 
   /// No description provided for @pdfPageOfTotal.
   ///
   /// In en, this message translates to:
   /// **'Page {current} of {total}'**
-  String pdfPageOfTotal(int current, int total);
+  String pdfPageOfTotal(Object current, Object total);
 
   /// No description provided for @loadingPdf.
   ///
@@ -5104,7 +5152,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'PDF rendering failed: {error}'**
-  String renderPdfFailed(String error);
+  String renderPdfFailed(Object error);
 
   /// No description provided for @ratingDetails.
   ///
@@ -5170,7 +5218,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'File saved to: {path}'**
-  String fileSavedToPath(String path);
+  String fileSavedToPath(Object path);
 
   /// No description provided for @localFileNotExist.
   ///
@@ -5182,7 +5230,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to load text: {error}'**
-  String loadTextFailed(String error);
+  String loadTextFailed(Object error);
 
   /// No description provided for @previewMode.
   ///
@@ -5230,19 +5278,19 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Set to: {progress}, rating: {rating} stars'**
-  String setProgressAndRating(String progress, int rating);
+  String setProgressAndRating(Object progress, Object rating);
 
   /// No description provided for @setProgressTo.
   ///
   /// In en, this message translates to:
   /// **'Set to: {progress}'**
-  String setProgressTo(String progress);
+  String setProgressTo(Object progress);
 
   /// No description provided for @ratingSetTo.
   ///
   /// In en, this message translates to:
   /// **'Rating set to: {rating} stars'**
-  String ratingSetTo(int rating);
+  String ratingSetTo(Object rating);
 
   /// No description provided for @updated.
   ///
@@ -5254,13 +5302,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to add tag: {error}'**
-  String addTagFailed(String error);
+  String addTagFailed(Object error);
 
   /// No description provided for @addWithCount.
   ///
   /// In en, this message translates to:
   /// **'Add ({count})'**
-  String addWithCount(int count);
+  String addWithCount(Object count);
 
   /// No description provided for @undo.
   ///
@@ -5272,7 +5320,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{count} stars'**
-  String nStars(int count);
+  String nStars(Object count);
 
   /// No description provided for @voteRemoved.
   ///
@@ -5296,7 +5344,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Vote failed: {error}'**
-  String voteFailedWithError(String error);
+  String voteFailedWithError(Object error);
 
   /// No description provided for @voteFor.
   ///
@@ -5320,7 +5368,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Tag blocked: {name}'**
-  String tagBlockedWithName(String name);
+  String tagBlockedWithName(Object name);
 
   /// No description provided for @subtitleParseFailedUnsupportedFormat.
   ///
@@ -5403,7 +5451,7 @@ abstract class S {
   /// No description provided for @floatingLyricLoading.
   ///
   /// In en, this message translates to:
-  /// **'♪ Loading subtitle ♪'**
+  /// **'\\u266a Loading subtitle \\u266a'**
   String get floatingLyricLoading;
 
   /// No description provided for @subtitleFileNotExist.
@@ -5446,13 +5494,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to edit playlist: {error}'**
-  String editPlaylistFailed(String error);
+  String editPlaylistFailed(Object error);
 
   /// No description provided for @unsupportedFileTypeWithTitle.
   ///
   /// In en, this message translates to:
   /// **'Cannot open this file type: {title}'**
-  String unsupportedFileTypeWithTitle(String title);
+  String unsupportedFileTypeWithTitle(Object title);
 
   /// No description provided for @settingsSaved.
   ///
@@ -5602,7 +5650,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to load path: {error}'**
-  String loadPathFailedWithError(String error);
+  String loadPathFailedWithError(Object error);
 
   /// No description provided for @platformNotSupportCustomPath.
   ///
@@ -5614,13 +5662,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'{count} download tasks are in progress. Please cancel or complete them before switching paths'**
-  String activeDownloadsWarning(int count);
+  String activeDownloadsWarning(Object count);
 
   /// No description provided for @setPathFailedWithError.
   ///
   /// In en, this message translates to:
   /// **'Failed to set path: {error}'**
-  String setPathFailedWithError(String error);
+  String setPathFailedWithError(Object error);
 
   /// No description provided for @confirmMigrateFiles.
   ///
@@ -5668,7 +5716,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Failed to restore default path: {error}'**
-  String resetPathFailedWithError(String error);
+  String resetPathFailedWithError(Object error);
 
   /// No description provided for @migratingFiles.
   ///
@@ -5830,7 +5878,7 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'• The first {maxVisible} buttons will be shown at the bottom of the player\n• The remaining buttons will be in the \"More\" menu'**
-  String buttonDisplayRulesDesc(int maxVisible);
+  String buttonDisplayRulesDesc(Object maxVisible);
 
   /// No description provided for @shownInPlayer.
   ///
@@ -6006,6 +6054,12 @@ abstract class S {
   /// **'Show online marked works'**
   String get showOnlineMarks;
 
+  /// No description provided for @showStats.
+  ///
+  /// In en, this message translates to:
+  /// **'Show listening statistics'**
+  String get showStats;
+
   /// No description provided for @cannotBeDisabled.
   ///
   /// In en, this message translates to:
@@ -6178,13 +6232,13 @@ abstract class S {
   ///
   /// In en, this message translates to:
   /// **'Logs exported to {path}'**
-  String logExported(String path);
+  String logExported(Object path);
 
   /// No description provided for @logCount.
   ///
   /// In en, this message translates to:
   /// **'{count} entries'**
-  String logCount(int count);
+  String logCount(Object count);
 
   /// No description provided for @logAutoScroll.
   ///
@@ -6197,6 +6251,630 @@ abstract class S {
   /// In en, this message translates to:
   /// **'No logs yet'**
   String get logEmpty;
+
+  /// No description provided for @crossfadeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfade'**
+  String get crossfadeTitle;
+
+  /// No description provided for @crossfadeEnabledWithDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfade: {ms}ms'**
+  String crossfadeEnabledWithDuration(Object ms);
+
+  /// No description provided for @gaplessPlaybackEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Gapless playback (no crossfade)'**
+  String get gaplessPlaybackEnabled;
+
+  /// No description provided for @crossfadeDurationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfade Duration'**
+  String get crossfadeDurationLabel;
+
+  /// No description provided for @crossfadeMinLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'0.5s'**
+  String get crossfadeMinLabel;
+
+  /// No description provided for @crossfadeMaxLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'10s'**
+  String get crossfadeMaxLabel;
+
+  /// No description provided for @crossfadeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Smoothly fades between tracks. When disabled, gapless playback minimizes gaps without fading.'**
+  String get crossfadeDescription;
+
+  /// No description provided for @equalizerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer'**
+  String get equalizerTitle;
+
+  /// No description provided for @equalizerEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer enabled'**
+  String get equalizerEnabled;
+
+  /// No description provided for @equalizerDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer disabled'**
+  String get equalizerDisabled;
+
+  /// No description provided for @equalizerActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get equalizerActive;
+
+  /// No description provided for @equalizerPresets.
+  ///
+  /// In en, this message translates to:
+  /// **'Presets'**
+  String get equalizerPresets;
+
+  /// No description provided for @equalizerCustomBands.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Bands'**
+  String get equalizerCustomBands;
+
+  /// No description provided for @equalizerCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get equalizerCustom;
+
+  /// No description provided for @equalizerReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to Flat'**
+  String get equalizerReset;
+
+  /// No description provided for @equalizerNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer not available on this device'**
+  String get equalizerNotSupported;
+
+  /// No description provided for @equalizerNotSupportedAndroid.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio session not initialized yet. Try playing a track first.'**
+  String get equalizerNotSupportedAndroid;
+
+  /// No description provided for @equalizerNotSupportedOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware EQ is not supported on this platform. Settings will be saved but EQ will be applied when supported.'**
+  String get equalizerNotSupportedOther;
+
+  /// No description provided for @equalizerInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'On Android, EQ is applied via hardware audio effects. On other platforms, EQ settings are stored for future use.'**
+  String get equalizerInfo;
+
+  /// No description provided for @searchSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Search settings...'**
+  String get searchSettings;
+
+  /// No description provided for @searchSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Settings'**
+  String get searchSettingsTitle;
+
+  /// No description provided for @searchSettingsComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Full settings search will be available in a future update.'**
+  String get searchSettingsComingSoon;
+
+  /// No description provided for @preferredSampleRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferred Sample Rate'**
+  String get preferredSampleRate;
+
+  /// No description provided for @preferredSampleRateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hi-res audio output target (Android)'**
+  String get preferredSampleRateSubtitle;
+
+  /// No description provided for @preferredSampleRateAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto (follow file)'**
+  String get preferredSampleRateAuto;
+
+  /// No description provided for @preferredSampleRateDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Sets the preferred sample rate for audio output. Higher rates may reduce compatibility but improve quality on supported DACs.'**
+  String get preferredSampleRateDesc;
+
+  /// No description provided for @settingsPlayback.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback'**
+  String get settingsPlayback;
+
+  /// No description provided for @settingsPlaybackSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer, crossfade, audio format'**
+  String get settingsPlaybackSubtitle;
+
+  /// No description provided for @settingsAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsAppearance;
+
+  /// No description provided for @settingsAppearanceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme, language, display settings'**
+  String get settingsAppearanceSubtitle;
+
+  /// No description provided for @settingsDownloadsStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads & Storage'**
+  String get settingsDownloadsStorage;
+
+  /// No description provided for @settingsDownloadsStorageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Download path, cache management'**
+  String get settingsDownloadsStorageSubtitle;
+
+  /// No description provided for @settingsPrivacyContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy & Content'**
+  String get settingsPrivacyContent;
+
+  /// No description provided for @settingsPrivacyContentSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy mode, blocked items'**
+  String get settingsPrivacyContentSubtitle;
+
+  /// No description provided for @settingsTranslation.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation'**
+  String get settingsTranslation;
+
+  /// No description provided for @settingsTranslationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation source, LLM config'**
+  String get settingsTranslationSubtitle;
+
+  /// No description provided for @settingsAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get settingsAccount;
+
+  /// No description provided for @settingsAccountSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Server accounts, floating lyric'**
+  String get settingsAccountSubtitle;
+
+  /// No description provided for @settingsAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get settingsAdvanced;
+
+  /// No description provided for @settingsAdvancedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort order, logs, all settings'**
+  String get settingsAdvancedSubtitle;
+
+  /// No description provided for @settingsAboutSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Version, updates, licenses'**
+  String get settingsAboutSubtitle;
+
+  /// No description provided for @advancedInfoBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'These settings rarely change after initial setup.'**
+  String get advancedInfoBanner;
+
+  /// No description provided for @advancedSectionDisplaySorting.
+  ///
+  /// In en, this message translates to:
+  /// **'Display & Sorting'**
+  String get advancedSectionDisplaySorting;
+
+  /// No description provided for @advancedDefaultSortOrderSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Release date, title, rating, etc.'**
+  String get advancedDefaultSortOrderSubtitle;
+
+  /// No description provided for @advancedMyTabsDisplaySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show/hide tabs in My page'**
+  String get advancedMyTabsDisplaySubtitle;
+
+  /// No description provided for @advancedSectionContentFiltering.
+  ///
+  /// In en, this message translates to:
+  /// **'Content Filtering'**
+  String get advancedSectionContentFiltering;
+
+  /// No description provided for @advancedSubtitlePrioritySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Highest vs lowest priority'**
+  String get advancedSubtitlePrioritySubtitle;
+
+  /// No description provided for @advancedSectionDebugLegacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Debug & Legacy'**
+  String get advancedSectionDebugLegacy;
+
+  /// No description provided for @advancedAllSettingsLegacy.
+  ///
+  /// In en, this message translates to:
+  /// **'All Settings (Legacy)'**
+  String get advancedAllSettingsLegacy;
+
+  /// No description provided for @advancedAllSettingsLegacySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Original full settings screen'**
+  String get advancedAllSettingsLegacySubtitle;
+
+  /// No description provided for @hiResExclusiveMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Hi-Res Exclusive Mode'**
+  String get hiResExclusiveMode;
+
+  /// No description provided for @hiResExclusiveModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use native ExoPlayer for FLAC/WAV hi-res tracks'**
+  String get hiResExclusiveModeSubtitle;
+
+  /// No description provided for @hiResExclusiveModeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, hi-res tracks (FLAC/WAV >48kHz) play through the native ExoPlayer. May cause brief interruption when switching players.'**
+  String get hiResExclusiveModeDesc;
+
+  /// No description provided for @hiResExclusiveModeEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Hi-Res Exclusive Mode enabled'**
+  String get hiResExclusiveModeEnabled;
+
+  /// No description provided for @hiResExclusiveModeDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Hi-Res Exclusive Mode disabled'**
+  String get hiResExclusiveModeDisabled;
+
+  /// No description provided for @enable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get enable;
+
+  /// No description provided for @listeningStatsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening Statistics'**
+  String get listeningStatsTitle;
+
+  /// No description provided for @listeningStatsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your listening habits and history'**
+  String get listeningStatsSubtitle;
+
+  /// No description provided for @statsWorksPlayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Works Played'**
+  String get statsWorksPlayed;
+
+  /// No description provided for @statsCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get statsCompleted;
+
+  /// No description provided for @statsListeningTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening Time'**
+  String get statsListeningTime;
+
+  /// No description provided for @statsStreakDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Day Streak'**
+  String get statsStreakDays;
+
+  /// No description provided for @statsDays.
+  ///
+  /// In en, this message translates to:
+  /// **'days'**
+  String get statsDays;
+
+  /// No description provided for @statsDailyActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily Activity (14 days)'**
+  String get statsDailyActivity;
+
+  /// No description provided for @statsTopVAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Top Voice Actors'**
+  String get statsTopVAs;
+
+  /// No description provided for @statsTopCircles.
+  ///
+  /// In en, this message translates to:
+  /// **'Top Circles'**
+  String get statsTopCircles;
+
+  /// No description provided for @statsRecentPlays.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Plays'**
+  String get statsRecentPlays;
+
+  /// No description provided for @statsNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No Statistics Yet'**
+  String get statsNoData;
+
+  /// No description provided for @statsNoDataDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Start listening to works and your stats will appear here.'**
+  String get statsNoDataDesc;
+
+  /// No description provided for @bitPerfectPlayback.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect Playback'**
+  String get bitPerfectPlayback;
+
+  /// No description provided for @bitPerfectPlaybackSubtitleOff.
+  ///
+  /// In en, this message translates to:
+  /// **'USB DAC detection is disabled'**
+  String get bitPerfectPlaybackSubtitleOff;
+
+  /// No description provided for @bitPerfectPlaybackSubtitleOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct USB DAC output via libusb'**
+  String get bitPerfectPlaybackSubtitleOn;
+
+  /// No description provided for @bitPerfectPlaybackSelectDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Select USB DAC'**
+  String get bitPerfectPlaybackSelectDevice;
+
+  /// No description provided for @bitPerfectPlaybackSelectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a USB audio device...'**
+  String get bitPerfectPlaybackSelectHint;
+
+  /// No description provided for @bitPerfectPlaybackNoDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'No USB DAC detected'**
+  String get bitPerfectPlaybackNoDevice;
+
+  /// No description provided for @bitPerfectPlaybackRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh device list'**
+  String get bitPerfectPlaybackRefreshTooltip;
+
+  /// No description provided for @bitPerfectPlaybackConfirmDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, your connected USB DAC will be detected and audio can be streamed directly to it, bypassing the Android mixer for pristine bit-perfect playback.'**
+  String get bitPerfectPlaybackConfirmDesc;
+
+  /// No description provided for @bitPerfectPlaybackEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect Playback enabled'**
+  String get bitPerfectPlaybackEnabled;
+
+  /// No description provided for @bitPerfectPlaybackDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect Playback disabled'**
+  String get bitPerfectPlaybackDisabled;
+
+  /// No description provided for @bitPerfectPlaybackDeviceUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'USB DAC device updated'**
+  String get bitPerfectPlaybackDeviceUpdated;
+
+  /// No description provided for @bitPerfectPlaybackListRefreshed.
+  ///
+  /// In en, this message translates to:
+  /// **'USB device list refreshed'**
+  String get bitPerfectPlaybackListRefreshed;
+
+  /// No description provided for @bitPerfectPlaybackInfoTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'About Bit-Perfect Playback'**
+  String get bitPerfectPlaybackInfoTooltip;
+
+  /// No description provided for @bitPerfectPlaybackInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect Playback sends the original audio data unmodified to your external DAC for the highest possible fidelity.\n\nAndroid\'s audio mixer normally resamples all audio to 48kHz, degrading hi-res content. This mode routes audio directly to your connected USB DAC via the libusb driver, bypassing the Android mixer for pristine, unaltered playback.'**
+  String get bitPerfectPlaybackInfo;
+
+  /// No description provided for @bitPerfectPlaybackPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'USB permission denied. Please grant USB access in settings.'**
+  String get bitPerfectPlaybackPermissionDenied;
+
+  /// No description provided for @playNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Play Next'**
+  String get playNext;
+
+  /// No description provided for @noAudioTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'No audio tracks found'**
+  String get noAudioTracks;
+
+  /// No description provided for @playingNextTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'Playing next: {count} tracks'**
+  String playingNextTracks(Object count);
+
+  /// No description provided for @localFileBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Local File Browser'**
+  String get localFileBrowser;
+
+  /// No description provided for @browseFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse Files'**
+  String get browseFiles;
+
+  /// No description provided for @progressSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Cross-device Progress Sync'**
+  String get progressSync;
+
+  /// No description provided for @progressSyncSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync playback progress to server for seamless resume across devices'**
+  String get progressSyncSubtitle;
+
+  /// No description provided for @progressSyncEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled — progress is synced to server'**
+  String get progressSyncEnabled;
+
+  /// No description provided for @progressSyncDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get progressSyncDisabled;
+
+  /// No description provided for @autoTranslateLyrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-translate Lyrics'**
+  String get autoTranslateLyrics;
+
+  /// No description provided for @autoTranslateLyricsEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled — lyrics are translated automatically when loaded'**
+  String get autoTranslateLyricsEnabled;
+
+  /// No description provided for @autoTranslateLyricsDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get autoTranslateLyricsDisabled;
+
+  /// No description provided for @autoTranslateBannerTranslating.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-translating to {language}…'**
+  String autoTranslateBannerTranslating(Object language);
+
+  /// No description provided for @autoTranslateBannerDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Translated to {language}'**
+  String autoTranslateBannerDone(Object language);
+
+  /// No description provided for @smartPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart Playlist'**
+  String get smartPlaylist;
+
+  /// No description provided for @smartPlaylists.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart Playlists'**
+  String get smartPlaylists;
+
+  /// No description provided for @smartPlaylistSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-generated from rules'**
+  String get smartPlaylistSubtitle;
+
+  /// No description provided for @searchRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Rules'**
+  String get searchRules;
+
+  /// No description provided for @activeRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Rules ({count})'**
+  String activeRules(Object count);
+
+  /// No description provided for @regularPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular Playlist'**
+  String get regularPlaylist;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

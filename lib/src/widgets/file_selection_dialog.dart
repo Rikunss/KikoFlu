@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../models/work.dart';
@@ -322,7 +323,7 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     if (isLandscape) {
       // 横屏模式：紧凑布局，最大化文件列表空间
@@ -435,21 +436,10 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
               // 文件列表：最大化显示空间
               Flexible(
                 child: _isCheckingDownloads
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const CircularProgressIndicator(),
-                            const SizedBox(height: 16),
-                            Text(S.of(context).checkingDownloadedFiles),
-                          ],
-                        ),
-                      )
+                    ? _buildLoadingIndicator(context)
                     : widget.work.children == null ||
                             widget.work.children!.isEmpty
-                        ? Center(
-                            child: Text(S.of(context).noDownloadableFiles),
-                          )
+                        ? _buildEmptyState(context)
                         : ListView(
                             children:
                                 _buildFileTree(widget.work.children!, 0, ''),
@@ -461,7 +451,7 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
       );
     }
 
-    // 竖屏模式：保持原有布局
+    // 竖屏模式
     return Dialog(
       child: Container(
         constraints: BoxConstraints(
@@ -535,14 +525,17 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
                   TextButton.icon(
                     icon: const Icon(Icons.select_all, size: 18),
                     label: Text(S.of(context).selectAll),
-                    onPressed: _toggleSelectAll,
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      _toggleSelectAll();
+                    },
                   ),
                   const Spacer(),
                   if (!_isCheckingDownloads) ...[
                     Text(
                       S.of(context).downloadedNCount(_downloadedFiles.values.where((v) => v).length),
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.green[700],
+                        color: theme.colorScheme.primary,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -566,21 +559,10 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
             // File List
             Flexible(
               child: _isCheckingDownloads
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const CircularProgressIndicator(),
-                          const SizedBox(height: 16),
-                          Text(S.of(context).checkingDownloadedFiles),
-                        ],
-                      ),
-                    )
+                  ? _buildLoadingIndicator(context)
                   : widget.work.children == null ||
                           widget.work.children!.isEmpty
-                      ? Center(
-                          child: Text(S.of(context).noDownloadableFiles),
-                        )
+                      ? _buildEmptyState(context)
                       : ListView(
                           shrinkWrap: true,
                           children:
@@ -597,12 +579,18 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.of(context).pop();
+                    },
                     child: Text(S.of(context).cancel),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
-                    onPressed: _startDownload,
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      _startDownload();
+                    },
                     icon: const Icon(Icons.download),
                     label: Text(S.of(context).downloadN(_getSelectedFiles().length)),
                   ),
@@ -615,10 +603,78 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
     );
   }
 
+  Widget _buildLoadingIndicator(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withValues(alpha: 0.3),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            S.of(context).checkingDownloadedFiles,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: cs.primaryContainer.withValues(alpha: 0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.folder_off_rounded,
+                size: 32,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              S.of(context).noDownloadableFiles,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   List<Widget> _buildFileTree(
       List<AudioFile> files, int level, String parentPath) {
     final widgets = <Widget>[];
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     for (final file in files) {
       final itemPath = _getItemPath(parentPath, file);
@@ -630,7 +686,10 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
         // 文件夹行
         widgets.add(
           InkWell(
-            onTap: () => _toggleFolder(itemPath),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _toggleFolder(itemPath);
+            },
             child: Padding(
               padding: EdgeInsets.only(
                 left: 4.0 + (level * 16.0),
@@ -646,7 +705,7 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
                       isExpanded
                           ? Icons.keyboard_arrow_down
                           : Icons.keyboard_arrow_right,
-                      color: theme.colorScheme.onSurface.withAlpha(153),
+                      color: cs.onSurface.withAlpha(153),
                       size: 20,
                     ),
                   ),
@@ -697,7 +756,10 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
 
         widgets.add(
           InkWell(
-            onTap: isDownloaded ? null : () => _toggleFile(hash),
+            onTap: isDownloaded ? null : () {
+              HapticFeedback.lightImpact();
+              _toggleFile(hash);
+            },
             child: Padding(
               padding: EdgeInsets.only(
                 left: 4.0 + (level * 16.0),
@@ -714,12 +776,15 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
                     child: isDownloaded
                         ? Icon(
                             Icons.check_circle,
-                            color: Colors.green,
+                            color: cs.primary,
                             size: 20,
                           )
                         : Checkbox(
                             value: isSelected,
-                            onChanged: (_) => _toggleFile(hash),
+                            onChanged: (_) {
+                              HapticFeedback.lightImpact();
+                              _toggleFile(hash);
+                            },
                           ),
                   ),
                   const SizedBox(width: 4),
@@ -742,8 +807,7 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
                                 file.title,
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: isDownloaded
-                                      ? theme.colorScheme.onSurface
-                                          .withAlpha(153)
+                                      ? cs.onSurface.withAlpha(153)
                                       : null,
                                 ),
                                 maxLines: 1,
@@ -758,13 +822,14 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.green.withAlpha(51),
+                                  color: cs.primaryContainer
+                                      .withValues(alpha: 0.5),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   S.of(context).downloaded,
                                   style: theme.textTheme.bodySmall?.copyWith(
-                                    color: Colors.green[700],
+                                    color: cs.primary,
                                     fontSize: 11,
                                   ),
                                 ),
@@ -777,7 +842,7 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
                           Text(
                             formatBytes(file.size!),
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withAlpha(153),
+                              color: cs.onSurface.withAlpha(153),
                             ),
                           ),
                         ],

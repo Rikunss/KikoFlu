@@ -3,7 +3,7 @@ description: A cross-platform Flutter app for browsing and playing Kikoeru serve
 
 publish_to: 'none'
 
-version: 3.1.1
+version: 3.2.0
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -42,7 +42,7 @@ dependencies:
   shared_preferences: ^2.2.2
   path: ^1.8.3
   sqflite: ^2.3.0
-  sqflite_common_ffi: ^2.3.0
+  sqflite_common_ffi: 2.4.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   path_provider: ^2.1.2
@@ -78,6 +78,12 @@ dependencies:
   desktop_multi_window: ^0.3.0
   audio_session: ^0.1.25
   ffi: ^2.1.4
+  http: ^1.6.0
+  sqlite3: ^3.3.2
+  flutter_cache_manager: ^3.4.1
+  image: ^4.3.0
+  blurhash_dart: ^1.2.1
+  home_widget: ^0.9.3
 
 dev_dependencies:
   flutter_test:
@@ -97,12 +103,10 @@ flutter:
     - assets/icons/
     - LICENSE
 
-  # fonts:
-  #   - family: NotoSans
-  #     fonts:
-  #       - asset: assets/fonts/NotoSans-Regular.ttf
-  #       - asset: assets/fonts/NotoSans-Bold.ttf
-  #         weight: 700
+  fonts:
+    - family: GoogleSans
+      fonts:
+        - asset: assets/fonts/GoogleSans.ttf
 
 flutter_launcher_icons:
   android: "launcher_icon"

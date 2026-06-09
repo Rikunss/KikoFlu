@@ -288,7 +288,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
           spacing: 12,
           runSpacing: 12,
           children: colors.map((color) {
-            final isSelected = color.value == currentColor.value;
+            final isSelected = color.toARGB32() == currentColor.toARGB32();
             return GestureDetector(
               onTap: () => onColorSelected(color),
               child: Container(
@@ -300,7 +300,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
                   border: Border.all(
                     color: isSelected
                         ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.withOpacity(0.3),
+                        : Colors.grey.withValues(alpha: 0.3),
                     width: isSelected ? 3 : 1,
                   ),
                   boxShadow: isSelected
@@ -309,7 +309,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
                             color: Theme.of(context)
                                 .colorScheme
                                 .primary
-                                .withOpacity(0.4),
+                                .withValues(alpha: 0.4),
                             blurRadius: 8,
                             spreadRadius: 2,
                           ),

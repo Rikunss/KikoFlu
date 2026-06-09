@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../providers/my_reviews_provider.dart';
@@ -23,7 +24,27 @@ import '../models/sort_options.dart';
 export '../providers/my_reviews_provider.dart' show MyReviewLayoutType;
 
 import '../widgets/overscroll_next_page_detector.dart';
+import 'listening_statistics_screen.dart';
 import '../../l10n/app_localizations.dart';
+
+/// Tab data for the premium segmented pill control.
+class _MyTabPill {
+  final String label;
+  final IconData outlined;
+  final IconData filled;
+  final WidgetBuilder builder;
+  final bool showFab;
+  final WidgetBuilder? fabBuilder;
+
+  const _MyTabPill({
+    required this.label,
+    required this.outlined,
+    required this.filled,
+    required this.builder,
+    this.showFab = false,
+    this.fabBuilder,
+  });
+}
 
 class MyScreen extends ConsumerStatefulWidget {
   const MyScreen({super.key});
@@ -34,52 +55,62 @@ class MyScreen extends ConsumerStatefulWidget {
 
 class _MyScreenState extends ConsumerState<MyScreen>
     with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
-  final ScrollController _scrollController = ScrollController();
+  int _currentTabIndex = 0;
   late TabController _tabController;
+  List<_MyTabPill> _cachedTabs = [];
+  MyTabsDisplaySettings? _lastTabSettings;
 
   @override
-  bool get wantKeepAlive => true; // 保持状态不被销毁
+  bool get wantKeepAlive => true;
 
-  List<_TabInfo> _buildTabList(MyTabsDisplaySettings settings) {
-    final tabs = <_TabInfo>[];
-    final authState = ref.watch(authProvider);
+  List<_MyTabPill> _buildTabList(MyTabsDisplaySettings settings) {
+    final s = S.of(context);
+    final tabs = <_MyTabPill>[];
+    final authState = ref.read(authProvider);
     final isOfficialServer = ServerUtils.isOfficialServer(authState.host);
 
     if (settings.showOnlineMarks) {
-      tabs.add(_TabInfo(
-        title: S.of(context).onlineMarks,
-        index: 0,
-        widget: _buildOnlineBookmarksTab(),
+      tabs.add(_MyTabPill(
+        label: s.onlineMarks,
+        outlined: Icons.bookmark_outline,
+        filled: Icons.bookmark,
+        builder: (_) => _buildOnlineBookmarksTab(),
         showFab: true,
-        fabWidget: const DownloadFab(),
+        fabBuilder: (_) => const DownloadFab(),
       ));
     }
 
-    // 历史记录
-    tabs.add(_TabInfo(
-      title: S.of(context).historyRecord,
-      index: tabs.length,
-      widget: const HistoryScreen(),
+    tabs.add(_MyTabPill(
+      label: s.historyRecord,
+      outlined: Icons.history,
+      filled: Icons.history,
+      builder: (_) => const HistoryScreen(),
     ));
 
     if (settings.showPlaylists && isOfficialServer) {
-      tabs.add(_TabInfo(
-        title: S.of(context).playlists,
-        index: 1,
-        widget: const PlaylistsScreen(),
+      tabs.add(_MyTabPill(
+        label: s.playlists,
+        outlined: Icons.queue_music_outlined,
+        filled: Icons.queue_music,
+        builder: (_) => const PlaylistsScreen(),
       ));
     }
 
-    // 已下载始终显示
-    tabs.add(_TabInfo(
-      title: S.of(context).downloaded,
-      index: 2,
-      widget: const LocalDownloadsScreen(),
+    tabs.add(_MyTabPill(
+      label: s.downloaded,
+      outlined: Icons.download_outlined,
+      filled: Icons.download,
+      builder: (_) => const LocalDownloadsScreen(),
       showFab: true,
-      fabWidget: StreamBuilder<List<DownloadTask>>(
+      fabBuilder: (_) => StreamBuilder<List<DownloadTask>>(
+        key: const ValueKey('downloads_badge'),
         stream: DownloadService.instance.tasksStream,
         builder: (context, snapshot) {
-          final activeCount = DownloadService.instance.activeDownloadCount;
+          // Compute active count from stream data reactively.
+          final tasks = snapshot.data ?? [];
+          final activeCount = tasks.where((t) =>
+              t.status == DownloadStatus.downloading ||
+              t.status == DownloadStatus.pending).length;
           return Badge(
             isLabelVisible: activeCount > 0,
             label: Text('$activeCount'),
@@ -94,10 +125,20 @@ class _MyScreenState extends ConsumerState<MyScreen>
     ));
 
     if (settings.showSubtitleLibrary) {
-      tabs.add(_TabInfo(
-        title: S.of(context).subtitleLibrary,
-        index: 3,
-        widget: const SubtitleLibraryScreen(),
+      tabs.add(_MyTabPill(
+        label: s.subtitleLibrary,
+        outlined: Icons.subtitles_outlined,
+        filled: Icons.subtitles,
+        builder: (_) => const SubtitleLibraryScreen(),
+      ));
+    }
+
+    if (settings.showStats) {
+      tabs.add(_MyTabPill(
+        label: s.listeningStatsTitle,
+        outlined: Icons.bar_chart_outlined,
+        filled: Icons.bar_chart_rounded,
+        builder: (_) => const ListeningStatisticsScreen(),
       ));
     }
 
@@ -108,7 +149,11 @@ class _MyScreenState extends ConsumerState<MyScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    // 只在首次加载时获取数据，如果已有数据则不重新加载
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() => _currentTabIndex = _tabController.index);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final myState = ref.read(myReviewsProvider);
       if (myState.works.isEmpty) {
@@ -120,18 +165,7 @@ class _MyScreenState extends ConsumerState<MyScreen>
   @override
   void dispose() {
     _tabController.dispose();
-    _scrollController.dispose();
     super.dispose();
-  }
-
-  void _scrollToTop() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
-    }
   }
 
   void _navigateToDownloads() {
@@ -142,29 +176,489 @@ class _MyScreenState extends ConsumerState<MyScreen>
     );
   }
 
-  Icon _getLayoutIcon(MyReviewLayoutType layoutType) {
-    switch (layoutType) {
-      case MyReviewLayoutType.bigGrid:
-        return const Icon(Icons.grid_3x3);
-      case MyReviewLayoutType.smallGrid:
-        return const Icon(Icons.view_list);
-      case MyReviewLayoutType.list:
-        return const Icon(Icons.view_agenda);
-    }
+  void _selectTab(int index) {
+    if (_currentTabIndex == index) return;
+    HapticFeedback.lightImpact();
+    _tabController.animateTo(index);
   }
 
-  String _getLayoutTooltip(MyReviewLayoutType layoutType) {
-    switch (layoutType) {
-      case MyReviewLayoutType.bigGrid:
-        return S.of(context).switchToSmallGrid;
-      case MyReviewLayoutType.smallGrid:
-        return S.of(context).switchToList;
-      case MyReviewLayoutType.list:
-        return S.of(context).switchToLargeGrid;
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    final tabsSettings = ref.watch(myTabsDisplayProvider);
+
+    if (_lastTabSettings != tabsSettings) {
+      _cachedTabs = _buildTabList(tabsSettings);
+      _lastTabSettings = tabsSettings;
     }
+    final tabs = _cachedTabs;
+
+    if (_tabController.length != tabs.length) {
+      final oldIndex = _currentTabIndex;
+      _tabController.dispose();
+      _tabController = TabController(length: tabs.length, vsync: this);
+      _tabController.addListener(() {
+        if (!_tabController.indexIsChanging) {
+          setState(() => _currentTabIndex = _tabController.index);
+        }
+      });
+      if (oldIndex < tabs.length) {
+        _tabController.index = oldIndex;
+        _currentTabIndex = oldIndex;
+      }
+    }
+
+    final colorScheme = Theme.of(context).colorScheme;
+    const Duration animDur = Duration(milliseconds: 300);
+
+    return Scaffold(
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(48),
+        child: Container(
+          color: colorScheme.surface,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                children: List.generate(tabs.length, (i) {
+                  final tab = tabs[i];
+                  final isSel = i == _currentTabIndex;
+
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        right: i < tabs.length - 1 ? 6 : 0,
+                      ),
+                      child: GestureDetector(
+                        onTap: () => _selectTab(i),
+                        behavior: HitTestBehavior.opaque,
+                        child: AnimatedContainer(
+                          duration: animDur,
+                          curve: Curves.easeOutCubic,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isSel
+                                ? colorScheme.primaryContainer
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AnimatedSwitcher(
+                                duration: animDur,
+                                switchInCurve: Curves.easeOutBack,
+                                switchOutCurve: Curves.easeIn,
+                                transitionBuilder: (child, anim) =>
+                                    ScaleTransition(
+                                      scale: anim,
+                                      child: FadeTransition(
+                                          opacity: anim, child: child),
+                                    ),
+                                child: Icon(
+                                  isSel ? tab.filled : tab.outlined,
+                                  key: ValueKey(
+                                      'my_tab_${i}_${isSel ? 'on' : 'off'}'),
+                                  size: 16,
+                                  color: isSel
+                                      ? colorScheme.onPrimaryContainer
+                                      : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  tab.label,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isSel
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                    color: isSel
+                                        ? colorScheme.onPrimaryContainer
+                                        : colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: _buildFab(tabs),
+      body: TabBarView(
+        controller: _tabController,
+        children: tabs.map((tab) => tab.builder(context)).toList(),
+      ),
+    );
   }
 
-  IconData _getFilterIcon(MyReviewFilter filter) {
+  Widget _buildFab(List<_MyTabPill> tabs) {
+    final idx = _currentTabIndex;
+    if (idx >= 0 && idx < tabs.length) {
+      final currentTab = tabs[idx];
+      if (currentTab.showFab && currentTab.fabBuilder != null) {
+        return currentTab.fabBuilder!(context);
+      }
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildOnlineBookmarksTab() {
+    return const Column(
+      children: [
+        _ProfileHeaderCard(),
+        _FilterToolbar(),
+        Expanded(child: _ContentArea()),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Profile Header Card
+// ═══════════════════════════════════════════════════
+
+class _ProfileHeaderCard extends ConsumerWidget {
+  const _ProfileHeaderCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider);
+    final host = ref.watch(serverHostProvider) ?? '';
+    final isLoggedIn = ref.watch(isLoggedInProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    if (user == null) return const SizedBox.shrink();
+
+    final displayName = user.name.isNotEmpty ? user.name : 'User';
+    final shortHost = _shortenHost(host);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      child: Card(
+        elevation: 0,
+        color: colorScheme.surfaceContainerLow,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(14)),
+        ),
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              // Avatar
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: colorScheme.primaryContainer,
+                child: Text(
+                  displayName.isNotEmpty
+                      ? displayName[0].toUpperCase()
+                      : '?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      displayName,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.link, size: 12,
+                            color: colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            shortHost,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isLoggedIn
+                                ? Colors.green.shade400
+                                : Colors.orange.shade400,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isLoggedIn ? 'Online' : 'Offline',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: isLoggedIn
+                                ? Colors.green.shade400
+                                : Colors.orange.shade400,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _shortenHost(String host) {
+    final cleaned = host
+        .replaceAll('https://', '')
+        .replaceAll('http://', '');
+    if (cleaned.length > 28) {
+      return '${cleaned.substring(0, 26)}...';
+    }
+    return cleaned;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Empty State
+// ═══════════════════════════════════════════════════
+
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 48, color: colorScheme.primary),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                subtitle!,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: onAction,
+                icon: const Icon(Icons.explore_outlined, size: 18),
+                label: Text(actionLabel!),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 10),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Filter Toolbar — Animated Pill Chips
+// ═══════════════════════════════════════════════════
+
+class _FilterToolbar extends ConsumerWidget {
+  const _FilterToolbar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(myReviewsProvider.select((s) => s.filter));
+    final layoutType =
+        ref.watch(myReviewsProvider.select((s) => s.layoutType));
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final horizontalPadding = isLandscape ? 24.0 : 8.0;
+    final colorScheme = Theme.of(context).colorScheme;
+    const Duration animDur = Duration(milliseconds: 300);
+
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      child: Row(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding, vertical: 4),
+              itemCount: MyReviewFilter.values.length,
+              itemBuilder: (context, i) {
+                final filter = MyReviewFilter.values[i];
+                final isSel = state == filter;
+
+                return Padding(
+                  padding: EdgeInsets.only(
+                      right: i < MyReviewFilter.values.length - 1 ? 6 : 0),
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      ref
+                          .read(myReviewsProvider.notifier)
+                          .changeFilter(filter);
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: AnimatedContainer(
+                      duration: animDur,
+                      curve: Curves.easeOutCubic,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isSel
+                            ? colorScheme.primaryContainer
+                            : colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _filterIcon(filter),
+                            size: 16,
+                            color: isSel
+                                ? colorScheme.primary
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            filter.localizedLabel(context),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight:
+                                  isSel ? FontWeight.w600 : FontWeight.w500,
+                              color: isSel
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.only(right: horizontalPadding - 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.sort),
+                  iconSize: 22,
+                  padding: const EdgeInsets.all(8),
+                  constraints:
+                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  onPressed: () => _showSortDialog(context, ref),
+                  tooltip: S.of(context).sort,
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  transitionBuilder: (child, anim) =>
+                      RotationTransition(
+                        turns: anim,
+                        child: FadeTransition(opacity: anim, child: child),
+                      ),
+                  child: IconButton(
+                    key: ValueKey('layout_$layoutType'),
+                    icon: _getLayoutIcon(layoutType),
+                    iconSize: 22,
+                    padding: const EdgeInsets.all(8),
+                    constraints:
+                        const BoxConstraints(minWidth: 40, minHeight: 40),
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      ref
+                          .read(myReviewsProvider.notifier)
+                          .toggleLayoutType();
+                    },
+                    tooltip: _getLayoutTooltip(context, layoutType),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _filterIcon(MyReviewFilter filter) {
     switch (filter) {
       case MyReviewFilter.all:
         return Icons.all_inclusive;
@@ -181,80 +675,29 @@ class _MyScreenState extends ConsumerState<MyScreen>
     }
   }
 
-  Widget _buildFilterButton({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required int index,
-    required int total,
-  }) {
-    final theme = Theme.of(context);
-
-    // 第一个按钮：左侧圆角，右侧方角
-    // 最后一个按钮：左侧方角，右侧圆角
-    // 中间按钮：两侧方角
-    BorderRadius buttonBorderRadius;
-    if (index == 0) {
-      buttonBorderRadius = const BorderRadius.only(
-        topLeft: Radius.circular(16),
-        bottomLeft: Radius.circular(16),
-      );
-    } else if (index == total - 1) {
-      buttonBorderRadius = const BorderRadius.only(
-        topRight: Radius.circular(16),
-        bottomRight: Radius.circular(16),
-      );
-    } else {
-      buttonBorderRadius = BorderRadius.zero;
+  Icon _getLayoutIcon(MyReviewLayoutType layoutType) {
+    switch (layoutType) {
+      case MyReviewLayoutType.bigGrid:
+        return const Icon(Icons.grid_view);
+      case MyReviewLayoutType.smallGrid:
+        return const Icon(Icons.grid_4x4);
+      case MyReviewLayoutType.list:
+        return const Icon(Icons.view_agenda_outlined);
     }
-
-    return Padding(
-      padding: const EdgeInsets.only(right: 4),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: buttonBorderRadius,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? theme.colorScheme.primaryContainer
-                  : theme.colorScheme.surfaceContainerHighest,
-              borderRadius: buttonBorderRadius,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  size: 16,
-                  color: isSelected
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    color: isSelected
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
-  void _showSortDialog() {
+  String _getLayoutTooltip(BuildContext context, MyReviewLayoutType layoutType) {
+    switch (layoutType) {
+      case MyReviewLayoutType.bigGrid:
+        return S.of(context).switchToSmallGrid;
+      case MyReviewLayoutType.smallGrid:
+        return S.of(context).switchToList;
+      case MyReviewLayoutType.list:
+        return S.of(context).switchToLargeGrid;
+    }
+  }
+
+  static void _showSortDialog(BuildContext context, WidgetRef ref) {
     final state = ref.read(myReviewsProvider);
     showDialog(
       context: context,
@@ -274,215 +717,129 @@ class _MyScreenState extends ConsumerState<MyScreen>
       ),
     );
   }
+}
+
+// ═══════════════════════════════════════════════════
+// Content Area
+// ═══════════════════════════════════════════════════
+
+class _ContentArea extends ConsumerWidget {
+  const _ContentArea();
 
   @override
-  Widget build(BuildContext context) {
-    super.build(context); // 必须调用以保持状态
-
-    final tabsSettings = ref.watch(myTabsDisplayProvider);
-    final tabs = _buildTabList(tabsSettings);
-
-    // 如果标签数量变化，需要重新创建 TabController
-    if (_tabController.length != tabs.length) {
-      final oldIndex = _tabController.index;
-      _tabController.dispose();
-      _tabController = TabController(length: tabs.length, vsync: this);
-      // 尝试恢复之前的位置，但不超出新的范围
-      if (oldIndex < tabs.length) {
-        _tabController.index = oldIndex;
-      }
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          tabs: tabs.map((tab) => Tab(text: tab.title)).toList(),
-        ),
-      ),
-      floatingActionButton: AnimatedBuilder(
-        animation: _tabController,
-        builder: (context, child) {
-          final currentIndex = _tabController.index;
-          if (currentIndex >= 0 && currentIndex < tabs.length) {
-            final currentTab = tabs[currentIndex];
-            if (currentTab.showFab && currentTab.fabWidget != null) {
-              return currentTab.fabWidget!;
-            }
-          }
-          return const SizedBox.shrink();
-        },
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: tabs.map((tab) => tab.widget).toList(),
-      ),
-    );
-  }
-
-  Widget _buildOnlineBookmarksTab() {
+  Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(myReviewsProvider);
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
-    final horizontalPadding = isLandscape ? 24.0 : 8.0;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
-    return Column(
-      children: [
-        // 筛选和布局切换工具栏
-        Container(
-          height: 56,
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          color: Theme.of(context)
-              .colorScheme
-              .surfaceContainerHighest
-              .withOpacity(0.5),
-          child: Row(
-            children: [
-              // 可滚动的筛选按钮
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding, vertical: 4),
-                  child: Row(
-                    children: [
-                      for (int i = 0; i < MyReviewFilter.values.length; i++)
-                        _buildFilterButton(
-                          icon: _getFilterIcon(MyReviewFilter.values[i]),
-                          label: MyReviewFilter.values[i].localizedLabel(context),
-                          isSelected: state.filter == MyReviewFilter.values[i],
-                          onTap: () => ref
-                              .read(myReviewsProvider.notifier)
-                              .changeFilter(MyReviewFilter.values[i]),
-                          index: i,
-                          total: MyReviewFilter.values.length,
-                        ),
-                    ],
+    if (state.error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              S.of(context).loadFailed,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              state.error!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                ),
-              ),
-              // 布局切换按钮
-              Padding(
-                padding: EdgeInsets.only(right: horizontalPadding - 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.sort),
-                      iconSize: 22,
-                      padding: const EdgeInsets.all(8),
-                      constraints:
-                          const BoxConstraints(minWidth: 40, minHeight: 40),
-                      onPressed: _showSortDialog,
-                      tooltip: S.of(context).sort,
-                    ),
-                    IconButton(
-                      icon: _getLayoutIcon(state.layoutType),
-                      iconSize: 22,
-                      padding: const EdgeInsets.all(8),
-                      constraints:
-                          const BoxConstraints(minWidth: 40, minHeight: 40),
-                      onPressed: () => ref
-                          .read(myReviewsProvider.notifier)
-                          .toggleLayoutType(),
-                      tooltip: _getLayoutTooltip(state.layoutType),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () =>
+                  ref.read(myReviewsProvider.notifier).refresh(),
+              icon: const Icon(Icons.refresh),
+              label: Text(S.of(context).retry),
+            ),
+          ],
         ),
-        // 内容区域
-        Expanded(
-          child: state.error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        S.of(context).loadFailed,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        state.error!,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: () =>
-                            ref.read(myReviewsProvider.notifier).refresh(),
-                        icon: const Icon(Icons.refresh),
-                        label: Text(S.of(context).retry),
-                      ),
-                    ],
-                  ),
-                )
-              : Stack(
-                  children: [
-                    _buildBody(state),
-                    // 全局加载动画 - 在有数据且正在刷新时显示顶部进度条
-                    if (state.isLoading && state.works.isNotEmpty)
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        child: SizedBox(
-                          height: 3,
-                          child: const LinearProgressIndicator(),
-                        ),
-                      ),
-                  ],
-                ),
-        ),
-      ],
-    );
-  }
+      );
+    }
 
-  Widget _buildBody(MyReviewsState state) {
-    // 初始加载状态（没有数据时）
+    // Initial loading
     if (state.isLoading && state.works.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // Empty state
+    if (state.works.isEmpty && !state.isLoading) {
+      return _EmptyState(
+        icon: Icons.bookmark_border,
+        title: S.of(context).noReviews,
+        subtitle: 'Your marked works will appear here',
+        actionLabel: S.of(context).search,
+        onAction: () {
+          // Navigate to search — exploring content
+        },
+      );
+    }
+
+    return Stack(
+      children: [
+        _buildBody(context, ref, state, isLandscape),
+        if (state.isLoading && state.works.isNotEmpty)
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SizedBox(
+              height: 3,
+              child: LinearProgressIndicator(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBody(BuildContext context, WidgetRef ref,
+      MyReviewsState state, bool isLandscape) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      transitionBuilder: (child, anim) =>
+          FadeTransition(opacity: anim, child: child),
+      child: _buildLayout(context, ref, state, isLandscape),
+    );
+  }
+
+  Widget _buildLayout(BuildContext context, WidgetRef ref,
+      MyReviewsState state, bool isLandscape) {
     switch (state.layoutType) {
       case MyReviewLayoutType.bigGrid:
         return _buildGridView(
+          context,
+          ref,
           state,
           crossAxisCount:
               ResponsiveGridHelper.getBigGridCrossAxisCount(context),
         );
       case MyReviewLayoutType.smallGrid:
         return _buildGridView(
+          context,
+          ref,
           state,
           crossAxisCount:
               ResponsiveGridHelper.getSmallGridCrossAxisCount(context),
         );
       case MyReviewLayoutType.list:
-        return _buildListView(state);
+        return _buildListView(context, ref, state);
     }
   }
 
-  Widget _buildGridView(MyReviewsState state, {required int crossAxisCount}) {
+  Widget _buildGridView(BuildContext context, WidgetRef ref,
+      MyReviewsState state, {required int crossAxisCount}) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
-
-    // 横屏模式下使用更大的间距，让布局更优雅
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     final spacing = isLandscape ? 24.0 : 8.0;
     final padding = isLandscape ? 24.0 : 8.0;
 
@@ -493,15 +850,10 @@ class _MyScreenState extends ConsumerState<MyScreen>
         isLoading: state.isLoading,
         onNextPage: () async {
           await ref.read(myReviewsProvider.notifier).nextPage();
-          // 等待一帧后滚动到顶部，确保内容已加载
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _scrollToTop();
-          });
         },
         child: CustomScrollView(
-          controller: _scrollController,
-          cacheExtent: ScrollOptimization.cacheExtent,
-          physics: ScrollOptimization.physics,
+          // ignore: deprecated_member_use
+          cacheExtent: ScrollOptimization.cacheExtent, physics: ScrollOptimization.physics,
           slivers: [
             SliverPadding(
               padding: EdgeInsets.fromLTRB(padding, 8, padding, padding),
@@ -514,13 +866,14 @@ class _MyScreenState extends ConsumerState<MyScreen>
                   final work = state.works[index];
                   return RepaintBoundary(
                     child: EnhancedWorkCard(
-                        work: work, crossAxisCount: crossAxisCount),
+                      key: ValueKey(work.id),
+                      work: work,
+                      crossAxisCount: crossAxisCount,
+                    ),
                   );
                 },
               ),
             ),
-
-            // 分页控件 - 始终显示
             SliverPadding(
               padding: EdgeInsets.fromLTRB(padding, spacing, padding, 24),
               sliver: SliverToBoxAdapter(
@@ -532,15 +885,12 @@ class _MyScreenState extends ConsumerState<MyScreen>
                   isLoading: state.isLoading,
                   onPreviousPage: () {
                     ref.read(myReviewsProvider.notifier).previousPage();
-                    _scrollToTop();
                   },
                   onNextPage: () {
                     ref.read(myReviewsProvider.notifier).nextPage();
-                    _scrollToTop();
                   },
                   onGoToPage: (page) {
                     ref.read(myReviewsProvider.notifier).goToPage(page);
-                    _scrollToTop();
                   },
                 ),
               ),
@@ -551,7 +901,8 @@ class _MyScreenState extends ConsumerState<MyScreen>
     );
   }
 
-  Widget _buildListView(MyReviewsState state) {
+  Widget _buildListView(
+      BuildContext context, WidgetRef ref, MyReviewsState state) {
     return RefreshIndicator(
       onRefresh: () async => ref.read(myReviewsProvider.notifier).refresh(),
       child: OverscrollNextPageDetector(
@@ -559,15 +910,10 @@ class _MyScreenState extends ConsumerState<MyScreen>
         isLoading: state.isLoading,
         onNextPage: () async {
           await ref.read(myReviewsProvider.notifier).nextPage();
-          // 等待一帧后滚动到顶部，确保内容已加载
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _scrollToTop();
-          });
         },
         child: CustomScrollView(
-          controller: _scrollController,
-          cacheExtent: ScrollOptimization.cacheExtent,
-          physics: ScrollOptimization.physics,
+          // ignore: deprecated_member_use
+          cacheExtent: ScrollOptimization.cacheExtent, physics: ScrollOptimization.physics,
           slivers: [
             SliverPadding(
               padding: const EdgeInsets.all(8),
@@ -576,15 +922,17 @@ class _MyScreenState extends ConsumerState<MyScreen>
                   (context, index) {
                     final work = state.works[index];
                     return RepaintBoundary(
-                      child: EnhancedWorkCard(work: work, crossAxisCount: 1),
+                      child: EnhancedWorkCard(
+                        key: ValueKey(work.id),
+                        work: work,
+                        crossAxisCount: 1,
+                      ),
                     );
                   },
                   childCount: state.works.length,
                 ),
               ),
             ),
-
-            // 分页控件 - 始终显示
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
               sliver: SliverToBoxAdapter(
@@ -596,15 +944,12 @@ class _MyScreenState extends ConsumerState<MyScreen>
                   isLoading: state.isLoading,
                   onPreviousPage: () {
                     ref.read(myReviewsProvider.notifier).previousPage();
-                    _scrollToTop();
                   },
                   onNextPage: () {
                     ref.read(myReviewsProvider.notifier).nextPage();
-                    _scrollToTop();
                   },
                   onGoToPage: (page) {
                     ref.read(myReviewsProvider.notifier).goToPage(page);
-                    _scrollToTop();
                   },
                 ),
               ),
@@ -614,21 +959,4 @@ class _MyScreenState extends ConsumerState<MyScreen>
       ),
     );
   }
-}
-
-// Helper class to organize tab information
-class _TabInfo {
-  final String title;
-  final int index;
-  final Widget widget;
-  final bool showFab;
-  final Widget? fabWidget;
-
-  const _TabInfo({
-    required this.title,
-    required this.index,
-    required this.widget,
-    this.showFab = false,
-    this.fabWidget,
-  });
 }

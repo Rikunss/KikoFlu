@@ -7,6 +7,7 @@ enum AppThemeMode {
   system, // 跟随系统
   light, // 浅色模式
   dark, // 深色模式
+  trueBlack, // 纯黑 OLED 模式
 }
 
 // 颜色方案类型枚举
@@ -16,6 +17,9 @@ enum ColorSchemeType {
   sunsetOrange, // 日落橙
   lavenderPurple, // 薰衣草紫
   sakuraPink, // 樱花粉
+  crimsonRed, // 绯红
+  amberGold, // 琥珀金
+  slateGray, // 岩灰
   dynamic, // 系统动态取色
 }
 
@@ -47,24 +51,43 @@ class ThemeSettings {
         return ThemeMode.light;
       case AppThemeMode.dark:
         return ThemeMode.dark;
+      case AppThemeMode.trueBlack:
+        return ThemeMode.dark;
     }
   }
 }
 
 // 主题设置控制器
 class ThemeSettingsNotifier extends StateNotifier<ThemeSettings> {
-  static const String _themeModeKey = 'theme_mode';
-  static const String _colorSchemeTypeKey = 'color_scheme_type';
+  static const String themeModeKey = 'theme_mode';
+  static const String colorSchemeTypeKey = 'color_scheme_type';
 
-  ThemeSettingsNotifier() : super(const ThemeSettings()) {
-    _loadSettings();
+  /// Pre-loaded settings from SharedPreferences (set before ProviderScope is created).
+  static ThemeSettings? _preloaded;
+
+  /// Call in [main] before [runApp] to avoid flashing the default theme.
+  static Future<void> preload() async {
+    final prefs = await SharedPreferences.getInstance();
+    _preloaded = ThemeSettings(
+      themeMode: AppThemeMode.values[prefs.getInt(themeModeKey) ?? 0],
+      colorSchemeType:
+          ColorSchemeType.values[prefs.getInt(colorSchemeTypeKey) ?? 0],
+    );
+  }
+
+  ThemeSettingsNotifier() : super(_preloaded ?? const ThemeSettings()) {
+    _preloaded = null; // one-time use, avoid leaking
+    if (state == const ThemeSettings()) {
+      // Only load async if no preload was done (splash-only / cold start fallback)
+      _loadSettings();
+    }
   }
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final themeModeIndex = prefs.getInt(_themeModeKey) ?? 0;
-    final colorSchemeTypeIndex = prefs.getInt(_colorSchemeTypeKey) ?? 0;
+    final themeModeIndex = prefs.getInt(themeModeKey) ?? 0;
+    final colorSchemeTypeIndex = prefs.getInt(colorSchemeTypeKey) ?? 0;
 
     state = ThemeSettings(
       themeMode: AppThemeMode.values[themeModeIndex],
@@ -74,13 +97,13 @@ class ThemeSettingsNotifier extends StateNotifier<ThemeSettings> {
 
   Future<void> setThemeMode(AppThemeMode mode) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_themeModeKey, mode.index);
+    await prefs.setInt(themeModeKey, mode.index);
     state = state.copyWith(themeMode: mode);
   }
 
   Future<void> setColorSchemeType(ColorSchemeType type) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_colorSchemeTypeKey, type.index);
+    await prefs.setInt(colorSchemeTypeKey, type.index);
     state = state.copyWith(colorSchemeType: type);
   }
 }

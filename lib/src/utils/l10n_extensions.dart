@@ -129,8 +129,6 @@ extension TranslationSourceL10n on TranslationSource {
     final s = S.of(context);
     return switch (this) {
       TranslationSource.google => s.translationSourceGoogle,
-      TranslationSource.youdao => s.translationSourceYoudao,
-      TranslationSource.microsoft => s.translationSourceMicrosoft,
       TranslationSource.llm => s.translationSourceLlm,
     };
   }
@@ -210,6 +208,7 @@ extension PlayerButtonTypeL10n on PlayerButtonType {
       PlayerButtonType.detail => s.viewDetail,
       PlayerButtonType.subtitleAdjustment => s.subtitleTimingAdjustment,
       PlayerButtonType.floatingLyric => s.desktopFloatingLyric,
+      PlayerButtonType.equalizer => s.equalizerTitle,
     };
   }
 }

@@ -228,7 +228,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
                           // 隐私设置
                           DropdownButtonFormField<int>(
-                            value: selectedPrivacy,
+                            initialValue: selectedPrivacy,
                             decoration: InputDecoration(
                               labelText: S.of(context).privacySetting,
                               border: const OutlineInputBorder(),
@@ -357,22 +357,22 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   maxWidth: dialogWidth.clamp(300.0, 600.0),
                   maxHeight: MediaQuery.of(context).size.height * 0.85,
                 ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 标题栏
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                        child: Row(
-                          children: [
-                            Text(
-                              S.of(context).addWorks,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ],
-                        ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 标题栏
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                      child: Row(
+                        children: [
+                          Text(
+                            S.of(context).addWorks,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ],
                       ),
+                    ),
 
                       // 内容区域
                       Padding(
@@ -425,13 +425,13 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                                   color: Theme.of(context)
                                       .colorScheme
                                       .primaryContainer
-                                      .withOpacity(0.3),
+                                      .withValues(alpha: 0.3),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
                                     color: Theme.of(context)
                                         .colorScheme
                                         .primary
-                                        .withOpacity(0.5),
+                                        .withValues(alpha: 0.5),
                                   ),
                                 ),
                                 child: Column(
@@ -805,8 +805,8 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           });
         },
         child: CustomScrollView(
-          controller: _scrollController,
-          cacheExtent: ScrollOptimization.cacheExtent,
+          // ignore: deprecated_member_use
+          cacheExtent: ScrollOptimization.cacheExtent, controller: _scrollController,
           physics: ScrollOptimization.physics,
           slivers: [
             // 元数据信息
@@ -819,16 +819,19 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final work = state.works[index];
-                    final authState = ref.watch(authProvider);
-                    final currentUserName = authState.currentUser?.name ?? '';
+                    final currentUserName =
+                        ref.watch(currentUserProvider.select((u) => u?.name ?? ''));
                     final isOwner = state.metadata?.userName == currentUserName;
 
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
+                    return RepaintBoundary(
+                      key: ValueKey(work.id),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        child: _buildPlaylistWorkCard(work, isOwner),
                       ),
-                      child: _buildPlaylistWorkCard(work, isOwner),
                     );
                   },
                   childCount: state.works.length,
@@ -933,8 +936,8 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                 // 操作按钮
                 Builder(
                   builder: (context) {
-                    final authState = ref.watch(authProvider);
-                    final currentUserName = authState.currentUser?.name ?? '';
+                    final currentUserName =
+                        ref.watch(currentUserProvider.select((u) => u?.name ?? ''));
                     final isOwner = metadata.userName == currentUserName;
 
                     if (isOwner) {
@@ -1036,9 +1039,8 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
   // 扁平播放列表风格的作品卡片
   Widget _buildPlaylistWorkCard(Work work, bool isOwner) {
-    final authState = ref.watch(authProvider);
-    final host = authState.host ?? '';
-    final token = authState.token ?? '';
+    final host = ref.watch(serverHostProvider) ?? '';
+    final token = ref.watch(authTokenProvider) ?? '';
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -1057,7 +1059,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           color: colorScheme.surface,
           border: Border(
             bottom: BorderSide(
-              color: colorScheme.outlineVariant.withOpacity(0.5),
+              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
               width: 1,
             ),
           ),
@@ -1077,6 +1079,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                     imageUrl: work.getCoverImageUrl(host, token: token),
                     httpHeaders: httpHeaders,
                     cacheKey: 'work_cover_${work.id}',
+                    memCacheWidth: (56 * MediaQuery.devicePixelRatioOf(context)).round(),
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
@@ -1190,7 +1193,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             if (isOwner) ...[
               const SizedBox(width: 8),
               IconButton(
-                icon: Icon(Icons.remove_circle_outline, size: 20),
+                icon: const Icon(Icons.remove_circle_outline, size: 20),
                 color: colorScheme.error,
                 visualDensity: VisualDensity.compact,
                 onPressed: () => _showRemoveWorkConfirmDialog(work),

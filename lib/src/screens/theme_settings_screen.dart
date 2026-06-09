@@ -33,52 +33,40 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         ),
                   ),
                 ),
-                RadioListTile<AppThemeMode>(
-                  title: Text(S.of(context).themeModeSystem),
-                  subtitle: Text(S.of(context).themeModeSystemDesc),
-                  value: AppThemeMode.system,
+                RadioGroup<AppThemeMode>(
                   groupValue: themeSettings.themeMode,
-                  onChanged: (value) {
+                  onChanged: (AppThemeMode? value) {
                     if (value != null) {
                       ref
                           .read(themeSettingsProvider.notifier)
                           .setThemeMode(value);
                     }
                   },
-                ),
-                RadioListTile<AppThemeMode>(
-                  title: Text(S.of(context).themeModeLight),
-                  subtitle: Text(S.of(context).themeModeLightDesc),
-                  value: AppThemeMode.light,
-                  groupValue: themeSettings.themeMode,
-                  onChanged: (value) {
-                    if (value != null) {
-                      ref
-                          .read(themeSettingsProvider.notifier)
-                          .setThemeMode(value);
-                    }
-                  },
-                ),
-                RadioListTile<AppThemeMode>(
-                  title: Text(S.of(context).themeModeDark),
-                  subtitle: Text(S.of(context).themeModeDarkDesc),
-                  value: AppThemeMode.dark,
-                  groupValue: themeSettings.themeMode,
-                  onChanged: (value) {
-                    if (value != null) {
-                      ref
-                          .read(themeSettingsProvider.notifier)
-                          .setThemeMode(value);
-                    }
-                  },
+                  child: Column(
+                    children: [
+                      RadioListTile<AppThemeMode>(
+                        title: Text(S.of(context).themeModeSystem),
+                        subtitle: Text(S.of(context).themeModeSystemDesc),
+                        value: AppThemeMode.system,
+                      ),
+                      RadioListTile<AppThemeMode>(
+                        title: Text(S.of(context).themeModeLight),
+                        subtitle: Text(S.of(context).themeModeLightDesc),
+                        value: AppThemeMode.light,
+                      ),
+                      RadioListTile<AppThemeMode>(
+                        title: Text(S.of(context).themeModeDark),
+                        subtitle: Text(S.of(context).themeModeDarkDesc),
+                        value: AppThemeMode.dark,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 16),
-
-          // 颜色方案选择
+          const SizedBox(height: 16),          // 颜色方案选择
           Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,144 +80,150 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         ),
                   ),
                 ),
-                _buildColorSchemeOption(
-                  context,
-                  ref,
-                  themeSettings,
-                  ColorSchemeType.oceanBlue,
-                  S.of(context).colorSchemeOceanBlue,
-                  S.of(context).colorSchemeOceanBlueDesc,
-                  const Color(0xFF146683),
-                ),
-                _buildColorSchemeOption(
-                  context,
-                  ref,
-                  themeSettings,
-                  ColorSchemeType.sakuraPink,
-                  S.of(context).colorSchemeSakuraPink,
-                  S.of(context).colorSchemeSakuraPinkDesc,
-                  const Color(0xFFB4276E),
-                ),
-                _buildColorSchemeOption(
-                  context,
-                  ref,
-                  themeSettings,
-                  ColorSchemeType.sunsetOrange,
-                  S.of(context).colorSchemeSunsetOrange,
-                  S.of(context).colorSchemeSunsetOrangeDesc,
-                  const Color(0xFF904D00),
-                ),
-                _buildColorSchemeOption(
-                  context,
-                  ref,
-                  themeSettings,
-                  ColorSchemeType.lavenderPurple,
-                  S.of(context).colorSchemeLavenderPurple,
-                  S.of(context).colorSchemeLavenderPurpleDesc,
-                  const Color(0xFF6750A4),
-                ),
-                _buildColorSchemeOption(
-                  context,
-                  ref,
-                  themeSettings,
-                  ColorSchemeType.forestGreen,
-                  S.of(context).colorSchemeForestGreen,
-                  S.of(context).colorSchemeForestGreenDesc,
-                  const Color(0xFF3A6F41),
-                ),
-                const Divider(),
-                InkWell(
-                  onTap: () {
-                    ref
-                        .read(themeSettingsProvider.notifier)
-                        .setColorSchemeType(ColorSchemeType.dynamic);
+                RadioGroup<ColorSchemeType>(
+                  groupValue: themeSettings.colorSchemeType,
+                  onChanged: (ColorSchemeType? value) {
+                    if (value != null) {
+                      ref
+                          .read(themeSettingsProvider.notifier)
+                          .setColorSchemeType(value);
+                    }
                   },
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      children: [
-                        // 彩色渐变圆圈
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFFE91E63), // Pink
-                                Color(0xFF9C27B0), // Purple
-                                Color(0xFF2196F3), // Blue
-                                Color(0xFF4CAF50), // Green
-                                Color(0xFFFFEB3B), // Yellow
-                                Color(0xFFFF5722), // Orange
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: themeSettings.colorSchemeType ==
-                                      ColorSchemeType.dynamic
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Colors.transparent,
-                              width: 2.5,
-                            ),
-                          ),
-                          child: themeSettings.colorSchemeType ==
-                                  ColorSchemeType.dynamic
-                              ? const Icon(
-                                  Icons.check,
-                                  color: Colors.white,
-                                  size: 16,
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Column(
+                    children: [
+                      _buildColorSchemeOption(
+                        context,
+                        ref,
+                        themeSettings,
+                        ColorSchemeType.oceanBlue,
+                        S.of(context).colorSchemeOceanBlue,
+                        S.of(context).colorSchemeOceanBlueDesc,
+                        const Color(0xFF146683),
+                      ),
+                      _buildColorSchemeOption(
+                        context,
+                        ref,
+                        themeSettings,
+                        ColorSchemeType.sakuraPink,
+                        S.of(context).colorSchemeSakuraPink,
+                        S.of(context).colorSchemeSakuraPinkDesc,
+                        const Color(0xFFB4276E),
+                      ),
+                      _buildColorSchemeOption(
+                        context,
+                        ref,
+                        themeSettings,
+                        ColorSchemeType.sunsetOrange,
+                        S.of(context).colorSchemeSunsetOrange,
+                        S.of(context).colorSchemeSunsetOrangeDesc,
+                        const Color(0xFF904D00),
+                      ),
+                      _buildColorSchemeOption(
+                        context,
+                        ref,
+                        themeSettings,
+                        ColorSchemeType.lavenderPurple,
+                        S.of(context).colorSchemeLavenderPurple,
+                        S.of(context).colorSchemeLavenderPurpleDesc,
+                        const Color(0xFF6750A4),
+                      ),
+                      _buildColorSchemeOption(
+                        context,
+                        ref,
+                        themeSettings,
+                        ColorSchemeType.forestGreen,
+                        S.of(context).colorSchemeForestGreen,
+                        S.of(context).colorSchemeForestGreenDesc,
+                        const Color(0xFF3A6F41),
+                      ),
+                      const Divider(),
+                      InkWell(
+                        onTap: () {
+                          ref
+                              .read(themeSettingsProvider.notifier)
+                              .setColorSchemeType(ColorSchemeType.dynamic);
+                        },
+                        child: Padding(
+                          padding:        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Row(
                             children: [
-                              Text(
-                                S.of(context).colorSchemeDynamic,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(
-                                      fontWeight:
-                                          themeSettings.colorSchemeType ==
-                                                  ColorSchemeType.dynamic
-                                              ? FontWeight.bold
-                                              : FontWeight.normal,
-                                    ),
+                              // 彩色渐变圆圈
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFFE91E63), // Pink
+                                      Color(0xFF9C27B0), // Purple
+                                      Color(0xFF2196F3), // Blue
+                                      Color(0xFF4CAF50), // Green
+                                      Color(0xFFFFEB3B), // Yellow
+                                      Color(0xFFFF5722), // Orange
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: themeSettings.colorSchemeType ==
+                                            ColorSchemeType.dynamic
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Colors.transparent,
+                                    width: 2.5,
+                                  ),
+                                ),
+                                child: themeSettings.colorSchemeType ==
+                                        ColorSchemeType.dynamic
+                                    ? const Icon(
+                                        Icons.check,
+                                        color: Colors.white,
+                                        size: 16,
+                                      )
+                                    : null,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                S.of(context).colorSchemeDynamicDesc,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      S.of(context).colorSchemeDynamic,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            fontWeight:
+                                                themeSettings
+                                                            .colorSchemeType ==
+                                                        ColorSchemeType.dynamic
+                                                    ? FontWeight.bold
+                                                    : FontWeight.normal,
+                                          ),
                                     ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      S.of(context).colorSchemeDynamicDesc,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Radio<ColorSchemeType>(
+                                value: ColorSchemeType.dynamic,
                               ),
                             ],
                           ),
                         ),
-                        Radio<ColorSchemeType>(
-                          value: ColorSchemeType.dynamic,
-                          groupValue: themeSettings.colorSchemeType,
-                          onChanged: (value) {
-                            if (value != null) {
-                              ref
-                                  .read(themeSettingsProvider.notifier)
-                                  .setColorSchemeType(value);
-                            }
-                          },
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -387,14 +381,14 @@ class ThemeSettingsScreen extends ConsumerWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: previewColor.withOpacity(0.3),
+                    color: previewColor.withValues(alpha: 0.3),
                     blurRadius: 6,
                     spreadRadius: 1,
                   ),
                 ],
               ),
               child: isSelected
-                  ? Icon(
+                  ? const Icon(
                       Icons.check,
                       color: Colors.white,
                       size: 16,
@@ -427,14 +421,6 @@ class ThemeSettingsScreen extends ConsumerWidget {
             // 选中的单选按钮
             Radio<ColorSchemeType>(
               value: type,
-              groupValue: themeSettings.colorSchemeType,
-              onChanged: (value) {
-                if (value != null) {
-                  ref
-                      .read(themeSettingsProvider.notifier)
-                      .setColorSchemeType(value);
-                }
-              },
             ),
           ],
         ),

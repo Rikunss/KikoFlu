@@ -5,6 +5,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../providers/audio_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/playlists_provider.dart';
+import '../../utils/snackbar_util.dart';
+import '../../models/audio_track.dart';
 import '../privacy_blur_cover.dart';
 import '../../../l10n/app_localizations.dart';
 
@@ -16,7 +19,9 @@ class PlaylistDialog extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final queueAsync = ref.watch(queueProvider);
     final currentTrack = ref.watch(currentTrackProvider);
-    final authState = ref.watch(authProvider);
+    final (host, token) = ref.watch(authProvider.select(
+      (s) => (s.host ?? '', s.token ?? ''),
+    ));
     final audioState = ref.watch(audioPlayerControllerProvider);
 
     // Get current queue synchronously as fallback
@@ -39,50 +44,121 @@ class PlaylistDialog extends ConsumerWidget {
             children: [
               // Header
               Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      S.of(context).playlistTitle,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const Spacer(),
-                    if (audioState.appendMode)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: Text(
-                          S.of(context).appendMode,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                S.of(context).playlistTitle,
+                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                               ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${currentQueue.length} ${S.of(context).nFiles(currentQueue.length)}',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (audioState.appendMode)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Text(
+                              S.of(context).appendMode,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                            ),
+                          ),
+                        IconButton(
+                          tooltip: audioState.appendMode ? S.of(context).appendModeStatusOn : S.of(context).appendModeStatusOff,
+                          icon: Icon(
+                            Icons.playlist_add,
+                            color: audioState.appendMode
+                                ? Theme.of(context).colorScheme.primary
+                                : null,
+                          ),
+                          onPressed: () async {
+                            final notifier =
+                                ref.read(audioPlayerControllerProvider.notifier);
+                            final shouldShowHint = notifier.toggleAppendMode();
+                            if (shouldShowHint && context.mounted) {
+                              await _showAppendHintDialog(context);
+                            }
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                    if (currentQueue.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, bottom: 4),
+                        child: Row(
+                          children: [
+                            TextButton.icon(
+                              icon: const Icon(Icons.playlist_remove, size: 18),
+                              label: Text(S.of(context).clearQueue),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Theme.of(context).colorScheme.error,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              onPressed: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: Text(S.of(context).clearQueue),
+                                    content: Text(S.of(context).clearQueueConfirm),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(false),
+                                        child: Text(S.of(context).cancel),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(true),
+                                        child: Text(S.of(context).delete),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed == true && context.mounted) {
+                                  await ref
+                                      .read(audioPlayerControllerProvider.notifier)
+                                      .clearQueue();
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                  }
+                                }
+                              },
+                            ),
+                            TextButton.icon(
+                              icon: const Icon(Icons.save_outlined, size: 18),
+                              label: Text(S.of(context).saveAsPlaylist),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              onPressed: () => _saveQueueAsPlaylist(context, ref, currentQueue),
+                            ),
+                          ],
                         ),
                       ),
-                    IconButton(
-                      tooltip: audioState.appendMode ? S.of(context).appendModeStatusOn : S.of(context).appendModeStatusOff,
-                      icon: Icon(
-                        Icons.playlist_add,
-                        color: audioState.appendMode
-                            ? Theme.of(context).colorScheme.primary
-                            : null,
-                      ),
-                      onPressed: () async {
-                        final notifier =
-                            ref.read(audioPlayerControllerProvider.notifier);
-                        final shouldShowHint = notifier.toggleAppendMode();
-                        if (shouldShowHint && context.mounted) {
-                          await _showAppendHintDialog(context);
-                        }
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
                   ],
                 ),
               ),
@@ -106,7 +182,7 @@ class PlaylistDialog extends ConsumerWidget {
                       padding: EdgeInsets.zero,
                       itemCount: tracks.length,
                       buildDefaultDragHandles: false,
-                      onReorder: (oldIndex, newIndex) {
+                      onReorderItem: (oldIndex, newIndex) {
                         ref
                             .read(audioPlayerControllerProvider.notifier)
                             .moveTrack(oldIndex, newIndex);
@@ -123,8 +199,6 @@ class PlaylistDialog extends ConsumerWidget {
                             track.artworkUrl!.startsWith('file://')) {
                           workCoverUrl = track.artworkUrl;
                         } else if (track.workId != null) {
-                          final host = authState.host ?? '';
-                          final token = authState.token ?? '';
                           if (host.isNotEmpty) {
                             var normalizedHost = host;
                             if (!normalizedHost.startsWith('http://') &&
@@ -232,6 +306,8 @@ class PlaylistDialog extends ConsumerWidget {
                                                             .replaceFirst(
                                                                 'file://', '')),
                                                         fit: BoxFit.cover,
+                                                        cacheWidth: 144,
+                                                        cacheHeight: 144,
                                                         errorBuilder: (context,
                                                             error, stackTrace) {
                                                           return const Icon(
@@ -241,6 +317,9 @@ class PlaylistDialog extends ConsumerWidget {
                                                       )
                                                     : CachedNetworkImage(
                                                         imageUrl: resolvedCover,
+                                                        cacheKey: track.workId != null
+                                                            ? 'work_cover_${track.workId}'
+                                                            : null,
                                                         fit: BoxFit.cover,
                                                         errorWidget: (context,
                                                             url, error) {
@@ -372,5 +451,72 @@ class PlaylistDialog extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _saveQueueAsPlaylist(
+      BuildContext context, WidgetRef ref, List<AudioTrack> tracks) async {
+    if (tracks.isEmpty) {
+      if (context.mounted) {
+        SnackBarUtil.showError(context, S.of(context).noWorks);
+      }
+      return;
+    }
+
+    final nameController = TextEditingController();
+
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(S.of(context).saveAsPlaylist),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: S.of(context).newPlaylistNameHint,
+            labelText: S.of(context).playlistName,
+          ),
+          onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(S.of(context).cancel),
+          ),
+          TextButton(
+            onPressed: () {
+              final text = nameController.text.trim();
+              if (text.isNotEmpty) {
+                Navigator.of(ctx).pop(text);
+              }
+            },
+            child: Text(S.of(context).create),
+          ),
+        ],
+      ),
+    );
+
+    nameController.dispose();
+
+    if (name == null || name.isEmpty || !context.mounted) return;
+
+    try {
+      await ref
+          .read(audioPlayerControllerProvider.notifier)
+          .saveQueueAsPlaylist(name: name);
+      if (context.mounted) {
+        ref.invalidate(playlistsProvider);
+        SnackBarUtil.showSuccess(
+          context,
+          S.of(context).playlistCreatedSuccess(name),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        SnackBarUtil.showError(
+          context,
+          S.of(context).createFailedWithError(e.toString()),
+        );
+      }
+    }
   }
 }

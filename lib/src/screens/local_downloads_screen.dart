@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 
 import '../../l10n/app_localizations.dart';
+import '../../src/services/log_service.dart';
 import '../models/download_task.dart';
 import '../models/sort_options.dart';
 import '../models/work.dart';
 import '../services/download_service.dart';
 import '../services/storage_service.dart';
 import '../utils/string_utils.dart';
-import '../utils/snackbar_util.dart';
+
 import '../providers/auth_provider.dart';
 import '../widgets/pagination_bar.dart';
 import '../widgets/sort_dialog.dart';
@@ -19,6 +21,38 @@ import 'offline_work_detail_screen.dart';
 import '../widgets/overscroll_next_page_detector.dart';
 import '../widgets/privacy_blur_cover.dart';
 import '../utils/scroll_optimization.dart';
+import 'local_file_browser_screen.dart';
+
+Map<String, dynamic> _sanitizeMetadata(Map<String, dynamic> metadata) {
+  try {
+    return _deepSanitize(metadata) as Map<String, dynamic>;
+  } catch (e) {
+    LogService.instance.error('[LocalDownloads] Error sanitizing metadata: $e', tag: 'Download');
+    rethrow;
+  }
+}
+
+dynamic _deepSanitize(dynamic value) {
+  if (value == null) return null;
+  if (value is Map) {
+    return value.map((key, val) => MapEntry(key.toString(), _deepSanitize(val)));
+  }
+  if (value is List) {
+    return value.map(_deepSanitize).toList();
+  }
+  // Serialize objects with toJson
+  if (const [
+    'Va', 'Tag', 'AudioFile', 'RatingDetail', 'OtherLanguageEdition'
+  ].contains(value.runtimeType.toString())) {
+    try {
+      return _deepSanitize((value as dynamic).toJson());
+    } catch (e) {
+      LogService.instance.warning('[LocalDownloads] Serialization failed ${value.runtimeType}: $e', tag: 'Download');
+      return null;
+    }
+  }
+  return value;
+}
 
 /// 本地下载屏幕 - 显示已完成的下载内容
 class LocalDownloadsScreen extends ConsumerStatefulWidget {
@@ -31,76 +65,44 @@ class LocalDownloadsScreen extends ConsumerStatefulWidget {
 
 class _LocalDownloadsScreenState extends ConsumerState<LocalDownloadsScreen>
     with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return const Scaffold(
+      backgroundColor: Colors.transparent,
+      body: _LocalDownloadList(),
+    );
+  }
+}
+
+/// ===================================================================
+/// Download list — owns StreamBuilder + selection/filter/sort/page state
+/// ===================================================================
+class _LocalDownloadList extends StatefulWidget {
+  const _LocalDownloadList();
+
+  @override
+  State<_LocalDownloadList> createState() => _LocalDownloadListState();
+}
+
+class _LocalDownloadListState extends State<_LocalDownloadList> {
   bool _isSelectionMode = false;
-  final Set<int> _selectedWorkIds = {}; // 选中的作品ID
+  final Set<int> _selectedWorkIds = {};
   final ScrollController _scrollController = ScrollController();
   int _currentPage = 1;
-  final int _pageSize = 30;
+  static const int _pageSize = 30;
 
-  // 搜索相关
+  // Search
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isSearchVisible = false;
 
-  // 排序相关
+  // Sort
   SortOrder _sortOrder = SortOrder.downloadDate;
   SortDirection _sortDirection = SortDirection.desc;
-
-  void _showSnackBarSafe(SnackBar snackBar) {
-    if (!mounted) return;
-
-    try {
-      // 提取消息
-      final content = snackBar.content;
-      String message = '';
-
-      if (content is Text) {
-        message = content.data ?? '';
-      } else if (content is Row) {
-        final children = content.children;
-        for (final child in children) {
-          if (child is Text) {
-            message = child.data ?? '';
-            break;
-          } else if (child is Expanded) {
-            final expandedChild = child.child;
-            if (expandedChild is Text) {
-              message = expandedChild.data ?? '';
-              break;
-            }
-          }
-        }
-      }
-
-      if (message.isEmpty) {
-        final messenger = ScaffoldMessenger.maybeOf(context);
-        if (messenger != null && messenger.mounted) {
-          messenger.showSnackBar(snackBar);
-        }
-        return;
-      }
-
-      // 根据背景色判断类型
-      final backgroundColor = snackBar.backgroundColor;
-      final duration = snackBar.duration;
-
-      if (backgroundColor == Colors.red ||
-          backgroundColor == Theme.of(context).colorScheme.error) {
-        SnackBarUtil.showError(context, message, duration: duration);
-      } else if (backgroundColor == Colors.green) {
-        SnackBarUtil.showSuccess(context, message, duration: duration);
-      } else if (backgroundColor == Colors.orange) {
-        SnackBarUtil.showWarning(context, message, duration: duration);
-      } else {
-        SnackBarUtil.showInfo(context, message, duration: duration);
-      }
-    } catch (e) {
-      print('[LocalDownloads] 无法显示 SnackBar: $e');
-    }
-  }
-
-  @override
-  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -120,30 +122,20 @@ class _LocalDownloadsScreenState extends ConsumerState<LocalDownloadsScreen>
   }
 
   void _goToPage(int page) {
-    setState(() {
-      _currentPage = page;
-    });
+    setState(() => _currentPage = page);
     _scrollToTop();
   }
 
   void _nextPage(int totalPages) {
-    if (_currentPage < totalPages) {
-      _goToPage(_currentPage + 1);
-    }
+    if (_currentPage < totalPages) _goToPage(_currentPage + 1);
   }
 
-  void _previousPage() {
-    if (_currentPage > 1) {
-      _goToPage(_currentPage - 1);
-    }
-  }
+  void _previousPage() => _goToPage((_currentPage - 1).clamp(1, 9999));
 
   void _toggleSelectionMode() {
     setState(() {
       _isSelectionMode = !_isSelectionMode;
-      if (!_isSelectionMode) {
-        _selectedWorkIds.clear();
-      }
+      if (!_isSelectionMode) _selectedWorkIds.clear();
     });
   }
 
@@ -165,237 +157,146 @@ class _LocalDownloadsScreenState extends ConsumerState<LocalDownloadsScreen>
   }
 
   void _deselectAll() {
-    setState(() {
-      _selectedWorkIds.clear();
-    });
+    setState(() => _selectedWorkIds.clear());
   }
 
-  // 打开本地下载目录
   Future<void> _openDownloadFolder() async {
     try {
       final downloadDir = await DownloadService.instance.getDownloadDirectory();
-      final path = downloadDir.path;
-
-      // 检查平台并打开文件夹
+      final uri = Uri.file(downloadDir.path);
       if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-        final uri = Uri.file(path);
-        final canLaunch = await canLaunchUrl(uri);
-
-        if (canLaunch) {
+        if (await canLaunchUrl(uri)) {
           await launchUrl(uri);
-        } else {
-          if (mounted) {
-            _showSnackBarSafe(
-              SnackBar(
-                content: Text(S.of(context).cannotOpenFolder(path)),
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
+          return;
         }
+      }
+      if (mounted) {
+        _showSnackBarSafe(SnackBar(
+          content: Text(S.of(context).cannotOpenFolder(downloadDir.path)),
+          duration: const Duration(seconds: 3),
+        ));
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBarSafe(
-          SnackBar(
-            content: Text(S.of(context).openFolderFailed(e.toString())),
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        _showSnackBarSafe(SnackBar(
+          content: Text(S.of(context).openFolderFailed(e.toString())),
+          duration: const Duration(seconds: 3),
+        ));
       }
     }
   }
 
-  // 刷新元数据
   Future<void> _refreshMetadata() async {
     if (!mounted) return;
-
-    ScaffoldMessengerState? messenger;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+      content: Row(children: [
+        const SizedBox(width: 16, height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+        ),
+        const SizedBox(width: 12),
+        Text(S.of(context).reloadingFromDisk),
+      ]),
+      duration: const Duration(seconds: 30),
+    ));
 
     try {
-      // 显示加载提示
-      if (mounted) {
-        try {
-          messenger = ScaffoldMessenger.maybeOf(context);
-          messenger?.showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(S.of(context).reloadingFromDisk),
-                ],
-              ),
-              duration: const Duration(seconds: 30), // 设置较长时间，手动清除
-            ),
-          );
-        } catch (e) {
-          print('[LocalDownloads] 无法显示加载提示: $e');
-        }
-      }
-
       await DownloadService.instance.reloadMetadataFromDisk();
-
-      // 清除加载提示并显示成功消息
       if (!mounted) return;
-
       Future.microtask(() {
         if (mounted) {
-          try {
-            // 清除之前的 SnackBar
-            ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
-            // 显示完成消息
-            _showSnackBarSafe(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.check_circle, color: Colors.white),
-                    const SizedBox(width: 12),
-                    Text(S.of(context).refreshComplete),
-                  ],
-                ),
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          } catch (e) {
-            print('[LocalDownloads] 无法显示完成提示: $e');
-          }
+          ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+          _showSnackBarSafe(SnackBar(
+            content: Row(children: [
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 12),
+              Text(S.of(context).refreshComplete),
+            ]),
+            duration: const Duration(seconds: 2),
+          ));
         }
       });
     } catch (e) {
       if (!mounted) return;
-
       Future.microtask(() {
         if (mounted) {
-          try {
-            // 清除加载提示
-            ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
-            // 显示错误消息
-            _showSnackBarSafe(
-              SnackBar(
-                content: Text(S.of(context).refreshFailed(e.toString())),
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          } catch (e) {
-            print('[LocalDownloads] 无法显示错误提示: $e');
-          }
+          ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+          _showSnackBarSafe(SnackBar(
+            content: Text(S.of(context).refreshFailed(e.toString())),
+            duration: const Duration(seconds: 3),
+          ));
         }
       });
     }
   }
 
-  // 删除选中的作品
+  void _showSnackBarSafe(SnackBar snackBar) {
+    if (!mounted) return;
+    try {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(snackBar);
+    } catch (_) {}
+  }
+
   Future<void> _deleteSelectedWorks(
       Map<int, List<DownloadTask>> groupedTasks) async {
     if (_selectedWorkIds.isEmpty) return;
-
+    final s = S.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: Text(S.of(context).deletionConfirmTitle),
         content: Text(S.of(context).deleteSelectedWorksConfirm(_selectedWorkIds.length)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(S.of(context).cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+            child: Text(S.of(context).cancel)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: Text(S.of(context).delete),
-          ),
+              foregroundColor: Theme.of(ctx).colorScheme.error),
+            child: Text(S.of(context).delete)),
         ],
       ),
     );
+    if (confirmed != true || !mounted) return;
 
-    if (confirmed != true) return;
-
-    // 保存 mounted 状态和 context，避免异步后使用失效的引用
-    if (!mounted) return;
-
-    String? errorMessage;
-    int successCount = 0;
-    int totalCount = 0;
-
-    try {
-      for (final workId in _selectedWorkIds) {
-        final tasks = groupedTasks[workId] ?? [];
-        for (final task in tasks) {
-          totalCount++;
-          try {
-            await DownloadService.instance.deleteTask(task.id);
-            successCount++;
-          } catch (e) {
-            errorMessage ??= S.of(context).partialDeleteFailed(e.toString());
-            print('[LocalDownloads] 删除任务 ${task.id} 失败: $e');
-          }
+    int success = 0, total = 0;
+    String? errorMsg;
+    for (final workId in _selectedWorkIds) {
+      for (final task in (groupedTasks[workId] ?? [])) {
+        total++;
+        try {
+          await DownloadService.instance.deleteTask(task.id);
+          success++;
+        } catch (e) {              errorMsg ??= s.partialDeleteFailed(e.toString());
         }
       }
-
-      // 只在 widget 仍然 mounted 时更新状态
-      if (!mounted) return;
-
-      setState(() {
-        _isSelectionMode = false;
-        _selectedWorkIds.clear();
+    }
+    if (!mounted) return;
+    setState(() {
+      _isSelectionMode = false;
+      _selectedWorkIds.clear();
+    });
+    if (mounted) {
+      Future.microtask(() {
+        if (mounted) {
+          _showSnackBarSafe(SnackBar(
+            content: Text(errorMsg != null && success > 0
+                ? S.of(context).deletedNOfTotal(success, total)
+                : errorMsg ?? S.of(context).deleted),
+          ));
+        }
       });
-
-      // 使用 Future.microtask 延迟到下一帧显示 SnackBar
-      if (mounted) {
-        Future.microtask(() {
-          if (mounted) {
-            if (errorMessage != null && successCount > 0) {
-              _showSnackBarSafe(
-                SnackBar(content: Text(S.of(context).deletedNOfTotal(successCount, totalCount))),
-              );
-            } else if (errorMessage != null) {
-              _showSnackBarSafe(
-                SnackBar(content: Text(errorMessage)),
-              );
-            } else {
-              _showSnackBarSafe(
-                SnackBar(content: Text(S.of(context).deleted)),
-              );
-            }
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        Future.microtask(() {
-          if (mounted) {
-            _showSnackBarSafe(
-              SnackBar(content: Text(S.of(context).deleteFailedWithError(e.toString()))),
-            );
-          }
-        });
-      }
     }
   }
 
-  // 显示排序对话框
   void _showSortDialog() {
     showDialog(
       context: context,
       barrierDismissible: !Platform.isIOS,
-      builder: (context) => CommonSortDialog(
+      builder: (ctx) => CommonSortDialog(
         title: S.of(context).sortOptions,
         currentOption: _sortOrder,
         currentDirection: _sortDirection,
-        availableOptions: const [
-          SortOrder.downloadDate,
-          SortOrder.workId,
-        ],
+        availableOptions: const [SortOrder.downloadDate, SortOrder.workId],
         onSort: (option, direction) {
           setState(() {
             _sortOrder = option;
@@ -408,7 +309,6 @@ class _LocalDownloadsScreenState extends ConsumerState<LocalDownloadsScreen>
     );
   }
 
-  // 切换搜索栏可见性
   void _toggleSearch() {
     setState(() {
       _isSearchVisible = !_isSearchVisible;
@@ -420,480 +320,196 @@ class _LocalDownloadsScreenState extends ConsumerState<LocalDownloadsScreen>
     });
   }
 
-  // 过滤作品（根据搜索关键词）
   Map<int, List<DownloadTask>> _filterTasks(
       Map<int, List<DownloadTask>> groupedTasks) {
     if (_searchQuery.isEmpty) return groupedTasks;
-
     final query = _searchQuery.toLowerCase();
-    return Map.fromEntries(
-      groupedTasks.entries.where((entry) {
-        final workId = entry.key;
-        final tasks = entry.value;
-        final firstTask = tasks.first;
-
-        // 匹配作品标题
-        if (firstTask.workTitle.toLowerCase().contains(query)) return true;
-
-        // 匹配 RJ 号（workId）
-        final rjCode = 'RJ${workId.toString().padLeft(6, '0')}';
-        if (rjCode.toLowerCase().contains(query)) return true;
-        if (workId.toString().contains(query)) return true;
-
-        return false;
-      }),
-    );
+    return Map.fromEntries(groupedTasks.entries.where((e) {
+      final first = e.value.first;
+      if (first.workTitle.toLowerCase().contains(query)) return true;
+      final rj = 'RJ${e.key.toString().padLeft(6, '0')}';
+      return rj.toLowerCase().contains(query) || e.key.toString().contains(query);
+    }));
   }
 
-  // 排序作品
   List<int> _sortWorkIds(Map<int, List<DownloadTask>> groupedTasks) {
-    final workIds = groupedTasks.keys.toList();
-
-    workIds.sort((a, b) {
-      int result;
+    final ids = groupedTasks.keys.toList();
+    ids.sort((a, b) {
+      int r;
       switch (_sortOrder) {
         case SortOrder.downloadDate:
-          final aDate = groupedTasks[a]!
-              .map((t) => t.completedAt ?? t.createdAt)
-              .reduce((a, b) => a.isAfter(b) ? a : b);
-          final bDate = groupedTasks[b]!
-              .map((t) => t.completedAt ?? t.createdAt)
-              .reduce((a, b) => a.isAfter(b) ? a : b);
-          result = aDate.compareTo(bDate);
-          break;
+          final aD = groupedTasks[a]!
+              .map((t) => t.completedAt ?? t.createdAt).reduce((x, y) => x.isAfter(y) ? x : y);
+          final bD = groupedTasks[b]!
+              .map((t) => t.completedAt ?? t.createdAt).reduce((x, y) => x.isAfter(y) ? x : y);
+          r = aD.compareTo(bD);
         case SortOrder.workId:
-          result = a.compareTo(b);
-          break;
+          r = a.compareTo(b);
         default:
-          result = 0;
+          r = 0;
       }
-      return _sortDirection == SortDirection.asc ? result : -result;
+      return _sortDirection == SortDirection.asc ? r : -r;
     });
-
-    return workIds;
+    return ids;
   }
 
   void _openWorkDetail(int workId, DownloadTask task) async {
-    print(
-        '[LocalDownloads] 打开作品详情: workId=$workId, hasMetadata=${task.workMetadata != null}');
-
     if (task.workMetadata == null) {
-      print('[LocalDownloads] 错误：任务没有元数据');
-      _showSnackBarSafe(
-        SnackBar(
-          content: Text(S.of(context).noWorkMetadataForOffline),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      _showSnackBarSafe(SnackBar(
+        content: Text(S.of(context).noWorkMetadataForOffline),
+        duration: const Duration(seconds: 2),
+      ));
       return;
     }
-
     try {
       final metadata = _sanitizeMetadata(task.workMetadata!);
       final work = Work.fromJson(metadata);
-
-      // 动态构建完整的封面路径
       final downloadDir = await DownloadService.instance.getDownloadDirectory();
-      final relativeCoverPath = metadata['localCoverPath'] as String?;
-      final localCoverPath = relativeCoverPath != null
-          ? '${downloadDir.path}/$workId/$relativeCoverPath'
-          : null;
-
-      if (mounted) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => OfflineWorkDetailScreen(
-              work: work,
-              isOffline: true,
-              localCoverPath: localCoverPath,
-            ),
-          ),
-        );
-      }
+      final relPath = metadata['localCoverPath'] as String?;
+      final localCover = relPath != null ? '${downloadDir.path}/$workId/$relPath' : null;
+      if (!mounted) return;
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => OfflineWorkDetailScreen(
+          work: work, isOffline: true, localCoverPath: localCover),
+      ));
     } catch (e) {
       if (mounted) {
-        _showSnackBarSafe(
-          SnackBar(
-            content: Text(S.of(context).openWorkDetailFailed(e.toString())),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        _showSnackBarSafe(SnackBar(
+          content: Text(S.of(context).openWorkDetailFailed(e.toString())),
+          duration: const Duration(seconds: 2),
+        ));
       }
     }
-  }
-
-  Map<String, dynamic> _sanitizeMetadata(Map<String, dynamic> metadata) {
-    try {
-      return _deepSanitize(metadata) as Map<String, dynamic>;
-    } catch (e) {
-      print('[LocalDownloads] 清理元数据时出错: $e');
-      rethrow;
-    }
-  }
-
-  dynamic _deepSanitize(dynamic value) {
-    if (value == null) return null;
-
-    if (value is Map) {
-      return value
-          .map((key, val) => MapEntry(key.toString(), _deepSanitize(val)));
-    }
-
-    if (value is List) {
-      return value.map(_deepSanitize).toList();
-    }
-
-    // 处理特殊类型对象 - 直接调用toJson()方法
-    if (value.runtimeType.toString() == 'Va' ||
-        value.runtimeType.toString() == 'Tag' ||
-        value.runtimeType.toString() == 'AudioFile' ||
-        value.runtimeType.toString() == 'RatingDetail' ||
-        value.runtimeType.toString() == 'OtherLanguageEdition') {
-      try {
-        // 尝试调用toJson方法
-        final json = (value as dynamic).toJson();
-        // 递归处理嵌套的children等字段
-        return _deepSanitize(json);
-      } catch (e) {
-        print('[LocalDownloads] 对象序列化失败 ${value.runtimeType}: $e');
-        return null;
-      }
-    }
-
-    return value;
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
-
     return StreamBuilder<List<DownloadTask>>(
       stream: DownloadService.instance.tasksStream,
       initialData: DownloadService.instance.tasks,
       builder: (context, snapshot) {
         final tasks = snapshot.data ?? [];
-        final completedTasks =
-            tasks.where((t) => t.status == DownloadStatus.completed).toList();
+        final completed = tasks.where((t) => t.status == DownloadStatus.completed).toList();
 
-        // 按作品分组
-        final Map<int, List<DownloadTask>> allGroupedTasks = {};
-        for (final task in completedTasks) {
-          allGroupedTasks.putIfAbsent(task.workId, () => []).add(task);
+        // Group by workId
+        final Map<int, List<DownloadTask>> allGrouped = {};
+        for (final task in completed) {
+          allGrouped.putIfAbsent(task.workId, () => []).add(task);
         }
 
-        // 应用搜索过滤
-        final groupedTasks = _filterTasks(allGroupedTasks);
+        // Filter + sort
+        final grouped = _filterTasks(allGrouped);
+        final sortedIds = _sortWorkIds(grouped);
 
-        // 应用排序
-        final sortedWorkIds = _sortWorkIds(groupedTasks);
-
-        // 计算分页
-        final totalCount = sortedWorkIds.length;
-        final totalPages = (totalCount / _pageSize).ceil();
-        final startIndex = (_currentPage - 1) * _pageSize;
-        final endIndex = (startIndex + _pageSize).clamp(0, totalCount);
-
-        // 获取当前页的作品
-        final currentPageWorkIds = sortedWorkIds.sublist(
-              startIndex,
-              endIndex,
-            );
-        final currentPageTasks = Map<int, List<DownloadTask>>.fromEntries(
-          currentPageWorkIds.map((id) => MapEntry(id, groupedTasks[id]!)),
+        // Pagination
+        final total = sortedIds.length;
+        final totalPages = (total / _pageSize).ceil();
+        final start = (_currentPage - 1) * _pageSize;
+        final end = (start + _pageSize).clamp(0, total);
+        final pageIds = sortedIds.sublist(start, end);
+        final pageMap = Map<int, List<DownloadTask>>.fromEntries(
+          pageIds.map((id) => MapEntry(id, grouped[id]!)),
         );
 
-        return Column(
-          children: [
-            // 顶部工具栏
-            _buildTopBar(allGroupedTasks),
-            // 搜索栏
-            if (_isSearchVisible) _buildSearchBar(),
-            // 内容区域
-            Expanded(
-              child: allGroupedTasks.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.download_outlined,
-                            size: 64,
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            S.of(context).noLocalDownloads,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : groupedTasks.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.search_off,
-                            size: 64,
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            S.of(context).noResults,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : OverscrollNextPageDetector(
-                      hasNextPage: _currentPage < totalPages,
-                      isLoading: false,
-                      onNextPage: () async {
-                        _nextPage(totalPages);
-                        // 等待一帧后滚动到顶部，确保内容已加载
-                        await Future.delayed(const Duration(milliseconds: 50));
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _scrollToTop();
-                        });
-                      },
-                      child: CustomScrollView(
-                        controller: _scrollController,
-                        cacheExtent: ScrollOptimization.cacheExtent,
-                        physics: ScrollOptimization.physics,
-                        slivers: [
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                            sliver: SliverGrid(
-                              gridDelegate:
-                                  const SliverGridDelegateWithMaxCrossAxisExtent(
-                                maxCrossAxisExtent: 210,
-                                childAspectRatio: 0.72,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                              ),
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                                  final workId = currentPageWorkIds[index];
-                                  final workTasks = currentPageTasks[workId]!;
-                                  final firstTask = workTasks.first;
-                                  final isSelected =
-                                      _selectedWorkIds.contains(workId);
-
-                                  return _buildWorkCard(
-                                    workId: workId,
-                                    workTasks: workTasks,
-                                    firstTask: firstTask,
-                                    isSelected: isSelected,
-                                  );
-                                },
-                                childCount: currentPageTasks.length,
+        return Column(children: [
+          _DownloadTopBar(
+            isSelectionMode: _isSelectionMode,
+            selectedCount: _selectedWorkIds.length,
+            totalWorkCount: allGrouped.length,
+            isSearchVisible: _isSearchVisible,
+            onToggleSelectionMode: _toggleSelectionMode,
+            onSelectAll: () => _selectAll(allGrouped),
+            onDeselectAll: _deselectAll,
+            onDeleteSelected: () => _deleteSelectedWorks(allGrouped),
+            onRefresh: _refreshMetadata,
+            onOpenFolder: _openDownloadFolder,
+            onToggleSearch: _toggleSearch,
+            onShowSort: _showSortDialog,
+          ),
+          if (_isSearchVisible) _buildSearchBar(),
+          Expanded(
+            child: allGrouped.isEmpty
+                ? _emptyState(context, S.of(context).noLocalDownloads, Icons.download_outlined)
+                : grouped.isEmpty
+                    ? _emptyState(context, S.of(context).noResults, Icons.search_off)
+                    : OverscrollNextPageDetector(
+                        hasNextPage: _currentPage < totalPages,
+                        isLoading: false,
+                        onNextPage: () async {
+                          _nextPage(totalPages);
+                          await Future.delayed(const Duration(milliseconds: 50));
+                          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToTop());
+                        },
+                        child: CustomScrollView(
+                          // ignore: deprecated_member_use
+                          cacheExtent: ScrollOptimization.cacheExtent, controller: _scrollController,
+                          physics: ScrollOptimization.physics,
+                          slivers: [
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                              sliver: SliverGrid(
+                                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 210,
+                                  childAspectRatio: 0.72,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                ),
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                    final id = pageIds[index];
+                                    final workTasks = pageMap[id]!;
+                                    return RepaintBoundary(
+                                      key: ValueKey('dl_$id'),
+                                      child: _DownloadWorkCard(
+                                      workId: id,
+                                      workTasks: workTasks,
+                                      firstTask: workTasks.first,
+                                      isSelected: _selectedWorkIds.contains(id),
+                                      isSelectionMode: _isSelectionMode,
+                                      onTap: _isSelectionMode
+                                          ? () => _toggleWorkSelection(id)
+                                          : () => _openWorkDetail(id, workTasks.first),
+                                      onLongPress: !_isSelectionMode
+                                          ? () => setState(() {
+                                              _isSelectionMode = true;
+                                              _toggleWorkSelection(id);
+                                            })
+                                          : null,
+                                      ),
+                                    );
+                                  },
+                                  childCount: pageMap.length,
+                                ),
                               ),
                             ),
-                          ),
-                          // 分页控件
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                            sliver: SliverToBoxAdapter(
-                              child: PaginationBar(
-                                currentPage: _currentPage,
-                                totalCount: totalCount,
-                                pageSize: _pageSize,
-                                hasMore: _currentPage < totalPages,
-                                isLoading: false,
-                                onPreviousPage: _previousPage,
-                                onNextPage: () => _nextPage(totalPages),
-                                onGoToPage: _goToPage,
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                              sliver: SliverToBoxAdapter(
+                                child: PaginationBar(
+                                  currentPage: _currentPage,
+                                  totalCount: total,
+                                  pageSize: _pageSize,
+                                  hasMore: _currentPage < totalPages,
+                                  isLoading: false,
+                                  onPreviousPage: _previousPage,
+                                  onNextPage: () => _nextPage(totalPages),
+                                  onGoToPage: _goToPage,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-            ),
-          ],
-        );
+          ),
+        ]);
       },
-    );
-  }
-
-  Widget _buildTopBar(Map<int, List<DownloadTask>> groupedTasks) {
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
-    final horizontalPadding = isLandscape ? 24.0 : 8.0;
-
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      color: Theme.of(context)
-          .colorScheme
-          .surfaceContainerHighest
-          .withOpacity(0.5),
-      child: _isSelectionMode
-          ? Row(
-              children: [
-                // 退出选择按钮
-                Padding(
-                  padding: EdgeInsets.only(left: horizontalPadding - 8),
-                  child: IconButton(
-                    icon: const Icon(Icons.close),
-                    iconSize: 22,
-                    padding: const EdgeInsets.all(8),
-                    constraints:
-                        const BoxConstraints(minWidth: 40, minHeight: 40),
-                    onPressed: _toggleSelectionMode,
-                    tooltip: S.of(context).exitSelection,
-                  ),
-                ),
-                // 选中数量显示
-                Text(
-                  S.of(context).selectedCount(_selectedWorkIds.length),
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const Spacer(),
-                // 全选/取消全选按钮
-                IconButton(
-                  icon: Icon(
-                    _selectedWorkIds.length == groupedTasks.length
-                        ? Icons.deselect
-                        : Icons.select_all,
-                  ),
-                  iconSize: 22,
-                  padding: const EdgeInsets.all(8),
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 40),
-                  onPressed: _selectedWorkIds.length == groupedTasks.length
-                      ? _deselectAll
-                      : () => _selectAll(groupedTasks),
-                  tooltip: _selectedWorkIds.length == groupedTasks.length
-                      ? S.of(context).deselectAll
-                      : S.of(context).selectAll,
-                ),
-                // 删除按钮
-                if (_selectedWorkIds.isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.delete),
-                    iconSize: 22,
-                    padding: const EdgeInsets.all(8),
-                    constraints:
-                        const BoxConstraints(minWidth: 40, minHeight: 40),
-                    onPressed: () => _deleteSelectedWorks(groupedTasks),
-                    tooltip: '${S.of(context).delete} (${_selectedWorkIds.length})',
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                SizedBox(width: horizontalPadding - 8),
-              ],
-            )
-          : Align(
-              alignment: Alignment.centerLeft,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 选择按钮
-                    Padding(
-                      padding: const EdgeInsets.only(left: 20, right: 8),
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.checklist, size: 20),
-                        label: Text(S.of(context).select),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
-                          backgroundColor: Theme.of(context)
-                              .colorScheme
-                              .primaryContainer
-                              .withOpacity(0.5),
-                        ),
-                        onPressed: _toggleSelectionMode,
-                      ),
-                    ),
-                    // 刷新按钮
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.refresh, size: 20),
-                        label: Text(S.of(context).reload),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
-                          backgroundColor: Theme.of(context)
-                              .colorScheme
-                              .primaryContainer
-                              .withOpacity(0.5),
-                        ),
-                        onPressed: _refreshMetadata,
-                      ),
-                    ),
-                    // 打开文件夹按钮（仅 Windows 和 macOS）
-                    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: TextButton.icon(
-                          icon: const Icon(Icons.folder_open, size: 20),
-                          label: Text(S.of(context).openFolder),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
-                            backgroundColor: Theme.of(context)
-                                .colorScheme
-                                .primaryContainer
-                                .withOpacity(0.5),
-                          ),
-                          onPressed: _openDownloadFolder,
-                        ),
-                      ),
-                    // 搜索按钮
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: IconButton(
-                        icon: Icon(
-                          _isSearchVisible ? Icons.search_off : Icons.search,
-                          size: 22,
-                        ),
-                        padding: const EdgeInsets.all(8),
-                        constraints:
-                            const BoxConstraints(minWidth: 40, minHeight: 40),
-                        onPressed: _toggleSearch,
-                        tooltip: S.of(context).search,
-                      ),
-                    ),
-                    // 排序按钮
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: IconButton(
-                        icon: const Icon(Icons.sort, size: 22),
-                        padding: const EdgeInsets.all(8),
-                        constraints:
-                            const BoxConstraints(minWidth: 40, minHeight: 40),
-                        onPressed: _showSortDialog,
-                        tooltip: S.of(context).sortOptions,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
     );
   }
 
   Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Theme.of(context)
-          .colorScheme
-          .surfaceContainerHighest
-          .withOpacity(0.3),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       child: TextField(
         controller: _searchController,
         autofocus: true,
@@ -913,11 +529,8 @@ class _LocalDownloadsScreenState extends ConsumerState<LocalDownloadsScreen>
                 )
               : null,
           isDense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         ),
         onChanged: (value) {
           setState(() {
@@ -929,18 +542,253 @@ class _LocalDownloadsScreenState extends ConsumerState<LocalDownloadsScreen>
     );
   }
 
-  Widget _buildWorkCard({
-    required int workId,
-    required List<DownloadTask> workTasks,
-    required DownloadTask firstTask,
-    required bool isSelected,
-  }) {
-    final authState = ref.watch(authProvider);
-    final host = authState.host ?? '';
-    final token = authState.token ?? '';
+  Widget _emptyState(BuildContext context, String message, IconData icon) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .primaryContainer
+                    .withValues(alpha: 0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 40,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              message,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ===================================================================
+/// Top toolbar — receives all callbacks, no state
+/// ===================================================================
+class _DownloadTopBar extends StatelessWidget {
+  final bool isSelectionMode;
+  final int selectedCount;
+  final int totalWorkCount;
+  final bool isSearchVisible;
+  final VoidCallback onToggleSelectionMode;
+  final VoidCallback onSelectAll;
+  final VoidCallback onDeselectAll;
+  final VoidCallback onDeleteSelected;
+  final VoidCallback onRefresh;
+  final VoidCallback onOpenFolder;
+  final VoidCallback onToggleSearch;
+  final VoidCallback onShowSort;
+
+  const _DownloadTopBar({
+    required this.isSelectionMode,
+    required this.selectedCount,
+    required this.totalWorkCount,
+    required this.isSearchVisible,
+    required this.onToggleSelectionMode,
+    required this.onSelectAll,
+    required this.onDeselectAll,
+    required this.onDeleteSelected,
+    required this.onRefresh,
+    required this.onOpenFolder,
+    required this.onToggleSearch,
+    required this.onShowSort,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    final hPad = isLandscape ? 24.0 : 8.0;
+
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      child: isSelectionMode ? _buildSelectionBar(context, hPad) : _buildActionBar(context, hPad),
+    );
+  }
+
+  Widget _buildSelectionBar(BuildContext context, double hPad) {
+    return Row(children: [
+      Padding(
+        padding: EdgeInsets.only(left: hPad - 8),
+        child: IconButton(
+          icon: const Icon(Icons.close), iconSize: 22,
+          padding: const EdgeInsets.all(8),
+          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          onPressed: onToggleSelectionMode,
+          tooltip: S.of(context).exitSelection,
+        ),
+      ),
+      Text(S.of(context).selectedCount(selectedCount),
+          style: Theme.of(context).textTheme.titleSmall),
+      const Spacer(),
+      IconButton(
+        icon: Icon(selectedCount == totalWorkCount ? Icons.deselect : Icons.select_all),
+        iconSize: 22, padding: const EdgeInsets.all(8),
+        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+        onPressed: selectedCount == totalWorkCount ? onDeselectAll : onSelectAll,
+        tooltip: selectedCount == totalWorkCount
+            ? S.of(context).deselectAll : S.of(context).selectAll,
+      ),
+      if (selectedCount > 0)
+        IconButton(
+          icon: const Icon(Icons.delete), iconSize: 22,
+          padding: const EdgeInsets.all(8),
+          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          onPressed: onDeleteSelected,
+          tooltip: '${S.of(context).delete} ($selectedCount)',
+          color: Theme.of(context).colorScheme.error,
+        ),
+      SizedBox(width: hPad - 8),
+    ]);
+  }
+
+  Widget _buildActionBar(BuildContext context, double hPad) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(mainAxisSize: MainAxisSize.min, children: [            Padding(
+            padding: const EdgeInsets.only(left: 16, right: 6),
+            child: FilledButton.tonalIcon(
+              icon: const Icon(Icons.checklist, size: 18),
+              label: Text(S.of(context).select),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onToggleSelectionMode();
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),              child: FilledButton.tonalIcon(
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(S.of(context).reload),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  onRefresh();
+                },
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: FilledButton.tonalIcon(
+              icon: const Icon(Icons.folder_open, size: 18),
+              label: Text(S.of(context).browseFiles),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const LocalFileBrowserScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: FilledButton.tonalIcon(
+                icon: const Icon(Icons.folder_open, size: 18),
+                label: Text(S.of(context).openFolder),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  onOpenFolder();
+                },
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: IconButton(
+              icon: Icon(isSearchVisible ? Icons.search_off : Icons.search, size: 22),
+              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onToggleSearch();
+              },
+              tooltip: S.of(context).search,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: IconButton(
+              icon: const Icon(Icons.sort, size: 22),
+              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onShowSort();
+              },
+              tooltip: S.of(context).sortOptions,
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// ===================================================================
+/// Search bar — shown when _isSearchVisible
+/// ===================================================================
+// (Search bar is built inline in _DownloadTopBar parent as a separate container)
+
+/// ===================================================================
+/// Work card — receives auth props instead of ref.watch per card
+/// ===================================================================
+class _DownloadWorkCard extends StatelessWidget {
+  final int workId;
+  final List<DownloadTask> workTasks;
+  final DownloadTask firstTask;
+  final bool isSelected;
+  final bool isSelectionMode;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  const _DownloadWorkCard({
+    required this.workId,
+    required this.workTasks,
+    required this.firstTask,
+    required this.isSelected,
+    required this.isSelectionMode,
+    this.onTap,
+    this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final totalSize = workTasks.fold<int>(
-      0,
-      (sum, task) => sum + (task.totalBytes ?? 0),
+      0, (sum, t) => sum + (t.totalBytes ?? 0),
     );
 
     Work? work;
@@ -949,7 +797,7 @@ class _LocalDownloadsScreenState extends ConsumerState<LocalDownloadsScreen>
         final sanitized = _sanitizeMetadata(firstTask.workMetadata!);
         work = Work.fromJson(sanitized);
       } catch (e) {
-        work = null;
+        LogService.instance.warning('[LocalDownloads] Failed to parse work metadata for offline card: $e', tag: 'Download');
       }
     }
 
@@ -957,260 +805,180 @@ class _LocalDownloadsScreenState extends ConsumerState<LocalDownloadsScreen>
       clipBehavior: Clip.antiAlias,
       elevation: isSelected ? 8 : 2,
       shadowColor: isSelected
-          ? Theme.of(context).colorScheme.primary.withOpacity(0.4)
+          ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.4)
           : null,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: isSelected
-            ? BorderSide(
-                color: Theme.of(context).colorScheme.primary,
-                width: 2,
-              )
+            ? BorderSide(color: Theme.of(context).colorScheme.primary, width: 2)
             : BorderSide.none,
       ),
       child: InkWell(
-        onTap: _isSelectionMode
-            ? () => _toggleWorkSelection(workId)
-            : () => _openWorkDetail(workId, firstTask),
-        onLongPress: !_isSelectionMode
-            ? () {
-                setState(() {
-                  _isSelectionMode = true;
-                  _toggleWorkSelection(workId);
-                });
-              }
-            : null,
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 封面区域
-                Expanded(
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _buildCover(workId, work, host, token, firstTask),
-                      // 底部渐变遮罩，提升文字可读性
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          height: 60,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black.withOpacity(0.7),
-                              ],
-                            ),
-                          ),
-                        ),
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Stack(children: [
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Cover
+            Expanded(
+              child: Stack(fit: StackFit.expand, children: [
+                _WorkCardCover(workId: workId, work: work, firstTask: firstTask),
+                Positioned(
+                  left: 0, right: 0, bottom: 0,
+                  child: Container(
+                    height: 60,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
                       ),
-                    ],
+                    ),
                   ),
                 ),
-                // 信息区域
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 标题
-                      Text(
-                        work?.title ?? firstTask.workTitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // 声优信息
-                      if (work?.vas != null && work!.vas!.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.mic,
-                                size: 12,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  work.vas!.first.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      // 文件信息
-                      Row(
-                        children: [
-                          // 文件数量
-                          Icon(
-                            Icons.folder_outlined,
-                            size: 12,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${workTasks.length}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // 文件大小
-                          Icon(
-                            Icons.storage,
-                            size: 12,
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              formatBytes(totalSize),
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ]),
             ),
-            // 选择模式的勾选标记
-            if (_isSelectionMode)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.white.withOpacity(0.95),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+            // Info
+            Container(
+              padding: const EdgeInsets.all(12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                  work?.title ?? firstTask.workTitle,
+                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                    height: 1.3, color: Theme.of(context).colorScheme.onSurface),
+                ),
+                const SizedBox(height: 8),
+                if (work?.vas != null && work!.vas!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(children: [
+                      Icon(Icons.mic, size: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Expanded(child: Text(work.vas!.first.name,
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant))),
+                    ]),
                   ),
-                  padding: const EdgeInsets.all(6),
-                  child: Icon(
-                    isSelected ? Icons.check : Icons.circle_outlined,
-                    color: isSelected
-                        ? Colors.white
-                        : Theme.of(context).colorScheme.outline,
-                    size: 20,
-                  ),
+                Row(children: [
+                  Icon(Icons.folder_outlined, size: 12,
+                    color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 4),
+                  Text('${workTasks.length}', style: TextStyle(fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.primary)),
+                  const SizedBox(width: 8),
+                  Icon(Icons.storage, size: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Flexible(child: Text(formatBytes(totalSize),
+                    style: TextStyle(fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    overflow: TextOverflow.ellipsis)),
+                ]),
+              ]),
+            ),
+          ]),
+          if (isSelectionMode)
+            Positioned(
+              top: 8, right: 8,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white.withValues(alpha: 0.95),
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 8, offset: const Offset(0, 2))],
+                ),
+                padding: const EdgeInsets.all(6),
+                child: Icon(
+                  isSelected ? Icons.check : Icons.circle_outlined,
+                  color: isSelected ? Colors.white
+                      : Theme.of(context).colorScheme.outline,
+                  size: 20,
                 ),
               ),
-          ],
-        ),
+            ),
+        ]),
       ),
     );
   }
+}
 
-  Widget _buildCover(
-    int workId,
-    Work? work,
-    String host,
-    String token,
-    DownloadTask task,
-  ) {
-    // 优先使用本地封面
-    if (task.workMetadata != null) {
-      final relativeCoverPath = task.workMetadata!['localCoverPath'] as String?;
-      if (relativeCoverPath != null) {
+/// ===================================================================
+/// Work card cover — fetches auth only when needed (not per-card)
+/// ===================================================================
+class _WorkCardCover extends ConsumerWidget {
+  final int workId;
+  final Work? work;
+  final DownloadTask firstTask;
+
+  const _WorkCardCover({
+    required this.workId,
+    this.work,
+    required this.firstTask,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Prefer local cover
+    if (firstTask.workMetadata != null) {
+      final relPath = firstTask.workMetadata!['localCoverPath'] as String?;
+      if (relPath != null) {
         return FutureBuilder<Directory>(
           future: DownloadService.instance.getDownloadDirectory(),
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              final localCoverPath =
-                  '${snapshot.data!.path}/$workId/$relativeCoverPath';
-              final coverFile = File(localCoverPath);
-              if (coverFile.existsSync()) {
+          builder: (context, snap) {
+            if (snap.hasData) {
+              final path = '${snap.data!.path}/$workId/$relPath';
+              final file = File(path);
+              if (file.existsSync()) {
+                final dpr = MediaQuery.devicePixelRatioOf(context);
                 return Hero(
                   tag: 'offline_work_cover_$workId',
                   child: PrivacyBlurCover(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      coverFile,
+                    child: Image.file(file,
                       fit: BoxFit.cover,
                       width: double.infinity,
+                      cacheWidth: (210 * dpr).round(),
                     ),
                   ),
                 );
               }
             }
-            return _buildPlaceholder();
+            return _buildPlaceholder(context);
           },
         );
       }
     }
 
-    final httpHeaders = StorageService.serverCookieHeaders;
-
-    // 降级使用网络封面
-    if (work != null && host.isNotEmpty) {
+    // Fallback to network cover — narrow auth watch with select()
+    final host = ref.watch(authProvider.select((s) => s.host));
+    if (work != null && host != null && host.isNotEmpty) {
       return Hero(
         tag: 'offline_work_cover_$workId',
         child: PrivacyBlurCover(
-          borderRadius: BorderRadius.circular(8),
-          child: CachedNetworkImage(
-            imageUrl: work.getCoverImageUrl(host, token: token),
-            httpHeaders: httpHeaders,
-            fit: BoxFit.cover,
-            errorWidget: (context, url, error) => _buildPlaceholder(),
+          borderRadius: BorderRadius.circular(8),                          child: CachedNetworkImage(
+                            imageUrl: work!.getCoverImageUrl(host),
+                            cacheKey: 'work_cover_${work!.id}',
+                            httpHeaders: StorageService.serverCookieHeaders,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => _buildPlaceholder(context),
           ),
         ),
       );
     }
-
-    return _buildPlaceholder();
+    return _buildPlaceholder(context);
   }
 
-  Widget _buildPlaceholder() {
+  Widget _buildPlaceholder(BuildContext context) {
     return Container(
       width: double.infinity,
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Icon(
-        Icons.image_not_supported,
-        size: 48,
-        color: Theme.of(context).colorScheme.outline,
-      ),
+      child: Icon(Icons.image_not_supported, size: 48,
+        color: Theme.of(context).colorScheme.outline),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../src/services/log_service.dart';
 import '../utils/snackbar_util.dart';
 
 /// 权限管理页面（仅安卓平台）
@@ -38,7 +39,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
       final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
       _ignoreBatteryOptimizationsGranted = batteryStatus.isGranted;
     } catch (e) {
-      debugPrint('检查权限失败: $e');
+      LogService.instance.error('检查权限失败: $e');
     }
 
     if (mounted) {

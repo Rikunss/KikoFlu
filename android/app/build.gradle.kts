@@ -40,6 +40,14 @@ android {
         versionName = flutter.versionName
     }
 
+    // AAudio exclusive mode — NDK (C++) build configuration
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.18.1+"
+        }
+    }
+
     signingConfigs {
         create("release") {
             if (hasReleaseKeystore && releaseKeystoreFile != null) {
@@ -71,4 +79,10 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // AndroidX Media3 (ExoPlayer) for hi-res audio playback
+    // FLAC decoding is natively supported by media3-exoplayer
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
 }

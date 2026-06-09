@@ -50,6 +50,9 @@ class Work extends Equatable {
   final String? description;
   final List<AudioFile>? children;
 
+  @JsonKey(name: 'blur_hash')
+  final String? blurHash; // blurhash placeholder
+
   @JsonKey(name: 'source_url')
   final String? sourceUrl; // 作品原始链接
 
@@ -78,6 +81,7 @@ class Work extends Equatable {
     this.images,
     this.description,
     this.children,
+    this.blurHash,
     this.sourceUrl,
     this.otherLanguageEditions,
   });
@@ -214,6 +218,7 @@ class Work extends Equatable {
         images,
         description,
         children,
+        blurHash,
         sourceUrl,
         otherLanguageEditions,
       ];

@@ -16,7 +16,7 @@ class PrivacyBlurCover extends ConsumerWidget {
     super.key,
     required this.child,
     this.borderRadius,
-    this.sigma = 27,
+    this.sigma = 15,
     this.enabled = true,
   });
 
@@ -45,7 +45,7 @@ class PrivacyBlurCover extends ConsumerWidget {
           child: IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.12),
+                color: Colors.black.withValues(alpha: 0.12),
               ),
             ),
           ),

@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'blur_hash_widget.dart';
+import '../models/audio_track.dart';
 import '../models/work.dart';
 import '../providers/auth_provider.dart';
 import '../providers/work_card_display_provider.dart';
 import '../providers/subtitle_library_provider.dart';
+import '../services/audio_player_service.dart';
+import '../services/cache_service.dart';
+import '../services/download_service.dart';
+import '../services/log_service.dart';
 import '../services/storage_service.dart';
+import '../services/blurhash_service.dart';
 import '../screens/work_detail_screen.dart';
 import '../utils/snackbar_util.dart';
 import '../utils/string_utils.dart';
 import '../../l10n/app_localizations.dart';
+import 'add_to_playlist_dialog.dart';
+import 'file_selection_dialog.dart';
 import 'tag_chip.dart';
 import 'va_chip.dart';
 import 'work_bookmark_manager.dart';
@@ -34,70 +44,306 @@ class EnhancedWorkCard extends ConsumerStatefulWidget {
 class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
   String? _progress; // 当前收藏状态
   int? _rating; // 当前评分
-  bool _loadingProgress = false; // 是否在获取状态
   bool _updating = false; // 是否在更新状态
+  bool _isPressed = false; // tap scale animation
 
   @override
   void initState() {
     super.initState();
-    _progress = widget.work.progress; // 初始来自传入的work
-    _rating = widget.work.userRating; // 初始评分
+    _progress = widget.work.progress;
+    _rating = widget.work.userRating;
   }
 
-  // 长按逻辑：获取最新详情(含 progress)，然后弹出编辑菜单
+  // 长按逻辑：显示上下文菜单
   Future<void> _onLongPress() async {
-    if (_loadingProgress || _updating) return;
-    setState(() => _loadingProgress = true);
+    HapticFeedback.mediumImpact();
+    final s = S.of(context);
+
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                widget.work.title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _MenuListTile(
+              icon: Icons.playlist_play,
+              label: s.playNext,
+              value: 'play_next',
+            ),
+            _MenuListTile(
+              icon: Icons.playlist_add,
+              label: s.addToPlaylist,
+              value: 'add_to_playlist',
+            ),
+            _MenuListTile(
+              icon: Icons.download,
+              label: s.download,
+              value: 'download',
+            ),
+            _MenuListTile(
+              icon: Icons.bookmark,
+              label: s.markWork,
+              value: 'mark_progress',
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    switch (result['action']) {
+      case 'play_next':
+        await _handlePlayNext();
+        break;
+      case 'add_to_playlist':
+        await _handleAddToPlaylist();
+        break;
+      case 'download':
+        await _handleDownload();
+        break;
+      case 'mark_progress':
+        await _handleMarkProgress();
+        break;
+    }
+  }
+
+  Future<void> _handlePlayNext() async {
+    final s = S.of(context);
+    final authState = ref.read(authProvider);
+    final host = authState.host ?? '';
+    final token = authState.token ?? '';
+
     try {
       final api = ref.read(kikoeruApiServiceProvider);
-      final json = await api.getWork(widget.work.id);
-      final detailed = Work.fromJson(json);
-      setState(() {
-        _progress = detailed.progress; // 更新最新状态
-        _rating = detailed.userRating; // 更新评分
-        _loadingProgress = false;
-      });
-      _showEditSheet();
-    } catch (e) {
-      setState(() => _loadingProgress = false);
+      final allFiles = await api.getWorkTracks(widget.work.id);
+
+      if (allFiles.isEmpty) {
+        if (mounted) {
+          SnackBarUtil.showWarning(context, s.noAudioTracks);
+        }
+        return;
+      }
+
+      // Flatten all audio files from the tree
+      List<dynamic> flattenAudioFiles(List<dynamic> files) {
+        final result = <dynamic>[];
+        for (final file in files) {
+          if (file['type'] == 'folder') {
+            if (file['children'] != null) {
+              result.addAll(flattenAudioFiles(file['children']));
+            }
+          } else {
+            final name = file['title'] ?? file['name'] ?? '';
+            final ext = name.split('.').last.toLowerCase();
+            if (['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'opus'].contains(ext)) {
+              result.add(file);
+            }
+          }
+        }
+        return result;
+      }
+
+      final audioFiles = flattenAudioFiles(allFiles);
+      if (audioFiles.isEmpty) {
+        if (mounted) {
+          SnackBarUtil.showWarning(context, s.noAudioTracks);
+        }
+        return;
+      }
+
+      // Build track URLs
+      final downloadService = DownloadService.instance;
+
+      String? coverUrl;
+      if (host.isNotEmpty) {
+        String normalizedUrl = host;
+        if (!host.startsWith('http://') && !host.startsWith('https://')) {
+          normalizedUrl = 'https://$host';
+        }
+        coverUrl = token.isNotEmpty
+            ? '$normalizedUrl/api/cover/${widget.work.id}?token=$token'
+            : '$normalizedUrl/api/cover/${widget.work.id}';
+      }
+
+      final vaNames = widget.work.vas?.map((va) => va.name).toList() ?? [];
+      final artistInfo = vaNames.isNotEmpty ? vaNames.join(', ') : null;
+
+      final tracks = <AudioTrack>[];
+      for (final file in audioFiles) {
+        final fileHash = file['hash'] as String?;
+        final fileTitle = file['title'] ?? file['name'] ?? s.unknown;
+
+        String audioUrl = '';
+        if (fileHash != null) {
+          // 1. Local downloaded file
+          final localPath = await downloadService.getDownloadedFilePath(
+            widget.work.id,
+            fileHash,
+          );
+          if (localPath != null) {
+            audioUrl = 'file://$localPath';
+          } else {
+            // 2. Cache
+            final cachedPath = await CacheService.getCachedAudioFile(fileHash);
+            if (cachedPath != null) {
+              audioUrl = 'file://$cachedPath';
+            }
+          }
+        }
+
+        // 3. Network URL
+        if (audioUrl.isEmpty) {
+          if (file['mediaDownloadUrl'] != null &&
+              file['mediaDownloadUrl'].toString().isNotEmpty) {
+            audioUrl = file['mediaDownloadUrl'];
+          } else if (file['mediaStreamUrl'] != null &&
+              file['mediaStreamUrl'].toString().isNotEmpty) {
+            audioUrl = file['mediaStreamUrl'];
+          } else if (host.isNotEmpty && fileHash != null) {
+            String normalizedUrl = host;
+            if (!host.startsWith('http://') && !host.startsWith('https://')) {
+              normalizedUrl = 'https://$host';
+            }
+            audioUrl = '$normalizedUrl/api/media/stream/$fileHash?token=$token';
+          }
+        }
+
+        if (audioUrl.isNotEmpty) {
+          tracks.add(AudioTrack(
+            id: fileHash ?? fileTitle,
+            url: audioUrl,
+            title: fileTitle,
+            artist: artistInfo,
+            album: widget.work.title,
+            artworkUrl: coverUrl,
+            duration: file['duration'] != null
+                ? Duration(milliseconds: (file['duration'] * 1000).round())
+                : null,
+            workId: widget.work.id,
+            hash: fileHash,
+          ));
+        }
+      }
+
+      if (tracks.isEmpty) {
+        if (mounted) {
+          SnackBarUtil.showWarning(context, s.playbackFailed(s.unknown));
+        }
+        return;
+      }
+
+      await AudioPlayerService.instance.insertTracksAfterCurrent(tracks);
+
       if (mounted) {
-        SnackBarUtil.showError(
-            context, S.of(context).getStatusFailed(e.toString()));
+        SnackBarUtil.showSuccess(context, s.playingNextTracks(tracks.length));
+      }
+    } catch (e) {
+      LogService.instance.error('Play Next failed: $e', tag: 'Playback');
+      if (mounted) {
+        SnackBarUtil.showError(context, s.playbackFailed(e.toString()));
       }
     }
   }
 
-  // 显示编辑收藏状态对话框
-  Future<void> _showEditSheet() async {
-    if (_updating) return; // 防止重复操作
-
-    final manager = WorkBookmarkManager(ref: ref, context: context);
-
-    await manager.showMarkDialog(
+  Future<void> _handleAddToPlaylist() async {
+    await AddToPlaylistDialog.show(
+      context: context,
       workId: widget.work.id,
-      currentProgress: _progress,
-      currentRating: _rating,
       workTitle: widget.work.title,
-      onChanged: (newProgress, newRating) {
-        // 更新本地状态
-        if (mounted) {
-          setState(() {
-            _progress = newProgress;
-            _rating = newRating;
-          });
-        }
-      },
     );
+  }
 
-    setState(() => _updating = false);
+  Future<void> _handleDownload() async {
+    await showDialog(
+      context: context,
+      builder: (ctx) => FileSelectionDialog(work: widget.work),
+    );
+  }
+
+  Future<void> _handleMarkProgress() async {
+    if (_updating) return;
+    setState(() => _updating = true);
+
+    try {
+      // Fetch latest progress from server
+      final api = ref.read(kikoeruApiServiceProvider);
+      final json = await api.getWork(widget.work.id);
+      final detailed = Work.fromJson(json);
+
+      if (!mounted) return;
+
+      setState(() {
+        _progress = detailed.progress;
+        _rating = detailed.userRating;
+      });
+
+      final manager = WorkBookmarkManager(ref: ref, context: context);
+      await manager.showMarkDialog(
+        workId: widget.work.id,
+        currentProgress: _progress,
+        currentRating: _rating,
+        workTitle: widget.work.title,
+        onChanged: (newProgress, newRating) {
+          if (mounted) {
+            setState(() {
+              _progress = newProgress;
+              _rating = newRating;
+            });
+          }
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        SnackBarUtil.showError(
+            context, S.of(context).getStatusFailed(e.toString()));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _updating = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
+    // Gunakan `select()` agar kartu tidak rebuild saat field auth lain berubah
+    final host = ref.watch(authProvider.select((s) => s.host ?? ''));
+    final token = ref.watch(authProvider.select((s) => s.token ?? ''));
     final displaySettings = ref.watch(workCardDisplayProvider);
-    final host = authState.host ?? '';
-    final token = authState.token ?? '';
+
+    // Gunakan select() pada subtitleLibraryProvider agar kartu hanya rebuild
+    // saat status subtitle work ini saja yang berubah, bukan seluruh set.
+    final hasLocalSubtitle = ref.watch(
+      subtitleLibraryProvider.select((set) => set.contains(widget.work.id)),
+    );
+    final hasSubtitle = widget.work.hasSubtitle == true || hasLocalSubtitle;
 
     final cardOnTap = widget.onTap ??
         () {
@@ -115,30 +361,43 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     // 竖屏模式：2列显示中等卡片，3列显示紧凑卡片
     if (widget.crossAxisCount >= 5 ||
         (widget.crossAxisCount == 3 && !isLandscape)) {
-      return _buildCompactCard(
-          context, host, token, cardOnTap, displaySettings);
+      return _buildCompactCard(context, host, token, cardOnTap, displaySettings,
+          hasSubtitle, hasLocalSubtitle);
     } else if (widget.crossAxisCount >= 2) {
-      return _buildMediumCard(context, host, token, cardOnTap, displaySettings);
+      return _buildMediumCard(context, host, token, cardOnTap, displaySettings,
+          hasSubtitle, hasLocalSubtitle);
     } else {
-      return _buildFullCard(context, host, token, cardOnTap, displaySettings);
+      return _buildFullCard(context, host, token, cardOnTap, displaySettings,
+          hasSubtitle, hasLocalSubtitle);
     }
   }
 
   // 紧凑卡片 (3列布局)
   Widget _buildCompactCard(BuildContext context, String host, String token,
-      VoidCallback cardOnTap, WorkCardDisplaySettings displaySettings) {
+      VoidCallback cardOnTap, WorkCardDisplaySettings displaySettings,
+      bool hasSubtitle, bool hasLocalSubtitle) {
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
     final titleFontSize = isLandscape ? 13.5 : 11.0;
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      margin: const EdgeInsets.all(0),
-      elevation: 8,
-      child: InkWell(
-        onTap: cardOnTap,
-        onLongPress: _onLongPress,
-        child: Column(
+    return AnimatedScale(
+      scale: _isPressed ? 0.97 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        margin: const EdgeInsets.all(0),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: InkWell(
+          onTap: cardOnTap,
+          onLongPress: _onLongPress,
+          onTapDown: (_) => setState(() => _isPressed = true),
+          onTapUp: (_) => setState(() => _isPressed = false),
+          onTapCancel: () => setState(() => _isPressed = false),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min, // 让 Column 高度自适应
           children: [
@@ -155,19 +414,13 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                     child: _buildRjTag(),
                   ),
                   // 字幕标签 (左下角)
-                  if (displaySettings.showSubtitleTag &&
-                      (widget.work.hasSubtitle == true ||
-                          ref
-                              .watch(subtitleLibraryProvider)
-                              .contains(widget.work.id)))
+                  if (displaySettings.showSubtitleTag && (hasSubtitle))
                     Positioned(
                       bottom: 4,
                       left: 4,
                       child: _buildSubtitleTag(
                         context,
-                        isLocal: ref
-                            .watch(subtitleLibraryProvider)
-                            .contains(widget.work.id),
+                        isLocal: hasLocalSubtitle,
                       ),
                     ),
                   // 日期标签 (右下角)
@@ -203,12 +456,14 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
           ],
         ),
       ),
+      ),
     );
   }
 
   // 中等卡片 (2列布局)
   Widget _buildMediumCard(BuildContext context, String host, String token,
-      VoidCallback cardOnTap, WorkCardDisplaySettings displaySettings) {
+      VoidCallback cardOnTap, WorkCardDisplaySettings displaySettings,
+      bool hasSubtitle, bool hasLocalSubtitle) {
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
     final titleFontSize = isLandscape ? 14.5 : 12.0;
@@ -217,14 +472,24 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     final ratingFontSize = isLandscape ? 13.0 : 9.0;
     final iconSize = isLandscape ? 14.0 : 12.0;
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      margin: const EdgeInsets.all(0),
-      elevation: 8,
-      child: InkWell(
-        onTap: cardOnTap,
-        onLongPress: _onLongPress,
-        child: Column(
+    return AnimatedScale(
+      scale: _isPressed ? 0.97 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        margin: const EdgeInsets.all(0),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: InkWell(
+          onTap: cardOnTap,
+          onLongPress: _onLongPress,
+          onTapDown: (_) => setState(() => _isPressed = true),
+          onTapUp: (_) => setState(() => _isPressed = false),
+          onTapCancel: () => setState(() => _isPressed = false),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -240,19 +505,13 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                     child: _buildRjTag(),
                   ),
                   // 字幕标签 (左下角)
-                  if (displaySettings.showSubtitleTag &&
-                      (widget.work.hasSubtitle == true ||
-                          ref
-                              .watch(subtitleLibraryProvider)
-                              .contains(widget.work.id)))
+                  if (displaySettings.showSubtitleTag && (hasSubtitle))
                     Positioned(
                       bottom: 6,
                       left: 6,
                       child: _buildSubtitleTag(
                         context,
-                        isLocal: ref
-                            .watch(subtitleLibraryProvider)
-                            .contains(widget.work.id),
+                        isLocal: hasLocalSubtitle,
                       ),
                     ),
                   if (displaySettings.showReleaseDate &&
@@ -368,24 +627,36 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
           ],
         ),
       ),
+      ),
     );
   }
 
   // 完整卡片 (列表布局)
   Widget _buildFullCard(BuildContext context, String host, String token,
-      VoidCallback cardOnTap, WorkCardDisplaySettings displaySettings) {
+      VoidCallback cardOnTap, WorkCardDisplaySettings displaySettings,
+      bool hasSubtitle, bool hasLocalSubtitle) {
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
     final rjFontSize = isLandscape ? 11.0 : 10.0;
     final titleFontSize = isLandscape ? 16.0 : 14.0;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 4,
-      child: InkWell(
-        onTap: cardOnTap,
-        onLongPress: _onLongPress,
-        child: Padding(
+    return AnimatedScale(
+      scale: _isPressed ? 0.97 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: InkWell(
+          onTap: cardOnTap,
+          onLongPress: _onLongPress,
+          onTapDown: (_) => setState(() => _isPressed = true),
+          onTapUp: (_) => setState(() => _isPressed = false),
+          onTapCancel: () => setState(() => _isPressed = false),
+          child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,7 +683,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 4, vertical: 1),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
+                              color: Colors.black.withValues(alpha: 0.7),
                               borderRadius: BorderRadius.circular(3),
                             ),
                             child: Text(
@@ -426,19 +697,13 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                           ),
                         ),
                         // 字幕标签 (左下角)
-                        if (displaySettings.showSubtitleTag &&
-                            (widget.work.hasSubtitle == true ||
-                                ref
-                                    .watch(subtitleLibraryProvider)
-                                    .contains(widget.work.id)))
+                        if (displaySettings.showSubtitleTag && (hasSubtitle))
                           Positioned(
                             bottom: 2,
                             left: 2,
                             child: _buildSubtitleTag(
                               context,
-                              isLocal: ref
-                                  .watch(subtitleLibraryProvider)
-                                  .contains(widget.work.id),
+                              isLocal: hasLocalSubtitle,
                             ),
                           ),
                       ],
@@ -573,6 +838,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -584,22 +850,27 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
 
     final url = widget.work.getCoverImageUrl(host, token: token);
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
-    // 依据不同布局控制图片缓存尺寸，避免加载超大原图导致卡顿
+    // Hitung ukuran decode berdasarkan lebar card sebenarnya (kurangi padding & spacing)
     int targetWidth;
-    switch (widget.crossAxisCount) {
-      case 3:
-        targetWidth =
-            (MediaQuery.sizeOf(context).width / 3 * devicePixelRatio).round();
-        break;
-      case 2:
-        targetWidth =
-            (MediaQuery.sizeOf(context).width / 2 * devicePixelRatio).round();
-        break;
-      default:
-        targetWidth = (80 * devicePixelRatio).round(); // 列表模式封面固定宽度
+    if (widget.crossAxisCount >= 2) {
+      final isLandscape =
+          MediaQuery.orientationOf(context) == Orientation.landscape;
+      final padding = isLandscape ? 24.0 : 8.0;
+      final spacing = isLandscape ? 24.0 : 8.0;
+      final screenWidth = MediaQuery.sizeOf(context).width;
+      final availableWidth =
+          screenWidth - 2 * padding - (widget.crossAxisCount - 1) * spacing;
+      targetWidth =
+          (availableWidth / widget.crossAxisCount * devicePixelRatio).round();
+    } else {
+      targetWidth = (80 * devicePixelRatio).round(); // 列表模式封面固定宽度
     }
 
     final httpHeaders = StorageService.serverCookieHeaders;
+
+    // Gunakan blurhash dari server API, fallback ke hasil generate lokal
+    final blurHash = widget.work.blurHash ??
+        BlurHashService.instance.getBlurHash(widget.work.id);
 
     return Hero(
       tag: 'work_cover_${widget.work.id}',
@@ -614,24 +885,43 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
             fadeInDuration: const Duration(milliseconds: 120),
             fadeOutDuration: const Duration(milliseconds: 90),
             placeholderFadeInDuration: const Duration(milliseconds: 80),
-            placeholder: (context, _) => _buildPlaceholder(context),
-            errorWidget: (context, _, __) => _buildPlaceholder(context),
-            imageBuilder: (context, imageProvider) => Container(
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: imageProvider,
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.low, // 优化滚动时的重采样性能
+            placeholder: (context, _) => _buildPlaceholder(context, blurHash: blurHash),
+            errorWidget: (context, _, __) => _buildPlaceholder(context, blurHash: blurHash),
+            imageBuilder: (context, imageProvider) {
+              // Trigger blurhash generation in background jika blm ada
+              // Cek cache lokal dulu agar tidak panggil generateIfNeeded yang
+              // sudah di-handle oleh batch trigger
+              if (widget.work.blurHash == null &&
+                  !BlurHashService.instance.hasBlurHash(widget.work.id)) {
+                BlurHashService.instance
+                    .generateIfNeeded(widget.work.id, url);
+              }
+              return Container(
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: imageProvider,
+                    fit: BoxFit.cover,
+                    filterQuality: FilterQuality.low,
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
     );
   }
 
-  Widget _buildPlaceholder(BuildContext context) {
+  Widget _buildPlaceholder(BuildContext context, {String? blurHash}) {
+    if (blurHash != null && blurHash.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: BlurHashWidget(
+          hash: blurHash,
+          imageFit: BoxFit.cover,
+        ),
+      );
+    }
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -655,7 +945,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
+        color: Colors.black.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -677,7 +967,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
+        color: Colors.black.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -700,8 +990,8 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: isLocal
-            ? Colors.green.withOpacity(0.9)
-            : Colors.black.withOpacity(0.7),
+            ? Colors.green.withValues(alpha: 0.9)
+            : Colors.black.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Icon(
@@ -795,6 +1085,29 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
           fontWeight: FontWeight.w500,
         );
       }).toList(),
+    );
+  }
+}
+
+/// Menu item widget for the long-press context menu bottom sheet.
+class _MenuListTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _MenuListTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+      title: Text(label),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.pop(context, {'action': value}),
     );
   }
 }

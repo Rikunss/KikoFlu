@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/log_service.dart';
-import '../../l10n/app_localizations.dart';
 import '../utils/snackbar_util.dart';
 
+/// Enhanced log viewer with tag filtering, live updates, and export/share.
 class LogScreen extends StatefulWidget {
   const LogScreen({super.key});
 
@@ -20,6 +20,7 @@ class _LogScreenState extends State<LogScreen> {
   StreamSubscription<LogEntry>? _subscription;
   List<LogEntry> _filteredLogs = [];
   LogLevel? _filterLevel;
+  LogTag _filterTag = LogTag.all;
   String _searchQuery = '';
   bool _autoScroll = true;
   bool _isSearching = false;
@@ -54,23 +55,19 @@ class _LogScreenState extends State<LogScreen> {
 
   void _updateFilteredLogs() {
     setState(() {
-      var logs = LogService.instance.logs.where((entry) {
-        if (_filterLevel != null && entry.level != _filterLevel) return false;
-        if (_searchQuery.isNotEmpty) {
-          final text = entry.format().toLowerCase();
-          if (!text.contains(_searchQuery.toLowerCase())) return false;
-        }
-        return true;
-      }).toList();
-      // 限制 UI 显示行数，只保留最新的
-      if (logs.length > _maxDisplayLogs) {
-        logs = logs.sublist(logs.length - _maxDisplayLogs);
+      _filteredLogs = LogService.instance.getFilteredLogs(
+        tag: _filterTag,
+        level: _filterLevel,
+        search: _searchQuery.isNotEmpty ? _searchQuery : null,
+      );
+      if (_filteredLogs.length > _maxDisplayLogs) {
+        _filteredLogs =
+            _filteredLogs.sublist(_filteredLogs.length - _maxDisplayLogs);
       }
-      _filteredLogs = logs;
     });
   }
 
-  Color _levelColor(LogLevel level, BuildContext context) {
+  Color _levelColor(LogLevel level) {
     switch (level) {
       case LogLevel.debug:
         return Theme.of(context).colorScheme.onSurfaceVariant;
@@ -83,17 +80,59 @@ class _LogScreenState extends State<LogScreen> {
     }
   }
 
+  Future<void> _exportLogs() async {
+    try {
+      final logService = LogService.instance;
+      final content = logService.exportAsText();
+      final fileName = logService.exportFileName;
+
+      if (Platform.isIOS) {
+        final result = await FilePicker.platform.saveFile(
+          dialogTitle: 'Export Logs',
+          fileName: fileName,
+          bytes: Uint8List.fromList(content.codeUnits),
+        );
+        if (result != null && mounted) {
+          SnackBarUtil.showSuccess(context, 'Logs exported to $result');
+        }
+      } else {
+        final result = await FilePicker.platform.saveFile(
+          dialogTitle: 'Export Logs',
+          fileName: fileName,
+        );
+        if (result != null) {
+          await File(result).writeAsString(content);
+          if (mounted) {
+            SnackBarUtil.showSuccess(context, 'Logs exported to $result');
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) SnackBarUtil.showError(context, e.toString());
+    }
+  }
+
+  Future<void> _shareLogs() async {
+    try {
+      final content = LogService.instance.exportAsText();
+      await Share.share(content, subject: 'KikoFlu Logs');
+    } catch (e) {
+      if (mounted) SnackBarUtil.showError(context, e.toString());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final l10n = S.of(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: _isSearching
             ? TextField(
                 controller: _searchController,
                 autofocus: true,
-                decoration: InputDecoration(
-                  hintText: l10n.logSearchHint,
+                decoration: const InputDecoration(
+                  hintText: 'Search logs...',
                   border: InputBorder.none,
                 ),
                 onChanged: (value) {
@@ -101,7 +140,7 @@ class _LogScreenState extends State<LogScreen> {
                   _updateFilteredLogs();
                 },
               )
-            : Text(l10n.logTitle),
+            : const Text('Log Viewer'),
         actions: [
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),
@@ -120,36 +159,22 @@ class _LogScreenState extends State<LogScreen> {
           ),
           PopupMenuButton<LogLevel?>(
             icon: Icon(
-              Icons.filter_list,
-              color: _filterLevel != null
-                  ? Theme.of(context).colorScheme.primary
-                  : null,
+              Icons.filter_alt_outlined,
+              color: _filterLevel != null ? colorScheme.primary : null,
             ),
             onSelected: (level) {
               _filterLevel = level;
               _updateFilteredLogs();
             },
             itemBuilder: (context) => [
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: null,
-                child: Text(l10n.logFilterAll),
+                child: Text('All Levels'),
               ),
-              const PopupMenuItem(
-                value: LogLevel.debug,
-                child: Text('Debug'),
-              ),
-              const PopupMenuItem(
-                value: LogLevel.info,
-                child: Text('Info'),
-              ),
-              const PopupMenuItem(
-                value: LogLevel.warning,
-                child: Text('Warning'),
-              ),
-              const PopupMenuItem(
-                value: LogLevel.error,
-                child: Text('Error'),
-              ),
+              ...LogLevel.values.map((level) => PopupMenuItem(
+                    value: level,
+                    child: Text(level.name.toUpperCase()),
+                  )),
             ],
           ),
           PopupMenuButton<String>(
@@ -159,44 +184,14 @@ class _LogScreenState extends State<LogScreen> {
                   await Clipboard.setData(
                     ClipboardData(text: LogService.instance.exportAsText()),
                   );
-                  if (mounted) {
-                    SnackBarUtil.showSuccess(context, l10n.logCopied);
-                  }
+                  if (!context.mounted) return;
+                  SnackBarUtil.showSuccess(context, 'Logs copied to clipboard');
                   break;
                 case 'export':
-                  try {
-                    final logService = LogService.instance;
-                    final content = logService.exportAsText();
-                    final fileName = logService.exportFileName;
-
-                    if (Platform.isIOS) {
-                      // iOS: 通过 saveFile 的 bytes 参数直接保存
-                      final result = await FilePicker.platform.saveFile(
-                        dialogTitle: l10n.logExport,
-                        fileName: fileName,
-                        bytes: Uint8List.fromList(content.codeUnits),
-                      );
-                      if (result != null && mounted) {
-                        SnackBarUtil.showSuccess(context, l10n.logExported(result));
-                      }
-                    } else {
-                      // Android/Windows/macOS/Linux: 选择路径后写入
-                      final result = await FilePicker.platform.saveFile(
-                        dialogTitle: l10n.logExport,
-                        fileName: fileName,
-                      );
-                      if (result != null) {
-                        await File(result).writeAsString(content);
-                        if (mounted) {
-                          SnackBarUtil.showSuccess(context, l10n.logExported(result));
-                        }
-                      }
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      SnackBarUtil.showError(context, e.toString());
-                    }
-                  }
+                  await _exportLogs();
+                  break;
+                case 'share':
+                  await _shareLogs();
                   break;
                 case 'clear':
                   LogService.instance.clear();
@@ -205,29 +200,38 @@ class _LogScreenState extends State<LogScreen> {
               }
             },
             itemBuilder: (context) => [
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'copy',
                 child: ListTile(
-                  leading: const Icon(Icons.copy),
-                  title: Text(l10n.logCopy),
+                  leading: Icon(Icons.copy),
+                  title: Text('Copy All'),
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'export',
                 child: ListTile(
-                  leading: const Icon(Icons.save_alt),
-                  title: Text(l10n.logExport),
+                  leading: Icon(Icons.save_alt),
+                  title: Text('Export'),
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
+                value: 'share',
+                child: ListTile(
+                  leading: Icon(Icons.share_outlined),
+                  title: Text('Share'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'clear',
                 child: ListTile(
-                  leading: const Icon(Icons.delete_outline),
-                  title: Text(l10n.logClear),
+                  leading: Icon(Icons.delete_outline),
+                  title: Text('Clear'),
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                 ),
@@ -238,16 +242,58 @@ class _LogScreenState extends State<LogScreen> {
       ),
       body: Column(
         children: [
-          // 状态栏
+          // ── Tag Filter Chips ──
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            color: colorScheme.surfaceContainerHighest,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: LogTag.predefined.map((tag) {
+                  final isSelected = _filterTag.name == tag.name;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: FilterChip(
+                      label: Text(
+                        tag.label,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                      selected: isSelected,
+                      onSelected: (_) {
+                        setState(() {
+                          _filterTag = tag;
+                          _updateFilteredLogs();
+                        });
+                      },
+                      visualDensity: VisualDensity.compact,
+                      selectedColor: colorScheme.primaryContainer,
+                      checkmarkColor: colorScheme.onPrimaryContainer,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          // ── Status Bar ──
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            color: colorScheme.surface,
             child: Row(
               children: [
                 Text(
-                  l10n.logCount(_filteredLogs.length),
-                  style: Theme.of(context).textTheme.bodySmall,
+                  '${_filteredLogs.length} entries',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
+                if (_filterTag.name.isNotEmpty || _filterLevel != null) ...[
+                  const SizedBox(width: 8),
+                  Icon(Icons.filter_alt, size: 12,
+                      color: colorScheme.primary),
+                ],
                 const Spacer(),
                 InkWell(
                   onTap: () {
@@ -269,17 +315,17 @@ class _LogScreenState extends State<LogScreen> {
                             : Icons.pause,
                         size: 14,
                         color: _autoScroll
-                            ? Theme.of(context).colorScheme.primary
-                            : null,
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        l10n.logAutoScroll,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: _autoScroll
-                                  ? Theme.of(context).colorScheme.primary
-                                  : null,
-                            ),
+                        'Auto-scroll',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: _autoScroll
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -287,17 +333,38 @@ class _LogScreenState extends State<LogScreen> {
               ],
             ),
           ),
-          // 日志列表
+          // ── Log List ──
           Expanded(
             child: _filteredLogs.isEmpty
                 ? Center(
-                    child: Text(
-                      l10n.logEmpty,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.article_outlined,
+                            size: 48,
+                            color: colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.3)),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No logs match filter',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
+                        ),
+                        const SizedBox(height: 4),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _filterTag = LogTag.all;
+                              _filterLevel = null;
+                              _searchQuery = '';
+                              _searchController.clear();
+                              _updateFilteredLogs();
+                            });
+                          },
+                          child: const Text('Clear filters'),
+                        ),
+                      ],
                     ),
                   )
                 : ListView.builder(
@@ -308,7 +375,7 @@ class _LogScreenState extends State<LogScreen> {
                       final entry = _filteredLogs[index];
                       return _LogEntryTile(
                         entry: entry,
-                        levelColor: _levelColor(entry.level, context),
+                        levelColor: _levelColor(entry.level),
                       );
                     },
                   ),
@@ -330,32 +397,34 @@ class _LogEntryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final time =
-        '${entry.timestamp.hour.toString().padLeft(2, '0')}:'
-        '${entry.timestamp.minute.toString().padLeft(2, '0')}:'
+        '${entry.timestamp.hour.toString().padLeft(2, '0')}:' //
+        '${entry.timestamp.minute.toString().padLeft(2, '0')}:' //
         '${entry.timestamp.second.toString().padLeft(2, '0')}';
 
     return InkWell(
       onLongPress: () {
         Clipboard.setData(ClipboardData(text: entry.format()));
-        SnackBarUtil.showSuccess(context, S.of(context).logCopied);
+        SnackBarUtil.showSuccess(context, 'Copied to clipboard');
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 时间
+            // Time
             Text(
               time,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontFamily: 'monospace',
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 11,
-                  ),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontFamily: 'monospace',
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 11,
+              ),
             ),
             const SizedBox(width: 6),
-            // 级别标签
+            // Level badge
             Container(
               width: 16,
               alignment: Alignment.center,
@@ -381,7 +450,7 @@ class _LogEntryTile extends StatelessWidget {
                         style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 12,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: colorScheme.primary,
                         ),
                       ),
                     TextSpan(
@@ -389,7 +458,7 @@ class _LogEntryTile extends StatelessWidget {
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                   ],

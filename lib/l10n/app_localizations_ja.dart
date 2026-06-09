@@ -9,7 +9,7 @@ class SJa extends S {
   SJa([String locale = 'ja']) : super(locale);
 
   @override
-  String get appTitle => 'KikoFlu';
+  String get appTitle => 'KikoFlu Edge';
 
   @override
   String get navHome => 'ホーム';
@@ -139,12 +139,6 @@ class SJa extends S {
   String get translationSourceGoogle => 'Google 翻訳';
 
   @override
-  String get translationSourceYoudao => 'Youdao 翻訳';
-
-  @override
-  String get translationSourceMicrosoft => 'Microsoft 翻訳';
-
-  @override
   String get translationSourceLlm => 'LLM 翻訳';
 
   @override
@@ -205,7 +199,7 @@ class SJa extends S {
   String get passwordMinLength => 'パスワードは5文字以上必要です';
 
   @override
-  String accountAdded(String username) {
+  String accountAdded(Object username) {
     return 'アカウント「$username」が追加されました';
   }
 
@@ -219,7 +213,7 @@ class SJa extends S {
   String get enterServerAddressToTest => 'サーバーアドレスを入力して接続テストしてください';
 
   @override
-  String latencyMs(String ms) {
+  String latencyMs(Object ms) {
     return '${ms}ms';
   }
 
@@ -291,7 +285,7 @@ class SJa extends S {
   String get minRating => '最低評価';
 
   @override
-  String minRatingStars(String stars) {
+  String minRatingStars(Object stars) {
     return '$starsつ星';
   }
 
@@ -326,7 +320,7 @@ class SJa extends S {
   String get loadFailed => '読み込み失敗';
 
   @override
-  String loadFailedWithError(String error) {
+  String loadFailedWithError(Object error) {
     return '読み込み失敗: $error';
   }
 
@@ -421,7 +415,7 @@ class SJa extends S {
   String get cacheManagement => 'キャッシュ管理';
 
   @override
-  String currentCache(String size) {
+  String currentCache(Object size) {
     return '現在のキャッシュ: $size';
   }
 
@@ -462,7 +456,7 @@ class SJa extends S {
   String get newVersionFound => '新バージョンが見つかりました';
 
   @override
-  String newVersionAvailable(String version, String current) {
+  String newVersionAvailable(Object current, Object version) {
     return '$version が利用可能です（現在: $current）';
   }
 
@@ -470,7 +464,7 @@ class SJa extends S {
   String get versionInfo => 'バージョン情報';
 
   @override
-  String currentVersion(String version) {
+  String currentVersion(Object version) {
     return '現在のバージョン: $version';
   }
 
@@ -490,12 +484,12 @@ class SJa extends S {
   String get cannotOpenLink => 'リンクを開けません';
 
   @override
-  String openLinkFailed(String error) {
+  String openLinkFailed(Object error) {
     return 'リンクを開けませんでした: $error';
   }
 
   @override
-  String foundNewVersion(String version) {
+  String foundNewVersion(Object version) {
     return '新バージョン $version が見つかりました';
   }
 
@@ -581,7 +575,7 @@ class SJa extends S {
   String get showOnlySubtitled => '字幕付き作品のみ表示';
 
   @override
-  String selectedCount(int count) {
+  String selectedCount(Object count) {
     return '$count件選択中';
   }
 
@@ -598,12 +592,12 @@ class SJa extends S {
   String get noDownloadTasks => 'ダウンロードタスクはありません';
 
   @override
-  String nFiles(int count) {
+  String nFiles(Object count) {
     return '$countファイル';
   }
 
   @override
-  String errorWithMessage(String error) {
+  String errorWithMessage(Object error) {
     return 'エラー: $error';
   }
 
@@ -617,12 +611,12 @@ class SJa extends S {
   String get deletionConfirmTitle => '削除の確認';
 
   @override
-  String deletionConfirmMessage(int count) {
+  String deletionConfirmMessage(Object count) {
     return '選択した$count件のダウンロードタスクを削除しますか？ダウンロード済みファイルも削除されます。';
   }
 
   @override
-  String deletedNFiles(int count) {
+  String deletedNFiles(Object count) {
     return '$countファイルを削除しました';
   }
 
@@ -642,12 +636,12 @@ class SJa extends S {
   String get downloadStatusPaused => '一時停止中';
 
   @override
-  String translationFailed(String error) {
+  String translationFailed(Object error) {
     return '翻訳失敗: $error';
   }
 
   @override
-  String copiedToClipboard(String label, String text) {
+  String copiedToClipboard(Object label, Object text) {
     return '$labelをコピーしました：$text';
   }
 
@@ -655,7 +649,7 @@ class SJa extends S {
   String get loadingFileList => 'ファイルリストを読み込み中...';
 
   @override
-  String loadFileListFailed(String error) {
+  String loadFileListFailed(Object error) {
     return 'ファイルリストの読み込みに失敗: $error';
   }
 
@@ -711,7 +705,7 @@ class SJa extends S {
   String get finishCurrentTrack => '現在のトラック終了後に停止';
 
   @override
-  String addMinutes(int min) {
+  String addMinutes(Object min) {
     return '+$min分';
   }
 
@@ -770,12 +764,12 @@ class SJa extends S {
   String get switchAccountTitle => 'アカウント切り替え';
 
   @override
-  String switchAccountConfirm(String username) {
+  String switchAccountConfirm(Object username) {
     return 'アカウント「$username」に切り替えますか？';
   }
 
   @override
-  String switchedToAccount(String username) {
+  String switchedToAccount(Object username) {
     return 'アカウントを切り替えました: $username';
   }
 
@@ -783,7 +777,7 @@ class SJa extends S {
   String get switchFailed => '切り替え失敗。アカウント情報を確認してください';
 
   @override
-  String switchFailedWithError(String error) {
+  String switchFailedWithError(Object error) {
     return '切り替え失敗: $error';
   }
 
@@ -803,7 +797,7 @@ class SJa extends S {
   String get deleteAccount => 'アカウント削除';
 
   @override
-  String deleteAccountConfirm(String username) {
+  String deleteAccountConfirm(Object username) {
     return 'アカウント「$username」を削除しますか？この操作は取り消せません。';
   }
 
@@ -811,7 +805,7 @@ class SJa extends S {
   String get accountDeleted => 'アカウントを削除しました';
 
   @override
-  String deletionFailedWithError(String error) {
+  String deletionFailedWithError(Object error) {
     return '削除失敗: $error';
   }
 
@@ -922,7 +916,7 @@ class SJa extends S {
   String get voteCancelled => '投票を取り消しました';
 
   @override
-  String voteFailed(String error) {
+  String voteFailed(Object error) {
     return '投票失敗: $error';
   }
 
@@ -936,7 +930,7 @@ class SJa extends S {
   String get addTag => 'タグを追加';
 
   @override
-  String loadTagsFailed(String error) {
+  String loadTagsFailed(Object error) {
     return 'タグの読み込みに失敗: $error';
   }
 
@@ -950,7 +944,7 @@ class SJa extends S {
   String get bindEmailFirst => 'www.asmr.one でメールアドレスを登録してください';
 
   @override
-  String selectedNTags(int count) {
+  String selectedNTags(Object count) {
     return '$count個のタグを選択中:';
   }
 
@@ -979,12 +973,12 @@ class SJa extends S {
   String get systemPlaylistLiked => 'お気に入り';
 
   @override
-  String totalNWorks(int count) {
+  String totalNWorks(Object count) {
     return '$count作品';
   }
 
   @override
-  String pageNOfTotal(int current, int total) {
+  String pageNOfTotal(Object current, Object total) {
     return '$current / $total ページ';
   }
 
@@ -998,7 +992,7 @@ class SJa extends S {
   String get translating => '翻訳中...';
 
   @override
-  String translationFallbackNotice(String source) {
+  String translationFallbackNotice(Object source) {
     return '翻訳に失敗しました。$sourceに自動切り替えしました';
   }
 
@@ -1078,6 +1072,9 @@ class SJa extends S {
   String get themeModeSystem => 'システムに従う';
 
   @override
+  String get themeModeTrueBlack => 'トゥルーブラック';
+
+  @override
   String get colorSchemeOceanBlue => 'オーシャンブルー';
 
   @override
@@ -1091,6 +1088,15 @@ class SJa extends S {
 
   @override
   String get colorSchemeSakuraPink => 'サクラピンク';
+
+  @override
+  String get colorSchemeCrimsonRed => 'クリムゾンレッド';
+
+  @override
+  String get colorSchemeAmberGold => 'アンバーゴールド';
+
+  @override
+  String get colorSchemeSlateGray => 'スレートグレー';
 
   @override
   String get colorSchemeDynamic => 'ダイナミックカラー';
@@ -1147,7 +1153,7 @@ class SJa extends S {
   String get noSubtitleFiles => '字幕ファイルが見つかりません';
 
   @override
-  String subtitleFilesFound(int count) {
+  String subtitleFilesFound(Object count) {
     return '$count個の字幕ファイルが見つかりました';
   }
 
@@ -1278,6 +1284,11 @@ class SJa extends S {
   String get relatedRecommendations => '関連作品';
 
   @override
+  String moreFromCircle(Object circle) {
+    return '$circle の他の作品';
+  }
+
+  @override
   String get myTabsDisplaySettings => '「マイ」ページ設定';
 
   @override
@@ -1344,12 +1355,12 @@ class SJa extends S {
   String get ratingDistribution => '評価分布';
 
   @override
-  String reviewsCount(int count) {
+  String reviewsCount(Object count) {
     return '$count件のレビュー';
   }
 
   @override
-  String ratingsCount(int count) {
+  String ratingsCount(Object count) {
     return '全 $count 件の評価';
   }
 
@@ -1387,7 +1398,7 @@ class SJa extends S {
   String get reviewSubmitted => 'レビューを送信しました';
 
   @override
-  String reviewFailed(String error) {
+  String reviewFailed(Object error) {
     return 'レビュー失敗: $error';
   }
 
@@ -1434,7 +1445,7 @@ class SJa extends S {
   String get fetchFailed => '取得に失敗';
 
   @override
-  String operationFailedWithError(String error) {
+  String operationFailedWithError(Object error) {
     return '操作失敗: $error';
   }
 
@@ -1445,7 +1456,7 @@ class SJa extends S {
   String get currentCacheSize => '現在のキャッシュサイズ';
 
   @override
-  String cacheLimitLabelMB(int size) {
+  String cacheLimitLabelMB(Object size) {
     return '上限: ${size}MB';
   }
 
@@ -1470,7 +1481,7 @@ class SJa extends S {
   String get confirmClearCacheMessage => 'すべてのキャッシュをクリアしますか？この操作は取り消せません。';
 
   @override
-  String clearCacheFailedWithError(String error) {
+  String clearCacheFailedWithError(Object error) {
     return 'キャッシュのクリアに失敗: $error';
   }
 
@@ -1511,6 +1522,15 @@ class SJa extends S {
   String get colorSchemeForestGreenDesc => 'グリーン、グリーン、グリーン';
 
   @override
+  String get colorSchemeCrimsonRedDesc => 'レッド、レッド、レッド！🔴';
+
+  @override
+  String get colorSchemeAmberGoldDesc => 'ゴールドで輝く！';
+
+  @override
+  String get colorSchemeSlateGrayDesc => 'ニュートラルでエレガント';
+
+  @override
   String get colorSchemeDynamicDesc => 'システム壁紙の色を使用 (Android 12+)';
 
   @override
@@ -1544,17 +1564,17 @@ class SJa extends S {
   String get pageSizeSettings => 'ページあたりの表示数';
 
   @override
-  String pageSizeCurrent(int size) {
+  String pageSizeCurrent(Object size) {
     return '現在の設定: $size 件/ページ';
   }
 
   @override
-  String currentSettingLabel(String value) {
+  String currentSettingLabel(Object value) {
     return '現在: $value';
   }
 
   @override
-  String setToValue(String value) {
+  String setToValue(Object value) {
     return '設定: $value';
   }
 
@@ -1567,12 +1587,6 @@ class SJa extends S {
 
   @override
   String get translationDescGoogle => 'Googleサービスへのネットワークアクセスが必要';
-
-  @override
-  String get translationDescYoudao => 'デフォルトネットワークで動作';
-
-  @override
-  String get translationDescMicrosoft => 'デフォルトネットワークで動作';
 
   @override
   String get translationDescLlm => 'OpenAI互換API、手動でAPI Keyの設定が必要';
@@ -1614,7 +1628,7 @@ class SJa extends S {
   String get notificationPermissionDenied => '通知権限が拒否されました';
 
   @override
-  String requestNotificationFailed(String error) {
+  String requestNotificationFailed(Object error) {
     return '通知権限の申請に失敗: $error';
   }
 
@@ -1625,17 +1639,17 @@ class SJa extends S {
   String get backgroundPermissionDenied => 'バックグラウンド実行権限が拒否されました';
 
   @override
-  String requestBackgroundFailed(String error) {
+  String requestBackgroundFailed(Object error) {
     return 'バックグラウンド権限の申請に失敗: $error';
   }
 
   @override
-  String permissionRequired(String permission) {
+  String permissionRequired(Object permission) {
     return '$permissionが必要です';
   }
 
   @override
-  String permissionPermanentlyDenied(String permission) {
+  String permissionPermanentlyDenied(Object permission) {
     return '$permissionが永久に拒否されています。システム設定で手動で有効にしてください。';
   }
 
@@ -1652,12 +1666,12 @@ class SJa extends S {
   String get refreshPermissionStatus => '権限状態を更新';
 
   @override
-  String deleteFileConfirm(String fileName) {
+  String deleteFileConfirm(Object fileName) {
     return '「$fileName」を削除しますか？';
   }
 
   @override
-  String deleteSelectedFilesConfirm(int count) {
+  String deleteSelectedFilesConfirm(Object count) {
     return '選択した $count 個のファイルを削除しますか？';
   }
 
@@ -1665,12 +1679,12 @@ class SJa extends S {
   String get deleted => '削除済み';
 
   @override
-  String cannotOpenFolder(String path) {
+  String cannotOpenFolder(Object path) {
     return 'フォルダを開けません: $path';
   }
 
   @override
-  String openFolderFailed(String error) {
+  String openFolderFailed(Object error) {
     return 'フォルダを開けませんでした: $error';
   }
 
@@ -1681,27 +1695,27 @@ class SJa extends S {
   String get refreshComplete => '更新完了';
 
   @override
-  String refreshFailed(String error) {
+  String refreshFailed(Object error) {
     return '更新失敗: $error';
   }
 
   @override
-  String deleteSelectedWorksConfirm(int count) {
+  String deleteSelectedWorksConfirm(Object count) {
     return '選択した $count 個の作品を削除しますか？';
   }
 
   @override
-  String partialDeleteFailed(String error) {
+  String partialDeleteFailed(Object error) {
     return '一部の削除に失敗: $error';
   }
 
   @override
-  String deletedNOfTotal(int success, int total) {
+  String deletedNOfTotal(Object success, Object total) {
     return '$success/$total 個のタスクを削除';
   }
 
   @override
-  String deleteFailedWithError(String error) {
+  String deleteFailedWithError(Object error) {
     return '削除失敗: $error';
   }
 
@@ -1710,7 +1724,7 @@ class SJa extends S {
       'このダウンロードには作品詳細が保存されていないため、オフラインで表示できません';
 
   @override
-  String openWorkDetailFailed(String error) {
+  String openWorkDetailFailed(Object error) {
     return '作品詳細を開けませんでした: $error';
   }
 
@@ -1755,7 +1769,7 @@ class SJa extends S {
   String get networkConnectionFailed => 'ネットワーク接続に失敗しました。接続を確認してください';
 
   @override
-  String addFailedWithError(String error) {
+  String addFailedWithError(Object error) {
     return '追加失敗: $error';
   }
 
@@ -1763,12 +1777,12 @@ class SJa extends S {
   String get creatingPlaylist => 'プレイリストを作成中...';
 
   @override
-  String playlistCreatedSuccess(String name) {
+  String playlistCreatedSuccess(Object name) {
     return 'プレイリスト「$name」を作成しました';
   }
 
   @override
-  String createFailedWithError(String error) {
+  String createFailedWithError(Object error) {
     return '作成失敗: $error';
   }
 
@@ -1782,7 +1796,7 @@ class SJa extends S {
   String get myPlaylists => 'マイプレイリスト';
 
   @override
-  String totalNItems(int count) {
+  String totalNItems(Object count) {
     return '全 $count 件';
   }
 
@@ -1800,7 +1814,7 @@ class SJa extends S {
       '削除すると元に戻せません。このプレイリストをお気に入りに登録しているユーザーもアクセスできなくなります。削除しますか？';
 
   @override
-  String unfavoritePlaylistConfirm(String name) {
+  String unfavoritePlaylistConfirm(Object name) {
     return '「$name」のお気に入りを解除しますか？';
   }
 
@@ -1844,12 +1858,12 @@ class SJa extends S {
   String get workIdHint => '例: RJ123456\nrj233333';
 
   @override
-  String detectedNWorkIds(int count) {
+  String detectedNWorkIds(Object count) {
     return '$count 個の作品番号を検出';
   }
 
   @override
-  String addNWorks(int count) {
+  String addNWorks(Object count) {
     return '$count 個追加';
   }
 
@@ -1857,12 +1871,12 @@ class SJa extends S {
   String get noValidWorkIds => '有効な作品番号が見つかりません（RJで始まるもの）';
 
   @override
-  String addingNWorks(int count) {
+  String addingNWorks(Object count) {
     return '$count 個の作品を追加中...';
   }
 
   @override
-  String addedNWorksSuccess(int count) {
+  String addedNWorksSuccess(Object count) {
     return '$count 個の作品を追加しました';
   }
 
@@ -1870,7 +1884,7 @@ class SJa extends S {
   String get removeWork => '作品を削除';
 
   @override
-  String removeWorkConfirm(String title) {
+  String removeWorkConfirm(Object title) {
     return 'プレイリストから「$title」を削除しますか？';
   }
 
@@ -1878,7 +1892,7 @@ class SJa extends S {
   String get removeSuccess => '削除成功';
 
   @override
-  String removeFailedWithError(String error) {
+  String removeFailedWithError(Object error) {
     return '削除失敗: $error';
   }
 
@@ -1889,7 +1903,7 @@ class SJa extends S {
   String get saveSuccess => '保存成功';
 
   @override
-  String saveFailedWithError(String error) {
+  String saveFailedWithError(Object error) {
     return '保存失敗: $error';
   }
 
@@ -1906,12 +1920,12 @@ class SJa extends S {
   String get createdTime => '作成日';
 
   @override
-  String nWorksCount(int count) {
+  String nWorksCount(Object count) {
     return '$count 作品';
   }
 
   @override
-  String nPlaysCount(int count) {
+  String nPlaysCount(Object count) {
     return '$count 再生';
   }
 
@@ -1925,12 +1939,12 @@ class SJa extends S {
   String get reachedEnd => '最後まで読みました~';
 
   @override
-  String excludedNWorks(int count) {
+  String excludedNWorks(Object count) {
     return '$count 作品を除外';
   }
 
   @override
-  String pageExcludedNWorks(int count) {
+  String pageExcludedNWorks(Object count) {
     return 'このページで $count 作品を除外しました';
   }
 
@@ -1977,6 +1991,18 @@ class SJa extends S {
   String get playlistEmpty => 'プレイリストが空です';
 
   @override
+  String get clearQueue => 'キューをクリア';
+
+  @override
+  String get clearQueueConfirm => '再生キューをクリアしてもよろしいですか？';
+
+  @override
+  String get saveAsPlaylist => 'プレイリストとして保存';
+
+  @override
+  String get newPlaylistNameHint => 'プレイリスト名を入力';
+
+  @override
   String get appendModeEnabled => '追加モードが有効です';
 
   @override
@@ -1987,12 +2013,12 @@ class SJa extends S {
   String get gotIt => '了解';
 
   @override
-  String nMinutes(int count) {
+  String nMinutes(Object count) {
     return '$count分';
   }
 
   @override
-  String nHours(int count) {
+  String nHours(Object count) {
     return '$count時間';
   }
 
@@ -2006,12 +2032,12 @@ class SJa extends S {
   String get tapToViewRatingDetail => 'タップして評価詳細を表示';
 
   @override
-  String priceInYen(int price) {
+  String priceInYen(Object price) {
     return '$price 円';
   }
 
   @override
-  String soldCount(String count) {
+  String soldCount(Object count) {
     return '販売数：$count';
   }
 
@@ -2025,7 +2051,7 @@ class SJa extends S {
   String get otherEditions => '他のバージョン';
 
   @override
-  String tenThousandSuffix(String count) {
+  String tenThousandSuffix(Object count) {
     return '$count万';
   }
 
@@ -2039,12 +2065,12 @@ class SJa extends S {
   String get packingFailed => 'パッキング失敗';
 
   @override
-  String exportSuccess(String path) {
+  String exportSuccess(Object path) {
     return 'エクスポート成功：$path';
   }
 
   @override
-  String exportFailed(String error) {
+  String exportFailed(Object error) {
     return 'エクスポート失敗: $error';
   }
 
@@ -2055,7 +2081,7 @@ class SJa extends S {
   String get offlineBadge => 'オフライン';
 
   @override
-  String loadFilesFailed(String error) {
+  String loadFilesFailed(Object error) {
     return 'ファイルの読み込みに失敗: $error';
   }
 
@@ -2066,12 +2092,12 @@ class SJa extends S {
   String get noPlayableAudioFiles => '再生可能な音声ファイルが見つかりません';
 
   @override
-  String cannotFindAudioFile(String title) {
+  String cannotFindAudioFile(Object title) {
     return '音声ファイルが見つかりません: $title';
   }
 
   @override
-  String nowPlayingNOfTotal(String title, int current, int total) {
+  String nowPlayingNOfTotal(Object current, Object title, Object total) {
     return '再生中: $title ($current/$total)';
   }
 
@@ -2100,12 +2126,12 @@ class SJa extends S {
   String get loadingSubtitle => '字幕を読み込み中...';
 
   @override
-  String subtitleLoadSuccess(String title) {
+  String subtitleLoadSuccess(Object title) {
     return '字幕読み込み成功：$title';
   }
 
   @override
-  String subtitleLoadFailed(String error) {
+  String subtitleLoadFailed(Object error) {
     return '字幕読み込み失敗：$error';
   }
 
@@ -2143,7 +2169,7 @@ class SJa extends S {
   String get openInBrowserOption => '2. ブラウザで開く';
 
   @override
-  String playVideoError(String error) {
+  String playVideoError(Object error) {
     return '動画再生エラー: $error';
   }
 
@@ -2154,7 +2180,7 @@ class SJa extends S {
   String get resourceFiles => 'リソースファイル';
 
   @override
-  String resourceFilesTranslated(int count) {
+  String resourceFilesTranslated(Object count) {
     return 'リソースファイル (翻訳済み $count 項目)';
   }
 
@@ -2165,12 +2191,12 @@ class SJa extends S {
   String get translationTranslated => '訳';
 
   @override
-  String copiedName(String title) {
+  String copiedName(Object title) {
     return '名前をコピー: $title';
   }
 
   @override
-  String translationComplete(int count) {
+  String translationComplete(Object count) {
     return '翻訳完了：$count 項目';
   }
 
@@ -2181,12 +2207,12 @@ class SJa extends S {
   String get preparingTranslation => '翻訳を準備中...';
 
   @override
-  String translatingProgress(int current, int total) {
+  String translatingProgress(Object current, Object total) {
     return '翻訳中 $current/$total';
   }
 
   @override
-  String nItems(int count) {
+  String nItems(Object count) {
     return '$count 項目';
   }
 
@@ -2197,12 +2223,12 @@ class SJa extends S {
   String get preview => 'プレビュー';
 
   @override
-  String openVideoFileError(String error) {
+  String openVideoFileError(Object error) {
     return '動画ファイルを開くエラー: $error';
   }
 
   @override
-  String cannotOpenVideoFile(String message) {
+  String cannotOpenVideoFile(Object message) {
     return '動画ファイルを開けません: $message';
   }
 
@@ -2228,7 +2254,7 @@ class SJa extends S {
   String get cannotFindFilePath => 'ファイルパスが見つかりません';
 
   @override
-  String fileNotExist(String title) {
+  String fileNotExist(Object title) {
     return 'ファイルが存在しません：$title';
   }
 
@@ -2242,7 +2268,7 @@ class SJa extends S {
   String get cannotOpenVideo => '動画を開けません';
 
   @override
-  String errorInfo(String message) {
+  String errorInfo(Object message) {
     return 'エラー情報: $message';
   }
 
@@ -2260,7 +2286,7 @@ class SJa extends S {
   String get offlineFiles => 'オフラインファイル';
 
   @override
-  String unsupportedFileType(String title) {
+  String unsupportedFileType(Object title) {
     return 'このファイル形式は未対応です: $title';
   }
 
@@ -2268,7 +2294,7 @@ class SJa extends S {
   String get deleteFilePrompt => 'このファイルを削除しますか？';
 
   @override
-  String deletedItem(String title) {
+  String deletedItem(Object title) {
     return '削除済み: $title';
   }
 
@@ -2276,17 +2302,17 @@ class SJa extends S {
   String get selectAtLeastOneFile => 'ファイルを少なくとも1つ選択してください';
 
   @override
-  String addedNFilesToDownloadQueue(int count) {
+  String addedNFilesToDownloadQueue(Object count) {
     return '$count ファイルをダウンロードキューに追加';
   }
 
   @override
-  String downloadedAndSelected(int downloaded, int selected) {
+  String downloadedAndSelected(Object downloaded, Object selected) {
     return 'ダウンロード済み $downloaded · 選択中 $selected';
   }
 
   @override
-  String downloadN(int count) {
+  String downloadN(Object count) {
     return 'ダウンロード ($count)';
   }
 
@@ -2300,12 +2326,12 @@ class SJa extends S {
   String get selectFilesToDownload => 'ダウンロードファイルを選択';
 
   @override
-  String downloadedNCount(int count) {
+  String downloadedNCount(Object count) {
     return 'ダウンロード済み $count 個';
   }
 
   @override
-  String selectedNCount(int count) {
+  String selectedNCount(Object count) {
     return '選択中 $count 個';
   }
 
@@ -2322,12 +2348,12 @@ class SJa extends S {
   String get notTestedYet => '未テスト';
 
   @override
-  String latencyResultDetail(String latency, String status) {
+  String latencyResultDetail(Object latency, Object status) {
     return '遅延 $latency ($status)';
   }
 
   @override
-  String connectionFailedWithDetail(String error) {
+  String connectionFailedWithDetail(Object error) {
     return '接続失敗: $error';
   }
 
@@ -2353,22 +2379,22 @@ class SJa extends S {
   String get unknownHost => '不明なホスト';
 
   @override
-  String lastUsedTime(String time) {
+  String lastUsedTime(Object time) {
     return '最終使用: $time';
   }
 
   @override
-  String daysAgo(int count) {
+  String daysAgo(Object count) {
     return '$count日前';
   }
 
   @override
-  String hoursAgo(int count) {
+  String hoursAgo(Object count) {
     return '$count時間前';
   }
 
   @override
-  String minutesAgo(int count) {
+  String minutesAgo(Object count) {
     return '$count分前';
   }
 
@@ -2379,12 +2405,12 @@ class SJa extends S {
   String get confirmDelete => '削除の確認';
 
   @override
-  String deleteSelectedConfirm(int count) {
+  String deleteSelectedConfirm(Object count) {
     return '選択した $count 項目を削除しますか？';
   }
 
   @override
-  String deletedNOfTotalItems(int success, int total) {
+  String deletedNOfTotalItems(Object success, Object total) {
     return '$success/$total 項目を削除';
   }
 
@@ -2454,7 +2480,7 @@ class SJa extends S {
   String get renameFailed => '名前変更失敗';
 
   @override
-  String deleteItemConfirm(String title) {
+  String deleteItemConfirm(Object title) {
     return '「$title」を削除しますか？';
   }
 
@@ -2465,7 +2491,7 @@ class SJa extends S {
   String get deleteFailed => '削除失敗';
 
   @override
-  String subtitleLoaded(String title) {
+  String subtitleLoaded(Object title) {
     return '字幕を読み込みました：$title';
   }
 
@@ -2476,12 +2502,12 @@ class SJa extends S {
   String get moveFailed => '移動失敗';
 
   @override
-  String previewFailed(String error) {
+  String previewFailed(Object error) {
     return 'プレビュー失敗: $error';
   }
 
   @override
-  String openFailed(String error) {
+  String openFailed(Object error) {
     return '開く失敗: $error';
   }
 
@@ -2534,37 +2560,37 @@ class SJa extends S {
   String get reset => 'リセット';
 
   @override
-  String noBlockedItemsOfType(String type) {
+  String noBlockedItemsOfType(Object type) {
     return 'ブロック中の$typeはありません';
   }
 
   @override
-  String unblockedItem(String item) {
+  String unblockedItem(Object item) {
     return 'ブロック解除: $item';
   }
 
   @override
-  String addBlockedItem(String type) {
+  String addBlockedItem(Object type) {
     return '$typeをブロックに追加';
   }
 
   @override
-  String blockedItemName(String type) {
+  String blockedItemName(Object type) {
     return '$type名';
   }
 
   @override
-  String enterBlockedItemHint(String type) {
+  String enterBlockedItemHint(Object type) {
     return 'ブロックする$typeを入力';
   }
 
   @override
-  String blockedItemAdded(String item) {
+  String blockedItemAdded(Object item) {
     return 'ブロックに追加: $item';
   }
 
   @override
-  String workCountLabel(int count) {
+  String workCountLabel(Object count) {
     return '作品数: $count';
   }
 
@@ -2627,7 +2653,7 @@ class SJa extends S {
   String get unknownFile => '不明なファイル';
 
   @override
-  String deleteWithCount(int count) {
+  String deleteWithCount(Object count) {
     return '削除 ($count)';
   }
 
@@ -2635,7 +2661,7 @@ class SJa extends S {
   String get searchSubtitles => '字幕を検索...';
 
   @override
-  String nFilesWithSize(int count, String size) {
+  String nFilesWithSize(Object count, Object size) {
     return '$count ファイル • $size';
   }
 
@@ -2646,7 +2672,7 @@ class SJa extends S {
   String get goToParent => '上の階層へ';
 
   @override
-  String moveToTarget(String name) {
+  String moveToTarget(Object name) {
     return '移動先: $name';
   }
 
@@ -2654,12 +2680,12 @@ class SJa extends S {
   String get noSubfoldersHere => 'このディレクトリにサブフォルダはありません';
 
   @override
-  String addedToPlaylist(String name) {
+  String addedToPlaylist(Object name) {
     return '「$name」に追加しました';
   }
 
   @override
-  String removedFromPlaylist(String name) {
+  String removedFromPlaylist(Object name) {
     return '「$name」から削除しました';
   }
 
@@ -2667,7 +2693,7 @@ class SJa extends S {
   String get alreadyFavorited => 'お気に入り済み';
 
   @override
-  String loadImageFailedWithError(String error) {
+  String loadImageFailedWithError(Object error) {
     return '画像の読み込みに失敗\n$error';
   }
 
@@ -2684,7 +2710,7 @@ class SJa extends S {
   String get saveCoverImage => 'カバー画像を保存';
 
   @override
-  String savedToPath(String path) {
+  String savedToPath(Object path) {
     return '$path に保存しました';
   }
 
@@ -2692,7 +2718,7 @@ class SJa extends S {
   String get doubleTapToZoom => 'ダブルタップで拡大 · ピンチでズーム';
 
   @override
-  String getStatusFailed(String error) {
+  String getStatusFailed(Object error) {
     return 'ステータスの取得に失敗: $error';
   }
 
@@ -2700,7 +2726,7 @@ class SJa extends S {
   String get deleteRecord => '記録を削除';
 
   @override
-  String deletePlayRecordConfirm(String title) {
+  String deletePlayRecordConfirm(Object title) {
     return '\"$title\" の再生記録を削除しますか？';
   }
 
@@ -2708,7 +2734,7 @@ class SJa extends S {
   String get notPlayedYet => '未再生';
 
   @override
-  String playbackFailed(String error) {
+  String playbackFailed(Object error) {
     return '再生失敗: $error';
   }
 
@@ -2726,7 +2752,7 @@ class SJa extends S {
   String get imageSavedToGallery => '画像をアルバムに保存しました';
 
   @override
-  String imageSavedToPath(String path) {
+  String imageSavedToPath(Object path) {
     return '画像を保存しました: $path';
   }
 
@@ -2743,7 +2769,7 @@ class SJa extends S {
   String get goToPageTitle => 'ページへ移動';
 
   @override
-  String pageNumberRange(int max) {
+  String pageNumberRange(Object max) {
     return 'ページ (1-$max)';
   }
 
@@ -2751,7 +2777,7 @@ class SJa extends S {
   String get enterPageNumber => 'ページ番号を入力';
 
   @override
-  String enterValidPageNumber(int max) {
+  String enterValidPageNumber(Object max) {
     return '有効なページ番号を入力してください (1-$max)';
   }
 
@@ -2768,12 +2794,12 @@ class SJa extends S {
   String get cannotOpenPdf => 'PDFファイルを開けません';
 
   @override
-  String loadPdfFailed(String error) {
+  String loadPdfFailed(Object error) {
     return 'PDFの読み込みに失敗: $error';
   }
 
   @override
-  String pdfPageOfTotal(int current, int total) {
+  String pdfPageOfTotal(Object current, Object total) {
     return '$current / $total ページ';
   }
 
@@ -2790,7 +2816,7 @@ class SJa extends S {
   String get openWithSystemApp => 'システムデフォルトアプリで開く';
 
   @override
-  String renderPdfFailed(String error) {
+  String renderPdfFailed(Object error) {
     return 'PDFのレンダリングに失敗: $error';
   }
 
@@ -2825,7 +2851,7 @@ class SJa extends S {
   String get noContentToSave => '保存するコンテンツがありません';
 
   @override
-  String fileSavedToPath(String path) {
+  String fileSavedToPath(Object path) {
     return 'ファイルを保存しました：$path';
   }
 
@@ -2833,7 +2859,7 @@ class SJa extends S {
   String get localFileNotExist => 'ローカルファイルが存在しません。再読み込みしてください';
 
   @override
-  String loadTextFailed(String error) {
+  String loadTextFailed(Object error) {
     return 'テキストの読み込みに失敗: $error';
   }
 
@@ -2859,17 +2885,17 @@ class SJa extends S {
   String get bookmarkRemoved => 'ブックマークを削除しました';
 
   @override
-  String setProgressAndRating(String progress, int rating) {
+  String setProgressAndRating(Object progress, Object rating) {
     return '$progressに設定、評価: $rating 星';
   }
 
   @override
-  String setProgressTo(String progress) {
+  String setProgressTo(Object progress) {
     return '$progressに設定';
   }
 
   @override
-  String ratingSetTo(int rating) {
+  String ratingSetTo(Object rating) {
     return '評価を$rating星に設定';
   }
 
@@ -2877,12 +2903,12 @@ class SJa extends S {
   String get updated => '更新しました';
 
   @override
-  String addTagFailed(String error) {
+  String addTagFailed(Object error) {
     return 'タグの追加に失敗: $error';
   }
 
   @override
-  String addWithCount(int count) {
+  String addWithCount(Object count) {
     return '追加 ($count)';
   }
 
@@ -2890,7 +2916,7 @@ class SJa extends S {
   String get undo => '元に戻す';
 
   @override
-  String nStars(int count) {
+  String nStars(Object count) {
     return '$count 星';
   }
 
@@ -2904,7 +2930,7 @@ class SJa extends S {
   String get votedDown => '反対票を投じました';
 
   @override
-  String voteFailedWithError(String error) {
+  String voteFailedWithError(Object error) {
     return '投票に失敗: $error';
   }
 
@@ -2918,7 +2944,7 @@ class SJa extends S {
   String get voted => '投票済み';
 
   @override
-  String tagBlockedWithName(String name) {
+  String tagBlockedWithName(Object name) {
     return 'タグをブロックしました: $name';
   }
 
@@ -2983,12 +3009,12 @@ class SJa extends S {
   String get encodingUnrecognized => 'ファイルエンコーディングを認識できず、正しく表示できません';
 
   @override
-  String editPlaylistFailed(String error) {
+  String editPlaylistFailed(Object error) {
     return 'プレイリストの編集に失敗: $error';
   }
 
   @override
-  String unsupportedFileTypeWithTitle(String title) {
+  String unsupportedFileTypeWithTitle(Object title) {
     return 'このファイルタイプは開けません: $title';
   }
 
@@ -3067,7 +3093,7 @@ class SJa extends S {
   String get downloadPathSettings => 'ダウンロードパス設定';
 
   @override
-  String loadPathFailedWithError(String error) {
+  String loadPathFailedWithError(Object error) {
     return 'パスの読み込みに失敗: $error';
   }
 
@@ -3076,12 +3102,12 @@ class SJa extends S {
       'このプラットフォームではカスタムダウンロードパスはサポートされていません';
 
   @override
-  String activeDownloadsWarning(int count) {
+  String activeDownloadsWarning(Object count) {
     return '$count 件のダウンロードが進行中です。パスを切り替える前に完了またはキャンセルしてください';
   }
 
   @override
-  String setPathFailedWithError(String error) {
+  String setPathFailedWithError(Object error) {
     return 'パスの設定に失敗: $error';
   }
 
@@ -3108,7 +3134,7 @@ class SJa extends S {
   String get defaultPathRestored => 'デフォルトパスに復元しました';
 
   @override
-  String resetPathFailedWithError(String error) {
+  String resetPathFailedWithError(Object error) {
     return 'デフォルトパスの復元に失敗: $error';
   }
 
@@ -3193,7 +3219,7 @@ class SJa extends S {
   String get buttonDisplayRules => 'ボタン表示ルール';
 
   @override
-  String buttonDisplayRulesDesc(int maxVisible) {
+  String buttonDisplayRulesDesc(Object maxVisible) {
     return '• 最初の $maxVisible 個のボタンがプレーヤーの下部に表示されます\n• 残りのボタンは「その他」メニューに格納されます';
   }
 
@@ -3286,6 +3312,9 @@ class SJa extends S {
   String get showOnlineMarks => 'オンラインマークの作品を表示';
 
   @override
+  String get showStats => '聴取統計を表示';
+
+  @override
   String get cannotBeDisabled => '無効にできません';
 
   @override
@@ -3372,12 +3401,12 @@ class SJa extends S {
   String get logCopied => 'ログをクリップボードにコピーしました';
 
   @override
-  String logExported(String path) {
+  String logExported(Object path) {
     return 'ログを $path にエクスポートしました';
   }
 
   @override
-  String logCount(int count) {
+  String logCount(Object count) {
     return '$count 件のログ';
   }
 
@@ -3386,4 +3415,335 @@ class SJa extends S {
 
   @override
   String get logEmpty => 'ログはありません';
+
+  @override
+  String get crossfadeTitle => 'クロスフェード';
+
+  @override
+  String crossfadeEnabledWithDuration(Object ms) {
+    return 'クロスフェード: ${ms}ms';
+  }
+
+  @override
+  String get gaplessPlaybackEnabled => 'ギャップレス再生（クロスフェードなし）';
+
+  @override
+  String get crossfadeDurationLabel => 'クロスフェード時間';
+
+  @override
+  String get crossfadeMinLabel => '0.5秒';
+
+  @override
+  String get crossfadeMaxLabel => '10秒';
+
+  @override
+  String get crossfadeDescription =>
+      'トラック間を滑らかにフェードします。無効にするとギャップレス再生が隙間を最小限に抑えます。';
+
+  @override
+  String get equalizerTitle => 'イコライザー';
+
+  @override
+  String get equalizerEnabled => 'イコライザー有効';
+
+  @override
+  String get equalizerDisabled => 'イコライザー無効';
+
+  @override
+  String get equalizerActive => 'アクティブ';
+
+  @override
+  String get equalizerPresets => 'プリセット';
+
+  @override
+  String get equalizerCustomBands => 'カスタムバンド';
+
+  @override
+  String get equalizerCustom => 'カスタム';
+
+  @override
+  String get equalizerReset => 'フラットにリセット';
+
+  @override
+  String get equalizerNotSupported => 'このデバイスではイコライザーを利用できません';
+
+  @override
+  String get equalizerNotSupportedAndroid =>
+      'オーディオセッションが初期化されていません。先にトラックを再生してください。';
+
+  @override
+  String get equalizerNotSupportedOther =>
+      'このプラットフォームではハードウェアEQはサポートされていません。設定は保存されますが、サポートされた環境で適用されます。';
+
+  @override
+  String get equalizerInfo =>
+      'AndroidではハードウェアオーディオエフェクトでEQが適用されます。その他のプラットフォームではEQ設定が保存されます。';
+
+  @override
+  String get searchSettings => '設定を検索...';
+
+  @override
+  String get searchSettingsTitle => '設定検索';
+
+  @override
+  String get searchSettingsComingSoon => '設定のフル検索は今後のアップデートで利用可能になります。';
+
+  @override
+  String get preferredSampleRate => '優先サンプルレート';
+
+  @override
+  String get preferredSampleRateSubtitle => 'ハイレゾ出力ターゲット (Android)';
+
+  @override
+  String get preferredSampleRateAuto => '自動（ファイルに合わせる）';
+
+  @override
+  String get preferredSampleRateDesc =>
+      '出力サンプルレートを設定します。高いレートは互換性を低下させる可能性がありますが、対応DACでは品質が向上します。';
+
+  @override
+  String get settingsPlayback => '再生';
+
+  @override
+  String get settingsPlaybackSubtitle => 'イコライザー、クロスフェード、オーディオフォーマット';
+
+  @override
+  String get settingsAppearance => '外観';
+
+  @override
+  String get settingsAppearanceSubtitle => 'テーマ、言語、表示設定';
+
+  @override
+  String get settingsDownloadsStorage => 'ダウンロード＆ストレージ';
+
+  @override
+  String get settingsDownloadsStorageSubtitle => 'ダウンロードパス、キャッシュ管理';
+
+  @override
+  String get settingsPrivacyContent => 'プライバシー＆コンテンツ';
+
+  @override
+  String get settingsPrivacyContentSubtitle => 'プライバシーモード、ブロック設定';
+
+  @override
+  String get settingsTranslation => '翻訳';
+
+  @override
+  String get settingsTranslationSubtitle => '翻訳ソース、LLM設定';
+
+  @override
+  String get settingsAccount => 'アカウント';
+
+  @override
+  String get settingsAccountSubtitle => 'サーバーアカウント、フローティング字幕';
+
+  @override
+  String get settingsAdvanced => '詳細設定';
+
+  @override
+  String get settingsAdvancedSubtitle => '並べ替え順、ログ、すべての設定';
+
+  @override
+  String get settingsAboutSubtitle => 'バージョン、アップデート、ライセンス';
+
+  @override
+  String get advancedInfoBanner => 'これらの設定は初期設定後はほとんど変更されません。';
+
+  @override
+  String get advancedSectionDisplaySorting => '表示＆並べ替え';
+
+  @override
+  String get advancedDefaultSortOrderSubtitle => '発売日、タイトル、評価など';
+
+  @override
+  String get advancedMyTabsDisplaySubtitle => 'マイページのタブの表示/非表示';
+
+  @override
+  String get advancedSectionContentFiltering => 'コンテンツフィルタリング';
+
+  @override
+  String get advancedSubtitlePrioritySubtitle => '優先度の高い順と低い順';
+
+  @override
+  String get advancedSectionDebugLegacy => 'デバッグ＆レガシー';
+
+  @override
+  String get advancedAllSettingsLegacy => 'すべての設定（レガシー）';
+
+  @override
+  String get advancedAllSettingsLegacySubtitle => '従来の設定画面';
+
+  @override
+  String get hiResExclusiveMode => 'ハイレゾ専用モード';
+
+  @override
+  String get hiResExclusiveModeSubtitle => 'FLAC/WAVハイレゾトラックにネイティブExoPlayerを使用';
+
+  @override
+  String get hiResExclusiveModeDesc =>
+      '有効にすると、ハイレゾトラック（FLAC/WAV >48kHz）はネイティブExoPlayerで再生されます。プレーヤー切り替え時に短い中断が発生する場合があります。';
+
+  @override
+  String get hiResExclusiveModeEnabled => 'ハイレゾ専用モードが有効になりました';
+
+  @override
+  String get hiResExclusiveModeDisabled => 'ハイレゾ専用モードが無効になりました';
+
+  @override
+  String get enable => '有効にする';
+
+  @override
+  String get listeningStatsTitle => 'リスニング統計';
+
+  @override
+  String get listeningStatsSubtitle => 'あなたの聴取習慣と履歴';
+
+  @override
+  String get statsWorksPlayed => '再生した作品';
+
+  @override
+  String get statsCompleted => '完了';
+
+  @override
+  String get statsListeningTime => '聴取時間';
+
+  @override
+  String get statsStreakDays => '連続日数';
+
+  @override
+  String get statsDays => '日';
+
+  @override
+  String get statsDailyActivity => '日別アクティビティ（14日間）';
+
+  @override
+  String get statsTopVAs => 'トップ声優';
+
+  @override
+  String get statsTopCircles => 'トップサークル';
+
+  @override
+  String get statsRecentPlays => '最近の再生';
+
+  @override
+  String get statsNoData => 'まだ統計データがありません';
+
+  @override
+  String get statsNoDataDesc => '作品を聴き始めると、統計データがここに表示されます。';
+
+  @override
+  String get bitPerfectPlayback => 'ビットパーフェクト再生';
+
+  @override
+  String get bitPerfectPlaybackSubtitleOff => 'USB DAC検出が無効です';
+
+  @override
+  String get bitPerfectPlaybackSubtitleOn => 'libusb経由でUSB DACに直接出力';
+
+  @override
+  String get bitPerfectPlaybackSelectDevice => 'USB DACを選択';
+
+  @override
+  String get bitPerfectPlaybackSelectHint => 'USBオーディオデバイスを選択...';
+
+  @override
+  String get bitPerfectPlaybackNoDevice => 'USB DACが検出されませんでした';
+
+  @override
+  String get bitPerfectPlaybackRefreshTooltip => 'デバイス一覧を更新';
+
+  @override
+  String get bitPerfectPlaybackConfirmDesc =>
+      '有効にすると、接続されたUSB DACが検出され、Androidミキサーをバイパスして直接オーディオをストリーミングできます。';
+
+  @override
+  String get bitPerfectPlaybackEnabled => 'ビットパーフェクト再生が有効になりました';
+
+  @override
+  String get bitPerfectPlaybackDisabled => 'ビットパーフェクト再生が無効になりました';
+
+  @override
+  String get bitPerfectPlaybackDeviceUpdated => 'USB DACデバイスを更新しました';
+
+  @override
+  String get bitPerfectPlaybackListRefreshed => 'USBデバイス一覧を更新しました';
+
+  @override
+  String get bitPerfectPlaybackInfoTooltip => 'ビットパーフェクト再生について';
+
+  @override
+  String get bitPerfectPlaybackInfo =>
+      'ビットパーフェクト再生は、元のオーディオデータを変更せずに外部DACに送信し、最高の忠実度を実現します。\n\nAndroidのオーディオミキサーは通常すべてのオーディオを48kHzにリサンプリングし、ハイレゾコンテンツを劣化させます。このモードでは、libusbドライバーを介して接続されたUSB DACにオーディオを直接ルーティングし、Androidミキサーをバイパスします。';
+
+  @override
+  String get bitPerfectPlaybackPermissionDenied =>
+      'USBパーミッションが拒否されました。設定でUSBアクセスを許可してください。';
+
+  @override
+  String get playNext => '次を再生';
+
+  @override
+  String get noAudioTracks => '音声トラックが見つかりません';
+
+  @override
+  String playingNextTracks(Object count) {
+    return '次を再生中: $count トラック';
+  }
+
+  @override
+  String get localFileBrowser => 'ローカルファイルブラウザ';
+
+  @override
+  String get browseFiles => 'ファイルを参照';
+
+  @override
+  String get progressSync => 'デバイス間進捗同期';
+
+  @override
+  String get progressSyncSubtitle => '再生進捗をサーバーに同期し、デバイス間でシームレスに再開';
+
+  @override
+  String get progressSyncEnabled => '有効 — 進捗がサーバーに同期されています';
+
+  @override
+  String get progressSyncDisabled => '無効';
+
+  @override
+  String get autoTranslateLyrics => '歌詞の自動翻訳';
+
+  @override
+  String get autoTranslateLyricsEnabled => '有効 — 歌詞が自動的に翻訳されます';
+
+  @override
+  String get autoTranslateLyricsDisabled => '無効';
+
+  @override
+  String autoTranslateBannerTranslating(Object language) {
+    return '$language に自動翻訳中…';
+  }
+
+  @override
+  String autoTranslateBannerDone(Object language) {
+    return '$language に翻訳しました';
+  }
+
+  @override
+  String get smartPlaylist => 'スマートプレイリスト';
+
+  @override
+  String get smartPlaylists => 'スマートプレイリスト';
+
+  @override
+  String get smartPlaylistSubtitle => 'ルールに基づいて自動生成';
+
+  @override
+  String get searchRules => '検索ルール';
+
+  @override
+  String activeRules(Object count) {
+    return 'アクティブルール ($count)';
+  }
+
+  @override
+  String get regularPlaylist => '通常プレイリスト';
 }

@@ -67,24 +67,18 @@ class _ScrollableAppBarState extends State<ScrollableAppBar> {
   void _handleScrollNotification(ScrollNotification notification) {
     if (notification is ScrollUpdateNotification &&
         defaultScrollNotificationPredicate(notification)) {
-      final bool oldScrolledUnder = _scrolledUnder;
       final ScrollMetrics metrics = notification.metrics;
-      switch (metrics.axisDirection) {
-        case AxisDirection.up:
-          // Scroll view is reversed
-          _scrolledUnder = metrics.extentAfter > 0;
-        case AxisDirection.down:
-          _scrolledUnder = metrics.extentBefore > 0;
-        case AxisDirection.right:
-        case AxisDirection.left:
-          // Scrolled under is only supported in the vertical axis
-          break;
-      }
 
-      if (_scrolledUnder != oldScrolledUnder) {
-        setState(() {
-          // React to a change in scroll state
-        });
+      // Compute scrolledUnder from axis direction
+      final bool newScrolledUnder = switch (metrics.axisDirection) {
+        AxisDirection.up => metrics.extentAfter > 0,
+        AxisDirection.down => metrics.extentBefore > 0,
+        AxisDirection.right || AxisDirection.left => _scrolledUnder,
+      };
+
+      if (newScrolledUnder != _scrolledUnder) {
+        _scrolledUnder = newScrolledUnder;
+        setState(() {});
       }
     }
   }
@@ -105,9 +99,7 @@ class _ScrollableAppBarState extends State<ScrollableAppBar> {
       automaticallyImplyLeading: widget.automaticallyImplyLeading,
       titleSpacing: widget.titleSpacing,
       centerTitle: widget.centerTitle,
-      bottom: widget.bottom != null
-          ? widget.bottom
-          : PreferredSize(
+      bottom: widget.bottom ?? PreferredSize(
               preferredSize: const Size.fromHeight(1),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
@@ -116,12 +108,12 @@ class _ScrollableAppBarState extends State<ScrollableAppBar> {
                   gradient: _scrolledUnder
                       ? LinearGradient(
                           colors: [
-                            Colors.grey.withOpacity(0.1),
-                            Colors.grey.withOpacity(0.3),
-                            Colors.grey.withOpacity(0.1),
+                            Colors.grey.withValues(alpha: 0.1),
+                            Colors.grey.withValues(alpha: 0.3),
+                            Colors.grey.withValues(alpha: 0.1),
                           ],
                         )
-                      : LinearGradient(
+                      : const LinearGradient(
                           colors: [
                             Colors.transparent,
                             Colors.transparent,

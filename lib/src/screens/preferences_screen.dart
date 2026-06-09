@@ -4,9 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import 'audio_format_settings_screen.dart';
 import 'blocked_items_screen.dart';
+import 'equalizer_screen.dart';
 import 'llm_settings_screen.dart';
 import '../models/sort_options.dart';
+import '../providers/audio_provider.dart';
+import '../providers/equalizer_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/equalizer_service.dart';
 import '../utils/l10n_extensions.dart';
 import '../utils/snackbar_util.dart';
 import '../widgets/scrollable_appbar.dart';
@@ -35,34 +39,39 @@ class PreferencesScreen extends ConsumerWidget {
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
-            ...SubtitleLibraryPriority.values.map((priority) {
-              return RadioListTile<SubtitleLibraryPriority>(
-                title: Text(priority.localizedName(context)),
-                subtitle: Text(
-                  priority == SubtitleLibraryPriority.highest
-                      ? S.of(context).subtitlePriorityHighestDesc
-                      : S.of(context).subtitlePriorityLowestDesc,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                value: priority,
-                groupValue: currentPriority,
-                onChanged: (value) {
-                  if (value != null) {
-                    ref
-                        .read(subtitleLibraryPriorityProvider.notifier)
-                        .updatePriority(value);
-                    Navigator.pop(context);
-                    SnackBarUtil.showSuccess(
-                      context,
-                      S.of(context).setToValue(value.localizedName(context)),
-                    );
-                  }
-                },
-              );
-            }),
+            RadioGroup<SubtitleLibraryPriority>(
+              groupValue: currentPriority,
+              onChanged: (SubtitleLibraryPriority? value) {
+                if (value != null) {
+                  ref
+                      .read(subtitleLibraryPriorityProvider.notifier)
+                      .updatePriority(value);
+                  Navigator.pop(context);
+                  SnackBarUtil.showSuccess(
+                    context,
+                    S.of(context).setToValue(value.localizedName(context)),
+                  );
+                }
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: SubtitleLibraryPriority.values.map((priority) {
+                  return RadioListTile<SubtitleLibraryPriority>(
+                    title: Text(priority.localizedName(context)),
+                    subtitle: Text(
+                      priority == SubtitleLibraryPriority.highest
+                          ? S.of(context).subtitlePriorityHighestDesc
+                          : S.of(context).subtitlePriorityLowestDesc,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    value: priority,
+                  );
+                }).toList(),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -120,83 +129,88 @@ class PreferencesScreen extends ConsumerWidget {
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
-            ...TranslationSource.values.map((source) {
-              return RadioListTile<TranslationSource>(
-                title: Text(source.localizedName(context)),
-                subtitle: Text(
-                  _getTranslationSourceDescription(context, source),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                value: source,
-                groupValue: currentSource,
-                onChanged: (value) {
-                  if (value != null) {
-                    if (value == TranslationSource.llm) {
-                      final llmSettings = ref.read(llmSettingsProvider);
-                      if (llmSettings.apiKey.isEmpty) {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text(S.of(context).needsConfiguration),
-                            content:
-                                Text(S.of(context).llmConfigRequiredMessage),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: Text(S.of(context).cancel),
-                              ),
-                              TextButton(
-                                onPressed: () async {
-                                  Navigator.pop(context); // Close alert dialog
-                                  Navigator.pop(
-                                      context); // Close source selection dialog
-                                  await Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const LLMSettingsScreen(),
-                                    ),
-                                  );
+            RadioGroup<TranslationSource>(
+              groupValue: currentSource,
+              onChanged: (TranslationSource? value) {
+                if (value != null) {
+                  if (value == TranslationSource.llm) {
+                    final llmSettings = ref.read(llmSettingsProvider);
+                    if (llmSettings.apiKey.isEmpty) {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text(S.of(context).needsConfiguration),
+                          content:
+                              Text(S.of(context).llmConfigRequiredMessage),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text(S.of(context).cancel),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                Navigator.pop(context); // Close alert dialog
+                                Navigator.pop(
+                                    context); // Close source selection dialog
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const LLMSettingsScreen(),
+                                  ),
+                                );
 
-                                  // Check if configured successfully
-                                  final newSettings =
-                                      ref.read(llmSettingsProvider);
-                                  if (newSettings.apiKey.isNotEmpty) {
-                                    ref
-                                        .read(
-                                            translationSourceProvider.notifier)
-                                        .updateSource(TranslationSource.llm);
-                                    if (context.mounted) {
-                                      SnackBarUtil.showSuccess(
-                                        context,
-                                        S.of(context).autoSwitchedToLlm,
-                                      );
-                                    }
+                                // Check if configured successfully
+                                final newSettings =
+                                    ref.read(llmSettingsProvider);
+                                if (newSettings.apiKey.isNotEmpty) {
+                                  ref
+                                      .read(
+                                          translationSourceProvider.notifier)
+                                      .updateSource(TranslationSource.llm);
+                                  if (context.mounted) {
+                                    SnackBarUtil.showSuccess(
+                                      context,
+                                      S.of(context).autoSwitchedToLlm,
+                                    );
                                   }
-                                },
-                                child: Text(S.of(context).goToConfigure),
-                              ),
-                            ],
-                          ),
-                        );
-                        return;
-                      }
+                                }
+                              },
+                              child: Text(S.of(context).goToConfigure),
+                            ),
+                          ],
+                        ),
+                      );
+                      return;
                     }
-
-                    ref
-                        .read(translationSourceProvider.notifier)
-                        .updateSource(value);
-                    Navigator.pop(context);
-                    SnackBarUtil.showSuccess(
-                      context,
-                      S.of(context).setToValue(value.localizedName(context)),
-                    );
                   }
-                },
-              );
-            }),
+
+                  ref
+                      .read(translationSourceProvider.notifier)
+                      .updateSource(value);
+                  Navigator.pop(context);
+                  SnackBarUtil.showSuccess(
+                    context,
+                    S.of(context).setToValue(value.localizedName(context)),
+                  );
+                }
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: TranslationSource.values.map((source) {
+                  return RadioListTile<TranslationSource>(
+                    title: Text(source.localizedName(context)),
+                    subtitle: Text(
+                      _getTranslationSourceDescription(context, source),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    value: source,
+                  );
+                }).toList(),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -214,10 +228,6 @@ class PreferencesScreen extends ConsumerWidget {
     switch (source) {
       case TranslationSource.google:
         return s.translationDescGoogle;
-      case TranslationSource.youdao:
-        return s.translationDescYoudao;
-      case TranslationSource.microsoft:
-        return s.translationDescMicrosoft;
       case TranslationSource.llm:
         return s.translationDescLlm;
     }
@@ -319,6 +329,30 @@ class PreferencesScreen extends ConsumerWidget {
                     );
                   },
                 ),
+                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                SwitchListTile(
+                  secondary: Icon(Icons.sync,
+                      color: Theme.of(context).colorScheme.primary),
+                  title: Text(S.of(context).progressSync),
+                  subtitle: Text(
+                    ref.watch(progressSyncProvider)
+                        ? S.of(context).progressSyncEnabled
+                        : S.of(context).progressSyncDisabled,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  value: ref.watch(progressSyncProvider),
+                  onChanged: (value) {
+                    ref.read(progressSyncProvider.notifier).toggle(value);
+                    if (context.mounted) {
+                      SnackBarUtil.showInfo(
+                        context,
+                        value
+                            ? S.of(context).progressSyncEnabled
+                            : S.of(context).progressSyncDisabled,
+                      );
+                    }
+                  },
+                ),
                 // 仅在 Android, Windows 和 macOS 平台上显示音频直通设置
                 if (Theme.of(context).platform == TargetPlatform.android ||
                     Theme.of(context).platform == TargetPlatform.windows ||
@@ -383,6 +417,187 @@ class PreferencesScreen extends ConsumerWidget {
               ],
             ),
           ),
+          // Equalizer settings
+          const SizedBox(height: 16),
+          _buildEqualizerCard(context, ref),
+          // Crossfade settings
+          const SizedBox(height: 16),
+          _buildCrossfadeCard(context, ref),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEqualizerCard(BuildContext context, WidgetRef ref) {
+    final eqEnabled = ref.watch(equalizerEnabledProvider);
+    final eqPreset = ref.watch(equalizerActivePresetProvider);
+    final isSupported = ref.watch(equalizerDeviceSupportProvider);
+
+    final presetName = EqualizerService.presets
+        .where((p) => p.id == eqPreset)
+        .firstOrNull
+        ?.name ?? (eqPreset == 'custom' ? S.of(context).equalizerCustom : '');
+
+    return Card(
+      child: ListTile(
+        leading: Icon(
+          Icons.equalizer,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        title: Text(S.of(context).equalizerTitle),
+        subtitle: Text(
+          eqEnabled && isSupported
+              ? '${S.of(context).equalizerActive}: $presetName'
+              : !isSupported
+                  ? S.of(context).equalizerNotSupported
+                  : S.of(context).equalizerDisabled,
+          style: TextStyle(
+            fontSize: 12,
+            color: eqEnabled && isSupported
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.8)
+                : null,
+          ),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const EqualizerScreen(),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCrossfadeCard(BuildContext context, WidgetRef ref) {
+    final crossfadeMs = ref.watch(crossfadeDurationProvider);
+    final crossfadeEnabled = crossfadeMs > 0;
+
+    return Card(
+      child: Column(
+        children: [
+          SwitchListTile(
+            secondary: Icon(Icons.swap_horiz,
+                color: Theme.of(context).colorScheme.primary),
+            title: Text(S.of(context).crossfadeTitle),
+            subtitle: Text(
+              crossfadeEnabled
+                  ? S.of(context).crossfadeEnabledWithDuration(crossfadeMs)
+                  : S.of(context).gaplessPlaybackEnabled,
+              style: TextStyle(
+                color: crossfadeEnabled
+                    ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.8)
+                    : null,
+              ),
+            ),
+            value: crossfadeEnabled,
+            onChanged: (value) {
+              final newMs = value ? 3000 : 0; // Default 3 seconds when enabled
+              ref.read(crossfadeDurationProvider.notifier).updateDuration(newMs);
+              ref.read(audioPlayerControllerProvider.notifier).setCrossfadeDuration(
+                Duration(milliseconds: newMs),
+              );
+              if (context.mounted) {
+                SnackBarUtil.showInfo(
+                  context,
+                  value
+                      ? S.of(context).crossfadeEnabledWithDuration(newMs)
+                      : S.of(context).gaplessPlaybackEnabled,
+                );
+              }
+            },
+          ),
+          if (crossfadeEnabled) ...[
+            Divider(height: 1, color: Theme.of(context).colorScheme.outlineVariant),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        S.of(context).crossfadeDurationLabel,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const Spacer(),
+                      Text(
+                        crossfadeMs >= 1000
+                            ? '${(crossfadeMs / 1000).toStringAsFixed(1)}s'
+                            : '${crossfadeMs}ms',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: crossfadeMs.toDouble(),
+                    min: 500,
+                    max: 10000,
+                    divisions: 19, // 500ms steps
+                    label: crossfadeMs >= 1000
+                        ? '${(crossfadeMs / 1000).toStringAsFixed(1)}s'
+                        : '${crossfadeMs}ms',
+                    onChanged: (value) {
+                      final rounded = (value / 500).round() * 500;
+                      ref.read(crossfadeDurationProvider.notifier).updateDuration(rounded);
+                      ref.read(audioPlayerControllerProvider.notifier).setCrossfadeDuration(
+                        Duration(milliseconds: rounded),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        S.of(context).crossfadeMinLabel,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        S.of(context).crossfadeMaxLabel,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            S.of(context).crossfadeDescription,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  height: 1.4,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

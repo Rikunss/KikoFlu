@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import '../models/work.dart';
 import '../models/sort_options.dart';
 import '../services/kikoeru_api_service.dart' hide kikoeruApiServiceProvider;
+import '../services/log_service.dart';
 import 'auth_provider.dart';
 import 'settings_provider.dart';
 
@@ -235,7 +236,7 @@ final myReviewsProvider =
     final prevUser = previous;
     final nextUser = next;
     if (prevUser?.name != nextUser?.name || prevUser?.host != nextUser?.host) {
-      print('[MyReviewsProvider] User changed, refreshing my reviews');
+      LogService.instance.debug('[MyReviewsProvider] User changed, refreshing my reviews', tag: 'UI');
       notifier.refresh();
     }
   });

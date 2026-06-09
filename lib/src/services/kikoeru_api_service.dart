@@ -6,6 +6,9 @@ import '../models/work.dart';
 import '../utils/server_utils.dart';
 import '../services/storage_service.dart';
 import 'cache_service.dart';
+import 'log_service.dart';
+
+final _log = LogService.instance;
 
 class KikoeruApiService {
   static const String remoteHost = ServerUtils.defaultRemoteHost;
@@ -62,12 +65,12 @@ class KikoeruApiService {
         },
         onError: (error, handler) async {
           // Handle errors globally
-          print('API Error: ${error.message}');
+          _log.error('API Error: ${error.message}');
 
           // 自动重试连接超时错误（仅重试一次）
           if (error.type == DioExceptionType.connectionTimeout &&
               error.requestOptions.extra['retried'] != true) {
-            print('Connection timeout detected, retrying once...');
+            _log.warning('Connection timeout detected, retrying once...');
 
             // 标记已重试，避免无限循环
             error.requestOptions.extra['retried'] = true;
@@ -93,7 +96,7 @@ class KikoeruApiService {
         responseBody: true,
         logPrint: (object) {
           // Custom logging if needed
-          print(object);
+          _log.info(object.toString());
         },
       ),
     );
@@ -116,8 +119,7 @@ class KikoeruApiService {
     }
     _dio.options.baseUrl = _host!;
 
-    print(
-        '[API] Initialized - host: $_host, token: ${token.isEmpty ? "empty" : "exists (${token.length} chars)"}');
+    _log.info('Initialized - host: $_host, token: ${token.isEmpty ? "empty" : "exists (${token.length} chars)"}', tag: 'API');
   }
 
   // Setters for configuration
@@ -157,7 +159,7 @@ class KikoeruApiService {
       );
       return true;
     } catch (e) {
-      print('Host connection test failed for $host: $e');
+      _log.error('Host connection test failed for $host: $e');
       return false;
     }
   }
@@ -361,7 +363,7 @@ class KikoeruApiService {
         }
       } catch (e) {
         // If getting recommender fails, use default UUID
-        print('Failed to get recommender, using default: $e');
+        _log.warning('Failed to get recommender, using default: $e');
       }
 
       // Step 2: Register with recommender UUID
@@ -750,12 +752,12 @@ class KikoeruApiService {
       // 1. 先检查缓存
       final cachedData = await CacheService.getCachedWorkDetail(workId);
       if (cachedData != null) {
-        print('[API] 作品详情缓存命中: $workId');
+        _log.info('作品详情缓存命中: $workId', tag: 'API');
         return cachedData;
       }
 
       // 2. 缓存未命中，从网络获取
-      print('[API] 作品详情缓存未命中，从网络获取: $workId');
+      _log.info('作品详情缓存未命中，从网络获取: $workId', tag: 'API');
       final response = await _dio.get('/api/work/$workId?v=2');
       final data = response.data as Map<String, dynamic>;
 
@@ -773,12 +775,12 @@ class KikoeruApiService {
       // 1. 先检查缓存
       final cachedData = await CacheService.getCachedWorkDetail(workId);
       if (cachedData != null) {
-        print('[API] 作品详情缓存命中: $workId');
+        _log.info('作品详情缓存命中: $workId', tag: 'API');
         return cachedData;
       }
 
       // 2. 缓存未命中，从网络获取
-      print('[API] 作品详情缓存未命中，从网络获取: $workId');
+      _log.info('作品详情缓存未命中，从网络获取: $workId', tag: 'API');
       final metadataResponse = await _dio.get('/api/work/$workId');
       final data = metadataResponse.data as Map<String, dynamic>;
 
@@ -998,7 +1000,7 @@ class KikoeruApiService {
         if (decoded is List) {
           keywordValue = keyword;
         } else {
-          throw FormatException('Not a list');
+          throw const FormatException('Not a list');
         }
       } catch (_) {
         // 解析自定义格式，如 "$tag:value$ $circle:value$ keyword"
@@ -1079,7 +1081,7 @@ class KikoeruApiService {
                 );
                 condition['d'] = tag.id;
               } catch (e) {
-                print('[API] Failed to resolve tag ID for "$name": $e');
+                _log.error('Failed to resolve tag ID for "$name": $e', tag: 'API');
                 // Fallback to text search if tag not found
                 condition['t'] = 1;
                 condition['d'] = name;
@@ -1218,7 +1220,7 @@ class KikoeruApiService {
       // 1. 尝试从缓存获取
       final cachedJson = await CacheService.getCachedWorkTracks(workId);
       if (cachedJson != null) {
-        print('[API] 从缓存加载作品文件列表: $workId');
+        _log.info('从缓存加载作品文件列表: $workId', tag: 'API');
         return jsonDecode(cachedJson) as List<dynamic>;
       }
 
@@ -1228,7 +1230,7 @@ class KikoeruApiService {
 
       // 3. 保存到缓存
       await CacheService.cacheWorkTracks(workId, jsonEncode(tracks));
-      print('[API] 已缓存作品文件列表: $workId');
+      _log.info('已缓存作品文件列表: $workId', tag: 'API');
 
       return tracks;
     } catch (e) {
@@ -1389,8 +1391,7 @@ class KikoeruApiService {
     int? rating,
     String? reviewText,
   }) async {
-    print(
-        '[API] 更新评论状态: workId=$workId, progress=$progress, rating=$rating, reviewText=${reviewText != null ? "exists" : "null"}');
+    _log.info('更新评论状态: workId=$workId, progress=$progress, rating=$rating', tag: 'API');
     try {
       final data = <String, dynamic>{
         'work_id': workId,

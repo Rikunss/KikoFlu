@@ -25,7 +25,7 @@ class ResponsiveDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     final screenWidth = MediaQuery.of(context).size.width;
 
     // 横屏时限制对话框最大宽度
@@ -107,7 +107,7 @@ class ResponsiveAlertDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     final screenWidth = MediaQuery.of(context).size.width;
 
     // 横屏时限制对话框最大宽度
@@ -152,7 +152,7 @@ class ResponsiveBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
@@ -197,7 +197,7 @@ Future<T?> showResponsiveBottomSheet<T>({
   bool enableDrag = true,
 }) {
   final isLandscape =
-      MediaQuery.of(context).orientation == Orientation.landscape;
+      MediaQuery.orientationOf(context) == Orientation.landscape;
 
   if (isLandscape) {
     // 横屏时使用对话框样式

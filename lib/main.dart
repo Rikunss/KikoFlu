@@ -1,306 +1,143 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:path/path.dart' as p;
-import 'dart:ffi' as ffi;
-import 'package:ffi/ffi.dart';
-import 'package:sqlite3/open.dart' as sqlite3_open;
 
+import 'src/app/app_bootstrap.dart';
 import 'src/screens/login_screen.dart';
+import 'src/screens/splash_screen.dart';
 import 'src/screens/main_screen.dart';
 import 'src/widgets/desktop_floating_lyric.dart';
 import 'src/utils/theme.dart';
-import 'src/services/storage_service.dart';
-import 'src/services/account_database.dart';
-import 'src/services/cache_service.dart';
+import 'src/utils/global_keys.dart';
+import 'src/utils/platform_utils.dart';
+import 'src/services/audio_player_service.dart';
 import 'src/services/download_service.dart';
 import 'src/services/floating_lyric_service.dart';
-import 'src/services/log_service.dart';
-import 'src/services/audio_player_service.dart';
+import 'src/services/home_widget_service.dart';
+import 'src/services/mpv_config_service.dart';
 import 'src/services/playback_history_service.dart';
+import 'src/services/progress_sync_service.dart';
 import 'src/models/work.dart';
+import 'package:flutter/services.dart';
 import 'l10n/app_localizations.dart';
 import 'src/providers/audio_provider.dart';
 import 'src/providers/auth_provider.dart';
 import 'src/providers/locale_provider.dart';
 import 'src/providers/theme_provider.dart';
 import 'src/providers/update_provider.dart';
-import 'src/utils/global_keys.dart';
 
-void _setEnv(String key, String value) {
-  if (Platform.isWindows) {
-    final keyNative = key.toNativeUtf16();
-    final valueNative = value.toNativeUtf16();
-    try {
-      final SetEnvironmentVariable = ffi.DynamicLibrary.open('kernel32.dll')
-          .lookupFunction<
-              ffi.Int32 Function(ffi.Pointer<Utf16>, ffi.Pointer<Utf16>),
-              int Function(ffi.Pointer<Utf16>,
-                  ffi.Pointer<Utf16>)>('SetEnvironmentVariableW');
-      SetEnvironmentVariable(keyNative, valueNative);
-    } finally {
-      calloc.free(keyNative);
-      calloc.free(valueNative);
-    }
-  } else if (Platform.isMacOS || Platform.isLinux) {
-    final keyNative = key.toNativeUtf8();
-    final valueNative = value.toNativeUtf8();
-    try {
-      final setenv = ffi.DynamicLibrary.process().lookupFunction<
-          ffi.Int32 Function(ffi.Pointer<Utf8>, ffi.Pointer<Utf8>, ffi.Int32),
-          int Function(ffi.Pointer<Utf8>, ffi.Pointer<Utf8>, int)>('setenv');
-      setenv(keyNative, valueNative, 1);
-    } finally {
-      calloc.free(keyNative);
-      calloc.free(valueNative);
-    }
-  }
-}
-
-ffi.DynamicLibrary _openSqliteOnLinux() {
-  final executableDir = p.dirname(Platform.resolvedExecutable);
-  final candidates = <String>[
-    p.join(executableDir, 'lib', 'libsqlite3.so.0'),
-    p.join(executableDir, 'lib', 'libsqlite3.so'),
-    'libsqlite3.so.0',
-    'libsqlite3.so',
-    '/lib/aarch64-linux-gnu/libsqlite3.so.0',
-    '/usr/lib/aarch64-linux-gnu/libsqlite3.so.0',
-    '/lib/x86_64-linux-gnu/libsqlite3.so.0',
-    '/usr/lib/x86_64-linux-gnu/libsqlite3.so.0',
-  ];
-
-  Object? lastError;
-  for (final candidate in candidates.toSet()) {
-    try {
-      return ffi.DynamicLibrary.open(candidate);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw ArgumentError(
-    'Failed to load sqlite3 on Linux. Tried: ${candidates.join(', ')}. '
-    'Last error: $lastError',
-  );
-}
-
-void _initSqfliteFfi() {
-  if (Platform.isLinux) {
-    sqlite3_open.open.overrideFor(
-      sqlite3_open.OperatingSystem.linux,
-      _openSqliteOnLinux,
-    );
-  }
-
-  sqfliteFfiInit();
-}
-
-Future<void> _configureMpv() async {
-  if (!Platform.isWindows && !Platform.isMacOS && !Platform.isLinux) return;
-
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final passthrough = prefs.getBool('audio_passthrough_enabled') ?? false;
-
-    Directory configDir;
-    if (Platform.isWindows) {
-      final exePath = Platform.resolvedExecutable;
-      final exeDir = p.dirname(exePath);
-      configDir = Directory(p.join(exeDir, 'portable_config'));
-    } else {
-      final appSupportDir = await getApplicationSupportDirectory();
-      configDir = Directory(p.join(appSupportDir.path, 'mpv_config'));
+void main(List<String> args) {
+  AppBootstrap.runWithZone(() async {
+    // --- Multi-window mode (floating lyric as separate window) ---
+    if (args.firstOrNull == 'multi_window') {
+      await _runMultiWindow(args);
+      return;
     }
 
-    if (!await configDir.exists()) {
-      await configDir.create(recursive: true);
+    // --- Desktop-only setup that must happen before any UI ---
+    final bool isDesktop =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+
+    if (isDesktop) {
+      await MpvConfigService.configure();
+      JustAudioMediaKit.ensureInitialized();
+      await windowManager.ensureInitialized();
+
+      await windowManager.waitUntilReadyToShow(
+        const WindowOptions(
+          size: Size(1280, 720),
+          minimumSize: Size(350, 600),
+          center: true,
+          backgroundColor: Colors.transparent,
+          skipTaskbar: false,
+          titleBarStyle: TitleBarStyle.normal,
+        ),
+        () async {
+          await windowManager.show();
+          await windowManager.focus();
+        },
+      );
     }
 
-    final configFile = File(p.join(configDir.path, 'mpv.conf'));
-
-    // Force set MPV_HOME to ensure config is read
-    _setEnv('MPV_HOME', configDir.path);
-    print('[Audio] Set MPV_HOME to: ${configDir.path}');
-
-    if (passthrough) {
-      String configContent;
-      if (Platform.isWindows) {
-        configContent = '''
-ao=wasapi
-audio-exclusive=yes
-audio-spdif=ac3,dts,eac3
-log-file=mpv_debug.log
-msg-level=all=v
-video=no
-sub-auto=no
-''';
-      } else if (Platform.isLinux) {
-        configContent = '''
-audio-spdif=ac3,dts,eac3
-log-file=${p.join(configDir.path, 'mpv_debug.log')}
-msg-level=all=v
-video=no
-sub-auto=no
-''';
-      } else {
-        configContent = '''
-ao=coreaudio
-audio-exclusive=yes
-audio-spdif=ac3,dts,eac3
-log-file=${p.join(configDir.path, 'mpv_debug.log')}
-msg-level=all=v
-video=no
-sub-auto=no
-''';
-      }
-
-      await configFile.writeAsString(configContent);
-      print('[Audio] Updated mpv.conf: Exclusive Mode ENABLED (Forced)');
-    } else {
-      // 即使不开启直通，也建议禁用视频输出以避免 Texture 崩溃
-      String configContent;
-      if (Platform.isWindows) {
-        configContent = '''
-log-file=mpv_debug.log
-msg-level=all=v
-video=no
-sub-auto=no
-''';
-      } else {
-        configContent = '''
-log-file=${p.join(configDir.path, 'mpv_debug.log')}
-msg-level=all=v
-video=no
-sub-auto=no
-''';
-      }
-      await configFile.writeAsString(configContent);
-      print('[Audio] Updated mpv.conf: Video Disabled');
-    }
-  } catch (e) {
-    print('[Audio] Error configuring mpv: $e');
-  }
-}
-
-void main(List<String> args) async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // 初始化日志系统，拦截 print/debugPrint 输出
-  setupLogCapture();
-
-  if (args.firstOrNull == 'multi_window') {
-    final windowId = args.length > 1 ? args[1] : '0';
-    Map<String, dynamic> argument;
-    try {
-      argument = (args.length > 2 && args[2].isNotEmpty)
-          ? jsonDecode(args[2]) as Map<String, dynamic>
-          : const <String, dynamic>{};
-    } catch (e) {
-      print('[MultiWindow] Failed to parse arguments: $e');
-      argument = const <String, dynamic>{};
+    if (Platform.isWindows || Platform.isLinux) {
+      initSqfliteFfi();
+      setupSqfliteDatabaseFactory();
     }
 
-    // Initialize window manager for the new window
-    await windowManager.ensureInitialized();
+    // --- Pre-load theme before single runApp ---
+    await ThemeSettingsNotifier.preload();
+    final splashSeed = await SplashApp.loadSavedSeedColor();
 
-    runApp(DesktopFloatingLyric(
-      windowId: windowId,
-      arguments: argument,
+    // --- CRITICAL: Init Hive + StorageService BEFORE runApp ---
+    // AuthNotifier._loadCurrentUser() accesses StorageService synchronously
+    // on creation. If runApp creates the widget tree before storage is ready,
+    // it throws a HiveError/StateError.
+    await AppBootstrap.initEssential(isDesktop: isDesktop);
+
+    // Notifier: signals when heavy init is done → triggers splash cross-fade
+    final initComplete = ValueNotifier<bool>(false);
+
+    // --- Single runApp with splash → main cross-fade ---
+    runApp(_SplashCrossFade(
+      initComplete: initComplete,
+      splashSeed: splashSeed,
+      child: const ProviderScope(child: KikoeruApp()),
     ));
-    return;
-  }
 
-  // Initialize just_audio_media_kit for desktop platforms
-  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-    await _configureMpv();
-    JustAudioMediaKit.ensureInitialized();
-  }
+    // --- Wait for first frame to render so splash screen is visible first ---
+    // runApp() schedules root widget attachment asynchronously via Timer.run.
+    // Without this delay, AppBootstrap.initialize() starts immediately and may
+    // complete before the first frame renders, especially on devices where
+    // Impeller/Vulkan shader compilation takes ~2s (Davey! frames).
+    // This 100ms is enough for the Timer to fire and the initial frame to begin.
+    await Future<void>.delayed(const Duration(milliseconds: 100));
 
-  if (Platform.isWindows || Platform.isLinux) {
-    _initSqfliteFfi();
-    databaseFactory = createDatabaseFactoryFfi(ffiInit: _initSqfliteFfi);
-  }
+    // Record when splash became visible (for minimum display duration)
+    final splashStart = DateTime.now();
 
-  // Set minimum window size for desktop platforms
-  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-    await windowManager.ensureInitialized();
+    // --- Remaining heavy initialization (runs while splash is showing) ---
+    await AppBootstrap.initialize(isDesktop: isDesktop);
+    AppBootstrap.configureSystemUi();
 
-    WindowOptions windowOptions = const WindowOptions(
-      size: Size(1280, 720),
-      minimumSize: Size(350, 600),
-      center: true,
-      backgroundColor: Colors.transparent,
-      skipTaskbar: false,
-      titleBarStyle: TitleBarStyle.normal,
-    );
+    // --- Ensure splash is visible for at least 1.5 seconds total ---
+    // Prevents the splash from flashing and disappearing too quickly when
+    // initialization finishes faster than the first frame can render.
+    const minSplashDuration = Duration(milliseconds: 1500);
+    final splashElapsed = DateTime.now().difference(splashStart);
+    if (splashElapsed < minSplashDuration) {
+      await Future<void>.delayed(minSplashDuration - splashElapsed);
+    }
 
-    windowManager.waitUntilReadyToShow(windowOptions, () async {
-      await windowManager.show();
-      await windowManager.focus();
-    });
-  }
-
-  // Initialize Hive for local storage
-  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-    // For desktop platforms, use application documents directory
-    final appDocDir = await getApplicationDocumentsDirectory();
-    await Hive.initFlutter('${appDocDir.path}/KikoFlu');
-  } else {
-    // For mobile platforms, use default path
-    await Hive.initFlutter();
-  }
-  await StorageService.init();
-
-  // Initialize account database
-  await AccountDatabase.instance.database;
-
-  // 启动时检查并清理缓存（如果超过上限）
-  CacheService.checkAndCleanCache(force: true).catchError((e) {
-    print('[Cache] 启动时检查缓存失�? $e');
+    // --- Signal init complete → triggers cross-fade transition ---
+    initComplete.value = true;
   });
+}
 
-  // 初始化下载服�?
-  await DownloadService.instance.initialize();
+/// Run the app in multi-window mode (floating lyric).
+Future<void> _runMultiWindow(List<String> args) async {
+  final windowId = args.length > 1 ? args[1] : '0';
+  Map<String, dynamic> argument;
+  try {
+    argument = (args.length > 2 && args[2].isNotEmpty)
+        ? jsonDecode(args[2]) as Map<String, dynamic>
+        : const <String, dynamic>{};
+  } catch (e) {
+    debugPrint('[MultiWindow] Failed to parse arguments: $e');
+    argument = const <String, dynamic>{};
+  }
 
-  // Set system UI overlay style
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      systemNavigationBarColor: Colors.transparent,
-    ),
-  );
+  await windowManager.ensureInitialized();
 
-  // 允许横竖屏旋�?
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
-
-  runZonedGuarded(
-    () => runApp(const ProviderScope(child: KikoeruApp())),
-    (error, stack) {
-      LogService.instance.error('$error\n$stack', tag: 'Zone');
-    },
-    zoneSpecification: ZoneSpecification(
-      print: (self, parent, zone, line) {
-        parent.print(zone, line);
-        LogService.instance.captureOutput(line);
-      },
-    ),
-  );
+  runApp(DesktopFloatingLyric(
+    windowId: windowId,
+    arguments: argument,
+  ));
 }
 
 class KikoeruApp extends ConsumerStatefulWidget {
@@ -319,28 +156,39 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       windowManager.addListener(this);
     }
-    // Initialize audio and video services
+    // Initialize audio and video services after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initPlaybackHistoryService();
-      ref.read(audioPlayerControllerProvider.notifier).initialize();
-
-      // Silent update check on startup
-      _checkForUpdates();
+      _initializeAppServices();
     });
   }
 
-  void _initPlaybackHistoryService() {
-    final historyService = PlaybackHistoryService.instance;
+  void _initializeAppServices() {
+    _attachPlaybackHistory();
+    _initProgressSync();
+    ref.read(audioPlayerControllerProvider.notifier).initialize();
+    _checkForUpdatesSilently();
+    _initHomeWidget();
+    _setupWidgetActionHandler();
 
-    // 注入 Work 获取回调
+    // Heavy download disk scan (fire-and-forget, runs after app is visible)
+    DownloadService.instance.syncWithDiskAfterInit().catchError((e) {
+      debugPrint('[Main] Disk sync failed: $e');
+    });
+  }
+
+  void _attachPlaybackHistory() {
+    final historyService = PlaybackHistoryService.instance;
     historyService.onFetchWork = (workId) async {
       final api = ref.read(kikoeruApiServiceProvider);
       final json = await api.getWork(workId);
       return Work.fromJson(json);
     };
-
-    // 绑定播放器
     historyService.attachPlayer(AudioPlayerService.instance);
+  }
+
+  void _initProgressSync() {
+    // Initialize cross-device progress sync
+    ProgressSyncService.instance.init(ref);
   }
 
   @override
@@ -355,7 +203,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    // 应用进入后台时立即 flush 播放历史
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
@@ -367,17 +214,41 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
 
   @override
   void onWindowClose() async {
-    // 桌面端关闭窗口时 flush 播放历史
     await PlaybackHistoryService.instance.flushNow(reason: FlushReason.dispose);
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      // 关闭主窗口时，同时关闭悬浮字幕窗口
       await FloatingLyricService.instance.hide();
     }
     super.onWindowClose();
   }
 
-  /// Silently check for updates on startup
-  Future<void> _checkForUpdates() async {
+  void _initHomeWidget() {
+    // Initialize widget service on Android only
+    if (!Platform.isAndroid) return;
+    HomeWidgetService.instance.init();
+  }
+
+  void _setupWidgetActionHandler() {
+    if (!Platform.isAndroid) return;
+
+    const widgetChannel = MethodChannel('com.kikoeru.flutter/home_widget_actions');
+    widgetChannel.setMethodCallHandler((call) async {
+      final controller = ref.read(audioPlayerControllerProvider.notifier);
+      switch (call.method) {
+        case 'togglePlayback':
+          if (controller.isPlaying) {
+            await controller.pause();
+          } else {
+            await controller.play();
+          }
+        case 'skipNext':
+          await controller.skipToNext();
+        case 'skipPrev':
+          await controller.skipToPrevious();
+      }
+    });
+  }
+
+  Future<void> _checkForUpdatesSilently() async {
     try {
       final updateService = ref.read(updateServiceProvider);
       final updateInfo = await updateService.checkForUpdates();
@@ -386,12 +257,11 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
         ref.read(updateInfoProvider.notifier).state = updateInfo;
         ref.read(hasNewVersionProvider.notifier).state = true;
 
-        // Check if red dot should be shown
         final shouldShow = await updateService.shouldShowRedDot();
         ref.read(showUpdateRedDotProvider.notifier).state = shouldShow;
       }
     } catch (e) {
-      // Silent failure - no user notification
+      // Silent failure
     }
   }
 
@@ -402,7 +272,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
 
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
-        // 根据用户设置决定是否使用动态颜�?
         final ColorScheme? lightScheme =
             themeSettings.colorSchemeType == ColorSchemeType.dynamic
                 ? lightDynamic
@@ -412,11 +281,11 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
                 ? darkDynamic
                 : null;
 
-        // 根据用户设置决定主题模式
         final ThemeMode mode = switch (themeSettings.themeMode) {
           AppThemeMode.system => ThemeMode.system,
           AppThemeMode.light => ThemeMode.light,
           AppThemeMode.dark => ThemeMode.dark,
+          AppThemeMode.trueBlack => ThemeMode.dark,
         };
 
         return MaterialApp(
@@ -428,8 +297,11 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
           locale: locale,
           theme:
               AppTheme.lightTheme(lightScheme, themeSettings.colorSchemeType),
-          darkTheme:
-              AppTheme.darkTheme(darkScheme, themeSettings.colorSchemeType),
+          darkTheme: themeSettings.themeMode == AppThemeMode.trueBlack
+              ? AppTheme.trueBlackDarkTheme(
+                  darkScheme, themeSettings.colorSchemeType)
+              : AppTheme.darkTheme(
+                  darkScheme, themeSettings.colorSchemeType),
           themeMode: mode,
           home: _buildHomeScreen(),
         );
@@ -439,13 +311,111 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
 
   Widget _buildHomeScreen() {
     final authState = ref.watch(authProvider);
+    return authState.currentUser != null
+        ? const MainScreen()
+        : const LoginScreen();
+  }
+}
 
-    // 如果有用户信息（包括离线模式），显示主页
-    // 这样用户可以访问本地下载的内�?
-    if (authState.currentUser != null) {
-      return const MainScreen();
-    } else {
-      return const LoginScreen();
+/// Cross-fades from splash content to the real app when init completes.
+/// Wraps the final app so the transition isn't a hard cut.
+///
+/// Uses [initComplete] ValueNotifier so the fade only starts after
+/// heavy initialization (accounts, database, auth) has finished.
+class _SplashCrossFade extends StatefulWidget {
+  /// Signals when `AppBootstrap.initialize()` has completed.
+  final ValueNotifier<bool> initComplete;
+
+  /// Seed color for the splash theme.
+  final Color? splashSeed;
+
+  /// The real app widget tree ([ProviderScope] wrapping [KikoeruApp]).
+  final Widget child;
+
+  const _SplashCrossFade({
+    required this.initComplete,
+    this.splashSeed,
+    required this.child,
+  });
+
+  @override
+  State<_SplashCrossFade> createState() => _SplashCrossFadeState();
+}
+
+class _SplashCrossFadeState extends State<_SplashCrossFade>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() {}); // remove splash overlay from tree
+        }
+      });
+
+    // Wait for init to complete before starting the cross-fade
+    widget.initComplete.addListener(_onInitComplete);
+  }
+
+  void _onInitComplete() {
+    if (widget.initComplete.value && mounted) {
+      widget.initComplete.removeListener(_onInitComplete);
+      _ctrl.forward();
     }
+  }
+
+  @override
+  void dispose() {
+    widget.initComplete.removeListener(_onInitComplete);
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final seed = widget.splashSeed ?? const Color(0xFF146683);
+    // Use light theme by default — will update on first app frame via
+    // the real KikoeruApp theme. Splash is brief so this is fine.
+    final splashCs = ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: Brightness.dark,
+    );
+
+    return Stack(
+      alignment: Alignment.topLeft,
+      children: [
+        // Real app (renders underneath, fully opaque)
+        widget.child,
+
+        // Splash overlay (fades out, removed from tree when done)
+        if (_ctrl.status != AnimationStatus.completed)
+          FadeTransition(
+            opacity: Tween<double>(begin: 1.0, end: 0.0).animate(
+              CurvedAnimation(
+                parent: _ctrl,
+                curve: Curves.easeOutCubic,
+              ),
+            ),
+            child: Container(
+              color: splashCs.surface,
+              child: Theme(
+                data: ThemeData(
+                  colorScheme: splashCs,
+                  useMaterial3: true,
+                ),
+                child: const Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: SplashBody(),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }

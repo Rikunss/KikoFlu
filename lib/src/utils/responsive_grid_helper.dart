@@ -12,7 +12,7 @@ class ResponsiveGridHelper {
   ///   - 屏幕宽度 >= 1200px 且宽高比 >= 1.3：4列
   static int getBigGridCrossAxisCount(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final orientation = MediaQuery.of(context).orientation;
+    final orientation = MediaQuery.orientationOf(context);
 
     // 竖屏固定2列
     if (orientation == Orientation.portrait) {
@@ -39,7 +39,7 @@ class ResponsiveGridHelper {
   /// - 竖屏：固定3列
   /// - 横屏：固定5列
   static int getSmallGridCrossAxisCount(BuildContext context) {
-    final orientation = MediaQuery.of(context).orientation;
+    final orientation = MediaQuery.orientationOf(context);
     return orientation == Orientation.landscape ? 5 : 3;
   }
 
@@ -77,7 +77,7 @@ class ResponsiveGridHelper {
 
   /// 获取推荐的间距
   static double getRecommendedSpacing(BuildContext context) {
-    final orientation = MediaQuery.of(context).orientation;
+    final orientation = MediaQuery.orientationOf(context);
     final widthClass = getScreenWidthClass(context);
 
     if (orientation == Orientation.landscape) {
@@ -90,7 +90,7 @@ class ResponsiveGridHelper {
 
   /// 获取推荐的边距
   static double getRecommendedPadding(BuildContext context) {
-    final orientation = MediaQuery.of(context).orientation;
+    final orientation = MediaQuery.orientationOf(context);
     final widthClass = getScreenWidthClass(context);
 
     if (orientation == Orientation.landscape) {

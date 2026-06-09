@@ -16,146 +16,173 @@ class RatingDetailPopup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 按照评分从高到低排序
+    final cs = Theme.of(context).colorScheme;
     final sortedDetails = List<RatingDetail>.from(ratingDetails)
       ..sort((a, b) => b.reviewPoint.compareTo(a.reviewPoint));
 
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 300),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 标题
-          Row(
-            children: [
-              Icon(
-                Icons.star,
-                color: Colors.amber,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                S.of(context).ratingDetails,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // 平均分和总评分数
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    averageRating.toStringAsFixed(1),
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber[700],
-                        ),
+      margin: EdgeInsets.zero,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 300),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 标题
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '/ 5',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[600],
-                        ),
-                  ),
-                ],
-              ),
-              Text(
-                S.of(context).ratingsCount(totalCount),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // 评分分布
-          ...sortedDetails.map((detail) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  // 星级
-                  SizedBox(
-                    width: 24,
-                    child: Text(
-                      '${detail.reviewPoint}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                    ),
-                  ),
-                  Icon(
-                    Icons.star,
+                  child: const Icon(
+                    Icons.star_rounded,
                     color: Colors.amber,
-                    size: 16,
+                    size: 20,
                   ),
-                  const SizedBox(width: 8),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  S.of(context).ratingDetails,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
-                  // 进度条
-                  Expanded(
-                    child: Stack(
+            // 平均分和总评分数
+            Card(
+              elevation: 0,
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        // 背景条
-                        Container(
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                        Text(
+                          averageRating.toStringAsFixed(1),
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber[700],
+                              ),
                         ),
-                        // 填充条
-                        FractionallySizedBox(
-                          widthFactor: detail.ratio / 100.0,
-                          child: Container(
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color: Colors.amber.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+                        const SizedBox(width: 4),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 3),
+                          child: Text(
+                            '/ 5',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // 比例和数量
-                  SizedBox(
-                    width: 80,
-                    child: Text(
-                      '${detail.ratio}% (${detail.count})',
+                    Text(
+                      S.of(context).ratingsCount(totalCount),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey[700],
+                            color: cs.onSurfaceVariant,
                           ),
-                      textAlign: TextAlign.right,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            );
-          }).toList(),
-        ],
+            ),
+            const SizedBox(height: 12),
+
+            // 评分分布
+            ...sortedDetails.map<Widget>((detail) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    // 星级
+                    SizedBox(
+                      width: 24,
+                      child: Text(
+                        '${detail.reviewPoint}',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const Icon(Icons.star, color: Colors.amber, size: 16),
+                    const SizedBox(width: 8),
+
+                    // 进度条
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          Container(
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: cs.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(11),
+                            ),
+                          ),
+                          FractionallySizedBox(
+                            widthFactor: detail.ratio / 100.0,
+                            child: Container(
+                              height: 22,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.amber.withValues(alpha: 0.6),
+                                    Colors.amber,
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(11),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // 比例和数量
+                    SizedBox(
+                      width: 80,
+                      child: Text(
+                        '${detail.ratio}% (${detail.count})',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }

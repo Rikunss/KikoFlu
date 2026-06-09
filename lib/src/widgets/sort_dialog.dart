@@ -60,7 +60,7 @@ class _CommonSortDialogState extends State<CommonSortDialog> {
   @override
   Widget build(BuildContext context) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     final options = widget.availableOptions ?? SortOrder.values;
 
     // 横屏时使用两列布局
@@ -93,7 +93,7 @@ class _CommonSortDialogState extends State<CommonSortDialog> {
                       padding: const EdgeInsets.only(left: 8, bottom: 8),
                       child: Text(
                         S.of(context).sortField,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
@@ -101,23 +101,25 @@ class _CommonSortDialogState extends State<CommonSortDialog> {
                     ),
                     Flexible(
                       child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: options.map((option) {
-                            return RadioListTile<SortOrder>(
-                              title: Text(option.localizedLabel(context)),
-                              value: option,
-                              groupValue: _currentOption,
-                              onChanged: (value) {
-                                if (value != null) {
-                                  _handleSort(value, _currentDirection);
-                                }
-                              },
-                              dense: true,
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 8),
-                            );
-                          }).toList(),
+                        child: RadioGroup<SortOrder>(
+                          groupValue: _currentOption,
+                          onChanged: (SortOrder? value) {
+                            if (value != null) {
+                              _handleSort(value, _currentDirection);
+                            }
+                          },
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: options.map((option) {
+                              return RadioListTile<SortOrder>(
+                                title: Text(option.localizedLabel(context)),
+                                value: option,
+                                dense: true,
+                                contentPadding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                              );
+                            }).toList(),
+                          ),
                         ),
                       ),
                     ),
@@ -135,7 +137,7 @@ class _CommonSortDialogState extends State<CommonSortDialog> {
                       padding: const EdgeInsets.only(left: 8, bottom: 8),
                       child: Text(
                         S.of(context).sortDirection,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
@@ -143,23 +145,25 @@ class _CommonSortDialogState extends State<CommonSortDialog> {
                     ),
                     Flexible(
                       child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: SortDirection.values.map((direction) {
-                            return RadioListTile<SortDirection>(
-                              title: Text(direction.localizedLabel(context)),
-                              value: direction,
-                              groupValue: _currentDirection,
-                              onChanged: (value) {
-                                if (value != null) {
-                                  _handleSort(_currentOption, value);
-                                }
-                              },
-                              dense: true,
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 8),
-                            );
-                          }).toList(),
+                        child: RadioGroup<SortDirection>(
+                          groupValue: _currentDirection,
+                          onChanged: (SortDirection? value) {
+                            if (value != null) {
+                              _handleSort(_currentOption, value);
+                            }
+                          },
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: SortDirection.values.map((direction) {
+                              return RadioListTile<SortDirection>(
+                                title: Text(direction.localizedLabel(context)),
+                                value: direction,
+                                dense: true,
+                                contentPadding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                              );
+                            }).toList(),
+                          ),
                         ),
                       ),
                     ),
@@ -193,19 +197,24 @@ class _CommonSortDialogState extends State<CommonSortDialog> {
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            ...options.map((option) {
-              return RadioListTile<SortOrder>(
-                title: Text(option.localizedLabel(context)),
-                value: option,
-                groupValue: _currentOption,
-                onChanged: (value) {
-                  if (value != null) {
-                    _handleSort(value, _currentDirection);
-                  }
-                },
-                dense: true,
-              );
-            }),
+            RadioGroup<SortOrder>(
+              groupValue: _currentOption,
+              onChanged: (SortOrder? value) {
+                if (value != null) {
+                  _handleSort(value, _currentDirection);
+                }
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: options.map((option) {
+                  return RadioListTile<SortOrder>(
+                    title: Text(option.localizedLabel(context)),
+                    value: option,
+                    dense: true,
+                  );
+                }).toList(),
+              ),
+            ),
             const Divider(),
             // 排序方向选择
             Text(
@@ -213,19 +222,24 @@ class _CommonSortDialogState extends State<CommonSortDialog> {
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            ...SortDirection.values.map((direction) {
-              return RadioListTile<SortDirection>(
-                title: Text(direction.localizedLabel(context)),
-                value: direction,
-                groupValue: _currentDirection,
-                onChanged: (value) {
-                  if (value != null) {
-                    _handleSort(_currentOption, value);
-                  }
-                },
-                dense: true,
-              );
-            }),
+            RadioGroup<SortDirection>(
+              groupValue: _currentDirection,
+              onChanged: (SortDirection? value) {
+                if (value != null) {
+                  _handleSort(_currentOption, value);
+                }
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: SortDirection.values.map((direction) {
+                  return RadioListTile<SortDirection>(
+                    title: Text(direction.localizedLabel(context)),
+                    value: direction,
+                    dense: true,
+                  );
+                }).toList(),
+              ),
+            ),
           ],
         ),
       ),

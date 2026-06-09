@@ -6,6 +6,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as p;
 
 import '../models/work.dart';
+import '../services/log_service.dart';
 import '../services/download_path_service.dart';
 import '../services/download_service.dart';
 import '../services/translation_service.dart';
@@ -307,10 +308,10 @@ class _OfflineFileExplorerWidgetState
         }
       }
 
-      print(
-          '[OfflineFileExplorer] 字幕库匹配: ${_audioWithLibrarySubtitles.length} 个音频文件有字幕');
+      LogService.instance.debug(
+          '[OfflineFileExplorer] 字幕库匹配: ${_audioWithLibrarySubtitles.length} 个音频文件有字幕', tag: 'UI');
     } catch (e) {
-      print('[OfflineFileExplorer] 检查字幕库失败: $e');
+      LogService.instance.warning('[OfflineFileExplorer] 检查字幕库失败: $e', tag: 'UI');
     }
   }
 
@@ -396,8 +397,8 @@ class _OfflineFileExplorerWidgetState
       _mainFolderPath = mainFolder;
       // 展开主文件夹路径上的所有父文件夹
       _expandPathToFolder(mainFolder);
-      print(
-          '[OfflineFileExplorer] 识别到主文件夹 $_mainFolderPath (音频:$maxAudioCount, 文本:$maxTextCount)');
+      LogService.instance.debug(
+          '[OfflineFileExplorer] 识别到主文件夹 $_mainFolderPath (音频:$maxAudioCount, 文本:$maxTextCount)', tag: 'UI');
     }
   }
 
@@ -581,7 +582,8 @@ class _OfflineFileExplorerWidgetState
   // 播放音频文件（从本地）
   Future<void> _playAudioFile(dynamic audioFile, String parentPath) async {
     final hash = _getProperty(audioFile, 'hash');
-    final title = _getProperty(audioFile, 'title', defaultValue: S.of(context).unknown);
+    final unknownLabel = S.of(context).unknown;
+    final title = _getProperty(audioFile, 'title', defaultValue: unknownLabel);
 
     if (hash == null) {
       SnackBarUtil.showError(context, S.of(context).cannotPlayAudioMissingId);
@@ -597,6 +599,7 @@ class _OfflineFileExplorerWidgetState
     final localFile = File(localPath);
 
     if (!await localFile.exists()) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).audioFileNotExist);
       return;
     }
@@ -619,6 +622,7 @@ class _OfflineFileExplorerWidgetState
         audioFiles.indexWhere((file) => _getProperty(file, 'hash') == hash);
 
     if (currentIndex == -1) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).cannotFindAudioFile(title));
       return;
     }
@@ -627,7 +631,7 @@ class _OfflineFileExplorerWidgetState
     final List<AudioTrack> audioTracks = [];
     for (final file in audioFiles) {
       final fileHash = _getProperty(file, 'hash');
-      final fileTitle = _getProperty(file, 'title', defaultValue: S.of(context).unknown);
+      final fileTitle = _getProperty(file, 'title', defaultValue: unknownLabel);
 
       if (fileHash == null) continue;
 
@@ -663,6 +667,7 @@ class _OfflineFileExplorerWidgetState
     }
 
     if (audioTracks.isEmpty) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).noPlayableAudioFiles);
       return;
     }
@@ -839,7 +844,7 @@ class _OfflineFileExplorerWidgetState
                   color: Theme.of(context)
                       .colorScheme
                       .secondaryContainer
-                      .withOpacity(0.3),
+                      .withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -887,14 +892,17 @@ class _OfflineFileExplorerWidgetState
             file,
             workId: widget.work.id,
           );
+      if (!mounted) return;
       SnackBarUtil.showSuccess(context, S.of(context).subtitleLoadSuccess(title));
     } catch (e) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).subtitleLoadFailed(e.toString()));
     }
   }
 
   // 预览图片文件（从本地）
   Future<void> _previewImageFile(dynamic file) async {
+    final unknownLabel = S.of(context).unknown;
     final downloadDir = await DownloadPathService.getDownloadDirectory();
     final workPath = p.join(downloadDir.path, widget.work.id.toString());
 
@@ -903,6 +911,7 @@ class _OfflineFileExplorerWidgetState
         (f) => _getProperty(f, 'hash') == _getProperty(file, 'hash'));
 
     if (currentIndex == -1) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).cannotFindImageFile);
       return;
     }
@@ -910,7 +919,7 @@ class _OfflineFileExplorerWidgetState
     final List<Map<String, String>> imageItems = [];
     for (final f in imageFiles) {
       final hash = _getProperty(f, 'hash', defaultValue: '');
-      final title = _getProperty(f, 'title', defaultValue: S.of(context).unknown);
+      final title = _getProperty(f, 'title', defaultValue: unknownLabel);
 
       final filePath = await _findFileFullPath(f, _localFiles, '');
       if (filePath != null) {
@@ -924,6 +933,7 @@ class _OfflineFileExplorerWidgetState
     }
 
     if (imageItems.isEmpty) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).noPreviewableImages);
       return;
     }
@@ -994,12 +1004,14 @@ class _OfflineFileExplorerWidgetState
     final title = _getProperty(file, 'title', defaultValue: S.of(context).unknown);
 
     if (hash == null) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).cannotPreviewTextMissingId);
       return;
     }
 
     final filePath = await _findFileFullPath(file, _localFiles, '');
     if (filePath == null) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).cannotFindFilePath);
       return;
     }
@@ -1010,6 +1022,7 @@ class _OfflineFileExplorerWidgetState
     final localFile = File(localPath);
 
     if (!await localFile.exists()) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).fileNotExist(title));
       return;
     }
@@ -1032,12 +1045,14 @@ class _OfflineFileExplorerWidgetState
     final title = _getProperty(file, 'title', defaultValue: S.of(context).unknown);
 
     if (hash == null) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).cannotPreviewPdfMissingId);
       return;
     }
 
     final filePath = await _findFileFullPath(file, _localFiles, '');
     if (filePath == null) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).cannotFindFilePath);
       return;
     }
@@ -1048,6 +1063,7 @@ class _OfflineFileExplorerWidgetState
     final localFile = File(localPath);
 
     if (!await localFile.exists()) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).fileNotExist(title));
       return;
     }
@@ -1075,6 +1091,7 @@ class _OfflineFileExplorerWidgetState
 
     final filePath = await _findFileFullPath(videoFile, _localFiles, '');
     if (filePath == null) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).cannotFindFilePath);
       return;
     }
@@ -1085,6 +1102,7 @@ class _OfflineFileExplorerWidgetState
     final localFile = File(localPath);
 
     if (!await localFile.exists()) {
+      if (!mounted) return;
       SnackBarUtil.showError(context, S.of(context).videoFileNotExist);
       return;
     }
@@ -1128,7 +1146,9 @@ class _OfflineFileExplorerWidgetState
         }
       }
     } catch (e) {
-      SnackBarUtil.showError(context, S.of(context).openVideoFileError(e.toString()));
+      if (mounted) {
+        SnackBarUtil.showError(context, S.of(context).openVideoFileError(e.toString()));
+      }
     }
   }
 
@@ -1227,11 +1247,11 @@ class _OfflineFileExplorerWidgetState
                               ? Theme.of(context)
                                   .colorScheme
                                   .primary
-                                  .withOpacity(0.3)
+                                  .withValues(alpha: 0.3)
                               : Theme.of(context)
                                   .colorScheme
                                   .onSurface
-                                  .withOpacity(0.2),
+                                  .withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
@@ -1246,7 +1266,7 @@ class _OfflineFileExplorerWidgetState
                                 : Theme.of(context)
                                     .colorScheme
                                     .onSurface
-                                    .withOpacity(0.7),
+                                    .withValues(alpha: 0.7),
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -1259,7 +1279,7 @@ class _OfflineFileExplorerWidgetState
                                   : Theme.of(context)
                                       .colorScheme
                                       .onSurface
-                                      .withOpacity(0.7),
+                                      .withValues(alpha: 0.7),
                             ),
                           ),
                         ],
@@ -1352,7 +1372,7 @@ class _OfflineFileExplorerWidgetState
                           left: 0,
                           top: 0,
                           child: Container(
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               color: Colors.white,
                               shape: BoxShape.circle,
                             ),
@@ -1489,7 +1509,7 @@ class _OfflineFileExplorerWidgetState
         _translatingItems.remove(originalName);
       });
     } catch (e) {
-      print('[OfflineFileExplorer] 翻译失败: $e');
+      LogService.instance.warning('[OfflineFileExplorer] 翻译失败: $e', tag: 'UI');
       setState(() {
         _translatingItems.remove(originalName);
       });

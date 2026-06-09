@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
+import 'waveform_seeker.dart';
+
 import '../../providers/audio_provider.dart';
 import '../../providers/floating_lyric_provider.dart';
 import '../../providers/lyric_provider.dart';
@@ -10,6 +12,7 @@ import '../../providers/player_buttons_provider.dart';
 import '../responsive_dialog.dart';
 import '../subtitle_adjustment_dialog.dart';
 import '../volume_control.dart';
+import '../../screens/equalizer_screen.dart';
 import 'sleep_timer_button.dart';
 import 'sleep_timer_dialog.dart';
 import '../../../l10n/app_localizations.dart';
@@ -31,6 +34,12 @@ class PlayerControlsWidget extends ConsumerStatefulWidget {
   final VoidCallback? onMarkPressed;
   final VoidCallback? onDetailPressed;
 
+  /// Optional gradient colours extracted from album artwork.
+  final List<Color>? gradientColors;
+
+  /// Called on long-press of the seekbar — used to refresh gradient colours.
+  final VoidCallback? onGradientRefresh;
+
   const PlayerControlsWidget({
     super.key,
     required this.isLandscape,
@@ -47,6 +56,8 @@ class PlayerControlsWidget extends ConsumerStatefulWidget {
     this.currentProgress,
     this.onMarkPressed,
     this.onDetailPressed,
+    this.gradientColors,
+    this.onGradientRefresh,
   });
 
   @override
@@ -324,8 +335,10 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           ],
         );
       case PlayerButtonType.subtitleAdjustment:
-        final lyricState = ref.watch(lyricControllerProvider);
-        final hasOffset = lyricState.timelineOffset != Duration.zero;
+        final timelineOffset = ref.watch(
+          lyricControllerProvider.select((s) => s.timelineOffset),
+        );
+        final hasOffset = timelineOffset != Duration.zero;
         return ListTile(
           leading: Icon(
             Icons.tune,
@@ -334,7 +347,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           title: Text(S.of(context).subtitleTimingAdjustment),
           trailing: hasOffset
               ? Text(
-                  '${lyricState.timelineOffset.inMilliseconds}ms',
+                  '${timelineOffset.inMilliseconds}ms',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
                       ),
@@ -372,6 +385,22 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               onTap: () {
                 ref.read(floatingLyricEnabledProvider.notifier).toggle();
               },
+            );
+          },
+        );
+      case PlayerButtonType.equalizer:
+        return ListTile(
+          leading: Icon(
+            Icons.equalizer,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: Text(S.of(context).equalizerTitle),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const EqualizerScreen(),
+              ),
             );
           },
         );
@@ -541,8 +570,9 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           ],
         );
       case PlayerButtonType.subtitleAdjustment:
-        final lyricState = ref.watch(lyricControllerProvider);
-        final hasOffset = lyricState.timelineOffset != Duration.zero;
+        final hasOffset = ref.watch(
+          lyricControllerProvider.select((s) => s.timelineOffset != Duration.zero),
+        );
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -583,6 +613,24 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
             if (!isLandscape) const SizedBox(height: 14),
           ],
         );
+      case PlayerButtonType.equalizer:
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const EqualizerScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.equalizer),
+              iconSize: iconSize,
+            ),
+            if (!isLandscape) const SizedBox(height: 14),
+          ],
+        );
     }
   }
 
@@ -602,29 +650,28 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                 final pos = widget.position.value ?? Duration.zero;
                 final dur = widget.duration.value ?? Duration.zero;
 
-                return SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    // 增强未播放部分的可见度，使其与背景区分
-                    inactiveTrackColor: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant
-                        .withOpacity(0.15),
-                    trackShape: const RoundedRectSliderTrackShape(),
-                  ),
-                  child: Slider(
-                    value: (widget.isSeekingManually
-                            ? widget.seekValue
-                            : dur.inMilliseconds > 0
-                                ? pos.inMilliseconds / dur.inMilliseconds
-                                : 0.0)
-                        .clamp(0.0, 1.0),
+                final seekValue = (widget.isSeekingManually
+                        ? widget.seekValue
+                        : dur.inMilliseconds > 0
+                            ? pos.inMilliseconds / dur.inMilliseconds
+                            : 0.0)
+                    .clamp(0.0, 1.0);
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: WaveformSeeker(
+                    value: seekValue,
+                    duration: dur,
+                    isPlaying: widget.isPlaying,
+                    gradientColors: widget.gradientColors,
                     onChanged: widget.onSeekChanged,
                     onChangeEnd: widget.onSeekEnd,
+                    onLongPress: widget.onGradientRefresh,
                   ),
                 );
               },
             ),
-            // Time labels
+            // Time labels - Material Design 3
             Consumer(
               builder: (context, ref, child) {
                 final pos = widget.position.value ?? Duration.zero;
@@ -637,17 +684,23 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                     : pos;
 
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         _formatDuration(displayPos),
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
                       Text(
                         _formatDuration(dur),
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
                     ],
                   ),
@@ -727,7 +780,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                 ...visibleButtons
                     .map((type) =>
                         _buildButton(context, ref, type, widget.isLandscape))
-                    .toList(),
+                    ,
                 // More menu button (always visible)
                 Column(
                   mainAxisSize: MainAxisSize.min,
@@ -750,7 +803,11 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                           final hasFloatingLyricInMore = moreButtons
                               .contains(PlayerButtonType.floatingLyric);
                           final timerState = ref.watch(sleepTimerProvider);
-                          final lyricState = ref.watch(lyricControllerProvider);
+                          final hasSubtitleOffset = ref.watch(
+                            lyricControllerProvider.select(
+                              (s) => s.timelineOffset != Duration.zero,
+                            ),
+                          );
                           final isFloatingLyricEnabled =
                               ref.watch(floatingLyricEnabledProvider);
 
@@ -761,7 +818,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                                       LoopMode.off) ||
                               (hasSleepTimerInMore && timerState.isActive) ||
                               (hasSubtitleAdjustmentInMore &&
-                                  lyricState.timelineOffset != Duration.zero) ||
+                                  hasSubtitleOffset) ||
                               (hasFloatingLyricInMore &&
                                   isFloatingLyricEnabled);
 

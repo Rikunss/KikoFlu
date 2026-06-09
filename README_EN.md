@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="assets/icons/app_icon_opaque.png" alt="KikoFlu" width="120" height="120">
+  <img src="assets/icons/app_icon_opaque.png" alt="KikoFlu Edge" width="120" height="120">
 
-  # KikoFlu
+  # KikoFlu Edge
 
   English | [日本語](README_JA.md) | [简体中文](README.md)
   
@@ -76,7 +76,7 @@ Platforms: Android (universal / arm64 / armeabi-v7a / x86_64), iOS (unsigned IPA
 
 ### AltStore / SideStore
 
-iOS users can add the KikoFlu source to AltStore or SideStore for easy installation and updates:
+iOS users can add the KikoFlu Edge source to AltStore or SideStore for easy installation and updates:
 
 **Source URL:** `https://raw.githubusercontent.com/pa-jesusf/KikoFlu/main/altstore-source.json`
 
@@ -110,6 +110,11 @@ flutter pub get
 
 - [Kikoeru](https://github.com/Number178/kikoeru-express) — Self-hosted backend server
 - [asmr.one](https://www.asmr.one) — Online service
+
+## Contributors
+
+- **Meteor-Sage** — Original author & lead developer
+- **Rikunss** — Co-developer
 
 ## License
 

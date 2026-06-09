@@ -4,6 +4,9 @@ import '../models/history_record.dart';
 import '../models/work.dart';
 import 'audio_player_service.dart';
 import 'history_database.dart';
+import 'log_service.dart';
+
+final _log = LogService.instance;
 
 /// 历史写入触发原因
 enum FlushReason {
@@ -38,7 +41,6 @@ class PlaybackHistoryService {
   int _playlistTotal = 0;
   int _lastKnownPositionMs = 0;
   int _lastPersistedPositionMs = 0;
-  DateTime? _lastPersistedAt;
   Work? _currentWork;
   bool _dirty = false;
 
@@ -106,7 +108,6 @@ class PlaybackHistoryService {
     _playlistTotal = playerService.queue.length;
     _lastKnownPositionMs = playerService.position.inMilliseconds;
     _lastPersistedPositionMs = 0;
-    _lastPersistedAt = null;
     _dirty = true;
 
     // 获取 Work 数据
@@ -135,7 +136,7 @@ class PlaybackHistoryService {
       try {
         _currentWork = await onFetchWork!(workId);
       } catch (e) {
-        print('[PlaybackHistoryService] Failed to fetch work $workId: $e');
+        _log.error('Failed to fetch work $workId: $e', tag: 'PlaybackHistoryService');
         _currentWork = null;
       }
     }
@@ -199,13 +200,12 @@ class PlaybackHistoryService {
     try {
       await HistoryDatabase.instance.addOrUpdate(record);
       _lastPersistedPositionMs = _lastKnownPositionMs;
-      _lastPersistedAt = now;
       _dirty = false;
 
       // 通知外部历史已更新
       _historyUpdatedController.add(_currentWorkId);
     } catch (e) {
-      print('[PlaybackHistoryService] Failed to persist ($reason): $e');
+      _log.error('Failed to persist ($reason): $e', tag: 'PlaybackHistoryService');
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/auth_provider.dart';
@@ -466,7 +467,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return Scaffold(
       appBar: ScrollableAppBar(
@@ -487,6 +488,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   // 竖屏布局
   Widget _buildPortraitLayout() {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: SingleChildScrollView(
@@ -499,36 +501,64 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               // Logo/Header
               Container(
                 height: 120,
-                margin: const EdgeInsets.only(bottom: 48),
+                margin: const EdgeInsets.only(bottom: 32),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset(
-                      'assets/icons/app_icon_login.png',
-                      width: 64,
-                      height: 64,
-                      errorBuilder: (context, error, stackTrace) {
-                        // 如果图片加载失败，显示默认图标
-                        return Icon(
-                          Icons.audiotrack,
-                          size: 64,
-                          color: Theme.of(context).colorScheme.primary,
-                        );
-                      },
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer.withValues(alpha: 0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/icons/app_icon_login.png',
+                          width: 64,
+                          height: 64,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Icon(
+                              Icons.audiotrack,
+                              size: 36,
+                              color: cs.primary,
+                            );
+                          },
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Text(
                       'KikoFlu',
                       style:
                           Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
+                                color: cs.primary,
                                 fontWeight: FontWeight.bold,
                               ),
                     ),
                   ],
                 ),
               ),
-              ..._buildFormFields(),
+              // Form Card
+              AnimatedOpacity(
+                opacity: _isLoading ? 0.55 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: Card(
+                  elevation: 0,
+                  color: cs.surfaceContainerLow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: _buildFormFields(),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -538,6 +568,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   // 横屏布局
   Widget _buildLandscapeLayout() {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Row(
@@ -550,24 +581,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Image.asset(
-                    'assets/icons/app_icon_login.png',
-                    width: 80,
-                    height: 80,
-                    errorBuilder: (context, error, stackTrace) {
-                      // 如果图片加载失败，显示默认图标
-                      return Icon(
-                        Icons.audiotrack,
-                        size: 80,
-                        color: Theme.of(context).colorScheme.primary,
-                      );
-                    },
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer.withValues(alpha: 0.3),
+                      shape: BoxShape.circle,
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/icons/app_icon_login.png',
+                        width: 80,
+                        height: 80,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            Icons.audiotrack,
+                            size: 44,
+                            color: cs.primary,
+                          );
+                        },
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'KikoFlu',
                     style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
+                          color: cs.primary,
                           fontWeight: FontWeight.bold,
                         ),
                   ),
@@ -582,9 +622,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
               child: Form(
                 key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: _buildFormFields(),
+                child: AnimatedOpacity(
+                  opacity: _isLoading ? 0.55 : 1.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Card(
+                    elevation: 0,
+                    color: cs.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    margin: EdgeInsets.zero,
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: _buildFormFields(),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -704,26 +759,55 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       const SizedBox(height: 15),
 
       // Cookie field (collapsible)
-      ExpansionTile(
-        title: const Text('Cookie'),
-        children: [
-          TextFormField(
-            controller: _serverCookieController,
-            decoration: InputDecoration(
-              labelText: S.of(context).serverCookie,
-              prefixIcon: const Icon(Icons.security),
-              border: const OutlineInputBorder(),
-              helperText: 'Server Cookie',
-            ),
-            textInputAction: TextInputAction.done,
+      Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ExpansionTile(
+          title: Row(
+            children: [
+              Icon(Icons.security,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('Cookie'),
+            ],
           ),
-          const SizedBox(height: 16),
-        ],
+          iconColor: Theme.of(context).colorScheme.primary,
+          collapsedIconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          collapsedShape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          children: [
+            TextFormField(
+              controller: _serverCookieController,
+              decoration: InputDecoration(
+                labelText: S.of(context).serverCookie,
+                prefixIcon: const Icon(Icons.security),
+                border: const OutlineInputBorder(),
+                helperText: 'Server Cookie',
+              ),
+              textInputAction: TextInputAction.done,
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
 
       // Submit button
       FilledButton(
-        onPressed: _isLoading ? null : _submit,
+        onPressed: _isLoading
+            ? null
+            : () {
+                HapticFeedback.lightImpact();
+                _submit();
+              },
         child: _isLoading
             ? const SizedBox(
                 height: 20,
@@ -738,7 +822,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // Guest login button (only show in login mode)
       if (_isLogin)
         OutlinedButton.icon(
-          onPressed: _isLoading ? null : _loginAsGuest,
+          onPressed: _isLoading
+              ? null
+              : () {
+                  HapticFeedback.lightImpact();
+                  _loginAsGuest();
+                },
           icon: const Icon(Icons.person_outline),
           label: Text(S.of(context).guestMode),
           style: OutlinedButton.styleFrom(

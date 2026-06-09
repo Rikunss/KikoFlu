@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../src/services/log_service.dart';
 import '../models/sort_options.dart';
 import '../providers/search_result_provider.dart';
 import '../providers/auth_provider.dart';
@@ -34,16 +35,7 @@ class SearchResultScreen extends StatelessWidget {
         searchResultProvider.overrideWith((ref) {
           final apiService = ref.watch(kikoeruApiServiceProvider);
           final pageSize = ref.read(pageSizeProvider);
-          final notifier =
-              SearchResultNotifier(apiService, ref, initialPageSize: pageSize);
-
-          ref.listen(pageSizeProvider, (previous, next) {
-            if (previous != next) {
-              notifier.updatePageSize(next);
-            }
-          });
-
-          return notifier;
+          return SearchResultNotifier(apiService, ref, initialPageSize: pageSize);
         }),
       ],
       child: _SearchResultContent(
@@ -77,11 +69,11 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
   @override
   void initState() {
     super.initState();
-    print(
+    LogService.instance.debug(
         '[SearchResult] Screen initialized with keyword: ${widget.keyword}, type: ${widget.searchTypeLabel}');
     // Load initial data
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      print(
+      LogService.instance.debug(
           '[SearchResult] Starting search with params: ${widget.searchParams}');
       ref.read(searchResultProvider.notifier).initializeSearch(
             keyword: widget.keyword,
@@ -150,10 +142,17 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen to pageSize changes to update search page size
+    ref.listen(pageSizeProvider, (previous, next) {
+      if (previous != next) {
+        ref.read(searchResultProvider.notifier).updatePageSize(next);
+      }
+    });
+
     final searchState = ref.watch(searchResultProvider);
 
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     final horizontalPadding = isLandscape ? 24.0 : 0.0;
 
     return GlobalAudioPlayerWrapper(
@@ -406,64 +405,101 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
   Widget _buildBody(SearchResultState searchState) {
     if (searchState.error != null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              S.of(context).loadFailed,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              searchState.error!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () =>
-                  ref.read(searchResultProvider.notifier).refresh(),
-              icon: const Icon(Icons.refresh),
-              label: Text(S.of(context).retry),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .errorContainer
+                      .withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.cloud_off_rounded,
+                  size: 40,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                S.of(context).loadFailed,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                searchState.error!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.tonalIcon(
+                onPressed: () =>
+                    ref.read(searchResultProvider.notifier).refresh(),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(S.of(context).retry),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     if (searchState.works.isEmpty && searchState.isLoading) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('...'),
-          ],
-        ),
-      );
+      return _buildSkeletonGrid();
     }
 
     if (searchState.works.isEmpty && !searchState.isLoading) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              S.of(context).noResults,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primaryContainer
+                      .withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.search_off_rounded,
+                  size: 40,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                S.of(context).noResults,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                S.of(context).noData,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -531,9 +567,168 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
     );
   }
 
+  Widget _buildSkeletonGrid() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverGrid(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 210,
+              childAspectRatio: 0.72,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _SkeletonWorkCard(),
+              childCount: 6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   IconData _getConditionIcon(String type) {
-    // type is a localized label, so we match by checking common patterns
-    // This is a best-effort fallback; the main UI uses SearchType enum directly
     return Icons.search;
+  }
+}
+
+/// A container that rebuilds every animation frame to produce shimmer effect.
+class _SkeletonShimmerContainer extends AnimatedWidget {
+  final Color baseColor;
+
+  const _SkeletonShimmerContainer({
+    required super.listenable,
+    required this.baseColor,
+  }) : super();
+
+  Animation<double> get _animation => listenable as Animation<double>;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        color: baseColor.withValues(alpha: _animation.value),
+      ),
+    );
+  }
+}
+
+/// A shimmer line that only rebuilds the animated Container, not the parent.
+class _SkeletonShimmerLine extends AnimatedWidget {
+  final Color baseColor;
+  final double width;
+  final double height;
+  final double alphaMultiplier;
+
+  const _SkeletonShimmerLine({
+    required super.listenable,
+    required this.baseColor,
+    required this.width,
+    required this.height,
+    required this.alphaMultiplier,
+  }) : super();
+
+  Animation<double> get _animation => listenable as Animation<double>;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: baseColor.withValues(alpha: _animation.value * alphaMultiplier),
+        borderRadius: BorderRadius.circular(4),
+      ),
+    );
+  }
+}
+
+class _SkeletonWorkCard extends StatefulWidget {
+  @override
+  State<_SkeletonWorkCard> createState() => _SkeletonWorkCardState();
+}
+
+class _SkeletonWorkCardState extends State<_SkeletonWorkCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0.3, end: 0.7).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final baseColor = colorScheme.surfaceContainerHighest;
+    final cardColor = colorScheme.surfaceContainerLow;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      color: cardColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cover placeholder — AnimatedWidget, only this rebuilds per frame
+          _SkeletonShimmerContainer(
+            listenable: _animation,
+            baseColor: baseColor,
+          ),
+          // Info placeholder
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SkeletonShimmerLine(
+                  listenable: _animation,
+                  baseColor: baseColor,
+                  width: double.infinity,
+                  height: 12,
+                  alphaMultiplier: 1.0,
+                ),
+                const SizedBox(height: 8),
+                _SkeletonShimmerLine(
+                  listenable: _animation,
+                  baseColor: baseColor,
+                  width: 100,
+                  height: 10,
+                  alphaMultiplier: 0.7,
+                ),
+                const SizedBox(height: 6),
+                _SkeletonShimmerLine(
+                  listenable: _animation,
+                  baseColor: baseColor,
+                  width: 80,
+                  height: 10,
+                  alphaMultiplier: 0.5,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

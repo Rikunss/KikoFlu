@@ -55,7 +55,7 @@ class MyTabsDisplaySettingsScreen extends ConsumerWidget {
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  trailing: Switch(
+                  trailing: const Switch(
                     value: true,
                     onChanged: null,
                   ),
@@ -85,6 +85,17 @@ class MyTabsDisplaySettingsScreen extends ConsumerWidget {
                   onChanged: (value) => notifier.setShowSubtitleLibrary(value),
                 ),
                 Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                SwitchListTile(
+                  secondary: Icon(
+                    Icons.bar_chart_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  title: Text(S.of(context).listeningStatsTitle),
+                  subtitle: Text(S.of(context).showStats),
+                  value: settings.showStats,
+                  onChanged: (value) => notifier.setShowStats(value),
+                ),
+                Divider(color: Theme.of(context).colorScheme.outlineVariant),
                 ListTile(
                   enabled: false,
                   leading: Icon(
@@ -98,7 +109,7 @@ class MyTabsDisplaySettingsScreen extends ConsumerWidget {
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  trailing: Switch(
+                  trailing: const Switch(
                     value: true,
                     onChanged: null,
                   ),

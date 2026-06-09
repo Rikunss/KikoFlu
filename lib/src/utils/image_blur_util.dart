@@ -1,98 +1,94 @@
-import 'dart:ui' as ui;
 import 'dart:io';
-import 'dart:typed_data';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../services/log_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import 'package:image/image.dart' as img;
+
+/// Top-level function that runs in a compute isolate.
+/// Disini kita menggunakan pure-Dart [img.Image] processing karena
+/// [dart:ui] APIs (Canvas, Picture, ImageFilter) tidak bisa diakses dari isolate.
+///
+/// Returns PNG bytes of the blurred image, or null on failure.
+Future<Uint8List?> _blurImageInIsolate(Uint8List imageBytes) async {
+  try {
+    // Decode image using pure-Dart decoder
+    final original = img.decodeImage(imageBytes);
+    if (original == null) return null;
+
+    // Downscale to ~200px wide for faster blur processing
+    // Privacy blur doesn't need full resolution
+    final thumb = img.copyResize(original, width: 200);
+
+    // Apply heavy gaussian blur with large radius
+    final blurred = img.gaussianBlur(thumb, radius: 50);
+
+    // Encode back to PNG bytes
+    final pngBytes = img.encodePng(blurred);
+    return Uint8List.fromList(pngBytes);
+  } catch (e) {
+    LogService.instance.error('[ImageBlur] Isolate processing failed: $e', tag: 'UI');
+    return null;
+  }
+}
 
 /// 图片模糊处理工具类
 class ImageBlurUtil {
   /// 对网络图片或本地图片应用高强度高斯模糊并保存到临时文件
   /// 返回模糊后的图片文件路径（file:// 协议）
+  ///
+  /// Image decoding + blurring dilakukan di Isolate terpisah via [compute]
+  /// agar tidak memblokade main thread (UI).
   static Future<String?> blurNetworkImageToFile(String imageUrl) async {
     try {
-      // 生成缓存文件名（基于URL的hash）
+      // Generate cache file name hash (quick — can stay on main thread)
       final urlHash = md5.convert(utf8.encode(imageUrl)).toString();
       final tempDir = await getTemporaryDirectory();
       final blurredFile = File('${tempDir.path}/blurred_$urlHash.png');
 
-      // 如果已经存在模糊后的文件，直接返回
+      // If already cached, return immediately (no processing needed)
       if (await blurredFile.exists()) {
         return 'file://${blurredFile.path}';
       }
 
       Uint8List imageData;
 
-      // 判断是本地文件还是网络URL
+      // Download image bytes on main thread (async HTTP — non-blocking)
       if (imageUrl.startsWith('file://')) {
-        // 本地文件
         final localPath = Uri.parse(imageUrl).toFilePath();
         final localFile = File(localPath);
         if (!await localFile.exists()) {
-          debugPrint('本地图片文件不存在: $localPath');
+          LogService.instance.debug('[ImageBlur] Local file not found: $localPath', tag: 'UI');
           return null;
         }
         imageData = await localFile.readAsBytes();
       } else {
-        // 网络URL
-        final response = await http.get(Uri.parse(imageUrl)).timeout(const Duration(seconds: 30));
+        final response = await http.get(Uri.parse(imageUrl)).timeout(
+              const Duration(seconds: 30),
+            );
         if (response.statusCode != 200) {
-          debugPrint('下载图片失败: ${response.statusCode}');
+          LogService.instance.warning('[ImageBlur] HTTP ${response.statusCode}', tag: 'UI');
           return null;
         }
         imageData = response.bodyBytes;
       }
 
-      // 解码图片
-      final ui.Codec codec = await ui.instantiateImageCodec(imageData);
-      final ui.FrameInfo frameInfo = await codec.getNextFrame();
-      final ui.Image image = frameInfo.image;
+      // Process heavy work (decode → downscale → blur → encode PNG) in Isolate.
+      // Menggunakan pure-Dart [image] package agar kompatibel dengan isolate.
+      final pngBytes = await compute(_blurImageInIsolate, imageData);
 
-      ui.Picture? picture;
-      ui.Image? blurredImage;
-      try {
-        // 应用极高强度模糊 (sigma = 100)
-        final ui.PictureRecorder recorder = ui.PictureRecorder();
-        final Canvas canvas = Canvas(recorder);
-
-        // 创建高斯模糊滤镜
-        final Paint paint = Paint()
-          ..imageFilter = ui.ImageFilter.blur(sigmaX: 100.0, sigmaY: 100.0);
-
-        // 绘制模糊图片
-        canvas.drawImage(image, Offset.zero, paint);
-
-        // 转换为图片
-        picture = recorder.endRecording();
-        blurredImage = await picture.toImage(
-          image.width,
-          image.height,
-        );
-
-        // 转换为PNG字节数据
-        final ByteData? byteData = await blurredImage.toByteData(
-          format: ui.ImageByteFormat.png,
-        );
-
-        if (byteData == null) {
-          return null;
-        }
-
-        final Uint8List pngBytes = byteData.buffer.asUint8List();
-
-        // 保存到临时文件
-        await blurredFile.writeAsBytes(pngBytes);
-
-        return 'file://${blurredFile.path}';
-      } finally {
-        image.dispose();
-        picture?.dispose();
-        blurredImage?.dispose();
+      if (pngBytes == null || pngBytes.isEmpty) {
+        LogService.instance.warning('[ImageBlur] Isolate returned null/empty', tag: 'UI');
+        return null;
       }
+
+      // Save to temp file (I/O — non-blocking)
+      await blurredFile.writeAsBytes(pngBytes);
+      return 'file://${blurredFile.path}';
     } catch (e) {
-      debugPrint('模糊图片失败: $e');
+      LogService.instance.error('[ImageBlur] Failed: $e', tag: 'UI');
       return null;
     }
   }

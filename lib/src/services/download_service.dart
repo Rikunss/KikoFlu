@@ -49,6 +49,8 @@ class DownloadService {
 
   static const String _tasksKey = 'download_tasks';
 
+  /// Lightweight init: only load tasks from SharedPreferences (no disk scan).
+  /// Call [syncWithDiskAfterInit] later from a post-frame callback.
   Future<void> initialize() async {
     await _loadTasks();
     // 恢复未完成的下载任务
@@ -57,13 +59,16 @@ class DownloadService {
         _updateTask(task.copyWith(status: DownloadStatus.paused));
       }
     }
-    // 启动时从硬盘完全同步任务（静默执行）
+  }
+
+  /// Heavy disk scan: sync tasks with filesystem. Run this fire-and-forget
+  /// after the app is fully initialized to avoid blocking startup.
+  Future<void> syncWithDiskAfterInit() async {
     try {
       await reloadMetadataFromDisk();
-      _log.info('启动时同步完成', tag: 'Download');
+      _log.info('启动后磁盘同步完成', tag: 'Download');
     } catch (e) {
-      _log.error('启动时同步失败: $e', tag: 'Download');
-      // 同步失败则保持当前状态，等待用户手动刷新
+      _log.error('启动后磁盘同步失败: $e', tag: 'Download');
     }
   }
 
@@ -508,7 +513,12 @@ class DownloadService {
   }
 
   Future<void> resumeTask(String taskId) async {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
+    final index = _tasks.indexWhere((t) => t.id == taskId);
+    if (index == -1) {
+      _log.warning('resumeTask: task not found: $taskId', tag: 'Download');
+      return;
+    }
+    final task = _tasks[index];
     if (task.status == DownloadStatus.paused ||
         task.status == DownloadStatus.failed) {
       _updateTask(task.copyWith(status: DownloadStatus.pending),
@@ -518,7 +528,12 @@ class DownloadService {
   }
 
   Future<void> deleteTask(String taskId) async {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
+    final taskIdx = _tasks.indexWhere((t) => t.id == taskId);
+    if (taskIdx == -1) {
+      _log.warning('deleteTask: task not found: $taskId', tag: 'Download');
+      return;
+    }
+    final task = _tasks[taskIdx];
     final workId = task.workId;
 
     // 取消下载

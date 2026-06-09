@@ -9,7 +9,7 @@ class SEn extends S {
   SEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'KikoFlu';
+  String get appTitle => 'KikoFlu Edge';
 
   @override
   String get navHome => 'Home';
@@ -139,12 +139,6 @@ class SEn extends S {
   String get translationSourceGoogle => 'Google Translate';
 
   @override
-  String get translationSourceYoudao => 'Youdao Translate';
-
-  @override
-  String get translationSourceMicrosoft => 'Microsoft Translate';
-
-  @override
   String get translationSourceLlm => 'LLM Translate';
 
   @override
@@ -205,7 +199,7 @@ class SEn extends S {
   String get passwordMinLength => 'Password must be at least 5 characters';
 
   @override
-  String accountAdded(String username) {
+  String accountAdded(Object username) {
     return 'Account \"$username\" has been added';
   }
 
@@ -220,7 +214,7 @@ class SEn extends S {
       'Please enter server address to test connection';
 
   @override
-  String latencyMs(String ms) {
+  String latencyMs(Object ms) {
     return '${ms}ms';
   }
 
@@ -292,7 +286,7 @@ class SEn extends S {
   String get minRating => 'Min Rating';
 
   @override
-  String minRatingStars(String stars) {
+  String minRatingStars(Object stars) {
     return '$stars stars';
   }
 
@@ -328,7 +322,7 @@ class SEn extends S {
   String get loadFailed => 'Load failed';
 
   @override
-  String loadFailedWithError(String error) {
+  String loadFailedWithError(Object error) {
     return 'Load failed: $error';
   }
 
@@ -431,7 +425,7 @@ class SEn extends S {
   String get cacheManagement => 'Cache Management';
 
   @override
-  String currentCache(String size) {
+  String currentCache(Object size) {
     return 'Current cache: $size';
   }
 
@@ -473,7 +467,7 @@ class SEn extends S {
   String get newVersionFound => 'New Version Found';
 
   @override
-  String newVersionAvailable(String version, String current) {
+  String newVersionAvailable(Object current, Object version) {
     return '$version available (current: $current)';
   }
 
@@ -481,7 +475,7 @@ class SEn extends S {
   String get versionInfo => 'Version Info';
 
   @override
-  String currentVersion(String version) {
+  String currentVersion(Object version) {
     return 'Current version: $version';
   }
 
@@ -501,12 +495,12 @@ class SEn extends S {
   String get cannotOpenLink => 'Cannot open link';
 
   @override
-  String openLinkFailed(String error) {
+  String openLinkFailed(Object error) {
     return 'Failed to open link: $error';
   }
 
   @override
-  String foundNewVersion(String version) {
+  String foundNewVersion(Object version) {
     return 'Found new version $version';
   }
 
@@ -594,7 +588,7 @@ class SEn extends S {
   String get showOnlySubtitled => 'Show only subtitled works';
 
   @override
-  String selectedCount(int count) {
+  String selectedCount(Object count) {
     return '$count selected';
   }
 
@@ -611,12 +605,12 @@ class SEn extends S {
   String get noDownloadTasks => 'No download tasks';
 
   @override
-  String nFiles(int count) {
+  String nFiles(Object count) {
     return '$count files';
   }
 
   @override
-  String errorWithMessage(String error) {
+  String errorWithMessage(Object error) {
     return 'Error: $error';
   }
 
@@ -630,12 +624,12 @@ class SEn extends S {
   String get deletionConfirmTitle => 'Confirm Delete';
 
   @override
-  String deletionConfirmMessage(int count) {
+  String deletionConfirmMessage(Object count) {
     return 'Are you sure you want to delete $count selected download tasks? Downloaded files will also be removed.';
   }
 
   @override
-  String deletedNFiles(int count) {
+  String deletedNFiles(Object count) {
     return 'Deleted $count files';
   }
 
@@ -655,12 +649,12 @@ class SEn extends S {
   String get downloadStatusPaused => 'Paused';
 
   @override
-  String translationFailed(String error) {
+  String translationFailed(Object error) {
     return 'Translation failed: $error';
   }
 
   @override
-  String copiedToClipboard(String label, String text) {
+  String copiedToClipboard(Object label, Object text) {
     return 'Copied $label: $text';
   }
 
@@ -668,7 +662,7 @@ class SEn extends S {
   String get loadingFileList => 'Loading file list...';
 
   @override
-  String loadFileListFailed(String error) {
+  String loadFileListFailed(Object error) {
     return 'Failed to load file list: $error';
   }
 
@@ -724,7 +718,7 @@ class SEn extends S {
   String get finishCurrentTrack => 'Stop after current track finishes';
 
   @override
-  String addMinutes(int min) {
+  String addMinutes(Object min) {
     return '+$min min';
   }
 
@@ -783,12 +777,12 @@ class SEn extends S {
   String get switchAccountTitle => 'Switch Account';
 
   @override
-  String switchAccountConfirm(String username) {
+  String switchAccountConfirm(Object username) {
     return 'Are you sure you want to switch to account \"$username\"?';
   }
 
   @override
-  String switchedToAccount(String username) {
+  String switchedToAccount(Object username) {
     return 'Switched to account: $username';
   }
 
@@ -796,7 +790,7 @@ class SEn extends S {
   String get switchFailed => 'Switch failed, please check account info';
 
   @override
-  String switchFailedWithError(String error) {
+  String switchFailedWithError(Object error) {
     return 'Switch failed: $error';
   }
 
@@ -817,7 +811,7 @@ class SEn extends S {
   String get deleteAccount => 'Delete Account';
 
   @override
-  String deleteAccountConfirm(String username) {
+  String deleteAccountConfirm(Object username) {
     return 'Are you sure you want to delete account \"$username\"? This action cannot be undone.';
   }
 
@@ -825,7 +819,7 @@ class SEn extends S {
   String get accountDeleted => 'Account deleted';
 
   @override
-  String deletionFailedWithError(String error) {
+  String deletionFailedWithError(Object error) {
     return 'Deletion failed: $error';
   }
 
@@ -944,7 +938,7 @@ class SEn extends S {
   String get voteCancelled => 'Vote cancelled';
 
   @override
-  String voteFailed(String error) {
+  String voteFailed(Object error) {
     return 'Vote failed: $error';
   }
 
@@ -958,7 +952,7 @@ class SEn extends S {
   String get addTag => 'Add Tag';
 
   @override
-  String loadTagsFailed(String error) {
+  String loadTagsFailed(Object error) {
     return 'Failed to load tags: $error';
   }
 
@@ -974,7 +968,7 @@ class SEn extends S {
       'Please go to www.asmr.one to bind your email first';
 
   @override
-  String selectedNTags(int count) {
+  String selectedNTags(Object count) {
     return 'Selected $count tags:';
   }
 
@@ -1003,12 +997,12 @@ class SEn extends S {
   String get systemPlaylistLiked => 'My Liked';
 
   @override
-  String totalNWorks(int count) {
+  String totalNWorks(Object count) {
     return '$count works';
   }
 
   @override
-  String pageNOfTotal(int current, int total) {
+  String pageNOfTotal(Object current, Object total) {
     return 'Page $current / $total';
   }
 
@@ -1022,7 +1016,7 @@ class SEn extends S {
   String get translating => 'Translating...';
 
   @override
-  String translationFallbackNotice(String source) {
+  String translationFallbackNotice(Object source) {
     return 'Translation failed, auto-switched to $source';
   }
 
@@ -1102,6 +1096,9 @@ class SEn extends S {
   String get themeModeSystem => 'Follow System';
 
   @override
+  String get themeModeTrueBlack => 'True Black';
+
+  @override
   String get colorSchemeOceanBlue => 'Ocean Blue';
 
   @override
@@ -1115,6 +1112,15 @@ class SEn extends S {
 
   @override
   String get colorSchemeSakuraPink => 'Sakura Pink';
+
+  @override
+  String get colorSchemeCrimsonRed => 'Crimson Red';
+
+  @override
+  String get colorSchemeAmberGold => 'Amber Gold';
+
+  @override
+  String get colorSchemeSlateGray => 'Slate Gray';
 
   @override
   String get colorSchemeDynamic => 'Dynamic Color';
@@ -1172,7 +1178,7 @@ class SEn extends S {
   String get noSubtitleFiles => 'No subtitle files found';
 
   @override
-  String subtitleFilesFound(int count) {
+  String subtitleFilesFound(Object count) {
     return 'Found $count subtitle files';
   }
 
@@ -1304,6 +1310,11 @@ class SEn extends S {
   String get relatedRecommendations => 'Related Works';
 
   @override
+  String moreFromCircle(Object circle) {
+    return 'More from $circle';
+  }
+
+  @override
   String get myTabsDisplaySettings => '\"My\" Page Settings';
 
   @override
@@ -1370,12 +1381,12 @@ class SEn extends S {
   String get ratingDistribution => 'Rating Distribution';
 
   @override
-  String reviewsCount(int count) {
+  String reviewsCount(Object count) {
     return '$count reviews';
   }
 
   @override
-  String ratingsCount(int count) {
+  String ratingsCount(Object count) {
     return '$count ratings total';
   }
 
@@ -1414,7 +1425,7 @@ class SEn extends S {
   String get reviewSubmitted => 'Review submitted';
 
   @override
-  String reviewFailed(String error) {
+  String reviewFailed(Object error) {
     return 'Review failed: $error';
   }
 
@@ -1461,7 +1472,7 @@ class SEn extends S {
   String get fetchFailed => 'Fetch failed';
 
   @override
-  String operationFailedWithError(String error) {
+  String operationFailedWithError(Object error) {
     return 'Operation failed: $error';
   }
 
@@ -1472,7 +1483,7 @@ class SEn extends S {
   String get currentCacheSize => 'Current Cache Size';
 
   @override
-  String cacheLimitLabelMB(int size) {
+  String cacheLimitLabelMB(Object size) {
     return 'Limit: ${size}MB';
   }
 
@@ -1498,7 +1509,7 @@ class SEn extends S {
       'Are you sure you want to clear all cache? This action cannot be undone.';
 
   @override
-  String clearCacheFailedWithError(String error) {
+  String clearCacheFailedWithError(Object error) {
     return 'Clear cache failed: $error';
   }
 
@@ -1540,6 +1551,15 @@ class SEn extends S {
   String get colorSchemeForestGreenDesc => 'Green, green, green';
 
   @override
+  String get colorSchemeCrimsonRedDesc => 'Red, red, red! 🔴';
+
+  @override
+  String get colorSchemeAmberGoldDesc => 'Golden and bright!';
+
+  @override
+  String get colorSchemeSlateGrayDesc => 'Neutral, elegant, cool';
+
+  @override
   String get colorSchemeDynamicDesc =>
       'Use wallpaper colors from system (Android 12+)';
 
@@ -1577,17 +1597,17 @@ class SEn extends S {
   String get pageSizeSettings => 'Items Per Page';
 
   @override
-  String pageSizeCurrent(int size) {
+  String pageSizeCurrent(Object size) {
     return 'Current: $size items/page';
   }
 
   @override
-  String currentSettingLabel(String value) {
+  String currentSettingLabel(Object value) {
     return 'Current: $value';
   }
 
   @override
-  String setToValue(String value) {
+  String setToValue(Object value) {
     return 'Set to: $value';
   }
 
@@ -1601,12 +1621,6 @@ class SEn extends S {
   @override
   String get translationDescGoogle =>
       'Requires network access to Google services';
-
-  @override
-  String get translationDescYoudao => 'Works with default network';
-
-  @override
-  String get translationDescMicrosoft => 'Works with default network';
 
   @override
   String get translationDescLlm =>
@@ -1653,7 +1667,7 @@ class SEn extends S {
   String get notificationPermissionDenied => 'Notification permission denied';
 
   @override
-  String requestNotificationFailed(String error) {
+  String requestNotificationFailed(Object error) {
     return 'Failed to request notification permission: $error';
   }
 
@@ -1666,17 +1680,17 @@ class SEn extends S {
       'Background running permission denied';
 
   @override
-  String requestBackgroundFailed(String error) {
+  String requestBackgroundFailed(Object error) {
     return 'Failed to request background permission: $error';
   }
 
   @override
-  String permissionRequired(String permission) {
+  String permissionRequired(Object permission) {
     return '$permission Required';
   }
 
   @override
-  String permissionPermanentlyDenied(String permission) {
+  String permissionPermanentlyDenied(Object permission) {
     return '$permission has been permanently denied. Please enable it manually in system settings.';
   }
 
@@ -1695,12 +1709,12 @@ class SEn extends S {
   String get refreshPermissionStatus => 'Refresh permission status';
 
   @override
-  String deleteFileConfirm(String fileName) {
+  String deleteFileConfirm(Object fileName) {
     return 'Are you sure you want to delete \"$fileName\"?';
   }
 
   @override
-  String deleteSelectedFilesConfirm(int count) {
+  String deleteSelectedFilesConfirm(Object count) {
     return 'Are you sure you want to delete $count selected files?';
   }
 
@@ -1708,12 +1722,12 @@ class SEn extends S {
   String get deleted => 'Deleted';
 
   @override
-  String cannotOpenFolder(String path) {
+  String cannotOpenFolder(Object path) {
     return 'Cannot open folder: $path';
   }
 
   @override
-  String openFolderFailed(String error) {
+  String openFolderFailed(Object error) {
     return 'Failed to open folder: $error';
   }
 
@@ -1724,27 +1738,27 @@ class SEn extends S {
   String get refreshComplete => 'Refresh complete';
 
   @override
-  String refreshFailed(String error) {
+  String refreshFailed(Object error) {
     return 'Refresh failed: $error';
   }
 
   @override
-  String deleteSelectedWorksConfirm(int count) {
+  String deleteSelectedWorksConfirm(Object count) {
     return 'Are you sure you want to delete $count selected works?';
   }
 
   @override
-  String partialDeleteFailed(String error) {
+  String partialDeleteFailed(Object error) {
     return 'Partial deletion failed: $error';
   }
 
   @override
-  String deletedNOfTotal(int success, int total) {
+  String deletedNOfTotal(Object success, Object total) {
     return 'Deleted $success/$total tasks';
   }
 
   @override
-  String deleteFailedWithError(String error) {
+  String deleteFailedWithError(Object error) {
     return 'Deletion failed: $error';
   }
 
@@ -1753,7 +1767,7 @@ class SEn extends S {
       'This download has no saved work details and cannot be viewed offline';
 
   @override
-  String openWorkDetailFailed(String error) {
+  String openWorkDetailFailed(Object error) {
     return 'Failed to open work detail: $error';
   }
 
@@ -1800,7 +1814,7 @@ class SEn extends S {
       'Network connection failed, please check network';
 
   @override
-  String addFailedWithError(String error) {
+  String addFailedWithError(Object error) {
     return 'Add failed: $error';
   }
 
@@ -1808,12 +1822,12 @@ class SEn extends S {
   String get creatingPlaylist => 'Creating playlist...';
 
   @override
-  String playlistCreatedSuccess(String name) {
+  String playlistCreatedSuccess(Object name) {
     return 'Playlist \"$name\" created successfully';
   }
 
   @override
-  String createFailedWithError(String error) {
+  String createFailedWithError(Object error) {
     return 'Creation failed: $error';
   }
 
@@ -1828,7 +1842,7 @@ class SEn extends S {
   String get myPlaylists => 'My Playlists';
 
   @override
-  String totalNItems(int count) {
+  String totalNItems(Object count) {
     return '$count items total';
   }
 
@@ -1846,7 +1860,7 @@ class SEn extends S {
       'Deletion is irreversible. Users who favorited this playlist will lose access. Are you sure?';
 
   @override
-  String unfavoritePlaylistConfirm(String name) {
+  String unfavoritePlaylistConfirm(Object name) {
     return 'Are you sure you want to unfavorite \"$name\"?';
   }
 
@@ -1891,12 +1905,12 @@ class SEn extends S {
   String get workIdHint => 'e.g.: RJ123456\nrj233333';
 
   @override
-  String detectedNWorkIds(int count) {
+  String detectedNWorkIds(Object count) {
     return 'Detected $count work IDs';
   }
 
   @override
-  String addNWorks(int count) {
+  String addNWorks(Object count) {
     return 'Add $count';
   }
 
@@ -1904,12 +1918,12 @@ class SEn extends S {
   String get noValidWorkIds => 'No valid work IDs found (starting with RJ)';
 
   @override
-  String addingNWorks(int count) {
+  String addingNWorks(Object count) {
     return 'Adding $count works...';
   }
 
   @override
-  String addedNWorksSuccess(int count) {
+  String addedNWorksSuccess(Object count) {
     return 'Successfully added $count works';
   }
 
@@ -1917,7 +1931,7 @@ class SEn extends S {
   String get removeWork => 'Remove Work';
 
   @override
-  String removeWorkConfirm(String title) {
+  String removeWorkConfirm(Object title) {
     return 'Are you sure you want to remove \"$title\" from the playlist?';
   }
 
@@ -1925,7 +1939,7 @@ class SEn extends S {
   String get removeSuccess => 'Removed successfully';
 
   @override
-  String removeFailedWithError(String error) {
+  String removeFailedWithError(Object error) {
     return 'Remove failed: $error';
   }
 
@@ -1936,7 +1950,7 @@ class SEn extends S {
   String get saveSuccess => 'Saved successfully';
 
   @override
-  String saveFailedWithError(String error) {
+  String saveFailedWithError(Object error) {
     return 'Save failed: $error';
   }
 
@@ -1954,12 +1968,12 @@ class SEn extends S {
   String get createdTime => 'Created';
 
   @override
-  String nWorksCount(int count) {
+  String nWorksCount(Object count) {
     return '$count works';
   }
 
   @override
-  String nPlaysCount(int count) {
+  String nPlaysCount(Object count) {
     return '$count plays';
   }
 
@@ -1974,12 +1988,12 @@ class SEn extends S {
   String get reachedEnd => 'You\'ve reached the end~';
 
   @override
-  String excludedNWorks(int count) {
+  String excludedNWorks(Object count) {
     return 'Excluded $count works';
   }
 
   @override
-  String pageExcludedNWorks(int count) {
+  String pageExcludedNWorks(Object count) {
     return 'This page excluded $count works';
   }
 
@@ -2026,6 +2040,19 @@ class SEn extends S {
   String get playlistEmpty => 'Playlist is empty';
 
   @override
+  String get clearQueue => 'Clear Queue';
+
+  @override
+  String get clearQueueConfirm =>
+      'Are you sure you want to clear the playback queue?';
+
+  @override
+  String get saveAsPlaylist => 'Save as Playlist';
+
+  @override
+  String get newPlaylistNameHint => 'Enter playlist name';
+
+  @override
   String get appendModeEnabled => 'Append Mode Enabled';
 
   @override
@@ -2036,12 +2063,12 @@ class SEn extends S {
   String get gotIt => 'Got it';
 
   @override
-  String nMinutes(int count) {
+  String nMinutes(Object count) {
     return '$count min';
   }
 
   @override
-  String nHours(int count) {
+  String nHours(Object count) {
     return '$count hr';
   }
 
@@ -2055,12 +2082,12 @@ class SEn extends S {
   String get tapToViewRatingDetail => 'Tap to view rating details';
 
   @override
-  String priceInYen(int price) {
+  String priceInYen(Object price) {
     return '$price Yen';
   }
 
   @override
-  String soldCount(String count) {
+  String soldCount(Object count) {
     return 'Sold: $count';
   }
 
@@ -2074,7 +2101,7 @@ class SEn extends S {
   String get otherEditions => 'Other Editions';
 
   @override
-  String tenThousandSuffix(String count) {
+  String tenThousandSuffix(Object count) {
     return '${count}k';
   }
 
@@ -2088,12 +2115,12 @@ class SEn extends S {
   String get packingFailed => 'Packing failed';
 
   @override
-  String exportSuccess(String path) {
+  String exportSuccess(Object path) {
     return 'Export successful: $path';
   }
 
   @override
-  String exportFailed(String error) {
+  String exportFailed(Object error) {
     return 'Export failed: $error';
   }
 
@@ -2104,7 +2131,7 @@ class SEn extends S {
   String get offlineBadge => 'Offline';
 
   @override
-  String loadFilesFailed(String error) {
+  String loadFilesFailed(Object error) {
     return 'Failed to load files: $error';
   }
 
@@ -2115,12 +2142,12 @@ class SEn extends S {
   String get noPlayableAudioFiles => 'No playable audio files found';
 
   @override
-  String cannotFindAudioFile(String title) {
+  String cannotFindAudioFile(Object title) {
     return 'Cannot find audio file: $title';
   }
 
   @override
-  String nowPlayingNOfTotal(String title, int current, int total) {
+  String nowPlayingNOfTotal(Object current, Object title, Object total) {
     return 'Now playing: $title ($current/$total)';
   }
 
@@ -2152,12 +2179,12 @@ class SEn extends S {
   String get loadingSubtitle => 'Loading subtitle...';
 
   @override
-  String subtitleLoadSuccess(String title) {
+  String subtitleLoadSuccess(Object title) {
     return 'Subtitle loaded: $title';
   }
 
   @override
-  String subtitleLoadFailed(String error) {
+  String subtitleLoadFailed(Object error) {
     return 'Subtitle load failed: $error';
   }
 
@@ -2201,7 +2228,7 @@ class SEn extends S {
   String get openInBrowserOption => '2. Open in browser';
 
   @override
-  String playVideoError(String error) {
+  String playVideoError(Object error) {
     return 'Error playing video: $error';
   }
 
@@ -2212,7 +2239,7 @@ class SEn extends S {
   String get resourceFiles => 'Resource Files';
 
   @override
-  String resourceFilesTranslated(int count) {
+  String resourceFilesTranslated(Object count) {
     return 'Resource Files (translated $count items)';
   }
 
@@ -2223,12 +2250,12 @@ class SEn extends S {
   String get translationTranslated => 'Trans';
 
   @override
-  String copiedName(String title) {
+  String copiedName(Object title) {
     return 'Copied name: $title';
   }
 
   @override
-  String translationComplete(int count) {
+  String translationComplete(Object count) {
     return 'Translation complete: $count items';
   }
 
@@ -2239,12 +2266,12 @@ class SEn extends S {
   String get preparingTranslation => 'Preparing translation...';
 
   @override
-  String translatingProgress(int current, int total) {
+  String translatingProgress(Object current, Object total) {
     return 'Translating $current/$total';
   }
 
   @override
-  String nItems(int count) {
+  String nItems(Object count) {
     return '$count items';
   }
 
@@ -2255,12 +2282,12 @@ class SEn extends S {
   String get preview => 'Preview';
 
   @override
-  String openVideoFileError(String error) {
+  String openVideoFileError(Object error) {
     return 'Error opening video file: $error';
   }
 
   @override
-  String cannotOpenVideoFile(String message) {
+  String cannotOpenVideoFile(Object message) {
     return 'Cannot open video file: $message';
   }
 
@@ -2287,7 +2314,7 @@ class SEn extends S {
   String get cannotFindFilePath => 'Cannot find file path';
 
   @override
-  String fileNotExist(String title) {
+  String fileNotExist(Object title) {
     return 'File does not exist: $title';
   }
 
@@ -2301,7 +2328,7 @@ class SEn extends S {
   String get cannotOpenVideo => 'Cannot open video';
 
   @override
-  String errorInfo(String message) {
+  String errorInfo(Object message) {
     return 'Error: $message';
   }
 
@@ -2319,7 +2346,7 @@ class SEn extends S {
   String get offlineFiles => 'Offline Files';
 
   @override
-  String unsupportedFileType(String title) {
+  String unsupportedFileType(Object title) {
     return 'This file type is not supported: $title';
   }
 
@@ -2327,7 +2354,7 @@ class SEn extends S {
   String get deleteFilePrompt => 'Are you sure you want to delete this file?';
 
   @override
-  String deletedItem(String title) {
+  String deletedItem(Object title) {
     return 'Deleted: $title';
   }
 
@@ -2335,17 +2362,17 @@ class SEn extends S {
   String get selectAtLeastOneFile => 'Please select at least one file';
 
   @override
-  String addedNFilesToDownloadQueue(int count) {
+  String addedNFilesToDownloadQueue(Object count) {
     return 'Added $count files to download queue';
   }
 
   @override
-  String downloadedAndSelected(int downloaded, int selected) {
+  String downloadedAndSelected(Object downloaded, Object selected) {
     return 'Downloaded $downloaded · Selected $selected';
   }
 
   @override
-  String downloadN(int count) {
+  String downloadN(Object count) {
     return 'Download ($count)';
   }
 
@@ -2359,12 +2386,12 @@ class SEn extends S {
   String get selectFilesToDownload => 'Select Files to Download';
 
   @override
-  String downloadedNCount(int count) {
+  String downloadedNCount(Object count) {
     return '$count downloaded';
   }
 
   @override
-  String selectedNCount(int count) {
+  String selectedNCount(Object count) {
     return '$count selected';
   }
 
@@ -2381,12 +2408,12 @@ class SEn extends S {
   String get notTestedYet => 'Not tested yet';
 
   @override
-  String latencyResultDetail(String latency, String status) {
+  String latencyResultDetail(Object latency, Object status) {
     return 'Latency $latency ($status)';
   }
 
   @override
-  String connectionFailedWithDetail(String error) {
+  String connectionFailedWithDetail(Object error) {
     return 'Connection failed: $error';
   }
 
@@ -2413,22 +2440,22 @@ class SEn extends S {
   String get unknownHost => 'Unknown host';
 
   @override
-  String lastUsedTime(String time) {
+  String lastUsedTime(Object time) {
     return 'Last used: $time';
   }
 
   @override
-  String daysAgo(int count) {
+  String daysAgo(Object count) {
     return '$count days ago';
   }
 
   @override
-  String hoursAgo(int count) {
+  String hoursAgo(Object count) {
     return '$count hours ago';
   }
 
   @override
-  String minutesAgo(int count) {
+  String minutesAgo(Object count) {
     return '$count minutes ago';
   }
 
@@ -2439,12 +2466,12 @@ class SEn extends S {
   String get confirmDelete => 'Confirm Delete';
 
   @override
-  String deleteSelectedConfirm(int count) {
+  String deleteSelectedConfirm(Object count) {
     return 'Delete $count selected items?';
   }
 
   @override
-  String deletedNOfTotalItems(int success, int total) {
+  String deletedNOfTotalItems(Object success, Object total) {
     return 'Deleted $success/$total items';
   }
 
@@ -2517,7 +2544,7 @@ class SEn extends S {
   String get renameFailed => 'Rename failed';
 
   @override
-  String deleteItemConfirm(String title) {
+  String deleteItemConfirm(Object title) {
     return 'Delete \"$title\"?';
   }
 
@@ -2529,7 +2556,7 @@ class SEn extends S {
   String get deleteFailed => 'Delete failed';
 
   @override
-  String subtitleLoaded(String title) {
+  String subtitleLoaded(Object title) {
     return 'Subtitle loaded: $title';
   }
 
@@ -2540,12 +2567,12 @@ class SEn extends S {
   String get moveFailed => 'Move failed';
 
   @override
-  String previewFailed(String error) {
+  String previewFailed(Object error) {
     return 'Preview failed: $error';
   }
 
   @override
-  String openFailed(String error) {
+  String openFailed(Object error) {
     return 'Open failed: $error';
   }
 
@@ -2599,37 +2626,37 @@ class SEn extends S {
   String get reset => 'Reset';
 
   @override
-  String noBlockedItemsOfType(String type) {
+  String noBlockedItemsOfType(Object type) {
     return 'No blocked $type';
   }
 
   @override
-  String unblockedItem(String item) {
+  String unblockedItem(Object item) {
     return 'Unblocked: $item';
   }
 
   @override
-  String addBlockedItem(String type) {
+  String addBlockedItem(Object type) {
     return 'Add Blocked $type';
   }
 
   @override
-  String blockedItemName(String type) {
+  String blockedItemName(Object type) {
     return '$type name';
   }
 
   @override
-  String enterBlockedItemHint(String type) {
+  String enterBlockedItemHint(Object type) {
     return 'Enter $type to block';
   }
 
   @override
-  String blockedItemAdded(String item) {
+  String blockedItemAdded(Object item) {
     return 'Blocked: $item';
   }
 
   @override
-  String workCountLabel(int count) {
+  String workCountLabel(Object count) {
     return 'Works: $count';
   }
 
@@ -2697,7 +2724,7 @@ class SEn extends S {
   String get unknownFile => 'Unknown file';
 
   @override
-  String deleteWithCount(int count) {
+  String deleteWithCount(Object count) {
     return 'Delete ($count)';
   }
 
@@ -2705,7 +2732,7 @@ class SEn extends S {
   String get searchSubtitles => 'Search subtitles...';
 
   @override
-  String nFilesWithSize(int count, String size) {
+  String nFilesWithSize(Object count, Object size) {
     return '$count files • $size';
   }
 
@@ -2716,7 +2743,7 @@ class SEn extends S {
   String get goToParent => 'Go to parent';
 
   @override
-  String moveToTarget(String name) {
+  String moveToTarget(Object name) {
     return 'Move to: $name';
   }
 
@@ -2724,12 +2751,12 @@ class SEn extends S {
   String get noSubfoldersHere => 'No subfolders in this directory';
 
   @override
-  String addedToPlaylist(String name) {
+  String addedToPlaylist(Object name) {
     return 'Added to playlist \"$name\"';
   }
 
   @override
-  String removedFromPlaylist(String name) {
+  String removedFromPlaylist(Object name) {
     return 'Removed from playlist \"$name\"';
   }
 
@@ -2737,7 +2764,7 @@ class SEn extends S {
   String get alreadyFavorited => 'Favorited';
 
   @override
-  String loadImageFailedWithError(String error) {
+  String loadImageFailedWithError(Object error) {
     return 'Failed to load image\n$error';
   }
 
@@ -2755,7 +2782,7 @@ class SEn extends S {
   String get saveCoverImage => 'Save Cover Image';
 
   @override
-  String savedToPath(String path) {
+  String savedToPath(Object path) {
     return 'Saved to: $path';
   }
 
@@ -2763,7 +2790,7 @@ class SEn extends S {
   String get doubleTapToZoom => 'Double-tap to zoom · Pinch to scale';
 
   @override
-  String getStatusFailed(String error) {
+  String getStatusFailed(Object error) {
     return 'Failed to get status: $error';
   }
 
@@ -2771,7 +2798,7 @@ class SEn extends S {
   String get deleteRecord => 'Delete Record';
 
   @override
-  String deletePlayRecordConfirm(String title) {
+  String deletePlayRecordConfirm(Object title) {
     return 'Are you sure you want to delete the play record for \"$title\"?';
   }
 
@@ -2779,7 +2806,7 @@ class SEn extends S {
   String get notPlayedYet => 'Not played yet';
 
   @override
-  String playbackFailed(String error) {
+  String playbackFailed(Object error) {
     return 'Playback failed: $error';
   }
 
@@ -2797,7 +2824,7 @@ class SEn extends S {
   String get imageSavedToGallery => 'Image saved to gallery';
 
   @override
-  String imageSavedToPath(String path) {
+  String imageSavedToPath(Object path) {
     return 'Image saved to: $path';
   }
 
@@ -2814,7 +2841,7 @@ class SEn extends S {
   String get goToPageTitle => 'Go to Page';
 
   @override
-  String pageNumberRange(int max) {
+  String pageNumberRange(Object max) {
     return 'Page (1-$max)';
   }
 
@@ -2822,7 +2849,7 @@ class SEn extends S {
   String get enterPageNumber => 'Enter page number';
 
   @override
-  String enterValidPageNumber(int max) {
+  String enterValidPageNumber(Object max) {
     return 'Please enter a valid page number (1-$max)';
   }
 
@@ -2839,12 +2866,12 @@ class SEn extends S {
   String get cannotOpenPdf => 'Cannot open PDF file';
 
   @override
-  String loadPdfFailed(String error) {
+  String loadPdfFailed(Object error) {
     return 'Failed to load PDF: $error';
   }
 
   @override
-  String pdfPageOfTotal(int current, int total) {
+  String pdfPageOfTotal(Object current, Object total) {
     return 'Page $current of $total';
   }
 
@@ -2862,7 +2889,7 @@ class SEn extends S {
   String get openWithSystemApp => 'Open with system default app';
 
   @override
-  String renderPdfFailed(String error) {
+  String renderPdfFailed(Object error) {
     return 'PDF rendering failed: $error';
   }
 
@@ -2898,7 +2925,7 @@ class SEn extends S {
   String get noContentToSave => 'No content to save';
 
   @override
-  String fileSavedToPath(String path) {
+  String fileSavedToPath(Object path) {
     return 'File saved to: $path';
   }
 
@@ -2907,7 +2934,7 @@ class SEn extends S {
       'Local file does not exist, please try reloading';
 
   @override
-  String loadTextFailed(String error) {
+  String loadTextFailed(Object error) {
     return 'Failed to load text: $error';
   }
 
@@ -2933,17 +2960,17 @@ class SEn extends S {
   String get bookmarkRemoved => 'Bookmark removed';
 
   @override
-  String setProgressAndRating(String progress, int rating) {
+  String setProgressAndRating(Object progress, Object rating) {
     return 'Set to: $progress, rating: $rating stars';
   }
 
   @override
-  String setProgressTo(String progress) {
+  String setProgressTo(Object progress) {
     return 'Set to: $progress';
   }
 
   @override
-  String ratingSetTo(int rating) {
+  String ratingSetTo(Object rating) {
     return 'Rating set to: $rating stars';
   }
 
@@ -2951,12 +2978,12 @@ class SEn extends S {
   String get updated => 'Updated';
 
   @override
-  String addTagFailed(String error) {
+  String addTagFailed(Object error) {
     return 'Failed to add tag: $error';
   }
 
   @override
-  String addWithCount(int count) {
+  String addWithCount(Object count) {
     return 'Add ($count)';
   }
 
@@ -2964,7 +2991,7 @@ class SEn extends S {
   String get undo => 'Undo';
 
   @override
-  String nStars(int count) {
+  String nStars(Object count) {
     return '$count stars';
   }
 
@@ -2978,7 +3005,7 @@ class SEn extends S {
   String get votedDown => 'Voted down';
 
   @override
-  String voteFailedWithError(String error) {
+  String voteFailedWithError(Object error) {
     return 'Vote failed: $error';
   }
 
@@ -2992,7 +3019,7 @@ class SEn extends S {
   String get voted => 'Voted';
 
   @override
-  String tagBlockedWithName(String name) {
+  String tagBlockedWithName(Object name) {
     return 'Tag blocked: $name';
   }
 
@@ -3037,7 +3064,7 @@ class SEn extends S {
   String get lyricPresetElegantDesc => 'Deep blue, refined elegance';
 
   @override
-  String get floatingLyricLoading => '♪ Loading subtitle ♪';
+  String get floatingLyricLoading => '\\u266a Loading subtitle \\u266a';
 
   @override
   String get subtitleFileNotExist => 'File does not exist';
@@ -3060,12 +3087,12 @@ class SEn extends S {
       'File encoding unrecognized, cannot display content correctly';
 
   @override
-  String editPlaylistFailed(String error) {
+  String editPlaylistFailed(Object error) {
     return 'Failed to edit playlist: $error';
   }
 
   @override
-  String unsupportedFileTypeWithTitle(String title) {
+  String unsupportedFileTypeWithTitle(Object title) {
     return 'Cannot open this file type: $title';
   }
 
@@ -3148,7 +3175,7 @@ class SEn extends S {
   String get downloadPathSettings => 'Download Path Settings';
 
   @override
-  String loadPathFailedWithError(String error) {
+  String loadPathFailedWithError(Object error) {
     return 'Failed to load path: $error';
   }
 
@@ -3157,12 +3184,12 @@ class SEn extends S {
       'Custom download path is not supported on this platform';
 
   @override
-  String activeDownloadsWarning(int count) {
+  String activeDownloadsWarning(Object count) {
     return '$count download tasks are in progress. Please cancel or complete them before switching paths';
   }
 
   @override
-  String setPathFailedWithError(String error) {
+  String setPathFailedWithError(Object error) {
     return 'Failed to set path: $error';
   }
 
@@ -3191,7 +3218,7 @@ class SEn extends S {
   String get defaultPathRestored => 'Default path restored';
 
   @override
-  String resetPathFailedWithError(String error) {
+  String resetPathFailedWithError(Object error) {
     return 'Failed to restore default path: $error';
   }
 
@@ -3278,7 +3305,7 @@ class SEn extends S {
   String get buttonDisplayRules => 'Button Display Rules';
 
   @override
-  String buttonDisplayRulesDesc(int maxVisible) {
+  String buttonDisplayRulesDesc(Object maxVisible) {
     return '• The first $maxVisible buttons will be shown at the bottom of the player\n• The remaining buttons will be in the \"More\" menu';
   }
 
@@ -3374,6 +3401,9 @@ class SEn extends S {
   String get showOnlineMarks => 'Show online marked works';
 
   @override
+  String get showStats => 'Show listening statistics';
+
+  @override
   String get cannotBeDisabled => 'Cannot be disabled';
 
   @override
@@ -3465,12 +3495,12 @@ class SEn extends S {
   String get logCopied => 'Logs copied to clipboard';
 
   @override
-  String logExported(String path) {
+  String logExported(Object path) {
     return 'Logs exported to $path';
   }
 
   @override
-  String logCount(int count) {
+  String logCount(Object count) {
     return '$count entries';
   }
 
@@ -3479,4 +3509,345 @@ class SEn extends S {
 
   @override
   String get logEmpty => 'No logs yet';
+
+  @override
+  String get crossfadeTitle => 'Crossfade';
+
+  @override
+  String crossfadeEnabledWithDuration(Object ms) {
+    return 'Crossfade: ${ms}ms';
+  }
+
+  @override
+  String get gaplessPlaybackEnabled => 'Gapless playback (no crossfade)';
+
+  @override
+  String get crossfadeDurationLabel => 'Crossfade Duration';
+
+  @override
+  String get crossfadeMinLabel => '0.5s';
+
+  @override
+  String get crossfadeMaxLabel => '10s';
+
+  @override
+  String get crossfadeDescription =>
+      'Smoothly fades between tracks. When disabled, gapless playback minimizes gaps without fading.';
+
+  @override
+  String get equalizerTitle => 'Equalizer';
+
+  @override
+  String get equalizerEnabled => 'Equalizer enabled';
+
+  @override
+  String get equalizerDisabled => 'Equalizer disabled';
+
+  @override
+  String get equalizerActive => 'Active';
+
+  @override
+  String get equalizerPresets => 'Presets';
+
+  @override
+  String get equalizerCustomBands => 'Custom Bands';
+
+  @override
+  String get equalizerCustom => 'Custom';
+
+  @override
+  String get equalizerReset => 'Reset to Flat';
+
+  @override
+  String get equalizerNotSupported => 'Equalizer not available on this device';
+
+  @override
+  String get equalizerNotSupportedAndroid =>
+      'Audio session not initialized yet. Try playing a track first.';
+
+  @override
+  String get equalizerNotSupportedOther =>
+      'Hardware EQ is not supported on this platform. Settings will be saved but EQ will be applied when supported.';
+
+  @override
+  String get equalizerInfo =>
+      'On Android, EQ is applied via hardware audio effects. On other platforms, EQ settings are stored for future use.';
+
+  @override
+  String get searchSettings => 'Search settings...';
+
+  @override
+  String get searchSettingsTitle => 'Search Settings';
+
+  @override
+  String get searchSettingsComingSoon =>
+      'Full settings search will be available in a future update.';
+
+  @override
+  String get preferredSampleRate => 'Preferred Sample Rate';
+
+  @override
+  String get preferredSampleRateSubtitle =>
+      'Hi-res audio output target (Android)';
+
+  @override
+  String get preferredSampleRateAuto => 'Auto (follow file)';
+
+  @override
+  String get preferredSampleRateDesc =>
+      'Sets the preferred sample rate for audio output. Higher rates may reduce compatibility but improve quality on supported DACs.';
+
+  @override
+  String get settingsPlayback => 'Playback';
+
+  @override
+  String get settingsPlaybackSubtitle => 'Equalizer, crossfade, audio format';
+
+  @override
+  String get settingsAppearance => 'Appearance';
+
+  @override
+  String get settingsAppearanceSubtitle => 'Theme, language, display settings';
+
+  @override
+  String get settingsDownloadsStorage => 'Downloads & Storage';
+
+  @override
+  String get settingsDownloadsStorageSubtitle =>
+      'Download path, cache management';
+
+  @override
+  String get settingsPrivacyContent => 'Privacy & Content';
+
+  @override
+  String get settingsPrivacyContentSubtitle => 'Privacy mode, blocked items';
+
+  @override
+  String get settingsTranslation => 'Translation';
+
+  @override
+  String get settingsTranslationSubtitle => 'Translation source, LLM config';
+
+  @override
+  String get settingsAccount => 'Account';
+
+  @override
+  String get settingsAccountSubtitle => 'Server accounts, floating lyric';
+
+  @override
+  String get settingsAdvanced => 'Advanced';
+
+  @override
+  String get settingsAdvancedSubtitle => 'Sort order, logs, all settings';
+
+  @override
+  String get settingsAboutSubtitle => 'Version, updates, licenses';
+
+  @override
+  String get advancedInfoBanner =>
+      'These settings rarely change after initial setup.';
+
+  @override
+  String get advancedSectionDisplaySorting => 'Display & Sorting';
+
+  @override
+  String get advancedDefaultSortOrderSubtitle =>
+      'Release date, title, rating, etc.';
+
+  @override
+  String get advancedMyTabsDisplaySubtitle => 'Show/hide tabs in My page';
+
+  @override
+  String get advancedSectionContentFiltering => 'Content Filtering';
+
+  @override
+  String get advancedSubtitlePrioritySubtitle => 'Highest vs lowest priority';
+
+  @override
+  String get advancedSectionDebugLegacy => 'Debug & Legacy';
+
+  @override
+  String get advancedAllSettingsLegacy => 'All Settings (Legacy)';
+
+  @override
+  String get advancedAllSettingsLegacySubtitle =>
+      'Original full settings screen';
+
+  @override
+  String get hiResExclusiveMode => 'Hi-Res Exclusive Mode';
+
+  @override
+  String get hiResExclusiveModeSubtitle =>
+      'Use native ExoPlayer for FLAC/WAV hi-res tracks';
+
+  @override
+  String get hiResExclusiveModeDesc =>
+      'When enabled, hi-res tracks (FLAC/WAV >48kHz) play through the native ExoPlayer. May cause brief interruption when switching players.';
+
+  @override
+  String get hiResExclusiveModeEnabled => 'Hi-Res Exclusive Mode enabled';
+
+  @override
+  String get hiResExclusiveModeDisabled => 'Hi-Res Exclusive Mode disabled';
+
+  @override
+  String get enable => 'Enable';
+
+  @override
+  String get listeningStatsTitle => 'Listening Statistics';
+
+  @override
+  String get listeningStatsSubtitle => 'Your listening habits and history';
+
+  @override
+  String get statsWorksPlayed => 'Works Played';
+
+  @override
+  String get statsCompleted => 'Completed';
+
+  @override
+  String get statsListeningTime => 'Listening Time';
+
+  @override
+  String get statsStreakDays => 'Day Streak';
+
+  @override
+  String get statsDays => 'days';
+
+  @override
+  String get statsDailyActivity => 'Daily Activity (14 days)';
+
+  @override
+  String get statsTopVAs => 'Top Voice Actors';
+
+  @override
+  String get statsTopCircles => 'Top Circles';
+
+  @override
+  String get statsRecentPlays => 'Recent Plays';
+
+  @override
+  String get statsNoData => 'No Statistics Yet';
+
+  @override
+  String get statsNoDataDesc =>
+      'Start listening to works and your stats will appear here.';
+
+  @override
+  String get bitPerfectPlayback => 'Bit-Perfect Playback';
+
+  @override
+  String get bitPerfectPlaybackSubtitleOff => 'USB DAC detection is disabled';
+
+  @override
+  String get bitPerfectPlaybackSubtitleOn => 'Direct USB DAC output via libusb';
+
+  @override
+  String get bitPerfectPlaybackSelectDevice => 'Select USB DAC';
+
+  @override
+  String get bitPerfectPlaybackSelectHint => 'Select a USB audio device...';
+
+  @override
+  String get bitPerfectPlaybackNoDevice => 'No USB DAC detected';
+
+  @override
+  String get bitPerfectPlaybackRefreshTooltip => 'Refresh device list';
+
+  @override
+  String get bitPerfectPlaybackConfirmDesc =>
+      'When enabled, your connected USB DAC will be detected and audio can be streamed directly to it, bypassing the Android mixer for pristine bit-perfect playback.';
+
+  @override
+  String get bitPerfectPlaybackEnabled => 'Bit-Perfect Playback enabled';
+
+  @override
+  String get bitPerfectPlaybackDisabled => 'Bit-Perfect Playback disabled';
+
+  @override
+  String get bitPerfectPlaybackDeviceUpdated => 'USB DAC device updated';
+
+  @override
+  String get bitPerfectPlaybackListRefreshed => 'USB device list refreshed';
+
+  @override
+  String get bitPerfectPlaybackInfoTooltip => 'About Bit-Perfect Playback';
+
+  @override
+  String get bitPerfectPlaybackInfo =>
+      'Bit-Perfect Playback sends the original audio data unmodified to your external DAC for the highest possible fidelity.\n\nAndroid\'s audio mixer normally resamples all audio to 48kHz, degrading hi-res content. This mode routes audio directly to your connected USB DAC via the libusb driver, bypassing the Android mixer for pristine, unaltered playback.';
+
+  @override
+  String get bitPerfectPlaybackPermissionDenied =>
+      'USB permission denied. Please grant USB access in settings.';
+
+  @override
+  String get playNext => 'Play Next';
+
+  @override
+  String get noAudioTracks => 'No audio tracks found';
+
+  @override
+  String playingNextTracks(Object count) {
+    return 'Playing next: $count tracks';
+  }
+
+  @override
+  String get localFileBrowser => 'Local File Browser';
+
+  @override
+  String get browseFiles => 'Browse Files';
+
+  @override
+  String get progressSync => 'Cross-device Progress Sync';
+
+  @override
+  String get progressSyncSubtitle =>
+      'Sync playback progress to server for seamless resume across devices';
+
+  @override
+  String get progressSyncEnabled => 'Enabled — progress is synced to server';
+
+  @override
+  String get progressSyncDisabled => 'Disabled';
+
+  @override
+  String get autoTranslateLyrics => 'Auto-translate Lyrics';
+
+  @override
+  String get autoTranslateLyricsEnabled =>
+      'Enabled — lyrics are translated automatically when loaded';
+
+  @override
+  String get autoTranslateLyricsDisabled => 'Disabled';
+
+  @override
+  String autoTranslateBannerTranslating(Object language) {
+    return 'Auto-translating to $language…';
+  }
+
+  @override
+  String autoTranslateBannerDone(Object language) {
+    return 'Translated to $language';
+  }
+
+  @override
+  String get smartPlaylist => 'Smart Playlist';
+
+  @override
+  String get smartPlaylists => 'Smart Playlists';
+
+  @override
+  String get smartPlaylistSubtitle => 'Auto-generated from rules';
+
+  @override
+  String get searchRules => 'Search Rules';
+
+  @override
+  String activeRules(Object count) {
+    return 'Active Rules ($count)';
+  }
+
+  @override
+  String get regularPlaylist => 'Regular Playlist';
 }

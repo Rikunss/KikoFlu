@@ -9,7 +9,7 @@ class SRu extends S {
   SRu([String locale = 'ru']) : super(locale);
 
   @override
-  String get appTitle => 'KikoFlu';
+  String get appTitle => 'KikoFlu Edge';
 
   @override
   String get navHome => 'Главная';
@@ -139,12 +139,6 @@ class SRu extends S {
   String get translationSourceGoogle => 'Google Переводчик';
 
   @override
-  String get translationSourceYoudao => 'Youdao Переводчик';
-
-  @override
-  String get translationSourceMicrosoft => 'Microsoft Переводчик';
-
-  @override
   String get translationSourceLlm => 'LLM Переводчик';
 
   @override
@@ -206,7 +200,7 @@ class SRu extends S {
   String get passwordMinLength => 'Пароль должен содержать не менее 5 символов';
 
   @override
-  String accountAdded(String username) {
+  String accountAdded(Object username) {
     return 'Аккаунт «$username» добавлен';
   }
 
@@ -221,7 +215,7 @@ class SRu extends S {
       'Введите адрес сервера для проверки соединения';
 
   @override
-  String latencyMs(String ms) {
+  String latencyMs(Object ms) {
     return '$msмс';
   }
 
@@ -293,7 +287,7 @@ class SRu extends S {
   String get minRating => 'Мин. рейтинг';
 
   @override
-  String minRatingStars(String stars) {
+  String minRatingStars(Object stars) {
     return '$stars звёзд';
   }
 
@@ -329,7 +323,7 @@ class SRu extends S {
   String get loadFailed => 'Ошибка загрузки';
 
   @override
-  String loadFailedWithError(String error) {
+  String loadFailedWithError(Object error) {
     return 'Ошибка загрузки: $error';
   }
 
@@ -432,7 +426,7 @@ class SRu extends S {
   String get cacheManagement => 'Управление кешем';
 
   @override
-  String currentCache(String size) {
+  String currentCache(Object size) {
     return 'Текущий кеш: $size';
   }
 
@@ -474,7 +468,7 @@ class SRu extends S {
   String get newVersionFound => 'Найдена новая версия';
 
   @override
-  String newVersionAvailable(String version, String current) {
+  String newVersionAvailable(Object current, Object version) {
     return '$version доступна (текущая: $current)';
   }
 
@@ -482,7 +476,7 @@ class SRu extends S {
   String get versionInfo => 'Информация о версии';
 
   @override
-  String currentVersion(String version) {
+  String currentVersion(Object version) {
     return 'Текущая версия: $version';
   }
 
@@ -502,12 +496,12 @@ class SRu extends S {
   String get cannotOpenLink => 'Не удаётся открыть ссылку';
 
   @override
-  String openLinkFailed(String error) {
+  String openLinkFailed(Object error) {
     return 'Не удалось открыть ссылку: $error';
   }
 
   @override
-  String foundNewVersion(String version) {
+  String foundNewVersion(Object version) {
     return 'Найдена новая версия $version';
   }
 
@@ -596,7 +590,7 @@ class SRu extends S {
   String get showOnlySubtitled => 'Только с субтитрами';
 
   @override
-  String selectedCount(int count) {
+  String selectedCount(Object count) {
     return 'Выбрано: $count';
   }
 
@@ -613,12 +607,12 @@ class SRu extends S {
   String get noDownloadTasks => 'Нет задач загрузки';
 
   @override
-  String nFiles(int count) {
+  String nFiles(Object count) {
     return '$count файлов';
   }
 
   @override
-  String errorWithMessage(String error) {
+  String errorWithMessage(Object error) {
     return 'Ошибка: $error';
   }
 
@@ -632,12 +626,12 @@ class SRu extends S {
   String get deletionConfirmTitle => 'Подтвердить удаление';
 
   @override
-  String deletionConfirmMessage(int count) {
+  String deletionConfirmMessage(Object count) {
     return 'Удалить $count выбранных задач загрузки? Загруженные файлы тоже будут удалены.';
   }
 
   @override
-  String deletedNFiles(int count) {
+  String deletedNFiles(Object count) {
     return 'Удалено файлов: $count';
   }
 
@@ -657,12 +651,12 @@ class SRu extends S {
   String get downloadStatusPaused => 'Приостановлено';
 
   @override
-  String translationFailed(String error) {
+  String translationFailed(Object error) {
     return 'Ошибка перевода: $error';
   }
 
   @override
-  String copiedToClipboard(String label, String text) {
+  String copiedToClipboard(Object label, Object text) {
     return 'Скопировано $label: $text';
   }
 
@@ -670,7 +664,7 @@ class SRu extends S {
   String get loadingFileList => 'Загрузка списка файлов...';
 
   @override
-  String loadFileListFailed(String error) {
+  String loadFileListFailed(Object error) {
     return 'Не удалось загрузить список файлов: $error';
   }
 
@@ -726,7 +720,7 @@ class SRu extends S {
   String get finishCurrentTrack => 'Остановить после текущего трека';
 
   @override
-  String addMinutes(int min) {
+  String addMinutes(Object min) {
     return '+$min мин';
   }
 
@@ -785,12 +779,12 @@ class SRu extends S {
   String get switchAccountTitle => 'Переключить аккаунт';
 
   @override
-  String switchAccountConfirm(String username) {
+  String switchAccountConfirm(Object username) {
     return 'Переключиться на аккаунт «$username»?';
   }
 
   @override
-  String switchedToAccount(String username) {
+  String switchedToAccount(Object username) {
     return 'Переключено на аккаунт: $username';
   }
 
@@ -799,7 +793,7 @@ class SRu extends S {
       'Не удалось переключиться. Проверьте данные аккаунта';
 
   @override
-  String switchFailedWithError(String error) {
+  String switchFailedWithError(Object error) {
     return 'Ошибка переключения: $error';
   }
 
@@ -820,7 +814,7 @@ class SRu extends S {
   String get deleteAccount => 'Удалить аккаунт';
 
   @override
-  String deleteAccountConfirm(String username) {
+  String deleteAccountConfirm(Object username) {
     return 'Удалить аккаунт «$username»? Это действие необратимо.';
   }
 
@@ -828,7 +822,7 @@ class SRu extends S {
   String get accountDeleted => 'Аккаунт удалён';
 
   @override
-  String deletionFailedWithError(String error) {
+  String deletionFailedWithError(Object error) {
     return 'Ошибка удаления: $error';
   }
 
@@ -946,7 +940,7 @@ class SRu extends S {
   String get voteCancelled => 'Голос отменён';
 
   @override
-  String voteFailed(String error) {
+  String voteFailed(Object error) {
     return 'Ошибка голосования: $error';
   }
 
@@ -960,7 +954,7 @@ class SRu extends S {
   String get addTag => 'Добавить тег';
 
   @override
-  String loadTagsFailed(String error) {
+  String loadTagsFailed(Object error) {
     return 'Не удалось загрузить теги: $error';
   }
 
@@ -975,7 +969,7 @@ class SRu extends S {
   String get bindEmailFirst => 'Пожалуйста, привяжите email на www.asmr.one';
 
   @override
-  String selectedNTags(int count) {
+  String selectedNTags(Object count) {
     return 'Выбрано тегов: $count:';
   }
 
@@ -1004,12 +998,12 @@ class SRu extends S {
   String get systemPlaylistLiked => 'Понравившееся';
 
   @override
-  String totalNWorks(int count) {
+  String totalNWorks(Object count) {
     return '$count работ';
   }
 
   @override
-  String pageNOfTotal(int current, int total) {
+  String pageNOfTotal(Object current, Object total) {
     return 'Страница $current / $total';
   }
 
@@ -1023,7 +1017,7 @@ class SRu extends S {
   String get translating => 'Перевод...';
 
   @override
-  String translationFallbackNotice(String source) {
+  String translationFallbackNotice(Object source) {
     return 'Перевод не удался, автоматически переключено на $source';
   }
 
@@ -1103,6 +1097,9 @@ class SRu extends S {
   String get themeModeSystem => 'Системный';
 
   @override
+  String get themeModeTrueBlack => 'Абсолютно чёрный';
+
+  @override
   String get colorSchemeOceanBlue => 'Океанский синий';
 
   @override
@@ -1116,6 +1113,15 @@ class SRu extends S {
 
   @override
   String get colorSchemeSakuraPink => 'Сакура';
+
+  @override
+  String get colorSchemeCrimsonRed => 'Красный';
+
+  @override
+  String get colorSchemeAmberGold => 'Янтарный';
+
+  @override
+  String get colorSchemeSlateGray => 'Серый';
 
   @override
   String get colorSchemeDynamic => 'Динамический цвет';
@@ -1173,7 +1179,7 @@ class SRu extends S {
   String get noSubtitleFiles => 'Файлы субтитров не найдены';
 
   @override
-  String subtitleFilesFound(int count) {
+  String subtitleFilesFound(Object count) {
     return 'Найдено файлов субтитров: $count';
   }
 
@@ -1307,6 +1313,11 @@ class SRu extends S {
   String get relatedRecommendations => 'Похожие работы';
 
   @override
+  String moreFromCircle(Object circle) {
+    return 'Ещё от $circle';
+  }
+
+  @override
   String get myTabsDisplaySettings => 'Настройки страницы «Моё»';
 
   @override
@@ -1373,12 +1384,12 @@ class SRu extends S {
   String get ratingDistribution => 'Распределение оценок';
 
   @override
-  String reviewsCount(int count) {
+  String reviewsCount(Object count) {
     return 'Отзывов: $count';
   }
 
   @override
-  String ratingsCount(int count) {
+  String ratingsCount(Object count) {
     return 'Всего $count оценок';
   }
 
@@ -1416,7 +1427,7 @@ class SRu extends S {
   String get reviewSubmitted => 'Отзыв отправлен';
 
   @override
-  String reviewFailed(String error) {
+  String reviewFailed(Object error) {
     return 'Ошибка отзыва: $error';
   }
 
@@ -1463,7 +1474,7 @@ class SRu extends S {
   String get fetchFailed => 'Не удалось получить';
 
   @override
-  String operationFailedWithError(String error) {
+  String operationFailedWithError(Object error) {
     return 'Ошибка операции: $error';
   }
 
@@ -1474,7 +1485,7 @@ class SRu extends S {
   String get currentCacheSize => 'Текущий размер кэша';
 
   @override
-  String cacheLimitLabelMB(int size) {
+  String cacheLimitLabelMB(Object size) {
     return 'Лимит: $sizeМБ';
   }
 
@@ -1500,7 +1511,7 @@ class SRu extends S {
       'Вы уверены, что хотите очистить весь кэш? Это действие нельзя отменить.';
 
   @override
-  String clearCacheFailedWithError(String error) {
+  String clearCacheFailedWithError(Object error) {
     return 'Ошибка очистки кэша: $error';
   }
 
@@ -1539,6 +1550,15 @@ class SRu extends S {
 
   @override
   String get colorSchemeForestGreenDesc => 'Зелень, зелень, зелень';
+
+  @override
+  String get colorSchemeCrimsonRedDesc => 'Красный, красный, красный! 🔴';
+
+  @override
+  String get colorSchemeAmberGoldDesc => 'Золотой и яркий!';
+
+  @override
+  String get colorSchemeSlateGrayDesc => 'Нейтральный, элегантный';
 
   @override
   String get colorSchemeDynamicDesc =>
@@ -1580,17 +1600,17 @@ class SRu extends S {
   String get pageSizeSettings => 'Элементов на странице';
 
   @override
-  String pageSizeCurrent(int size) {
+  String pageSizeCurrent(Object size) {
     return 'Текущее: $size элементов/стр.';
   }
 
   @override
-  String currentSettingLabel(String value) {
+  String currentSettingLabel(Object value) {
     return 'Текущее: $value';
   }
 
   @override
-  String setToValue(String value) {
+  String setToValue(Object value) {
     return 'Установлено: $value';
   }
 
@@ -1603,12 +1623,6 @@ class SRu extends S {
 
   @override
   String get translationDescGoogle => 'Требуется доступ к сервисам Google';
-
-  @override
-  String get translationDescYoudao => 'Работает с сетью по умолчанию';
-
-  @override
-  String get translationDescMicrosoft => 'Работает с сетью по умолчанию';
 
   @override
   String get translationDescLlm =>
@@ -1655,7 +1669,7 @@ class SRu extends S {
       'Разрешение на уведомления отклонено';
 
   @override
-  String requestNotificationFailed(String error) {
+  String requestNotificationFailed(Object error) {
     return 'Ошибка запроса разрешения на уведомления: $error';
   }
 
@@ -1668,17 +1682,17 @@ class SRu extends S {
       'Разрешение на фоновую работу отклонено';
 
   @override
-  String requestBackgroundFailed(String error) {
+  String requestBackgroundFailed(Object error) {
     return 'Ошибка запроса разрешения на фоновую работу: $error';
   }
 
   @override
-  String permissionRequired(String permission) {
+  String permissionRequired(Object permission) {
     return 'Требуется $permission';
   }
 
   @override
-  String permissionPermanentlyDenied(String permission) {
+  String permissionPermanentlyDenied(Object permission) {
     return '$permission отклонено навсегда. Включите вручную в настройках системы.';
   }
 
@@ -1697,12 +1711,12 @@ class SRu extends S {
   String get refreshPermissionStatus => 'Обновить статус разрешений';
 
   @override
-  String deleteFileConfirm(String fileName) {
+  String deleteFileConfirm(Object fileName) {
     return 'Удалить \"$fileName\"?';
   }
 
   @override
-  String deleteSelectedFilesConfirm(int count) {
+  String deleteSelectedFilesConfirm(Object count) {
     return 'Удалить $count выбранных файлов?';
   }
 
@@ -1710,12 +1724,12 @@ class SRu extends S {
   String get deleted => 'Удалено';
 
   @override
-  String cannotOpenFolder(String path) {
+  String cannotOpenFolder(Object path) {
     return 'Не удалось открыть папку: $path';
   }
 
   @override
-  String openFolderFailed(String error) {
+  String openFolderFailed(Object error) {
     return 'Ошибка открытия папки: $error';
   }
 
@@ -1726,27 +1740,27 @@ class SRu extends S {
   String get refreshComplete => 'Обновление завершено';
 
   @override
-  String refreshFailed(String error) {
+  String refreshFailed(Object error) {
     return 'Ошибка обновления: $error';
   }
 
   @override
-  String deleteSelectedWorksConfirm(int count) {
+  String deleteSelectedWorksConfirm(Object count) {
     return 'Удалить $count выбранных работ?';
   }
 
   @override
-  String partialDeleteFailed(String error) {
+  String partialDeleteFailed(Object error) {
     return 'Частичная ошибка удаления: $error';
   }
 
   @override
-  String deletedNOfTotal(int success, int total) {
+  String deletedNOfTotal(Object success, Object total) {
     return 'Удалено $success/$total задач';
   }
 
   @override
-  String deleteFailedWithError(String error) {
+  String deleteFailedWithError(Object error) {
     return 'Ошибка удаления: $error';
   }
 
@@ -1755,7 +1769,7 @@ class SRu extends S {
       'У этой загрузки нет сохранённых данных о работе для просмотра офлайн';
 
   @override
-  String openWorkDetailFailed(String error) {
+  String openWorkDetailFailed(Object error) {
     return 'Ошибка открытия деталей работы: $error';
   }
 
@@ -1803,7 +1817,7 @@ class SRu extends S {
       'Ошибка сетевого подключения, проверьте сеть';
 
   @override
-  String addFailedWithError(String error) {
+  String addFailedWithError(Object error) {
     return 'Ошибка добавления: $error';
   }
 
@@ -1811,12 +1825,12 @@ class SRu extends S {
   String get creatingPlaylist => 'Создание плейлиста...';
 
   @override
-  String playlistCreatedSuccess(String name) {
+  String playlistCreatedSuccess(Object name) {
     return 'Плейлист \"$name\" создан';
   }
 
   @override
-  String createFailedWithError(String error) {
+  String createFailedWithError(Object error) {
     return 'Ошибка создания: $error';
   }
 
@@ -1831,7 +1845,7 @@ class SRu extends S {
   String get myPlaylists => 'Мои плейлисты';
 
   @override
-  String totalNItems(int count) {
+  String totalNItems(Object count) {
     return 'Всего $count записей';
   }
 
@@ -1849,7 +1863,7 @@ class SRu extends S {
       'Удаление необратимо. Пользователи, добавившие этот плейлист в избранное, потеряют к нему доступ. Продолжить?';
 
   @override
-  String unfavoritePlaylistConfirm(String name) {
+  String unfavoritePlaylistConfirm(Object name) {
     return 'Убрать \"$name\" из избранного?';
   }
 
@@ -1895,12 +1909,12 @@ class SRu extends S {
   String get workIdHint => 'Например: RJ123456\nrj233333';
 
   @override
-  String detectedNWorkIds(int count) {
+  String detectedNWorkIds(Object count) {
     return 'Обнаружено $count номеров работ';
   }
 
   @override
-  String addNWorks(int count) {
+  String addNWorks(Object count) {
     return 'Добавить $count';
   }
 
@@ -1909,12 +1923,12 @@ class SRu extends S {
       'Не найдено действительных номеров работ (начинающихся с RJ)';
 
   @override
-  String addingNWorks(int count) {
+  String addingNWorks(Object count) {
     return 'Добавление $count работ...';
   }
 
   @override
-  String addedNWorksSuccess(int count) {
+  String addedNWorksSuccess(Object count) {
     return 'Успешно добавлено $count работ';
   }
 
@@ -1922,7 +1936,7 @@ class SRu extends S {
   String get removeWork => 'Удалить работу';
 
   @override
-  String removeWorkConfirm(String title) {
+  String removeWorkConfirm(Object title) {
     return 'Удалить «$title» из плейлиста?';
   }
 
@@ -1930,7 +1944,7 @@ class SRu extends S {
   String get removeSuccess => 'Успешно удалено';
 
   @override
-  String removeFailedWithError(String error) {
+  String removeFailedWithError(Object error) {
     return 'Ошибка удаления: $error';
   }
 
@@ -1941,7 +1955,7 @@ class SRu extends S {
   String get saveSuccess => 'Сохранено';
 
   @override
-  String saveFailedWithError(String error) {
+  String saveFailedWithError(Object error) {
     return 'Ошибка сохранения: $error';
   }
 
@@ -1959,12 +1973,12 @@ class SRu extends S {
   String get createdTime => 'Дата создания';
 
   @override
-  String nWorksCount(int count) {
+  String nWorksCount(Object count) {
     return '$count произведений';
   }
 
   @override
-  String nPlaysCount(int count) {
+  String nPlaysCount(Object count) {
     return '$count воспроизведений';
   }
 
@@ -1979,12 +1993,12 @@ class SRu extends S {
   String get reachedEnd => 'Вы достигли конца~';
 
   @override
-  String excludedNWorks(int count) {
+  String excludedNWorks(Object count) {
     return 'Исключено $count работ';
   }
 
   @override
-  String pageExcludedNWorks(int count) {
+  String pageExcludedNWorks(Object count) {
     return 'На этой странице исключено $count работ';
   }
 
@@ -2032,6 +2046,19 @@ class SRu extends S {
   String get playlistEmpty => 'Плейлист пуст';
 
   @override
+  String get clearQueue => 'Очистить очередь';
+
+  @override
+  String get clearQueueConfirm =>
+      'Вы уверены, что хотите очистить очередь воспроизведения?';
+
+  @override
+  String get saveAsPlaylist => 'Сохранить как плейлист';
+
+  @override
+  String get newPlaylistNameHint => 'Введите название плейлиста';
+
+  @override
   String get appendModeEnabled => 'Режим добавления включён';
 
   @override
@@ -2042,12 +2069,12 @@ class SRu extends S {
   String get gotIt => 'Понятно';
 
   @override
-  String nMinutes(int count) {
+  String nMinutes(Object count) {
     return '$count мин';
   }
 
   @override
-  String nHours(int count) {
+  String nHours(Object count) {
     return '$count ч';
   }
 
@@ -2061,12 +2088,12 @@ class SRu extends S {
   String get tapToViewRatingDetail => 'Нажмите для просмотра деталей рейтинга';
 
   @override
-  String priceInYen(int price) {
+  String priceInYen(Object price) {
     return '$price иен';
   }
 
   @override
-  String soldCount(String count) {
+  String soldCount(Object count) {
     return 'Продано: $count';
   }
 
@@ -2080,7 +2107,7 @@ class SRu extends S {
   String get otherEditions => 'Другие версии';
 
   @override
-  String tenThousandSuffix(String count) {
+  String tenThousandSuffix(Object count) {
     return '$count тыс.';
   }
 
@@ -2094,12 +2121,12 @@ class SRu extends S {
   String get packingFailed => 'Ошибка упаковки';
 
   @override
-  String exportSuccess(String path) {
+  String exportSuccess(Object path) {
     return 'Экспорт выполнен: $path';
   }
 
   @override
-  String exportFailed(String error) {
+  String exportFailed(Object error) {
     return 'Ошибка экспорта: $error';
   }
 
@@ -2110,7 +2137,7 @@ class SRu extends S {
   String get offlineBadge => 'Офлайн';
 
   @override
-  String loadFilesFailed(String error) {
+  String loadFilesFailed(Object error) {
     return 'Ошибка загрузки файлов: $error';
   }
 
@@ -2121,12 +2148,12 @@ class SRu extends S {
   String get noPlayableAudioFiles => 'Воспроизводимые аудиофайлы не найдены';
 
   @override
-  String cannotFindAudioFile(String title) {
+  String cannotFindAudioFile(Object title) {
     return 'Аудиофайл не найден: $title';
   }
 
   @override
-  String nowPlayingNOfTotal(String title, int current, int total) {
+  String nowPlayingNOfTotal(Object current, Object title, Object total) {
     return 'Воспроизведение: $title ($current/$total)';
   }
 
@@ -2158,12 +2185,12 @@ class SRu extends S {
   String get loadingSubtitle => 'Загрузка субтитров...';
 
   @override
-  String subtitleLoadSuccess(String title) {
+  String subtitleLoadSuccess(Object title) {
     return 'Субтитры загружены: $title';
   }
 
   @override
-  String subtitleLoadFailed(String error) {
+  String subtitleLoadFailed(Object error) {
     return 'Ошибка загрузки субтитров: $error';
   }
 
@@ -2207,7 +2234,7 @@ class SRu extends S {
   String get openInBrowserOption => '2. Открыть в браузере';
 
   @override
-  String playVideoError(String error) {
+  String playVideoError(Object error) {
     return 'Ошибка воспроизведения видео: $error';
   }
 
@@ -2218,7 +2245,7 @@ class SRu extends S {
   String get resourceFiles => 'Файлы ресурсов';
 
   @override
-  String resourceFilesTranslated(int count) {
+  String resourceFilesTranslated(Object count) {
     return 'Файлы ресурсов (переведено $count)';
   }
 
@@ -2229,12 +2256,12 @@ class SRu extends S {
   String get translationTranslated => 'Перев';
 
   @override
-  String copiedName(String title) {
+  String copiedName(Object title) {
     return 'Имя скопировано: $title';
   }
 
   @override
-  String translationComplete(int count) {
+  String translationComplete(Object count) {
     return 'Перевод завершён: $count элементов';
   }
 
@@ -2245,12 +2272,12 @@ class SRu extends S {
   String get preparingTranslation => 'Подготовка перевода...';
 
   @override
-  String translatingProgress(int current, int total) {
+  String translatingProgress(Object current, Object total) {
     return 'Перевод $current/$total';
   }
 
   @override
-  String nItems(int count) {
+  String nItems(Object count) {
     return '$count элементов';
   }
 
@@ -2261,12 +2288,12 @@ class SRu extends S {
   String get preview => 'Предпросмотр';
 
   @override
-  String openVideoFileError(String error) {
+  String openVideoFileError(Object error) {
     return 'Ошибка открытия видеофайла: $error';
   }
 
   @override
-  String cannotOpenVideoFile(String message) {
+  String cannotOpenVideoFile(Object message) {
     return 'Невозможно открыть видеофайл: $message';
   }
 
@@ -2294,7 +2321,7 @@ class SRu extends S {
   String get cannotFindFilePath => 'Путь к файлу не найден';
 
   @override
-  String fileNotExist(String title) {
+  String fileNotExist(Object title) {
     return 'Файл не существует: $title';
   }
 
@@ -2309,7 +2336,7 @@ class SRu extends S {
   String get cannotOpenVideo => 'Невозможно открыть видео';
 
   @override
-  String errorInfo(String message) {
+  String errorInfo(Object message) {
     return 'Ошибка: $message';
   }
 
@@ -2327,7 +2354,7 @@ class SRu extends S {
   String get offlineFiles => 'Офлайн-файлы';
 
   @override
-  String unsupportedFileType(String title) {
+  String unsupportedFileType(Object title) {
     return 'Этот тип файлов не поддерживается: $title';
   }
 
@@ -2335,7 +2362,7 @@ class SRu extends S {
   String get deleteFilePrompt => 'Вы уверены, что хотите удалить этот файл?';
 
   @override
-  String deletedItem(String title) {
+  String deletedItem(Object title) {
     return 'Удалено: $title';
   }
 
@@ -2343,17 +2370,17 @@ class SRu extends S {
   String get selectAtLeastOneFile => 'Выберите хотя бы один файл';
 
   @override
-  String addedNFilesToDownloadQueue(int count) {
+  String addedNFilesToDownloadQueue(Object count) {
     return '$count файлов добавлено в очередь загрузки';
   }
 
   @override
-  String downloadedAndSelected(int downloaded, int selected) {
+  String downloadedAndSelected(Object downloaded, Object selected) {
     return 'Загружено $downloaded · Выбрано $selected';
   }
 
   @override
-  String downloadN(int count) {
+  String downloadN(Object count) {
     return 'Скачать ($count)';
   }
 
@@ -2367,12 +2394,12 @@ class SRu extends S {
   String get selectFilesToDownload => 'Выбрать файлы для загрузки';
 
   @override
-  String downloadedNCount(int count) {
+  String downloadedNCount(Object count) {
     return 'Загружено $count';
   }
 
   @override
-  String selectedNCount(int count) {
+  String selectedNCount(Object count) {
     return 'Выбрано $count';
   }
 
@@ -2389,12 +2416,12 @@ class SRu extends S {
   String get notTestedYet => 'Ещё не тестировалось';
 
   @override
-  String latencyResultDetail(String latency, String status) {
+  String latencyResultDetail(Object latency, Object status) {
     return 'Задержка $latency ($status)';
   }
 
   @override
-  String connectionFailedWithDetail(String error) {
+  String connectionFailedWithDetail(Object error) {
     return 'Ошибка подключения: $error';
   }
 
@@ -2421,22 +2448,22 @@ class SRu extends S {
   String get unknownHost => 'Неизвестный хост';
 
   @override
-  String lastUsedTime(String time) {
+  String lastUsedTime(Object time) {
     return 'Последнее использование: $time';
   }
 
   @override
-  String daysAgo(int count) {
+  String daysAgo(Object count) {
     return '$count дней назад';
   }
 
   @override
-  String hoursAgo(int count) {
+  String hoursAgo(Object count) {
     return '$count часов назад';
   }
 
   @override
-  String minutesAgo(int count) {
+  String minutesAgo(Object count) {
     return '$count минут назад';
   }
 
@@ -2447,12 +2474,12 @@ class SRu extends S {
   String get confirmDelete => 'Подтвердить удаление';
 
   @override
-  String deleteSelectedConfirm(int count) {
+  String deleteSelectedConfirm(Object count) {
     return 'Удалить $count выбранных элементов?';
   }
 
   @override
-  String deletedNOfTotalItems(int success, int total) {
+  String deletedNOfTotalItems(Object success, Object total) {
     return 'Удалено $success/$total элементов';
   }
 
@@ -2525,7 +2552,7 @@ class SRu extends S {
   String get renameFailed => 'Ошибка переименования';
 
   @override
-  String deleteItemConfirm(String title) {
+  String deleteItemConfirm(Object title) {
     return 'Удалить \"$title\"?';
   }
 
@@ -2537,7 +2564,7 @@ class SRu extends S {
   String get deleteFailed => 'Ошибка удаления';
 
   @override
-  String subtitleLoaded(String title) {
+  String subtitleLoaded(Object title) {
     return 'Субтитры загружены: $title';
   }
 
@@ -2548,12 +2575,12 @@ class SRu extends S {
   String get moveFailed => 'Ошибка перемещения';
 
   @override
-  String previewFailed(String error) {
+  String previewFailed(Object error) {
     return 'Ошибка предпросмотра: $error';
   }
 
   @override
-  String openFailed(String error) {
+  String openFailed(Object error) {
     return 'Ошибка открытия: $error';
   }
 
@@ -2606,37 +2633,37 @@ class SRu extends S {
   String get reset => 'Сброс';
 
   @override
-  String noBlockedItemsOfType(String type) {
+  String noBlockedItemsOfType(Object type) {
     return 'Нет заблокированных $type';
   }
 
   @override
-  String unblockedItem(String item) {
+  String unblockedItem(Object item) {
     return 'Разблокировано: $item';
   }
 
   @override
-  String addBlockedItem(String type) {
+  String addBlockedItem(Object type) {
     return 'Заблокировать $type';
   }
 
   @override
-  String blockedItemName(String type) {
+  String blockedItemName(Object type) {
     return 'Название $type';
   }
 
   @override
-  String enterBlockedItemHint(String type) {
+  String enterBlockedItemHint(Object type) {
     return 'Введите $type для блокировки';
   }
 
   @override
-  String blockedItemAdded(String item) {
+  String blockedItemAdded(Object item) {
     return 'Заблокировано: $item';
   }
 
   @override
-  String workCountLabel(int count) {
+  String workCountLabel(Object count) {
     return 'Работ: $count';
   }
 
@@ -2705,7 +2732,7 @@ class SRu extends S {
   String get unknownFile => 'Неизвестный файл';
 
   @override
-  String deleteWithCount(int count) {
+  String deleteWithCount(Object count) {
     return 'Удалить ($count)';
   }
 
@@ -2713,7 +2740,7 @@ class SRu extends S {
   String get searchSubtitles => 'Поиск субтитров...';
 
   @override
-  String nFilesWithSize(int count, String size) {
+  String nFilesWithSize(Object count, Object size) {
     return '$count файлов • $size';
   }
 
@@ -2724,7 +2751,7 @@ class SRu extends S {
   String get goToParent => 'На уровень выше';
 
   @override
-  String moveToTarget(String name) {
+  String moveToTarget(Object name) {
     return 'Переместить в: $name';
   }
 
@@ -2732,12 +2759,12 @@ class SRu extends S {
   String get noSubfoldersHere => 'В этой директории нет подпапок';
 
   @override
-  String addedToPlaylist(String name) {
+  String addedToPlaylist(Object name) {
     return 'Добавлено в плейлист \"$name\"';
   }
 
   @override
-  String removedFromPlaylist(String name) {
+  String removedFromPlaylist(Object name) {
     return 'Удалено из плейлиста \"$name\"';
   }
 
@@ -2745,7 +2772,7 @@ class SRu extends S {
   String get alreadyFavorited => 'В избранном';
 
   @override
-  String loadImageFailedWithError(String error) {
+  String loadImageFailedWithError(Object error) {
     return 'Не удалось загрузить изображение\n$error';
   }
 
@@ -2763,7 +2790,7 @@ class SRu extends S {
   String get saveCoverImage => 'Сохранить обложку';
 
   @override
-  String savedToPath(String path) {
+  String savedToPath(Object path) {
     return 'Сохранено в: $path';
   }
 
@@ -2772,7 +2799,7 @@ class SRu extends S {
       'Двойное нажатие для увеличения · Щипок для масштабирования';
 
   @override
-  String getStatusFailed(String error) {
+  String getStatusFailed(Object error) {
     return 'Не удалось получить статус: $error';
   }
 
@@ -2780,7 +2807,7 @@ class SRu extends S {
   String get deleteRecord => 'Удалить запись';
 
   @override
-  String deletePlayRecordConfirm(String title) {
+  String deletePlayRecordConfirm(Object title) {
     return 'Удалить запись воспроизведения для \"$title\"?';
   }
 
@@ -2788,7 +2815,7 @@ class SRu extends S {
   String get notPlayedYet => 'Ещё не воспроизводилось';
 
   @override
-  String playbackFailed(String error) {
+  String playbackFailed(Object error) {
     return 'Ошибка воспроизведения: $error';
   }
 
@@ -2806,7 +2833,7 @@ class SRu extends S {
   String get imageSavedToGallery => 'Изображение сохранено в галерею';
 
   @override
-  String imageSavedToPath(String path) {
+  String imageSavedToPath(Object path) {
     return 'Изображение сохранено: $path';
   }
 
@@ -2824,7 +2851,7 @@ class SRu extends S {
   String get goToPageTitle => 'Перейти на страницу';
 
   @override
-  String pageNumberRange(int max) {
+  String pageNumberRange(Object max) {
     return 'Страница (1-$max)';
   }
 
@@ -2832,7 +2859,7 @@ class SRu extends S {
   String get enterPageNumber => 'Введите номер страницы';
 
   @override
-  String enterValidPageNumber(int max) {
+  String enterValidPageNumber(Object max) {
     return 'Введите корректный номер страницы (1-$max)';
   }
 
@@ -2849,12 +2876,12 @@ class SRu extends S {
   String get cannotOpenPdf => 'Невозможно открыть PDF-файл';
 
   @override
-  String loadPdfFailed(String error) {
+  String loadPdfFailed(Object error) {
     return 'Не удалось загрузить PDF: $error';
   }
 
   @override
-  String pdfPageOfTotal(int current, int total) {
+  String pdfPageOfTotal(Object current, Object total) {
     return 'Страница $current из $total';
   }
 
@@ -2872,7 +2899,7 @@ class SRu extends S {
   String get openWithSystemApp => 'Открыть системным приложением';
 
   @override
-  String renderPdfFailed(String error) {
+  String renderPdfFailed(Object error) {
     return 'Ошибка рендеринга PDF: $error';
   }
 
@@ -2909,7 +2936,7 @@ class SRu extends S {
   String get noContentToSave => 'Нет содержимого для сохранения';
 
   @override
-  String fileSavedToPath(String path) {
+  String fileSavedToPath(Object path) {
     return 'Файл сохранён: $path';
   }
 
@@ -2918,7 +2945,7 @@ class SRu extends S {
       'Локальный файл не существует, попробуйте перезагрузить';
 
   @override
-  String loadTextFailed(String error) {
+  String loadTextFailed(Object error) {
     return 'Не удалось загрузить текст: $error';
   }
 
@@ -2944,17 +2971,17 @@ class SRu extends S {
   String get bookmarkRemoved => 'Закладка удалена';
 
   @override
-  String setProgressAndRating(String progress, int rating) {
+  String setProgressAndRating(Object progress, Object rating) {
     return 'Установлено: $progress, оценка: $rating звёзд';
   }
 
   @override
-  String setProgressTo(String progress) {
+  String setProgressTo(Object progress) {
     return 'Установлено: $progress';
   }
 
   @override
-  String ratingSetTo(int rating) {
+  String ratingSetTo(Object rating) {
     return 'Оценка: $rating звёзд';
   }
 
@@ -2962,12 +2989,12 @@ class SRu extends S {
   String get updated => 'Обновлено';
 
   @override
-  String addTagFailed(String error) {
+  String addTagFailed(Object error) {
     return 'Не удалось добавить тег: $error';
   }
 
   @override
-  String addWithCount(int count) {
+  String addWithCount(Object count) {
     return 'Добавить ($count)';
   }
 
@@ -2975,7 +3002,7 @@ class SRu extends S {
   String get undo => 'Отменить';
 
   @override
-  String nStars(int count) {
+  String nStars(Object count) {
     return '$count звёзд';
   }
 
@@ -2989,7 +3016,7 @@ class SRu extends S {
   String get votedDown => 'Голос против';
 
   @override
-  String voteFailedWithError(String error) {
+  String voteFailedWithError(Object error) {
     return 'Ошибка голосования: $error';
   }
 
@@ -3003,7 +3030,7 @@ class SRu extends S {
   String get voted => 'Проголосовали';
 
   @override
-  String tagBlockedWithName(String name) {
+  String tagBlockedWithName(Object name) {
     return 'Тег заблокирован: $name';
   }
 
@@ -3073,12 +3100,12 @@ class SRu extends S {
       'Кодировка файла не распознана, невозможно корректно отобразить';
 
   @override
-  String editPlaylistFailed(String error) {
+  String editPlaylistFailed(Object error) {
     return 'Не удалось редактировать плейлист: $error';
   }
 
   @override
-  String unsupportedFileTypeWithTitle(String title) {
+  String unsupportedFileTypeWithTitle(Object title) {
     return 'Невозможно открыть этот тип файла: $title';
   }
 
@@ -3162,7 +3189,7 @@ class SRu extends S {
   String get downloadPathSettings => 'Настройки пути загрузки';
 
   @override
-  String loadPathFailedWithError(String error) {
+  String loadPathFailedWithError(Object error) {
     return 'Не удалось загрузить путь: $error';
   }
 
@@ -3171,12 +3198,12 @@ class SRu extends S {
       'Пользовательский путь загрузки не поддерживается на этой платформе';
 
   @override
-  String activeDownloadsWarning(int count) {
+  String activeDownloadsWarning(Object count) {
     return 'Выполняется $count загрузок. Завершите или отмените их перед сменой пути';
   }
 
   @override
-  String setPathFailedWithError(String error) {
+  String setPathFailedWithError(Object error) {
     return 'Не удалось установить путь: $error';
   }
 
@@ -3205,7 +3232,7 @@ class SRu extends S {
   String get defaultPathRestored => 'Путь по умолчанию восстановлен';
 
   @override
-  String resetPathFailedWithError(String error) {
+  String resetPathFailedWithError(Object error) {
     return 'Не удалось восстановить путь по умолчанию: $error';
   }
 
@@ -3292,7 +3319,7 @@ class SRu extends S {
   String get buttonDisplayRules => 'Правила отображения кнопок';
 
   @override
-  String buttonDisplayRulesDesc(int maxVisible) {
+  String buttonDisplayRulesDesc(Object maxVisible) {
     return '• Первые $maxVisible кнопок отображаются внизу плеера\n• Остальные кнопки доступны в меню «Ещё»';
   }
 
@@ -3392,6 +3419,9 @@ class SRu extends S {
   String get showOnlineMarks => 'Показывать произведения с онлайн-метками';
 
   @override
+  String get showStats => 'Показывать статистику';
+
+  @override
   String get cannotBeDisabled => 'Нельзя отключить';
 
   @override
@@ -3484,12 +3514,12 @@ class SRu extends S {
   String get logCopied => 'Логи скопированы в буфер обмена';
 
   @override
-  String logExported(String path) {
+  String logExported(Object path) {
     return 'Логи экспортированы в $path';
   }
 
   @override
-  String logCount(int count) {
+  String logCount(Object count) {
     return '$count записей';
   }
 
@@ -3498,4 +3528,354 @@ class SRu extends S {
 
   @override
   String get logEmpty => 'Логов пока нет';
+
+  @override
+  String get crossfadeTitle => 'Кроссфейд';
+
+  @override
+  String crossfadeEnabledWithDuration(Object ms) {
+    return 'Кроссфейд: ${ms}ms';
+  }
+
+  @override
+  String get gaplessPlaybackEnabled =>
+      'Бесшовное воспроизведение (без кроссфейда)';
+
+  @override
+  String get crossfadeDurationLabel => 'Длительность кроссфейда';
+
+  @override
+  String get crossfadeMinLabel => '0.5с';
+
+  @override
+  String get crossfadeMaxLabel => '10с';
+
+  @override
+  String get crossfadeDescription =>
+      'Плавный переход между треками. При отключении бесшовное воспроизведение минимизирует паузы.';
+
+  @override
+  String get equalizerTitle => 'Эквалайзер';
+
+  @override
+  String get equalizerEnabled => 'Эквалайзер включён';
+
+  @override
+  String get equalizerDisabled => 'Эквалайзер выключен';
+
+  @override
+  String get equalizerActive => 'Активен';
+
+  @override
+  String get equalizerPresets => 'Пресеты';
+
+  @override
+  String get equalizerCustomBands => 'Пользовательские полосы';
+
+  @override
+  String get equalizerCustom => 'Пользовательский';
+
+  @override
+  String get equalizerReset => 'Сбросить';
+
+  @override
+  String get equalizerNotSupported =>
+      'Эквалайзер недоступен на этом устройстве';
+
+  @override
+  String get equalizerNotSupportedAndroid =>
+      'Аудиосессия ещё не инициализирована. Сначала воспроизведите трек.';
+
+  @override
+  String get equalizerNotSupportedOther =>
+      'Аппаратный эквалайзер не поддерживается на этой платформе. Настройки будут сохранены для использования при поддержке.';
+
+  @override
+  String get equalizerInfo =>
+      'На Android эквалайзер применяется через аппаратные аудиоэффекты. На других платформах настройки EQ сохраняются для будущего использования.';
+
+  @override
+  String get searchSettings => 'Поиск настроек...';
+
+  @override
+  String get searchSettingsTitle => 'Поиск настроек';
+
+  @override
+  String get searchSettingsComingSoon =>
+      'Полный поиск по настройкам будет доступен в будущем обновлении.';
+
+  @override
+  String get preferredSampleRate => 'Предпочтительная частота дискретизации';
+
+  @override
+  String get preferredSampleRateSubtitle =>
+      'Цель вывода Hi-res аудио (Android)';
+
+  @override
+  String get preferredSampleRateAuto => 'Авто (следовать файлу)';
+
+  @override
+  String get preferredSampleRateDesc =>
+      'Устанавливает предпочтительную частоту дискретизации для вывода аудио. Более высокие значения могут снизить совместимость, но улучшить качество на поддерживаемых ЦАП.';
+
+  @override
+  String get settingsPlayback => 'Воспроизведение';
+
+  @override
+  String get settingsPlaybackSubtitle => 'Эквалайзер, кроссфейд, аудиоформат';
+
+  @override
+  String get settingsAppearance => 'Внешний вид';
+
+  @override
+  String get settingsAppearanceSubtitle => 'Тема, язык, настройки отображения';
+
+  @override
+  String get settingsDownloadsStorage => 'Загрузки и хранилище';
+
+  @override
+  String get settingsDownloadsStorageSubtitle =>
+      'Путь загрузки, управление кешем';
+
+  @override
+  String get settingsPrivacyContent => 'Приватность и контент';
+
+  @override
+  String get settingsPrivacyContentSubtitle =>
+      'Режим конфиденциальности, блокировки';
+
+  @override
+  String get settingsTranslation => 'Перевод';
+
+  @override
+  String get settingsTranslationSubtitle => 'Источник перевода, настройки LLM';
+
+  @override
+  String get settingsAccount => 'Аккаунт';
+
+  @override
+  String get settingsAccountSubtitle => 'Аккаунты сервера, плавающие субтитры';
+
+  @override
+  String get settingsAdvanced => 'Дополнительно';
+
+  @override
+  String get settingsAdvancedSubtitle =>
+      'Порядок сортировки, логи, все настройки';
+
+  @override
+  String get settingsAboutSubtitle => 'Версия, обновления, лицензии';
+
+  @override
+  String get advancedInfoBanner =>
+      'Эти настройки редко меняются после первоначальной настройки.';
+
+  @override
+  String get advancedSectionDisplaySorting => 'Отображение и сортировка';
+
+  @override
+  String get advancedDefaultSortOrderSubtitle =>
+      'Дата выхода, название, рейтинг и др.';
+
+  @override
+  String get advancedMyTabsDisplaySubtitle =>
+      'Показать/скрыть вкладки на странице «Моё»';
+
+  @override
+  String get advancedSectionContentFiltering => 'Фильтрация контента';
+
+  @override
+  String get advancedSubtitlePrioritySubtitle => 'Высший и низший приоритет';
+
+  @override
+  String get advancedSectionDebugLegacy => 'Отладка и устаревшее';
+
+  @override
+  String get advancedAllSettingsLegacy => 'Все настройки (устаревшие)';
+
+  @override
+  String get advancedAllSettingsLegacySubtitle =>
+      'Оригинальный полный экран настроек';
+
+  @override
+  String get hiResExclusiveMode => 'Hi-Res эксклюзивный режим';
+
+  @override
+  String get hiResExclusiveModeSubtitle =>
+      'Использовать нативный ExoPlayer для FLAC/WAV hi-res треков';
+
+  @override
+  String get hiResExclusiveModeDesc =>
+      'При включении hi-res треки (FLAC/WAV >48кГц) воспроизводятся через нативный ExoPlayer. Возможна кратковременная пауза при переключении плееров.';
+
+  @override
+  String get hiResExclusiveModeEnabled => 'Hi-Res эксклюзивный режим включён';
+
+  @override
+  String get hiResExclusiveModeDisabled => 'Hi-Res эксклюзивный режим выключен';
+
+  @override
+  String get enable => 'Включить';
+
+  @override
+  String get listeningStatsTitle => 'Статистика прослушивания';
+
+  @override
+  String get listeningStatsSubtitle => 'Ваши привычки и история прослушивания';
+
+  @override
+  String get statsWorksPlayed => 'Прослушано работ';
+
+  @override
+  String get statsCompleted => 'Завершено';
+
+  @override
+  String get statsListeningTime => 'Время прослушивания';
+
+  @override
+  String get statsStreakDays => 'Дней подряд';
+
+  @override
+  String get statsDays => 'дней';
+
+  @override
+  String get statsDailyActivity => 'Активность за 14 дней';
+
+  @override
+  String get statsTopVAs => 'Лучшие сэйю';
+
+  @override
+  String get statsTopCircles => 'Лучшие кружки';
+
+  @override
+  String get statsRecentPlays => 'Недавние';
+
+  @override
+  String get statsNoData => 'Статистики пока нет';
+
+  @override
+  String get statsNoDataDesc =>
+      'Начните слушать работы, и статистика появится здесь.';
+
+  @override
+  String get bitPerfectPlayback => 'Бит-перфект воспроизведение';
+
+  @override
+  String get bitPerfectPlaybackSubtitleOff => 'Обнаружение USB ЦАП отключено';
+
+  @override
+  String get bitPerfectPlaybackSubtitleOn =>
+      'Прямой вывод на USB ЦАП через libusb';
+
+  @override
+  String get bitPerfectPlaybackSelectDevice => 'Выбрать USB ЦАП';
+
+  @override
+  String get bitPerfectPlaybackSelectHint => 'Выберите USB аудиоустройство...';
+
+  @override
+  String get bitPerfectPlaybackNoDevice => 'USB ЦАП не обнаружен';
+
+  @override
+  String get bitPerfectPlaybackRefreshTooltip => 'Обновить список устройств';
+
+  @override
+  String get bitPerfectPlaybackConfirmDesc =>
+      'При включении подключённый USB ЦАП будет обнаружен, и аудио может передаваться напрямую, минуя микшер Android для безупречного бит-перфект воспроизведения.';
+
+  @override
+  String get bitPerfectPlaybackEnabled =>
+      'Бит-перфект воспроизведение включено';
+
+  @override
+  String get bitPerfectPlaybackDisabled =>
+      'Бит-перфект воспроизведение отключено';
+
+  @override
+  String get bitPerfectPlaybackDeviceUpdated => 'USB ЦАП устройство обновлено';
+
+  @override
+  String get bitPerfectPlaybackListRefreshed => 'Список USB устройств обновлён';
+
+  @override
+  String get bitPerfectPlaybackInfoTooltip => 'О бит-перфект воспроизведении';
+
+  @override
+  String get bitPerfectPlaybackInfo =>
+      'Бит-перфект воспроизведение отправляет исходные аудиоданные без изменений на внешний ЦАП для максимально возможной точности.\n\nОбычный аудиомикшер Android передискретизирует всё аудио до 48кГц, ухудшая hi-res контент. Этот режим направляет аудио напрямую на подключённый USB ЦАП через драйвер libusb, минуя микшер Android.';
+
+  @override
+  String get bitPerfectPlaybackPermissionDenied =>
+      'Разрешение USB отклонено. Пожалуйста, предоставьте доступ USB в настройках.';
+
+  @override
+  String get playNext => 'Воспроизвести следующую';
+
+  @override
+  String get noAudioTracks => 'Аудиодорожки не найдены';
+
+  @override
+  String playingNextTracks(Object count) {
+    return 'Далее: $count дорожек';
+  }
+
+  @override
+  String get localFileBrowser => 'Локальный файловый браузер';
+
+  @override
+  String get browseFiles => 'Обзор файлов';
+
+  @override
+  String get progressSync => 'Синхронизация прогресса между устройствами';
+
+  @override
+  String get progressSyncSubtitle =>
+      'Синхронизация прогресса воспроизведения с сервером для бесшовного продолжения на других устройствах';
+
+  @override
+  String get progressSyncEnabled =>
+      'Включено — прогресс синхронизируется с сервером';
+
+  @override
+  String get progressSyncDisabled => 'Отключено';
+
+  @override
+  String get autoTranslateLyrics => 'Автоматический перевод текста';
+
+  @override
+  String get autoTranslateLyricsEnabled =>
+      'Включено — текст переводится автоматически';
+
+  @override
+  String get autoTranslateLyricsDisabled => 'Выключено';
+
+  @override
+  String autoTranslateBannerTranslating(Object language) {
+    return 'Автоматический перевод на $language…';
+  }
+
+  @override
+  String autoTranslateBannerDone(Object language) {
+    return 'Переведено на $language';
+  }
+
+  @override
+  String get smartPlaylist => 'Умный плейлист';
+
+  @override
+  String get smartPlaylists => 'Умные плейлисты';
+
+  @override
+  String get smartPlaylistSubtitle => 'Автоматически создан по правилам';
+
+  @override
+  String get searchRules => 'Правила поиска';
+
+  @override
+  String activeRules(Object count) {
+    return 'Активные правила ($count)';
+  }
+
+  @override
+  String get regularPlaylist => 'Обычный плейлист';
 }

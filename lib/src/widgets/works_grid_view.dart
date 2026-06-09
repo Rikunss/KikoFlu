@@ -55,12 +55,8 @@ class WorksGridView extends StatelessWidget {
     final padding = isLandscape ? 24.0 : 8.0;
 
     return CustomScrollView(
-      controller: scrollController,
-      cacheExtent: ScrollOptimization.cacheExtent,
-      // 移除 physics 设置，让 OverscrollNextPageDetector 处理
-      // physics: const AlwaysScrollableScrollPhysics(
-      //   parent: ClampingScrollPhysics(),
-      // ),
+      // ignore: deprecated_member_use
+      cacheExtent: ScrollOptimization.cacheExtent, controller: scrollController,
       slivers: [
         SliverPadding(
           padding: EdgeInsets.all(padding),
@@ -72,7 +68,7 @@ class WorksGridView extends StatelessWidget {
             itemBuilder: (context, index) {
               if (isLoading && index == works.length) {
                 return const SizedBox(
-                  height: 100, // 统一加载指示器高度
+                  height: 100,
                   child: Center(child: CircularProgressIndicator()),
                 );
               }
@@ -80,6 +76,7 @@ class WorksGridView extends StatelessWidget {
               final work = works[index];
               return RepaintBoundary(
                 child: EnhancedWorkCard(
+                  key: ValueKey(work.id),
                   work: work,
                   crossAxisCount: crossAxisCount,
                 ),
@@ -128,12 +125,8 @@ class WorksGridView extends StatelessWidget {
 
   Widget _buildListView(BuildContext context) {
     return CustomScrollView(
-      controller: scrollController,
-      cacheExtent: ScrollOptimization.cacheExtent,
-      // 移除 physics 设置，让 OverscrollNextPageDetector 处理
-      // physics: const AlwaysScrollableScrollPhysics(
-      //   parent: ClampingScrollPhysics(),
-      // ),
+      // ignore: deprecated_member_use
+      cacheExtent: ScrollOptimization.cacheExtent, controller: scrollController,
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.all(8),
@@ -159,7 +152,8 @@ class WorksGridView extends StatelessWidget {
                         Icon(
                           Icons.check_circle_outline,
                           size: 16,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -178,13 +172,15 @@ class WorksGridView extends StatelessWidget {
                 final work = works[index];
                 return RepaintBoundary(
                   child: EnhancedWorkCard(
+                    key: ValueKey(work.id),
                     work: work,
                     crossAxisCount: 1,
                   ),
                 );
               },
-              childCount:
-                  works.length + (isLoading ? 1 : 0) + (showEndMessage ? 1 : 0),
+              childCount: works.length +
+                  (isLoading ? 1 : 0) +
+                  (showEndMessage ? 1 : 0),
             ),
           ),
         ),
@@ -192,7 +188,7 @@ class WorksGridView extends StatelessWidget {
         // 分页控件
         if (paginationWidget != null)
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 24), // 统一左右padding为8
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
             sliver: SliverToBoxAdapter(
               child: paginationWidget!,
             ),
