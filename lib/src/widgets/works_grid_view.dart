@@ -28,18 +28,21 @@ class WorksGridView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final orientation = MediaQuery.orientationOf(context);
+
     switch (layoutType) {
       case LayoutType.bigGrid:
         return _buildGridView(
           context,
           crossAxisCount:
-              ResponsiveGridHelper.getBigGridCrossAxisCount(context),
+              ResponsiveGridHelper.getBigGridCrossAxisCountForSize(size, orientation),
         );
       case LayoutType.smallGrid:
         return _buildGridView(
           context,
           crossAxisCount:
-              ResponsiveGridHelper.getSmallGridCrossAxisCount(context),
+              ResponsiveGridHelper.getSmallGridCrossAxisCountForOrientation(orientation),
         );
       case LayoutType.list:
         return _buildListView(context);

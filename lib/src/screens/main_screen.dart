@@ -248,6 +248,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     if (isLandscape) {
       // 横屏布局：使用自定义 NavigationRail 风格
       final colorScheme = Theme.of(context).colorScheme;
+      final mq = MediaQuery.of(context);
 
       Widget navRail = SizedBox(
         width: 72,
@@ -367,11 +368,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 SafeArea(
                   child: SingleChildScrollView(
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: MediaQuery.of(context).size.height -
-                            MediaQuery.of(context).padding.top -
-                            MediaQuery.of(context).padding.bottom,
-                      ),
+                    constraints: BoxConstraints(
+                      minHeight: mq.size.height -
+                          mq.padding.top -
+                          mq.padding.bottom,
+                    ),
                       child: IntrinsicHeight(
                         child: navRail,
                       ),

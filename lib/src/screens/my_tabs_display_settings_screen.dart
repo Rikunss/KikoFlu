@@ -12,6 +12,7 @@ class MyTabsDisplaySettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
     final settings = ref.watch(myTabsDisplayProvider);
     final notifier = ref.read(myTabsDisplayProvider.notifier);
     final authState = ref.watch(authProvider);
@@ -34,25 +35,25 @@ class MyTabsDisplaySettingsScreen extends ConsumerWidget {
                 SwitchListTile(
                   secondary: Icon(
                     Icons.favorite,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: cs.primary,
                   ),
                   title: Text(S.of(context).onlineMarks),
                   subtitle: Text(S.of(context).showOnlineMarks),
                   value: settings.showOnlineMarks,
                   onChanged: (value) => notifier.setShowOnlineMarks(value),
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: cs.outlineVariant),
                 ListTile(
                   enabled: false,
                   leading: Icon(
                     Icons.download,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: cs.onSurfaceVariant,
                   ),
                   title: Text(S.of(context).historyRecord),
                   subtitle: Text(
                     S.of(context).cannotBeDisabled,
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: cs.onSurfaceVariant,
                     ),
                   ),
                   trailing: const Switch(
@@ -61,7 +62,7 @@ class MyTabsDisplaySettingsScreen extends ConsumerWidget {
                   ),
                 ),
                 if (isOfficialServer) ...[
-                  Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                  Divider(color: cs.outlineVariant),
                   SwitchListTile(
                     secondary: Icon(
                       Icons.playlist_play,
@@ -73,40 +74,40 @@ class MyTabsDisplaySettingsScreen extends ConsumerWidget {
                     onChanged: (value) => notifier.setShowPlaylists(value),
                   ),
                 ],
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: cs.outlineVariant),
                 SwitchListTile(
                   secondary: Icon(
                     Icons.subtitles,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: cs.primary,
                   ),
                   title: Text(S.of(context).subtitleLibrary),
                   subtitle: Text(S.of(context).showSubtitleLibrary),
                   value: settings.showSubtitleLibrary,
                   onChanged: (value) => notifier.setShowSubtitleLibrary(value),
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: cs.outlineVariant),
                 SwitchListTile(
                   secondary: Icon(
                     Icons.bar_chart_rounded,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: cs.primary,
                   ),
                   title: Text(S.of(context).listeningStatsTitle),
                   subtitle: Text(S.of(context).showStats),
                   value: settings.showStats,
                   onChanged: (value) => notifier.setShowStats(value),
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: cs.outlineVariant),
                 ListTile(
                   enabled: false,
                   leading: Icon(
                     Icons.download,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: cs.onSurfaceVariant,
                   ),
                   title: Text(S.of(context).downloaded),
                   subtitle: Text(
                     S.of(context).cannotBeDisabled,
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: cs.onSurfaceVariant,
                     ),
                   ),
                   trailing: const Switch(

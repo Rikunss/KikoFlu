@@ -24,7 +24,6 @@ import '../models/sort_options.dart';
 export '../providers/my_reviews_provider.dart' show MyReviewLayoutType;
 
 import '../widgets/overscroll_next_page_detector.dart';
-import 'listening_statistics_screen.dart';
 import '../../l10n/app_localizations.dart';
 
 /// Tab data for the premium segmented pill control.
@@ -130,15 +129,6 @@ class _MyScreenState extends ConsumerState<MyScreen>
         outlined: Icons.subtitles_outlined,
         filled: Icons.subtitles,
         builder: (_) => const SubtitleLibraryScreen(),
-      ));
-    }
-
-    if (settings.showStats) {
-      tabs.add(_MyTabPill(
-        label: s.listeningStatsTitle,
-        outlined: Icons.bar_chart_outlined,
-        filled: Icons.bar_chart_rounded,
-        builder: (_) => const ListeningStatisticsScreen(),
       ));
     }
 
@@ -728,6 +718,8 @@ class _ContentArea extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final state = ref.watch(myReviewsProvider);
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
@@ -740,18 +732,18 @@ class _ContentArea extends ConsumerWidget {
             Icon(
               Icons.error_outline,
               size: 64,
-              color: Theme.of(context).colorScheme.error,
+              color: cs.error,
             ),
             const SizedBox(height: 16),
             Text(
               S.of(context).loadFailed,
-              style: Theme.of(context).textTheme.titleLarge,
+              style: tt.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
               state.error!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              style: tt.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
                   ),
               textAlign: TextAlign.center,
             ),
@@ -814,6 +806,10 @@ class _ContentArea extends ConsumerWidget {
 
   Widget _buildLayout(BuildContext context, WidgetRef ref,
       MyReviewsState state, bool isLandscape) {
+    final orientation =
+        isLandscape ? Orientation.landscape : Orientation.portrait;
+    final size = MediaQuery.of(context).size;
+
     switch (state.layoutType) {
       case MyReviewLayoutType.bigGrid:
         return _buildGridView(
@@ -821,7 +817,8 @@ class _ContentArea extends ConsumerWidget {
           ref,
           state,
           crossAxisCount:
-              ResponsiveGridHelper.getBigGridCrossAxisCount(context),
+              ResponsiveGridHelper.getBigGridCrossAxisCountForSize(size, orientation),
+          isLandscape: isLandscape,
         );
       case MyReviewLayoutType.smallGrid:
         return _buildGridView(
@@ -829,7 +826,8 @@ class _ContentArea extends ConsumerWidget {
           ref,
           state,
           crossAxisCount:
-              ResponsiveGridHelper.getSmallGridCrossAxisCount(context),
+              ResponsiveGridHelper.getSmallGridCrossAxisCountForOrientation(orientation),
+          isLandscape: isLandscape,
         );
       case MyReviewLayoutType.list:
         return _buildListView(context, ref, state);
@@ -837,9 +835,7 @@ class _ContentArea extends ConsumerWidget {
   }
 
   Widget _buildGridView(BuildContext context, WidgetRef ref,
-      MyReviewsState state, {required int crossAxisCount}) {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+      MyReviewsState state, {required int crossAxisCount, bool isLandscape = false}) {
     final spacing = isLandscape ? 24.0 : 8.0;
     final padding = isLandscape ? 24.0 : 8.0;
 

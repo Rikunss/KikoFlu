@@ -4,6 +4,7 @@ import 'dart:math' show max;
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +24,7 @@ import '../widgets/work_bookmark_manager.dart';
 import '../widgets/player/audio_info_sheet.dart' show showAudioInfoSheet;
 import '../providers/exclusive_audio_provider.dart';
 import '../utils/audio_format_parser.dart' show AudioFormatInfo;
+import '../widgets/player/work_info_panel.dart' show showWorkInfoPanel;
 import '../utils/artwork_color_extractor.dart';
 import 'work_detail_screen.dart';
 import '../../l10n/app_localizations.dart';
@@ -44,6 +46,7 @@ class _TranslateButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lyricState = ref.watch(lyricControllerProvider);
+    final cs = Theme.of(context).colorScheme;
     if (lyricState.lyrics.isEmpty) return const SizedBox.shrink();
 
     final appLocale =
@@ -96,7 +99,7 @@ class _TranslateButton extends ConsumerWidget {
             )
           : Icon(Icons.translate,
               color: (isTranslated && showTranslated)
-                  ? Theme.of(context).colorScheme.primary
+                  ? cs.primary
                   : null),
     );
   }
@@ -115,12 +118,16 @@ class _LyricHintBanner extends ConsumerWidget {
     final lyricState = ref.watch(lyricControllerProvider);
     if (lyricState.lyrics.isEmpty) return const SizedBox.shrink();
 
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
+
     return Material(
       color: Colors.transparent,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer,
+          color: cs.primaryContainer,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.1),
@@ -132,17 +139,17 @@ class _LyricHintBanner extends ConsumerWidget {
         child: Row(
           children: [
             Icon(Icons.info_outline, size: 18,
-              color: Theme.of(context).colorScheme.onPrimaryContainer),
+              color: cs.onPrimaryContainer),
             const SizedBox(width: 10),
             Expanded(
               child: Text(S.of(context).lyricHintTapCover,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer)),
+                style: tt.bodySmall?.copyWith(
+                  color: cs.onPrimaryContainer)),
             ),
             IconButton(
               onPressed: onDismiss,
               icon: Icon(Icons.close, size: 18,
-                color: Theme.of(context).colorScheme.onPrimaryContainer),
+                color: cs.onPrimaryContainer),
               padding: EdgeInsets.zero, constraints: const BoxConstraints(),
             ),
           ],
@@ -207,6 +214,10 @@ class _PortraitLyricViewState extends ConsumerState<_PortraitLyricView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
+
     if (_isLyricLocked) {
       return GestureDetector(
         onTap: _handleLockedTap,
@@ -226,7 +237,7 @@ class _PortraitLyricViewState extends ConsumerState<_PortraitLyricView> {
                   duration: const Duration(milliseconds: 200),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest
+                      color: cs.surfaceContainerHighest
                           .withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [BoxShadow(
@@ -242,11 +253,11 @@ class _PortraitLyricViewState extends ConsumerState<_PortraitLyricView> {
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
                             Icon(Icons.lock_open, size: 20,
-                              color: Theme.of(context).colorScheme.primary),
+                              color: cs.primary),
                             const SizedBox(width: 8),
                             Text(S.of(context).unlock,
-                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
+                              style: tt.labelLarge?.copyWith(
+                                color: cs.primary,
                                 fontWeight: FontWeight.bold)),
                           ]),
                         ),
@@ -324,17 +335,11 @@ class _PlayerControlsWithPosition extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isPlaying = ref.watch(isPlayingProvider);
-    final position = ref.watch(positionProvider);
-    final duration = ref.watch(durationProvider);
     final audioState = ref.watch(audioPlayerControllerProvider);
 
     return PlayerControlsWidget(
       isLandscape: isLandscape,
       audioState: audioState,
-      isPlaying: isPlaying,
-      position: position,
-      duration: duration,
       isSeekingManually: isSeekingManually,
       seekValue: seekValue,
       onSeekChanged: onSeekChanged,
@@ -364,12 +369,27 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   String? _currentProgress;
   int? _currentRating;
   int? _currentWorkId;
+  bool _isFavorited = false;
+  bool _isFavLoading = false;
   List<Color>? _gradientColors;
   Duration? _seekingPosition;
   bool _showLyricView = false;
   bool _showSwipeHint = false;
   StreamSubscription<Duration>? _seekCompletionSub;
   int _seekGeneration = 0;
+  /// Tracks whether SystemChrome.setSystemUIOverlayStyle has been called.
+  /// The fullscreen player always uses a dark canvas (Colors.black / #111111),
+  /// so the status bar style never needs to change after initial setup.
+  /// Guarding this avoids a platform-channel method call on every build().
+  bool _systemUiStyleSet = false;
+
+  /// Force-dark status bar + nav bar for the fullscreen player.
+  /// The player background is always dark regardless of theme.
+  static const _darkSystemUi = SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+  );
 
   @override
   void initState() {
@@ -425,8 +445,89 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     }
   }
 
+  /// Check if the current work is in user's favorites.
+  /// Uses an in-memory cache so re-playing the same work within a session
+  /// is instant. Iterates at most 2 pages (40 works) — covers the vast
+  /// majority of users without excessive API calls.
+  Future<void> _checkFavoriteStatus(int workId) async {
+    // Check in-memory cache first.
+    if (_favoriteCache.containsKey(workId)) {
+      final cached = _favoriteCache[workId]!;
+      if (mounted && cached != _isFavorited) {
+        setState(() => _isFavorited = cached);
+      }
+      return;
+    }
+
+    try {
+      final apiService = ref.read(kikoeruApiServiceProvider);
+      for (int page = 1; page <= 2; page++) {
+        final favorites = await apiService.getFavorites(page: page, pageSize: 20);
+        final worksList = favorites['works'] as List? ?? [];
+        if (worksList.any((w) => w is Map && w['id'] == workId)) {
+          _favoriteCache[workId] = true;
+          if (mounted) {
+            setState(() => _isFavorited = true);
+          }
+          return;
+        }
+        // Server returned fewer items than pageSize — no more pages.
+        if (worksList.length < 20) break;
+      }
+      _favoriteCache[workId] = false;
+    } catch (_) {
+      // Silently fail — heart stays unfilled.
+    }
+  }
+
+  /// Toggle favorite status for the current work.
+  Future<void> _toggleFavorite(int workId) async {
+    if (_isFavLoading) return;
+    setState(() => _isFavLoading = true);
+
+    try {
+      final apiService = ref.read(kikoeruApiServiceProvider);
+      if (_isFavorited) {
+        await apiService.removeFromFavorites(workId);
+      } else {
+        await apiService.addToFavorites(workId);
+      }
+      if (mounted) {
+        _favoriteCache[workId] = !_isFavorited;
+        setState(() => _isFavorited = !_isFavorited);
+        HapticFeedback.lightImpact();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_isFavorited
+                  ? S.of(context).alreadyFavorited
+                  : 'Removed from favorites'),
+              duration: const Duration(seconds: 1),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to toggle favorite'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isFavLoading = false);
+    }
+  }
+
   /// Track which work's cover has been extracted to avoid duplicate work.
   int? _extractedCoverForWorkId;
+  /// Simple in-memory cache for favorite status checks — avoids redundant
+  /// API calls across track changes.
+  final Map<int, bool> _favoriteCache = {};
 
   void _handleRefreshGradient() {
     ArtworkColorExtractor.clearCache();
@@ -446,7 +547,27 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   Future<void> _extractGradientColors(int? workId, String? artworkUrl) async {
     final coverUrl = _buildWorkCoverUrl(workId, artworkUrl) ?? artworkUrl;
     if (coverUrl == null) return;
-    final colors = await ArtworkColorExtractor.extract(coverUrl);
+
+    // Pre-load from CachedNetworkImage's disk cache using the same cacheKey
+    // so we don't download the same image twice (once for the blur background,
+    // once for colour extraction).
+    Uint8List? preloadedBytes;
+    if (workId != null && !coverUrl.startsWith('file://')) {
+      try {
+        final cacheKey = 'work_cover_$workId';
+        final cached = await DefaultCacheManager().getFileFromCache(cacheKey);
+        if (cached != null && await cached.file.exists()) {
+          preloadedBytes = await cached.file.readAsBytes();
+        }
+      } catch (_) {
+        // Cache miss — extractor will download via HTTP.
+      }
+    }
+
+    final colors = await ArtworkColorExtractor.extract(
+      coverUrl,
+      preloadedBytes: preloadedBytes,
+    );
     if (mounted && workId == _currentWorkId) {
       setState(() => _gradientColors = colors);
     }
@@ -563,12 +684,16 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     ref.watch(lyricAutoLoaderProvider);
     ref.watch(audioFormatInfoProvider); // keep the format info alive
 
-    final brightness = Theme.of(context).brightness;
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: brightness == Brightness.light ? Brightness.dark : Brightness.light,
-      systemNavigationBarColor: Colors.transparent,
-    ));
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    // Guard: only call platform channel once since the player always uses
+    // a dark canvas (Colors.black / #111111). The status bar style never
+    // changes after initial setup — calling it on every build() causes
+    // unnecessary platform channel round-trips.
+    if (!_systemUiStyleSet) {
+      _systemUiStyleSet = true;
+      SystemChrome.setSystemUIOverlayStyle(_darkSystemUi);
+    }
 
     // Compute drag progress for dismiss animation
     final screenHeight = MediaQuery.sizeOf(context).height;
@@ -610,14 +735,15 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
               // Safe area content
               SafeArea(
                 child: isLandscape
-                    ? _buildLandscapeLayout(context, currentTrack)
-                    : _buildPortraitLayout(context, currentTrack),
+                    ? _buildLandscapeLayout(context, currentTrack, theme, cs)
+                    : _buildPortraitLayout(context, currentTrack, theme, cs),
               ),
 
               if (_showLyricHint && !isLandscape && !_showLyricView)
                 Positioned(top: 0, left: 0, right: 0,
                   child: _LyricHintBanner(onDismiss: () => setState(() => _showLyricHint = false)),
                 ),
+
             ]),
           ),
         ),
@@ -723,6 +849,21 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
           ),
           const SizedBox(width: 4),
           IconButton(
+            icon: const Icon(Icons.article_outlined, color: Colors.white),
+            onPressed: () {
+              final track = ref.read(currentTrackProvider).valueOrNull;
+              if (track != null) {
+                showWorkInfoPanel(context, ref, track);
+              }
+            },
+            tooltip: 'Work Info',
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white.withValues(alpha: 0.15),
+              shape: const CircleBorder(),
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
             icon: const Icon(Icons.queue_music, color: Colors.white),
             onPressed: () => PlaylistDialog.show(context),
             tooltip: S.of(context).playlistTitle,
@@ -791,19 +932,23 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       );
     }
 
+    // Apply blur directly to the cover image via ImageFiltered instead of
+    // using BackdropFilter. ImageFiltered avoids the expensive offscreen
+    // render pass that BackdropFilter requires every frame — the blur is
+    // applied as a paint-level operation directly on the image, which is
+    // significantly more GPU-friendly and reduces frame render time.
+    //
+    // Wrapped in RepaintBoundary to avoid an Impeller validation error when
+    // the parent Opacity widget (drag-to-dismiss animation) tries to pass
+    // inherited opacity to ImageFiltered, which doesn't support it.
     return Positioned.fill(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          imageWidget,
-          // Heavy blur for aesthetic effect
-          ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: Container(color: const Color(0x01000000)),
-            ),
+      child: RepaintBoundary(
+        child: ClipRect(
+          child: ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+            child: imageWidget,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -838,7 +983,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     );
   }
 
-  Widget _buildPortraitLayout(BuildContext context, AsyncValue currentTrack) {
+  Widget _buildPortraitLayout(BuildContext context, AsyncValue currentTrack, ThemeData theme, ColorScheme cs) {
     return currentTrack.when(
       data: (track) {
         if (track == null) {
@@ -850,11 +995,21 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
         if (track.workId != null && _currentWorkId != track.workId) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              setState(() { _currentWorkId = track.workId; _currentProgress = null; _extractedCoverForWorkId = null; });
-              _loadCurrentProgress(track.workId!);
-              // Fallback extraction — caches colors so imageBuilder returns instantly.
+            if (mounted && track.workId != null &&
+                _extractedCoverForWorkId != track.workId) {
+              _extractedCoverForWorkId = track.workId;
+              setState(() { _currentWorkId = track.workId; _currentProgress = null; _isFavorited = false; });
+              // Gradient extraction runs immediately — needed for seekbar
+              // colour theming on the first frame.
               _extractGradientColors(track.workId, track.artworkUrl);
+              // Defer non-critical API calls (progress + favorite check) to
+              // let the route entrance animation (~300ms) settle first.
+              Future.delayed(const Duration(milliseconds: 400), () {
+                if (mounted && _currentWorkId == track.workId) {
+                  _loadCurrentProgress(track.workId!);
+                  _checkFavoriteStatus(track.workId!);
+                }
+              });
             }
           });
         }
@@ -905,15 +1060,26 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(children: [
-                Text(track.title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(track.title,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Favorite heart button
+                    if (track.workId != null)
+                      _buildFavoriteButton(track.workId!),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 if (track.artist != null)
@@ -964,11 +1130,13 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
               ]),
             ),
             const SizedBox(height: 8),
-            // Lyric preview (tappable)
+            // Lyric preview (tappable) — only rebuilds when lyric presence changes
             Consumer(builder: (context, ref, child) {
-              final lyricState = ref.watch(lyricControllerProvider);
+              final hasLyrics = ref.watch(
+                lyricControllerProvider.select((s) => s.lyrics.isNotEmpty),
+              );
               return GestureDetector(
-                onTap: lyricState.lyrics.isNotEmpty
+                onTap: hasLyrics
                     ? () => setState(() => _showLyricView = true)
                     : null,
                 child: LyricDisplay(albumName: track.album),
@@ -983,9 +1151,9 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
           // icons/text using onSurface/onSurfaceVariant would be dark/invisible
           // in light mode.
           Theme(
-            data: Theme.of(context).copyWith(
+            data: theme.copyWith(
               colorScheme: ColorScheme.fromSeed(
-                seedColor: Theme.of(context).colorScheme.primary,
+                seedColor: cs.primary,
                 brightness: Brightness.dark,
               ),
             ),
@@ -1040,11 +1208,13 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       },
       child: Center(
         child: Consumer(builder: (context, ref, child) {
-          final lyricState = ref.watch(lyricControllerProvider);
+          final hasLyrics = ref.watch(
+            lyricControllerProvider.select((s) => s.lyrics.isNotEmpty),
+          );
           return PlayerCoverWidget(
             track: track,
             workCoverUrl: workCoverUrl,
-            onTap: lyricState.lyrics.isNotEmpty
+            onTap: hasLyrics
                 ? () => setState(() => _showLyricView = true)
                 : null,
             onSwipeLeft: () {
@@ -1065,7 +1235,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     );
   }
 
-  Widget _buildLandscapeLayout(BuildContext context, AsyncValue currentTrack) {
+  Widget _buildLandscapeLayout(BuildContext context, AsyncValue currentTrack, ThemeData theme, ColorScheme cs) {
     return currentTrack.when(
       data: (track) {
         if (track == null) {
@@ -1077,11 +1247,18 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
         if (track.workId != null && _currentWorkId != track.workId) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              setState(() { _currentWorkId = track.workId; _currentProgress = null; _extractedCoverForWorkId = null; });
-              _loadCurrentProgress(track.workId!);
-              // Fallback extraction — caches colors so imageBuilder returns instantly.
+            if (mounted && track.workId != null &&
+                _extractedCoverForWorkId != track.workId) {
+              _extractedCoverForWorkId = track.workId;
+              setState(() { _currentWorkId = track.workId; _currentProgress = null; _isFavorited = false; });
               _extractGradientColors(track.workId, track.artworkUrl);
+              // Defer non-critical API calls to let route animation settle.
+              Future.delayed(const Duration(milliseconds: 400), () {
+                if (mounted && _currentWorkId == track.workId) {
+                  _loadCurrentProgress(track.workId!);
+                  _checkFavoriteStatus(track.workId!);
+                }
+              });
             }
           });
         }
@@ -1136,15 +1313,23 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                         const SizedBox(height: 16),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(track.title,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(track.title,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis),
+                              ),
+                              if (track.workId != null) ...[const SizedBox(width: 6), _buildFavoriteButton(track.workId!)],
+                            ],
+                          ),
                         ),
                         if (track.artist != null) ...[
                           const SizedBox(height: 4),
@@ -1194,9 +1379,9 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                         ),
                         const SizedBox(height: 12),
                         Theme(
-                          data: Theme.of(context).copyWith(
+                          data: theme.copyWith(
                             colorScheme: ColorScheme.fromSeed(
-                              seedColor: Theme.of(context).colorScheme.primary,
+                              seedColor: cs.primary,
                               brightness: Brightness.dark,
                             ),
                           ),
@@ -1232,8 +1417,10 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
               Expanded(
                 flex: 3,
                 child: Consumer(builder: (context, ref, child) {
-                  final lyricState = ref.watch(lyricControllerProvider);
-                  if (lyricState.lyrics.isEmpty) {
+                  final isEmpty = ref.watch(
+                    lyricControllerProvider.select((s) => s.lyrics.isEmpty),
+                  );
+                  if (isEmpty) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1268,6 +1455,33 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       error: (error, stack) => Center(
         child: Text(S.of(context).errorWithMessage(error.toString()),
           style: const TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
+  /// Build the favorite toggle heart button.
+  Widget _buildFavoriteButton(int workId) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: IconButton(
+        onPressed: _isFavLoading ? null : () => _toggleFavorite(workId),
+        icon: _isFavLoading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white70,
+                ),
+              )
+            : Icon(
+                _isFavorited ? Icons.favorite : Icons.favorite_border,
+                color: _isFavorited ? Colors.red[400] : Colors.white70,
+              ),
+        iconSize: 20,
+        padding: EdgeInsets.zero,
+        tooltip: _isFavorited ? 'Remove from favorites' : 'Add to favorites',
       ),
     );
   }
@@ -1438,7 +1652,9 @@ class _UsbDacBadgeInPlayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
@@ -1452,7 +1668,7 @@ class _UsbDacBadgeInPlayer extends StatelessWidget {
           const SizedBox(width: 3),
           Text(
             dacName.length > 12 ? '${dacName.substring(0, 11)}…' : dacName,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            style: tt.labelSmall?.copyWith(
               fontSize: 9,
               color: cs.onPrimaryContainer,
               fontWeight: FontWeight.w600,

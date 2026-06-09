@@ -507,9 +507,10 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
   }
 
   Widget _buildSearchBar() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       child: TextField(
         controller: _searchController,
         autofocus: true,
@@ -543,6 +544,9 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
   }
 
   Widget _emptyState(BuildContext context, String message, IconData icon) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -553,22 +557,19 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .primaryContainer
-                    .withValues(alpha: 0.3),
+                color: cs.primaryContainer.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 size: 40,
-                color: Theme.of(context).colorScheme.primary,
+                color: cs.primary,
               ),
             ),
             const SizedBox(height: 24),
             Text(
               message,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: tt.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
               textAlign: TextAlign.center,
@@ -615,17 +616,18 @@ class _DownloadTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    final cs = Theme.of(context).colorScheme;
     final hPad = isLandscape ? 24.0 : 8.0;
 
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(vertical: 4),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      child: isSelectionMode ? _buildSelectionBar(context, hPad) : _buildActionBar(context, hPad),
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+      child: isSelectionMode ? _buildSelectionBar(context, hPad, cs) : _buildActionBar(context, hPad),
     );
   }
 
-  Widget _buildSelectionBar(BuildContext context, double hPad) {
+  Widget _buildSelectionBar(BuildContext context, double hPad, ColorScheme cs) {
     return Row(children: [
       Padding(
         padding: EdgeInsets.only(left: hPad - 8),
@@ -655,7 +657,7 @@ class _DownloadTopBar extends StatelessWidget {
           constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
           onPressed: onDeleteSelected,
           tooltip: '${S.of(context).delete} ($selectedCount)',
-          color: Theme.of(context).colorScheme.error,
+          color: cs.error,
         ),
       SizedBox(width: hPad - 8),
     ]);
@@ -790,6 +792,7 @@ class _DownloadWorkCard extends StatelessWidget {
     final totalSize = workTasks.fold<int>(
       0, (sum, t) => sum + (t.totalBytes ?? 0),
     );
+    final cs = Theme.of(context).colorScheme;
 
     Work? work;
     if (firstTask.workMetadata != null) {
@@ -805,12 +808,12 @@ class _DownloadWorkCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       elevation: isSelected ? 8 : 2,
       shadowColor: isSelected
-          ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.4)
+          ? cs.primary.withValues(alpha: 0.4)
           : null,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: isSelected
-            ? BorderSide(color: Theme.of(context).colorScheme.primary, width: 2)
+            ? BorderSide(color: cs.primary, width: 2)
             : BorderSide.none,
       ),
       child: InkWell(
@@ -844,7 +847,7 @@ class _DownloadWorkCard extends StatelessWidget {
                   work?.title ?? firstTask.workTitle,
                   maxLines: 2, overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                    height: 1.3, color: Theme.of(context).colorScheme.onSurface),
+                    height: 1.3, color: cs.onSurface),
                 ),
                 const SizedBox(height: 8),
                 if (work?.vas != null && work!.vas!.isNotEmpty)
@@ -852,28 +855,28 @@ class _DownloadWorkCard extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Row(children: [
                       Icon(Icons.mic, size: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        color: cs.onSurfaceVariant),
                       const SizedBox(width: 4),
                       Expanded(child: Text(work.vas!.first.name,
                         maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 11,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant))),
+                          color: cs.onSurfaceVariant))),
                     ]),
                   ),
                 Row(children: [
                   Icon(Icons.folder_outlined, size: 12,
-                    color: Theme.of(context).colorScheme.primary),
+                    color: cs.primary),
                   const SizedBox(width: 4),
                   Text('${workTasks.length}', style: TextStyle(fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.primary)),
+                    color: cs.primary)),
                   const SizedBox(width: 8),
                   Icon(Icons.storage, size: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    color: cs.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Flexible(child: Text(formatBytes(totalSize),
                     style: TextStyle(fontSize: 11,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      color: cs.onSurfaceVariant),
                     overflow: TextOverflow.ellipsis)),
                 ]),
               ]),
@@ -885,7 +888,7 @@ class _DownloadWorkCard extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? Theme.of(context).colorScheme.primary
+                      ? cs.primary
                       : Colors.white.withValues(alpha: 0.95),
                   shape: BoxShape.circle,
                   boxShadow: [BoxShadow(
@@ -896,7 +899,7 @@ class _DownloadWorkCard extends StatelessWidget {
                 child: Icon(
                   isSelected ? Icons.check : Icons.circle_outlined,
                   color: isSelected ? Colors.white
-                      : Theme.of(context).colorScheme.outline,
+                      : cs.outline,
                   size: 20,
                 ),
               ),
@@ -974,11 +977,12 @@ class _WorkCardCover extends ConsumerWidget {
   }
 
   Widget _buildPlaceholder(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: cs.surfaceContainerHighest,
       child: Icon(Icons.image_not_supported, size: 48,
-        color: Theme.of(context).colorScheme.outline),
+        color: cs.outline),
     );
   }
 }

@@ -11,6 +11,9 @@ class ThemeSettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeSettings = ref.watch(themeSettingsProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
     return Scaffold(
       appBar: ScrollableAppBar(
@@ -28,7 +31,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(16),
                   child: Text(
                     S.of(context).themeMode,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                   ),
@@ -75,7 +78,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(16),
                   child: Text(
                     S.of(context).colorTheme,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                   ),
@@ -99,6 +102,8 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         S.of(context).colorSchemeOceanBlue,
                         S.of(context).colorSchemeOceanBlueDesc,
                         const Color(0xFF146683),
+                        colorScheme,
+                        textTheme,
                       ),
                       _buildColorSchemeOption(
                         context,
@@ -108,6 +113,8 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         S.of(context).colorSchemeSakuraPink,
                         S.of(context).colorSchemeSakuraPinkDesc,
                         const Color(0xFFB4276E),
+                        colorScheme,
+                        textTheme,
                       ),
                       _buildColorSchemeOption(
                         context,
@@ -117,6 +124,8 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         S.of(context).colorSchemeSunsetOrange,
                         S.of(context).colorSchemeSunsetOrangeDesc,
                         const Color(0xFF904D00),
+                        colorScheme,
+                        textTheme,
                       ),
                       _buildColorSchemeOption(
                         context,
@@ -126,6 +135,8 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         S.of(context).colorSchemeLavenderPurple,
                         S.of(context).colorSchemeLavenderPurpleDesc,
                         const Color(0xFF6750A4),
+                        colorScheme,
+                        textTheme,
                       ),
                       _buildColorSchemeOption(
                         context,
@@ -135,6 +146,8 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         S.of(context).colorSchemeForestGreen,
                         S.of(context).colorSchemeForestGreenDesc,
                         const Color(0xFF3A6F41),
+                        colorScheme,
+                        textTheme,
                       ),
                       const Divider(),
                       InkWell(
@@ -168,7 +181,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
                                   border: Border.all(
                                     color: themeSettings.colorSchemeType ==
                                             ColorSchemeType.dynamic
-                                        ? Theme.of(context).colorScheme.primary
+                                        ? colorScheme.primary
                                         : Colors.transparent,
                                     width: 2.5,
                                   ),
@@ -189,10 +202,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
                                   children: [
                                     Text(
                                       S.of(context).colorSchemeDynamic,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
+                                      style: textTheme.titleMedium?.copyWith(
                                             fontWeight:
                                                 themeSettings
                                                             .colorSchemeType ==
@@ -204,13 +214,8 @@ class ThemeSettingsScreen extends ConsumerWidget {
                                     const SizedBox(height: 2),
                                     Text(
                                       S.of(context).colorSchemeDynamicDesc,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurfaceVariant,
+                                      style: textTheme.bodySmall?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
                                           ),
                                     ),
                                   ],
@@ -241,7 +246,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
                 children: [
                   Text(
                     S.of(context).themePreview,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                   ),
@@ -252,17 +257,14 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         child: Container(
                           height: 60,
                           decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).colorScheme.primaryContainer,
+                            color: colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Center(
                             child: Text(
                               S.of(context).primaryContainer,
                               style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
+                                color: colorScheme.onPrimaryContainer,
                               ),
                             ),
                           ),
@@ -273,18 +275,14 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         child: Container(
                           height: 60,
                           decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .secondaryContainer,
+                            color: colorScheme.secondaryContainer,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Center(
                             child: Text(
                               S.of(context).secondaryContainer,
                               style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSecondaryContainer,
+                                color: colorScheme.onSecondaryContainer,
                               ),
                             ),
                           ),
@@ -299,17 +297,14 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         child: Container(
                           height: 60,
                           decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).colorScheme.tertiaryContainer,
+                            color: colorScheme.tertiaryContainer,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Center(
                             child: Text(
                               S.of(context).tertiaryContainer,
                               style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onTertiaryContainer,
+                                color: colorScheme.onTertiaryContainer,
                               ),
                             ),
                           ),
@@ -320,9 +315,9 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         child: Container(
                           height: 60,
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
+                            color: colorScheme.surface,
                             border: Border.all(
-                              color: Theme.of(context).colorScheme.outline,
+                              color: colorScheme.outline,
                             ),
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -330,7 +325,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
                             child: Text(
                               S.of(context).surfaceColor,
                               style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
+                                color: colorScheme.onSurface,
                               ),
                             ),
                           ),
@@ -355,6 +350,8 @@ class ThemeSettingsScreen extends ConsumerWidget {
     String title,
     String subtitle,
     Color previewColor,
+    ColorScheme colorScheme,
+    TextTheme textTheme,
   ) {
     final isSelected = themeSettings.colorSchemeType == type;
 
@@ -375,7 +372,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isSelected
-                      ? Theme.of(context).colorScheme.primary
+                      ? colorScheme.primary
                       : Colors.transparent,
                   width: 2.5,
                 ),
@@ -403,7 +400,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
                 children: [
                   Text(
                     title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: textTheme.titleMedium?.copyWith(
                           fontWeight:
                               isSelected ? FontWeight.bold : FontWeight.normal,
                         ),
@@ -411,8 +408,8 @@ class ThemeSettingsScreen extends ConsumerWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
                   ),
                 ],

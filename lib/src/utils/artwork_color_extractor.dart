@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import '../services/log_service.dart';
@@ -68,6 +69,10 @@ class ArtworkColorExtractor {
   }
 
   /// Fetch image bytes from local file or network.
+  ///
+  /// Prioritises the CachedNetworkImage disk cache (via [DefaultCacheManager])
+  /// so the same artwork isn't downloaded twice — once for the background and
+  /// once for the colour palette.
   static Future<Uint8List> _fetchBytes(String imageUrl) async {
     if (imageUrl.startsWith('file://')) {
       final localPath = Uri.parse(imageUrl).toFilePath();
@@ -75,6 +80,18 @@ class ArtworkColorExtractor {
       if (await file.exists()) return await file.readAsBytes();
       return Uint8List(0);
     }
+
+    // Try CachedNetworkImage's disk cache first (avoids redundant HTTP download).
+    try {
+      final cacheFile = await DefaultCacheManager().getFileFromCache(imageUrl);
+      if (cacheFile != null && await cacheFile.file.exists()) {
+        final bytes = await cacheFile.file.readAsBytes();
+        if (bytes.isNotEmpty) return bytes;
+      }
+    } catch (_) {
+      // Cache miss or error — fall through to HTTP.
+    }
+
     final response = await http
         .get(Uri.parse(imageUrl))
         .timeout(const Duration(seconds: 15));

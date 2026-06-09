@@ -201,6 +201,8 @@ class _AudioFormatSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return Scaffold(
       appBar: ScrollableAppBar(
         title: Text(S.of(context).audioFormatPriority, style: const TextStyle(fontSize: 18)),
@@ -223,7 +225,7 @@ class _AudioFormatSettingsScreenState
                 // 说明卡片
                 Card(
                   elevation: 0,
-                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                  color: cs.surfaceContainerLow,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -239,26 +241,19 @@ class _AudioFormatSettingsScreenState
                               width: 32,
                               height: 32,
                               decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.12),
+                                color: cs.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Icon(
                                 Icons.info_outline,
                                 size: 18,
-                                color:
-                                    Theme.of(context).colorScheme.primary,
+                                color: cs.primary,
                               ),
                             ),
                             const SizedBox(width: 10),
                             Text(
                               S.of(context).priorityDescription,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(
+                              style: tt.titleSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
                             ),
@@ -267,13 +262,8 @@ class _AudioFormatSettingsScreenState
                         const SizedBox(height: 12),
                         Text(
                           S.of(context).audioFormatPriorityDesc,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+                          style: tt.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
                                 height: 1.5,
                               ),
                         ),

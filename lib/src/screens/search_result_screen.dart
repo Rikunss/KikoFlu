@@ -150,6 +150,9 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
     });
 
     final searchState = ref.watch(searchResultProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
@@ -179,7 +182,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
                     ? Icons.closed_caption
                     : Icons.closed_caption_disabled,
                 color: searchState.subtitleFilter == 1
-                    ? Theme.of(context).colorScheme.primary
+                    ? colorScheme.primary
                     : null,
               ),
               iconSize: 22,
@@ -214,22 +217,22 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
                 vertical: 8,
               ),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
+                color: colorScheme.surface,
                 border: Border(
                   bottom: BorderSide(
-                    color: Theme.of(context).dividerColor,
+                    color: theme.dividerColor,
                     width: 1,
                   ),
                 ),
               ),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                child: _buildSearchInfo(context, searchState),
+                child: _buildSearchInfo(context, searchState, colorScheme),
               ),
             ),
             // 搜索结果内容
             Expanded(
-              child: _buildBody(searchState),
+              child: _buildBody(searchState, colorScheme, textTheme),
             ),
           ],
         ),
@@ -237,7 +240,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
     );
   }
 
-  Widget _buildSearchInfo(BuildContext context, SearchResultState searchState) {
+  Widget _buildSearchInfo(BuildContext context, SearchResultState searchState, ColorScheme colorScheme) {
     // 检查是否有详细的搜索条件
     final conditions = widget.searchParams?['conditions'] as List?;
     final minRate = widget.searchParams?['minRate'] as num?;
@@ -272,8 +275,8 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
                 style: const TextStyle(fontSize: 13),
               ),
               backgroundColor: isExclude
-                  ? Theme.of(context).colorScheme.errorContainer
-                  : Theme.of(context).colorScheme.secondaryContainer,
+                  ? colorScheme.errorContainer
+                  : colorScheme.secondaryContainer,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
               side: BorderSide.none,
@@ -288,7 +291,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
                 '${S.of(context).ratingLabel} ≥ ${minRate.toStringAsFixed(2)}',
                 style: const TextStyle(fontSize: 13),
               ),
-              backgroundColor: Theme.of(context).colorScheme.tertiaryContainer,
+              backgroundColor: colorScheme.tertiaryContainer,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
               side: BorderSide.none,
@@ -300,7 +303,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
                 ageRating,
                 style: const TextStyle(fontSize: 13),
               ),
-              backgroundColor: Theme.of(context).colorScheme.tertiaryContainer,
+              backgroundColor: colorScheme.tertiaryContainer,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
               side: BorderSide.none,
@@ -312,7 +315,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
                 salesRange,
                 style: const TextStyle(fontSize: 13),
               ),
-              backgroundColor: Theme.of(context).colorScheme.tertiaryContainer,
+              backgroundColor: colorScheme.tertiaryContainer,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               visualDensity: VisualDensity.compact,
               side: BorderSide.none,
@@ -325,7 +328,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
               child: Text(
                 S.of(context).totalNWorks(searchState.totalCount),
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: colorScheme.onSurfaceVariant,
                   fontSize: 13,
                 ),
               ),
@@ -348,7 +351,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.secondaryContainer,
+            color: colorScheme.secondaryContainer,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
@@ -357,13 +360,13 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
               Icon(
                 Icons.search,
                 size: 18,
-                color: Theme.of(context).colorScheme.onSecondaryContainer,
+                color: colorScheme.onSecondaryContainer,
               ),
               const SizedBox(width: 6),
               Text(
                 searchInfo,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  color: colorScheme.onSecondaryContainer,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -375,7 +378,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
+              color: colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(6),
             ),
             child: Row(
@@ -384,13 +387,13 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
                 Icon(
                   Icons.numbers,
                   size: 18,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  color: colorScheme.onPrimaryContainer,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   S.of(context).totalNWorks(searchState.totalCount),
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    color: colorScheme.onPrimaryContainer,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -402,7 +405,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
     );
   }
 
-  Widget _buildBody(SearchResultState searchState) {
+  Widget _buildBody(SearchResultState searchState, ColorScheme colorScheme, TextTheme textTheme) {
     if (searchState.error != null) {
       return Center(
         child: Padding(
@@ -414,8 +417,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
+                  color: colorScheme
                       .errorContainer
                       .withValues(alpha: 0.3),
                   shape: BoxShape.circle,
@@ -423,21 +425,21 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
                 child: Icon(
                   Icons.cloud_off_rounded,
                   size: 40,
-                  color: Theme.of(context).colorScheme.error,
+                  color: colorScheme.error,
                 ),
               ),
               const SizedBox(height: 24),
               Text(
                 S.of(context).loadFailed,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
               ),
               const SizedBox(height: 8),
               Text(
                 searchState.error!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                 textAlign: TextAlign.center,
                 maxLines: 3,
@@ -471,8 +473,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
+                  color: colorScheme
                       .primaryContainer
                       .withValues(alpha: 0.3),
                   shape: BoxShape.circle,
@@ -480,21 +481,21 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
                 child: Icon(
                   Icons.search_off_rounded,
                   size: 40,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: colorScheme.primary,
                 ),
               ),
               const SizedBox(height: 24),
               Text(
                 S.of(context).noResults,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
               ),
               const SizedBox(height: 8),
               Text(
                 S.of(context).noData,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -521,12 +522,12 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
         layoutType: searchState.layoutType.toWorksLayoutType(),
         scrollController: _scrollController,
         isLoading: searchState.isLoading,
-        paginationWidget: _buildPaginationBar(searchState),
+        paginationWidget: _buildPaginationBar(searchState, colorScheme),
       ),
     );
   }
 
-  Widget _buildPaginationBar(SearchResultState searchState) {
+  Widget _buildPaginationBar(SearchResultState searchState, ColorScheme colorScheme) {
     return Column(
       children: [
         PaginationBar(
@@ -558,7 +559,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
           Text(
             '${searchState.rawWorks.length - searchState.works.length} filtered',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
           ),

@@ -28,6 +28,10 @@ class PlaylistDialog extends ConsumerWidget {
     final audioService = ref.read(audioPlayerServiceProvider);
     final currentQueue = audioService.queue;
 
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
+
     final borderRadius = BorderRadius.circular(18);
 
     return Dialog(
@@ -56,15 +60,15 @@ class PlaylistDialog extends ConsumerWidget {
                             children: [
                               Text(
                                 S.of(context).playlistTitle,
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                style: tt.titleLarge?.copyWith(
                                       fontWeight: FontWeight.bold,
                                     ),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 '${currentQueue.length} ${S.of(context).nFiles(currentQueue.length)}',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                style: tt.bodySmall?.copyWith(
+                                      color: cs.onSurfaceVariant,
                                     ),
                               ),
                             ],
@@ -75,11 +79,8 @@ class PlaylistDialog extends ConsumerWidget {
                             padding: const EdgeInsets.only(right: 4),
                             child: Text(
                               S.of(context).appendMode,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: Theme.of(context).colorScheme.primary,
+                              style: tt.bodySmall?.copyWith(
+                                    color: cs.primary,
                                   ),
                             ),
                           ),
@@ -88,7 +89,7 @@ class PlaylistDialog extends ConsumerWidget {
                           icon: Icon(
                             Icons.playlist_add,
                             color: audioState.appendMode
-                                ? Theme.of(context).colorScheme.primary
+                                ? cs.primary
                                 : null,
                           ),
                           onPressed: () async {
@@ -115,7 +116,7 @@ class PlaylistDialog extends ConsumerWidget {
                               icon: const Icon(Icons.playlist_remove, size: 18),
                               label: Text(S.of(context).clearQueue),
                               style: TextButton.styleFrom(
-                                foregroundColor: Theme.of(context).colorScheme.error,
+                                foregroundColor: cs.error,
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 visualDensity: VisualDensity.compact,
                               ),
@@ -224,7 +225,7 @@ class PlaylistDialog extends ConsumerWidget {
                                   Icon(
                                     Icons.music_note,
                                     color:
-                                        Theme.of(context).colorScheme.primary,
+                                        cs.primary,
                                     size: 18,
                                   ),
                                 IconButton(
@@ -266,13 +267,9 @@ class PlaylistDialog extends ConsumerWidget {
                                   gradient: isCurrentTrack
                                       ? LinearGradient(
                                           colors: [
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .primaryContainer
+                                            cs.primaryContainer
                                                 .withValues(alpha: 0.4),
-                                            Theme.of(context)
-                                                .colorScheme
-                                                .primaryContainer
+                                            cs.primaryContainer
                                                 .withValues(alpha: 0.2),
                                           ],
                                           begin: Alignment.topLeft,
@@ -288,9 +285,7 @@ class PlaylistDialog extends ConsumerWidget {
                                       height: 48,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(6),
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .surfaceContainerHighest,
+                                        color: cs.surfaceContainerHighest,
                                       ),
                                       child: resolvedCover != null
                                           ? PrivacyBlurCover(
@@ -357,9 +352,7 @@ class PlaylistDialog extends ConsumerWidget {
                                                         ? FontWeight.bold
                                                         : FontWeight.normal,
                                                     color: isCurrentTrack
-                                                        ? Theme.of(context)
-                                                            .colorScheme
-                                                            .primary
+                                                        ? cs.primary
                                                         : null,
                                                   ),
                                                   maxLines: 1,
@@ -386,13 +379,8 @@ class PlaylistDialog extends ConsumerWidget {
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   color: isCurrentTrack
-                                                      ? Theme.of(context)
-                                                          .colorScheme
-                                                          .primary
-                                                      : Theme.of(context)
-                                                          .textTheme
-                                                          .bodySmall
-                                                          ?.color,
+                                                      ? cs.primary
+                                                      : tt.bodySmall?.color,
                                                 ),
                                               ),
                                             ),

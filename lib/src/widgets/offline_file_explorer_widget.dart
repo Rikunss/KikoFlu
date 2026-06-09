@@ -734,6 +734,8 @@ class _OfflineFileExplorerWidgetState
   // 辅助方法：判断文件名是否为音频格式
   // 手动加载字幕
   Future<void> _loadLyricManually(dynamic file) async {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final title = _getProperty(file, 'title', defaultValue: S.of(context).unknown);
 
     final currentTrackAsync = ref.read(currentTrackProvider);
@@ -751,7 +753,7 @@ class _OfflineFileExplorerWidgetState
           children: [
             Icon(
               Icons.subtitles,
-              color: Theme.of(context).colorScheme.primary,
+              color: cs.primary,
               size: 24,
             ),
             const SizedBox(width: 12),
@@ -765,16 +767,16 @@ class _OfflineFileExplorerWidgetState
             children: [
               Text(
                 S.of(context).loadSubtitleConfirm,
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: tt.bodyMedium,
               ),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  color: cs.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Theme.of(context).colorScheme.outlineVariant,
+                    color: cs.outlineVariant,
                     width: 1,
                   ),
                 ),
@@ -786,7 +788,7 @@ class _OfflineFileExplorerWidgetState
                         Icon(
                           Icons.closed_caption,
                           size: 16,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: cs.primary,
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -794,7 +796,7 @@ class _OfflineFileExplorerWidgetState
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.primary,
+                            color: cs.primary,
                           ),
                         ),
                       ],
@@ -813,7 +815,7 @@ class _OfflineFileExplorerWidgetState
                         Icon(
                           Icons.music_note,
                           size: 16,
-                          color: Theme.of(context).colorScheme.secondary,
+                          color: cs.secondary,
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -821,7 +823,7 @@ class _OfflineFileExplorerWidgetState
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.secondary,
+                            color: cs.secondary,
                           ),
                         ),
                       ],
@@ -841,10 +843,7 @@ class _OfflineFileExplorerWidgetState
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .secondaryContainer
-                      .withValues(alpha: 0.3),
+                  color: cs.secondaryContainer.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -852,7 +851,7 @@ class _OfflineFileExplorerWidgetState
                     Icon(
                       Icons.info_outline,
                       size: 16,
-                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      color: cs.onSecondaryContainer,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -860,9 +859,7 @@ class _OfflineFileExplorerWidgetState
                         S.of(context).subtitleAutoRestoreNote,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSecondaryContainer,
+                          color: cs.onSecondaryContainer,
                         ),
                       ),
                     ),
@@ -1158,6 +1155,10 @@ class _OfflineFileExplorerWidgetState
   }
 
   Widget _buildFileList() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(),
@@ -1212,7 +1213,7 @@ class _OfflineFileExplorerWidgetState
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
-                  color: Theme.of(context).dividerColor,
+                  color: theme.dividerColor,
                   width: 1,
                 ),
               ),
@@ -1222,7 +1223,7 @@ class _OfflineFileExplorerWidgetState
                 Expanded(
                   child: Text(
                     S.of(context).offlineFiles,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -1244,14 +1245,8 @@ class _OfflineFileExplorerWidgetState
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: _showTranslation
-                              ? Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.3)
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.2),
+                              ? colorScheme.primary.withValues(alpha: 0.3)
+                              : colorScheme.onSurface.withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
@@ -1262,11 +1257,8 @@ class _OfflineFileExplorerWidgetState
                             Icons.g_translate,
                             size: 16,
                             color: _showTranslation
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withValues(alpha: 0.7),
+                                ? colorScheme.primary
+                                : colorScheme.onSurface.withValues(alpha: 0.7),
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -1275,11 +1267,8 @@ class _OfflineFileExplorerWidgetState
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
                               color: _showTranslation
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context)
-                                      .colorScheme
-                                      .onSurface
-                                      .withValues(alpha: 0.7),
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurface.withValues(alpha: 0.7),
                             ),
                           ),
                         ],

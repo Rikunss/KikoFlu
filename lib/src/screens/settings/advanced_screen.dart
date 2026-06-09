@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
+
 import '../../../l10n/app_localizations.dart';
+import '../../../src/providers/settings_provider.dart';
 import '../../../src/services/log_service.dart';
 import '../about_screen.dart';
 import '../log_screen.dart';
@@ -185,6 +188,9 @@ class _AdvancedScreenState extends ConsumerState<AdvancedScreen> {
                             () => _navigate(const LogScreen()),
                             isLast: false,
                           ),
+                          // FPS Monitor toggle (debug builds only)
+                          if (kDebugMode)
+                            _buildFpsToggle(context, colorScheme),
                           // USB DAC Diagnostics removed — now handled via Android API in Playback settings
                         ],
                       ),
@@ -338,6 +344,25 @@ class _AdvancedScreenState extends ConsumerState<AdvancedScreen> {
               height: 1,
               indent: 72,
               color: theme.colorScheme.outlineVariant),
+      ],
+    );
+  }
+
+  Widget _buildFpsToggle(BuildContext context, ColorScheme cs) {
+    final showFps = ref.watch(showFpsOverlayProvider);
+
+    return Column(
+      children: [
+        Divider(height: 1, indent: 72, color: cs.outlineVariant),
+        SwitchListTile(
+          secondary: Icon(Icons.monitor_heart_outlined,
+              color: showFps ? cs.primary : null),
+          title: const Text('FPS Monitor'),
+          subtitle: const Text('Show real-time FPS overlay on all screens'),
+          value: showFps,
+          onChanged: (v) =>
+              ref.read(showFpsOverlayProvider.notifier).toggle(v),
+        ),
       ],
     );
   }

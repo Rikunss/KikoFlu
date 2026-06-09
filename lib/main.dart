@@ -29,8 +29,10 @@ import 'l10n/app_localizations.dart';
 import 'src/providers/audio_provider.dart';
 import 'src/providers/auth_provider.dart';
 import 'src/providers/locale_provider.dart';
+import 'src/providers/settings_provider.dart';
 import 'src/providers/theme_provider.dart';
 import 'src/providers/update_provider.dart';
+import 'src/widgets/fps_overlay.dart';
 
 void main(List<String> args) {
   AppBootstrap.runWithZone(() async {
@@ -210,6 +212,23 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
       PlaybackHistoryService.instance
           .flushNow(reason: FlushReason.appBackground);
     }
+
+    // On Android, when the app is swiped away from recent apps (detached),
+    // stop the audio service foreground notification if audio is NOT
+    // actively playing. This prevents a stale, non-functional media
+    // notification from lingering after the user has left the app.
+    if (state == AppLifecycleState.detached && Platform.isAndroid) {
+      try {
+        final service = AudioPlayerService.instance;
+        if (!service.playing) {
+          service.audioHandler
+              ?.stop()
+              .catchError((_) {/* service may already be disposed */});
+        }
+      } catch (e) {
+        // Service may already be disposed — safe to ignore.
+      }
+    }
   }
 
   @override
@@ -304,6 +323,15 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
                   darkScheme, themeSettings.colorSchemeType),
           themeMode: mode,
           home: _buildHomeScreen(),
+          builder: (context, child) {
+            return Stack(
+              children: [
+                if (child != null) child,
+                // Global FPS overlay (top-right, togglable via Developer Tools)
+                const _FpsOverlayGlobal(),
+              ],
+            );
+          },
         );
       },
     );
@@ -314,6 +342,24 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     return authState.currentUser != null
         ? const MainScreen()
         : const LoginScreen();
+  }
+}
+
+/// Global FPS overlay — watches the toggle from Developer Tools.
+/// Rendered above all screens via MaterialApp.builder.
+class _FpsOverlayGlobal extends ConsumerWidget {
+  const _FpsOverlayGlobal();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final showFps = ref.watch(showFpsOverlayProvider);
+    if (!showFps) return const SizedBox.shrink();
+
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 8,
+      right: 4,
+      child: const FpsOverlay(),
+    );
   }
 }
 

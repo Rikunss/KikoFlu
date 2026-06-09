@@ -262,19 +262,20 @@ class _OfflineWorkDetailScreenState
 
   // 构建网络封面图片（使用缓存）
   Widget _buildNetworkCover(Work work, String host, String token) {
+    final cs = Theme.of(context).colorScheme;
     return CachedNetworkImage(
       imageUrl: '$host/api/cover/${work.id}',
       cacheKey: 'work_cover_${work.id}',
       httpHeaders: {'Authorization': 'Bearer $token'},
       fit: BoxFit.contain,
       placeholder: (context, url) => Container(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: cs.surfaceContainerHighest,
         child: const Center(
           child: CircularProgressIndicator(),
         ),
       ),
       errorWidget: (context, url, error) => Container(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: cs.surfaceContainerHighest,
         child: const Icon(Icons.broken_image, size: 64),
       ),
     );
@@ -282,7 +283,8 @@ class _OfflineWorkDetailScreenState
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
+    final theme = Theme.of(context);
+    final brightness = theme.brightness;
     final systemOverlayStyle = SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness:
@@ -312,7 +314,7 @@ class _OfflineWorkDetailScreenState
                 children: [
                   Text(
                     formatRJCode(widget.work.id),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),
@@ -358,6 +360,8 @@ class _OfflineWorkDetailScreenState
   }
 
   Widget _buildBody() {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final (host, token) = ref.watch(authProvider.select(
       (s) => (s.host ?? '', s.token ?? ''),
     ));
@@ -473,19 +477,15 @@ class _OfflineWorkDetailScreenState
                                   height: 16,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
+                                    color: cs.primary,
                                   ),
                                 )
                               : Icon(
                                   Icons.g_translate,
                                   size: 18,
                                   color: _showTranslation
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withValues(alpha: 0.6),
+                                      ? cs.primary
+                                      : cs.onSurface.withValues(alpha: 0.6),
                                 ),
                         ),
                       ),
@@ -493,7 +493,7 @@ class _OfflineWorkDetailScreenState
                   ),
                 ],
               ),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: tt.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
@@ -508,7 +508,7 @@ class _OfflineWorkDetailScreenState
               (work.vas != null && work.vas!.isNotEmpty)) ...[
             Text(
               S.of(context).circleAndVaSection,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              style: tt.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -548,7 +548,7 @@ class _OfflineWorkDetailScreenState
           if (work.tags != null && work.tags!.isNotEmpty) ...[
             Text(
               S.of(context).tagLabel,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              style: tt.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -576,7 +576,7 @@ class _OfflineWorkDetailScreenState
           if (work.release != null) ...[
             Text(
               S.of(context).releaseDate,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: tt.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -584,7 +584,7 @@ class _OfflineWorkDetailScreenState
             const SizedBox(height: 8),
             Text(
               work.release!.split('T')[0],
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              style: tt.bodyMedium?.copyWith(
                     fontSize: 14,
                   ),
             ),

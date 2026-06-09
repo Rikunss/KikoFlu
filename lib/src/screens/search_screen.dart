@@ -334,7 +334,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                     ? Icons.filter_alt
                     : Icons.filter_alt_outlined,
                 color: _showAdvancedFilters
-                    ? Theme.of(context).colorScheme.primary
+                    ? theme.colorScheme.primary
                     : null,
               ),
               iconSize: 22,
@@ -441,6 +441,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   /// Returns the main content sections as a flat list.
   List<Widget> _buildContentSections() {
+    final tt = Theme.of(context).textTheme;
     return [
       // ── 1. Active condition chips ──
       if (_searchConditions.isNotEmpty) ...[
@@ -452,7 +453,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child:
-            Text(S.of(context).search, style: Theme.of(context).textTheme.titleSmall),
+            Text(S.of(context).search, style: tt.titleSmall),
       ),
       _buildSearchTypePills(),
       if (_currentSearchType == SearchType.tag ||
@@ -853,6 +854,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       return const SizedBox.shrink();
     }
 
+    final cs = Theme.of(context).colorScheme;
     final items = _getFilteredItems();
     if (items.isEmpty) {
       return Padding(
@@ -861,7 +863,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           S.of(context).noMatchingTags,
           style: TextStyle(
             fontSize: 12,
-            color: Theme.of(context).colorScheme.outline,
+            color: cs.outline,
           ),
         ),
       );

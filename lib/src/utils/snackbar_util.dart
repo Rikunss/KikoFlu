@@ -10,13 +10,14 @@ class SnackBarUtil {
     String message, {
     Duration duration = const Duration(seconds: 2),
   }) {
+    final cs = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
             Icon(
               Icons.check_circle_outline,
-              color: Theme.of(context).colorScheme.onPrimary,
+              color: cs.onPrimary,
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -24,14 +25,14 @@ class SnackBarUtil {
               child: Text(
                 message,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimary,
+                  color: cs.onPrimary,
                 ),
               ),
             ),
           ],
         ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: cs.primary,
         duration: duration,
       ),
     );
@@ -43,13 +44,14 @@ class SnackBarUtil {
     String message, {
     Duration duration = const Duration(seconds: 4),
   }) {
+    final cs = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
             Icon(
               Icons.error_outline,
-              color: Theme.of(context).colorScheme.onError,
+              color: cs.onError,
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -57,14 +59,14 @@ class SnackBarUtil {
               child: Text(
                 message,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onError,
+                  color: cs.onError,
                 ),
               ),
             ),
           ],
         ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: Theme.of(context).colorScheme.error,
+        backgroundColor: cs.error,
         duration: duration,
       ),
     );
@@ -114,13 +116,14 @@ class SnackBarUtil {
     String message, {
     Duration duration = const Duration(seconds: 2),
   }) {
+    final cs = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
             Icon(
               Icons.info_outline,
-              color: Theme.of(context).colorScheme.onSecondaryContainer,
+              color: cs.onSecondaryContainer,
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -128,14 +131,14 @@ class SnackBarUtil {
               child: Text(
                 message,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  color: cs.onSecondaryContainer,
                 ),
               ),
             ),
           ],
         ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+        backgroundColor: cs.secondaryContainer,
         duration: duration,
       ),
     );
@@ -147,6 +150,7 @@ class SnackBarUtil {
     String message, {
     Duration duration = const Duration(seconds: 30),
   }) {
+    final cs = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -157,7 +161,7 @@ class SnackBarUtil {
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  Theme.of(context).colorScheme.onSecondaryContainer,
+                  cs.onSecondaryContainer,
                 ),
               ),
             ),
@@ -166,14 +170,14 @@ class SnackBarUtil {
               child: Text(
                 message,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  color: cs.onSecondaryContainer,
                 ),
               ),
             ),
           ],
         ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+        backgroundColor: cs.secondaryContainer,
         duration: duration,
       ),
     );

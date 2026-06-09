@@ -1457,6 +1457,9 @@ class AudioPlayerService {
     }
   }
 
+  /// The audio handler registered with AudioService (for system controls).
+  AudioHandler? get audioHandler => _audioHandler;
+
   // Cleanup
   Future<void> dispose() async {
     _cancelCrossfade();

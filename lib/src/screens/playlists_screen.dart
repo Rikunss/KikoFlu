@@ -502,6 +502,9 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
     super.build(context); // 必须调用以保持状态
 
     final state = ref.watch(playlistsProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
     // Defer data loading to first visit
     if (!_hasVisited) {
@@ -522,18 +525,18 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
             Icon(
               Icons.error_outline,
               size: 64,
-              color: Theme.of(context).colorScheme.error,
+              color: colorScheme.error,
             ),
             const SizedBox(height: 16),
             Text(
               S.of(context).loadFailed,
-              style: Theme.of(context).textTheme.titleLarge,
+              style: textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
               state.error!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
               textAlign: TextAlign.center,
             ),
@@ -570,18 +573,18 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
               Icon(
                 Icons.playlist_play,
                 size: 64,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: colorScheme.onSurfaceVariant,
               ),
               const SizedBox(height: 16),
               Text(
                 S.of(context).noPlaylists,
-                style: Theme.of(context).textTheme.titleLarge,
+                style: textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               Text(
                 S.of(context).noPlaylistsDescription,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -602,7 +605,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
           ref.read(playlistsProvider.notifier).refresh();
           if (mounted) setState(() {});
         },
-        child: _buildListView(state),
+        child: _buildListView(state, colorScheme, textTheme),
       ),
     );
   }
@@ -743,7 +746,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
     );
   }
 
-  Widget _buildListView(PlaylistsState state) {
+  Widget _buildListView(PlaylistsState state, ColorScheme colorScheme, TextTheme textTheme) {
     final smartPlaylists = ref.watch(smartPlaylistsProvider);
 
     return CustomScrollView(
@@ -763,7 +766,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                   const SizedBox(width: 8),
                   Text(
                     S.of(context).smartPlaylists,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    style: textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: Colors.amber.shade700,
                         ),
@@ -771,8 +774,8 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                   const Spacer(),
                   Text(
                     '${smartPlaylists.length}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
                   ),
                 ],
@@ -799,20 +802,20 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                 Icon(
                   Icons.playlist_play,
                   size: 20,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   S.of(context).myPlaylists,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  style: textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                 ),
                 const Spacer(),
                 Text(
                   S.of(context).totalNItems(state.totalCount),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                       ),
                 ),
               ],

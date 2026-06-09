@@ -85,6 +85,14 @@ dependencies:
   blurhash_dart: ^1.2.1
   home_widget: ^0.9.3
 
+dependency_overrides:
+  # Local fork of audio_service with null-safety fixes for Android destroy sequence.
+  # The upstream plugin crashes with NullPointerException when AudioService.instance
+  # is null during app teardown. Patched: all AudioService.instance calls are now
+  # guarded with null checks. See packages/audio_service/android/src/...Plugin.java
+  audio_service:
+    path: packages/audio_service
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

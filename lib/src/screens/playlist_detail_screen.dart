@@ -89,6 +89,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
       return;
     }
 
+    final cs = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -108,7 +109,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: cs.error,
             ),
             child:
                 Text(isOwner ? S.of(context).delete : S.of(context).unfavorite),
@@ -162,6 +163,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
   /// 显示编辑对话框
   void _showEditDialog(metadata) {
+    final tt = Theme.of(context).textTheme;
     // 检查权限：只有作者才能编辑
     final authState = ref.read(authProvider);
     final currentUserName = authState.currentUser?.name ?? '';
@@ -203,7 +205,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                         children: [
                           Text(
                             S.of(context).editPlaylist,
-                            style: Theme.of(context).textTheme.titleMedium,
+                            style: tt.titleMedium,
                           ),
                         ],
                       ),
@@ -342,6 +344,8 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
   /// 显示添加作品对话框
   void _showAddWorksDialog() {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final textController = TextEditingController();
     List<String> parsedWorkIds = [];
 
@@ -371,14 +375,13 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                       child: Row(
                         children: [
                           Text(
-                            S.of(context).addWorks,
-                            style: Theme.of(context).textTheme.titleMedium,
+                            S.of(context).addWorks,                            style: tt.titleMedium,
                           ),
                         ],
                       ),
                     ),
 
-                      // 内容区域
+                    // 内容区域
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Column(
@@ -388,13 +391,8 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                             // 提示文本
                             Text(
                               S.of(context).addWorksInputHint,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
+                              style: tt.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
                                   ),
                             ),
                             const SizedBox(height: 12),
@@ -426,16 +424,10 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .primaryContainer
-                                      .withValues(alpha: 0.3),
+                                  color: cs.primaryContainer.withValues(alpha: 0.3),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.5),
+                                    color: cs.primary.withValues(alpha: 0.5),
                                   ),
                                 ),
                                 child: Column(
@@ -446,9 +438,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                                         Icon(
                                           Icons.check_circle_outline,
                                           size: 16,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary,
+                                          color: cs.primary,
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
@@ -458,9 +448,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                                               .textTheme
                                               .bodySmall
                                               ?.copyWith(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .primary,
+                                                color: cs.primary,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                         ),
@@ -474,14 +462,10 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                                         return Chip(
                                           label: Text(
                                             id,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall,
+                                            style: tt.bodySmall,
                                           ),
                                           visualDensity: VisualDensity.compact,
-                                          backgroundColor: Theme.of(context)
-                                              .colorScheme
-                                              .primaryContainer,
+                                          backgroundColor: cs.primaryContainer,
                                         );
                                       }).toList(),
                                     ),
@@ -582,6 +566,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
   /// 显示移除作品确认对话框
   Future<void> _showRemoveWorkConfirmDialog(Work work) async {
+    final cs = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -595,7 +580,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: cs.error,
             ),
             child: Text(S.of(context).remove),
           ),
@@ -723,6 +708,10 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   }
 
   Widget _buildBody(PlaylistDetailState state) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     // 错误状态
     if (state.error != null && state.metadata == null) {
       return Center(
@@ -732,18 +721,18 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             Icon(
               Icons.error_outline,
               size: 64,
-              color: Theme.of(context).colorScheme.error,
+              color: colorScheme.error,
             ),
             const SizedBox(height: 16),
             Text(
               S.of(context).loadFailed,
-              style: Theme.of(context).textTheme.titleLarge,
+              style: textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
               state.error!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
               textAlign: TextAlign.center,
             ),
@@ -784,19 +773,18 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                     Icon(
                       Icons.music_note,
                       size: 64,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(height: 16),
                     Text(
                       S.of(context).noWorks,
-                      style: Theme.of(context).textTheme.titleLarge,
+                      style: textTheme.titleLarge,
                     ),
                     const SizedBox(height: 8),
                     Text(
                       S.of(context).playlistNoWorksDescription,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                      style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
                       textAlign: TextAlign.center,
                     ),
@@ -1231,7 +1219,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
-                    children: topVas.map((entry) => _buildTopVaChip(entry.key, entry.value, works.length)),
+                    children: topVas.map((entry) => _buildTopVaChip(entry.key, entry.value, works.length)).toList(),
                   ),
                 ],
 
@@ -1248,7 +1236,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   Wrap(
                     spacing: 4,
                     runSpacing: 4,
-                    children: topTags.map((entry) => _buildTopTagChip(entry.key, entry.value, works.length)),
+                    children: topTags.map((entry) => _buildTopTagChip(entry.key, entry.value, works.length)).toList(),
                   ),
                 ],
               ],
@@ -1302,7 +1290,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   }
 
   Widget _buildTopVaChip(String name, int count, int totalWorks) {
-    final colorScheme = Theme.of(context).colorScheme;
     final pct = (count / totalWorks * 100).round();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1346,7 +1333,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   }
 
   Widget _buildTopTagChip(String name, int count, int totalWorks) {
-    final colorScheme = Theme.of(context).colorScheme;
     final pct = (count / totalWorks * 100).round();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
@@ -1381,7 +1367,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   }
 
   Widget _buildStatChip(IconData icon, String label, Color color) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -1408,6 +1393,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
   Widget _buildPrivacyBadge(int privacy) {
     final colorScheme = Theme.of(context).colorScheme;
+
     IconData icon;
     String label;
     switch (privacy) {

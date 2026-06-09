@@ -29,6 +29,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
     final eqState = ref.watch(equalizerStateProvider);
     final isSupported = ref.watch(equalizerDeviceSupportProvider);
     final s = S.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: ScrollableAppBar(
@@ -41,7 +42,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                     ? Icons.equalizer
                     : Icons.equalizer_outlined,
                 color: eqState.value!.enabled
-                    ? Theme.of(context).colorScheme.primary
+                    ? colorScheme.primary
                     : null,
               ),
               tooltip: eqState.value!.enabled
@@ -171,7 +172,9 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   }
 
   Widget _buildErrorState(BuildContext context, String error, S s) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final textTheme = theme.textTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -191,14 +194,14 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
             const SizedBox(height: 20),
             Text(
               'Error',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
             ),
             const SizedBox(height: 8),
             Text(
               error,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              style: textTheme.bodySmall?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
               textAlign: TextAlign.center,
@@ -212,7 +215,9 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   }
 
   Widget _buildUnsupported(BuildContext context, S s) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final textTheme = theme.textTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -235,7 +240,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
             const SizedBox(height: 20),
             Text(
               s.equalizerNotSupported,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
               textAlign: TextAlign.center,
@@ -245,7 +250,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
               Platform.isAndroid
                   ? s.equalizerNotSupportedAndroid
                   : s.equalizerNotSupportedOther,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              style: textTheme.bodySmall?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
               textAlign: TextAlign.center,
@@ -257,7 +262,9 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   }
 
   Widget _buildEqualizer(BuildContext context, EqualizerState state, S s) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final textTheme = theme.textTheme;
     final activePresetName = EqualizerService.presets
         .where((p) => p.id == state.activePresetId)
         .firstOrNull
@@ -320,7 +327,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
               children: [
                 Text(
                   s.equalizerPresets,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  style: textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                 ),
@@ -356,14 +363,13 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
         Row(
           children: [
             Text(
-              s.equalizerCustomBands,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const Spacer(),
-            Text(
-              '${state.gains.where((g) => g > 0).isNotEmpty ? "+" : ""}${state.gains.isEmpty ? "0" : state.gains.reduce((a, b) => a.abs() > b.abs() ? a : b).toStringAsFixed(1)}dB',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
+              s.equalizerCustomBands,            style: textTheme.titleMedium,
+          ),
+          const Spacer(),
+          Text(
+            '${state.gains.where((g) => g > 0).isNotEmpty ? "+" : ""}${state.gains.isEmpty ? "0" : state.gains.reduce((a, b) => a.abs() > b.abs() ? a : b).toStringAsFixed(1)}dB',
+            style: textTheme.bodySmall?.copyWith(
+                    color: cs.primary,
                   ),
             ),
           ],
@@ -388,17 +394,17 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                       children: [
                         Text(
                           '+12dB',
-                          style: Theme.of(context).textTheme.labelSmall,
+                          style: textTheme.labelSmall,
                         ),
                         const Spacer(),
                         Text(
                           '0dB',
-                          style: Theme.of(context).textTheme.labelSmall,
+                          style: textTheme.labelSmall,
                         ),
                         const Spacer(),
                         Text(
                           '-12dB',
-                          style: Theme.of(context).textTheme.labelSmall,
+                          style: textTheme.labelSmall,
                         ),
                       ],
                     ),
@@ -433,7 +439,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                           child: Text(
                             label,
                             textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.labelSmall,
+                            style: textTheme.labelSmall,
                           ),
                         );
                       }).toList(),
@@ -477,13 +483,13 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                   Icon(
                     Icons.info_outline,
                     size: 16,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: cs.primary,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       s.equalizerInfo,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      style: textTheme.bodySmall?.copyWith(
                             height: 1.4,
                           ),
                     ),

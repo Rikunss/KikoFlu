@@ -246,38 +246,20 @@ class _AudioInfoDialog extends ConsumerStatefulWidget {
 }
 
 class _AudioInfoDialogState extends ConsumerState<_AudioInfoDialog> {
-  Timer? _refreshTimer;
-  Map<String, int>? _systemVolume;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchSystemVolume();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (mounted) setState(() {});
-      _fetchSystemVolume();
-    });
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    // All reactive providers are already watched via [_buildAudioInfo] below,
-    // which causes automatic rebuild on change. No need for ref.listen + setState.
+    // Timer setState((){}) tiap 2 detik sudah dihapus — system volume
+    // direfresh dari _SystemVolumeWidget terpisah yang punya timer sendiri.
     final info = _buildAudioInfo(ref);
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final tt = theme.textTheme;
+    final size = MediaQuery.of(context).size;
+    final orientation = MediaQuery.orientationOf(context);
 
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final isLandscape = orientation == Orientation.landscape;
     final maxH = isLandscape ? 0.70 : 0.80;
-    final screenWidth = MediaQuery.of(context).size.width;
+    final screenWidth = size.width;
     final dialogWidth = screenWidth > 480 ? 380.0 : screenWidth * 0.88;
 
     return SafeArea(
@@ -287,7 +269,7 @@ class _AudioInfoDialogState extends ConsumerState<_AudioInfoDialog> {
           child: Container(
             constraints: BoxConstraints(
               maxWidth: dialogWidth,
-              maxHeight: MediaQuery.of(context).size.height * maxH,
+              maxHeight: size.height * maxH,
             ),
             decoration: BoxDecoration(
               color: cs.surface,
@@ -502,10 +484,8 @@ class _AudioInfoDialogState extends ConsumerState<_AudioInfoDialog> {
                                 const SizedBox(width: 8),
                                 Text('Volume · Speed', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                                 const Spacer(),
-                                Text(
-                                  _formatVolumeSpeed(info, systemVolume: _systemVolume),
-                                  style: tt.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface),
-                                ),
+                                // Sub-widget dengan timer sendiri — tidak rebuild dialog utama
+                                _SystemVolumeWidget(info: info, cs: cs, tt: tt),
                               ],
                             ),
                           ),
@@ -631,10 +611,46 @@ class _AudioInfoDialogState extends ConsumerState<_AudioInfoDialog> {
     }
     return id == 'custom' ? 'Custom' : id;
   }
+}
 
-  /// Format volume display: when on Android without exclusive mode,
-  /// the volume is controlled by the Android system (hardware keys),
-  /// so just_audio's software volume (always 100%) is not meaningful.
+// ═══════════════════════════════════════════════
+// System Volume — sub-widget dengan periodic refresh sendiri
+// Timer 2 detik hanya rebuild widget kecil ini, bukan seluruh dialog.
+// ═══════════════════════════════════════════════
+class _SystemVolumeWidget extends ConsumerStatefulWidget {
+  final AudioInfoData info;
+  final ColorScheme cs;
+  final TextTheme tt;
+
+  const _SystemVolumeWidget({
+    required this.info,
+    required this.cs,
+    required this.tt,
+  });
+
+  @override
+  ConsumerState<_SystemVolumeWidget> createState() => _SystemVolumeWidgetState();
+}
+
+class _SystemVolumeWidgetState extends ConsumerState<_SystemVolumeWidget> {
+  Map<String, int>? _systemVolume;
+  Timer? _volumeTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSystemVolume();
+    _volumeTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _fetchSystemVolume();
+    });
+  }
+
+  @override
+  void dispose() {
+    _volumeTimer?.cancel();
+    super.dispose();
+  }
+
   void _fetchSystemVolume() {
     if (!Platform.isAndroid) return;
     ExclusiveAudioService.instance.getSystemVolume().then((vol) {
@@ -644,21 +660,25 @@ class _AudioInfoDialogState extends ConsumerState<_AudioInfoDialog> {
     });
   }
 
-  String _formatVolumeSpeed(AudioInfoData info, {Map<String, int>? systemVolume}) {
+  @override
+  Widget build(BuildContext context) {
+    final info = widget.info;
     final isSystemVolume = Platform.isAndroid && !info.exclusiveMode;
     if (isSystemVolume) {
       final deviceLabel = _outputDeviceLabel(info.outputDevice);
-      final sv = systemVolume;
+      final sv = _systemVolume;
       if (sv != null && sv['maxVolume']! > 0) {
         final percent = (sv['currentVolume']! / sv['maxVolume']! * 100).round();
-        return '$deviceLabel ($percent%) · ${info.speed.toStringAsFixed(2)}x';
+        return Text('$deviceLabel ($percent%) · ${info.speed.toStringAsFixed(2)}x',
+            style: widget.tt.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: widget.cs.onSurface));
       }
-      return '$deviceLabel · ${info.speed.toStringAsFixed(2)}x';
+      return Text('$deviceLabel · ${info.speed.toStringAsFixed(2)}x',
+          style: widget.tt.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: widget.cs.onSurface));
     }
-    return '${(info.volume * 100).round()}%  ·  ${info.speed.toStringAsFixed(2)}x';
+    return Text('${(info.volume * 100).round()}%  ·  ${info.speed.toStringAsFixed(2)}x',
+        style: widget.tt.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: widget.cs.onSurface));
   }
 
-  /// Map raw output device type to a friendly display label.
   String _outputDeviceLabel(String? outputDevice) {
     return switch (outputDevice) {
       'builtin' => 'Speaker',

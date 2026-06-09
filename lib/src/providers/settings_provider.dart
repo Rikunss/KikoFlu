@@ -998,3 +998,36 @@ final autoTranslateLyricsProvider =
   return AutoTranslateLyricsNotifier();
 });
 
+/// Show FPS overlay (debug only — persisted in SharedPreferences).
+class FpsOverlayNotifier extends StateNotifier<bool> {
+  static const String _preferenceKey = 'show_fps_overlay';
+
+  FpsOverlayNotifier() : super(false) {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      state = prefs.getBool(_preferenceKey) ?? false;
+    } catch (e) {
+      state = false;
+    }
+  }
+
+  Future<void> toggle(bool enabled) async {
+    state = enabled;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_preferenceKey, enabled);
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
+final showFpsOverlayProvider =
+    StateNotifierProvider<FpsOverlayNotifier, bool>((ref) {
+  return FpsOverlayNotifier();
+});
+

@@ -106,14 +106,16 @@ final progressProvider = Provider<double>((ref) {
 /// 是否可以播放下一首（列表未结束或开启了循环模式）
 final canSkipNextProvider = Provider<bool>((ref) {
   final service = ref.watch(audioPlayerServiceProvider);
-  final audioState = ref.watch(audioPlayerControllerProvider);
+  final repeatMode = ref.watch(
+    audioPlayerControllerProvider.select((s) => s.repeatMode),
+  );
   // 监听队列和当前曲目变化
   ref.watch(queueProvider);
   ref.watch(currentTrackProvider);
 
   // 如果开启了列表循环或单曲循环，始终可以跳转
-  if (audioState.repeatMode == LoopMode.all ||
-      audioState.repeatMode == LoopMode.one) {
+  if (repeatMode == LoopMode.all ||
+      repeatMode == LoopMode.one) {
     return true;
   }
 

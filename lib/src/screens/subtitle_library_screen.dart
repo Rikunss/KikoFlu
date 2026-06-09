@@ -321,29 +321,31 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
   }
 
   Widget _stepCircle(BuildContext context, String number) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       width: 28, height: 28,
       margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer,
+        color: cs.primaryContainer,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Center(
         child: Text(number, style: TextStyle(
           fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.onPrimaryContainer,
+          color: cs.onPrimaryContainer,
         )),
       ),
     );
   }
 
   Widget _bulletPoint(BuildContext context, Widget child) {
+    final tt = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.only(left: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('• ', style: Theme.of(context).textTheme.bodyMedium),
+          Text('• ', style: tt.bodyMedium),
           Expanded(child: child),
         ],
       ),
@@ -351,6 +353,7 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
   }
 
   void _showLibraryInfoDialog() {
+    final tt = Theme.of(context).textTheme;
     showDialog(
       context: context,
       builder: (context) => ResponsiveAlertDialog(
@@ -365,10 +368,10 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
                 _stepCircle(context, '1'),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(S.of(context).subtitleLibraryFunction,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                    style: tt.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text(S.of(context).subtitleLibraryFunctionDesc,
-                    style: Theme.of(context).textTheme.bodyMedium),
+                    style: tt.bodyMedium),
                 ])),
               ]),
               const SizedBox(height: 16),
@@ -377,25 +380,25 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
                 _stepCircle(context, '2'),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(S.of(context).subtitleAutoLoad,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                    style: tt.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text(S.of(context).subtitleAutoLoadDesc,
-                    style: Theme.of(context).textTheme.bodyMedium),
+                    style: tt.bodyMedium),
                   const SizedBox(height: 8),
-                  _bulletPoint(context, Text.rich(TextSpan(style: Theme.of(context).textTheme.bodyMedium, children: [
+                  _bulletPoint(context, Text.rich(TextSpan(style: tt.bodyMedium, children: [
                     TextSpan(text: S.of(context).guideInPrefix),
                     TextSpan(text: S.of(context).guideParsedFolder, style: const TextStyle(fontWeight: FontWeight.bold)),
                     TextSpan(text: S.of(context).guideFindWorkDesc),
                   ]))),
                   const SizedBox(height: 6),
-                  _bulletPoint(context, Text.rich(TextSpan(style: Theme.of(context).textTheme.bodyMedium, children: [
+                  _bulletPoint(context, Text.rich(TextSpan(style: tt.bodyMedium, children: [
                     TextSpan(text: S.of(context).guideInPrefix),
                     TextSpan(text: S.of(context).guideSavedFolder, style: const TextStyle(fontWeight: FontWeight.bold)),
                     TextSpan(text: S.of(context).guideFindSubtitleDesc),
                   ]))),
                   const SizedBox(height: 6),
                   _bulletPoint(context, Text(S.of(context).guideMatchRule,
-                    style: Theme.of(context).textTheme.bodyMedium)),
+                    style: tt.bodyMedium)),
                 ])),
               ]),
               const SizedBox(height: 16),
@@ -404,9 +407,9 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
                 _stepCircle(context, '3'),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(S.of(context).smartCategoryAndMark,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                    style: tt.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  _bulletPoint(context, Text.rich(TextSpan(style: Theme.of(context).textTheme.bodyMedium, children: [
+                  _bulletPoint(context, Text.rich(TextSpan(style: tt.bodyMedium, children: [
                     TextSpan(text: S.of(context).guideRecognizedWorkPrefix),
                     WidgetSpan(alignment: PlaceholderAlignment.middle,
                       child: Container(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -424,10 +427,10 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
                   ]))),
                   const SizedBox(height: 6),
                   _bulletPoint(context, Text(S.of(context).guideAutoRecognizeRJ,
-                    style: Theme.of(context).textTheme.bodyMedium)),
+                    style: tt.bodyMedium)),
                   const SizedBox(height: 6),
                   _bulletPoint(context, Text(S.of(context).guideAutoAddRJPrefix,
-                    style: Theme.of(context).textTheme.bodyMedium)),
+                    style: tt.bodyMedium)),
                 ])),
               ]),
             ],
@@ -618,6 +621,9 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
   }
 
   Future<void> _loadLyricManually(Map<String, dynamic> item) async {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
     final title = item['title'] ?? S.of(context).unknownFile;
     final path = item['path'] as String;
     final currentTrack = ref.read(currentTrackProvider).value;
@@ -637,7 +643,7 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
       context: context,
       builder: (context) => ResponsiveAlertDialog(
         title: Row(children: [
-          Icon(Icons.subtitles, color: Theme.of(context).colorScheme.primary, size: 24),
+          Icon(Icons.subtitles, color: cs.primary, size: 24),
           const SizedBox(width: 12),
           Text(S.of(context).loadSubtitle),
         ]),
@@ -647,34 +653,34 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(S.of(context).loadSubtitleConfirm,
-                style: Theme.of(context).textTheme.bodyMedium),
+                style: tt.bodyMedium),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  color: cs.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                  border: Border.all(color: cs.outlineVariant),
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
                     Icon(Icons.closed_caption, size: 16,
-                      color: Theme.of(context).colorScheme.primary),
+                      color: cs.primary),
                     const SizedBox(width: 8),
                     Text(S.of(context).subtitleFile,
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.primary)),
+                        color: cs.primary)),
                   ]),
                   const SizedBox(height: 8),
                   Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   const SizedBox(height: 16),
                   Row(children: [
                     Icon(Icons.music_note, size: 16,
-                      color: Theme.of(context).colorScheme.secondary),
+                      color: cs.secondary),
                     const SizedBox(width: 8),
                     Text(S.of(context).currentAudio,
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.secondary)),
+                        color: cs.secondary)),
                   ]),
                   const SizedBox(height: 8),
                   Text(currentTrack.title,
@@ -685,16 +691,16 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
+                  color: cs.secondaryContainer.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(children: [
                   Icon(Icons.info_outline, size: 16,
-                    color: Theme.of(context).colorScheme.onSecondaryContainer),
+                    color: cs.onSecondaryContainer),
                   const SizedBox(width: 8),
                   Expanded(child: Text(S.of(context).subtitleAutoRestoreNote,
                     style: TextStyle(fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSecondaryContainer))),
+                      color: cs.onSecondaryContainer))),
                 ]),
               ),
             ],
@@ -808,6 +814,10 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     ref.listen<int>(subtitleLibraryRefreshTriggerProvider, (previous, next) {
       if (previous != next && _files.isNotEmpty) _loadFiles();
     });
@@ -850,19 +860,19 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
           ),
           if (_currentPath != _rootPath && _currentPath.isNotEmpty && !_isSearching)
             Material(
-              color: Theme.of(context).colorScheme.surface,
+              color: colorScheme.surface,
               child: InkWell(
                 onTap: _navigateUp,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     border: Border(bottom: BorderSide(
-                      color: Theme.of(context).dividerColor.withValues(alpha: 0.5))),
+                      color: theme.dividerColor.withValues(alpha: 0.5))),
                   ),
                   child: Row(children: [
                     const Icon(Icons.arrow_back, size: 20),
                     const SizedBox(width: 16),
-                    Text(S.of(context).back, style: Theme.of(context).textTheme.bodyLarge),
+                    Text(S.of(context).back, style: textTheme.bodyLarge),
                   ]),
                 ),
               ),
@@ -881,15 +891,15 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
                     : _files.isEmpty
                         ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                             Icon(Icons.library_books_outlined, size: 64,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              color: colorScheme.onSurfaceVariant),
                             const SizedBox(height: 16),
                             Text(S.of(context).subtitleLibraryEmpty,
                               style: TextStyle(fontSize: 18,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                color: colorScheme.onSurfaceVariant)),
                             const SizedBox(height: 8),
                             Text(S.of(context).tapToImportSubtitle,
                               style: TextStyle(fontSize: 14,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                color: colorScheme.onSurfaceVariant)),
                           ]))
                         : RefreshIndicator(
                             onRefresh: () => _loadFiles(forceRefresh: true),
@@ -1038,25 +1048,28 @@ class _SubtitleToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
     final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
     final hPad = isLandscape ? 24.0 : 8.0;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (isSelectionMode)
-          _buildSelectionBar(context, hPad)
+          _buildSelectionBar(context, colorScheme, textTheme, hPad)
         else if (isSearching)
           _buildSearchBar(context, hPad)
         else
-          _buildActionBar(context, hPad),
-        if (!isSearching && !isSelectionMode) _buildBreadcrumbs(context, hPad),
+          _buildActionBar(context, colorScheme, textTheme, hPad),
+        if (!isSearching && !isSelectionMode) _buildBreadcrumbs(context, colorScheme, hPad),
       ]),
     );
   }
 
-  Widget _buildSelectionBar(BuildContext context, double hPad) {
+  Widget _buildSelectionBar(BuildContext context, ColorScheme colorScheme, TextTheme textTheme, double hPad) {
     return Row(children: [
       Padding(
         padding: EdgeInsets.only(left: hPad - 8),
@@ -1068,7 +1081,7 @@ class _SubtitleToolbar extends StatelessWidget {
           tooltip: S.of(context).exitSelection,
         ),
       ),
-      Text(S.of(context).selectedCount(selectedCount), style: Theme.of(context).textTheme.titleSmall),
+      Text(S.of(context).selectedCount(selectedCount), style: textTheme.titleSmall),
       const Spacer(),
       IconButton(
         icon: Icon(selectedCount == 0 ? Icons.select_all : Icons.deselect),
@@ -1084,7 +1097,7 @@ class _SubtitleToolbar extends StatelessWidget {
           constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
           onPressed: onDeleteSelected,
           tooltip: S.of(context).deleteWithCount(selectedCount),
-          color: Theme.of(context).colorScheme.error,
+          color: colorScheme.error,
         ),
       SizedBox(width: hPad - 8),
     ]);
@@ -1107,7 +1120,7 @@ class _SubtitleToolbar extends StatelessWidget {
     ]);
   }
 
-  Widget _buildActionBar(BuildContext context, double hPad) {
+  Widget _buildActionBar(BuildContext context, ColorScheme colorScheme, TextTheme textTheme, double hPad) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: hPad),
       child: Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
@@ -1116,7 +1129,7 @@ class _SubtitleToolbar extends StatelessWidget {
           label: Text(S.of(context).reload),
           style: TextButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
+            backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.5),
           ),
           onPressed: onRefresh,
         ),
@@ -1125,10 +1138,9 @@ class _SubtitleToolbar extends StatelessWidget {
             icon: const Icon(Icons.folder_open, size: 20),
             label: Text(S.of(context).openFolder),
             style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
-            ),
-            onPressed: onOpenFolder,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),            backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.5),
+          ),
+          onPressed: onOpenFolder,
           ),
         IconButton(
           icon: const Icon(Icons.search), onPressed: onEnterSearch,
@@ -1141,7 +1153,7 @@ class _SubtitleToolbar extends StatelessWidget {
           padding: EdgeInsets.zero, constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
         ),
         IconButton(
-          icon: Icon(Icons.info_outline, size: 20, color: Theme.of(context).colorScheme.primary),
+          icon: Icon(Icons.info_outline, size: 20, color: colorScheme.primary),
           padding: EdgeInsets.zero, constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           tooltip: S.of(context).subtitleLibraryGuide, onPressed: onShowInfo,
         ),
@@ -1149,17 +1161,17 @@ class _SubtitleToolbar extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              color: colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(S.of(context).nFilesWithSize(stats!.totalFiles, stats!.sizeFormatted),
-              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
           ),
       ]),
     );
   }
 
-  Widget _buildBreadcrumbs(BuildContext context, double hPad) {
+  Widget _buildBreadcrumbs(BuildContext context, ColorScheme colorScheme, double hPad) {
     if (rootPath == null) return const SizedBox.shrink();
     final crumbs = <Widget>[];
     crumbs.add(InkWell(
@@ -1168,7 +1180,7 @@ class _SubtitleToolbar extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         child: Text(S.of(context).subtitleLibrary,
-          style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary,
+          style: TextStyle(fontSize: 13, color: colorScheme.primary,
             fontWeight: FontWeight.w500)),
       ),
     ));
@@ -1182,12 +1194,12 @@ class _SubtitleToolbar extends StatelessWidget {
         buildPath = '$buildPath${Platform.pathSeparator}${parts[i]}';
         final target = buildPath;
         crumbs.add(Text(' > ',
-          style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)));
+          style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant)));
         if (i == parts.length - 1) {
           crumbs.add(Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             child: Text(parts[i],
-              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface,
+              style: TextStyle(fontSize: 13, color: colorScheme.onSurface,
                 fontWeight: FontWeight.bold)),
           ));
         } else {
@@ -1197,7 +1209,7 @@ class _SubtitleToolbar extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Text(parts[i],
-                style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary,
+                style: TextStyle(fontSize: 13, color: colorScheme.primary,
                   fontWeight: FontWeight.w500)),
             ),
           ));
@@ -1208,7 +1220,7 @@ class _SubtitleToolbar extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(left: hPad, right: hPad, top: 8),
       child: Row(children: [
-        Icon(Icons.folder_open, size: 16, color: Theme.of(context).colorScheme.primary),
+        Icon(Icons.folder_open, size: 16, color: colorScheme.primary),
         const SizedBox(width: 8),
         Expanded(child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -1245,10 +1257,11 @@ class _SubtitleFileTree extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: _buildNodes(context, items, level: 0));
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(children: _buildNodes(context, colorScheme, items, level: 0));
   }
 
-  List<Widget> _buildNodes(BuildContext context, List<Map<String, dynamic>> nodes, {int level = 0}) {
+  List<Widget> _buildNodes(BuildContext context, ColorScheme colorScheme, List<Map<String, dynamic>> nodes, {int level = 0}) {
     final result = <Widget>[];
     for (final item in nodes) {
       final isFolder = item['type'] == 'folder';
@@ -1272,7 +1285,7 @@ class _SubtitleFileTree extends StatelessWidget {
                 if (!isFolder && item['size'] != null)
                   Text(_formatSize(item['size']),
                     style: TextStyle(fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                      color: colorScheme.onSurfaceVariant)),
               ],
             )),
             if (!isFolder && FileIconUtils.isLyricFile(item['title'] ?? ''))
@@ -1295,13 +1308,13 @@ class _SubtitleFileTree extends StatelessWidget {
             if (isSelectionMode)
               Padding(padding: const EdgeInsets.only(left: 8),
                 child: Icon(isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-                  color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey, size: 20)),
+                  color: isSelected ? colorScheme.primary : Colors.grey, size: 20)),
           ]),
         ),
       ));
 
       if (isRecursive && isFolder && item['children'] != null) {
-        result.addAll(_buildNodes(context,
+        result.addAll(_buildNodes(context, colorScheme,
           (item['children'] as List).cast<Map<String, dynamic>>(),
           level: level + 1));
       }
@@ -1357,6 +1370,7 @@ class _FolderBrowserDialogState extends State<_FolderBrowserDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return AlertDialog(
       title: Row(children: [
         if (_pathStack.isNotEmpty)
@@ -1393,8 +1407,8 @@ class _FolderBrowserDialogState extends State<_FolderBrowserDialog> {
           icon: const Icon(Icons.check_circle, size: 18),
           label: Text(_currentDisplayName(context), overflow: TextOverflow.ellipsis, maxLines: 1),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            backgroundColor: colorScheme.primary,
+            foregroundColor: colorScheme.onPrimary,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
           onPressed: () => Navigator.pop(context, _currentPath),

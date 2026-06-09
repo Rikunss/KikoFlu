@@ -808,6 +808,8 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
 
   // 手动加载字幕
   Future<void> _loadLyricManually(dynamic file) async {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final title = file['title'] ?? file['name'] ?? S.of(context).unknown;
 
     // 检查当前是否有播放中的音频
@@ -835,7 +837,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           children: [
             Icon(
               Icons.subtitles,
-              color: Theme.of(context).colorScheme.primary,
+              color: cs.primary,
               size: 24,
             ),
             const SizedBox(width: 12),
@@ -849,16 +851,16 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
             children: [
               Text(
                 S.of(context).loadSubtitleConfirm,
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: tt.bodyMedium,
               ),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  color: cs.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Theme.of(context).colorScheme.outlineVariant,
+                    color: cs.outlineVariant,
                     width: 1,
                   ),
                 ),
@@ -870,7 +872,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                         Icon(
                           Icons.closed_caption,
                           size: 16,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: cs.primary,
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -878,7 +880,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.primary,
+                            color: cs.primary,
                           ),
                         ),
                       ],
@@ -897,7 +899,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                         Icon(
                           Icons.music_note,
                           size: 16,
-                          color: Theme.of(context).colorScheme.secondary,
+                          color: cs.secondary,
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -905,7 +907,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.secondary,
+                            color: cs.secondary,
                           ),
                         ),
                       ],
@@ -925,10 +927,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .secondaryContainer
-                      .withValues(alpha: 0.3),
+                  color: cs.secondaryContainer.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -936,7 +935,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                     Icon(
                       Icons.info_outline,
                       size: 16,
-                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      color: cs.onSecondaryContainer,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -944,9 +943,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                         S.of(context).subtitleAutoRestoreNote,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSecondaryContainer,
+                          color: cs.onSecondaryContainer,
                         ),
                       ),
                     ),
@@ -1481,33 +1478,36 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
     // 直接返回文件列表，占满全部空间
-    return _buildFileList();
+    return _buildFileList(colorScheme, textTheme);
   }
 
-  Widget _buildFileList() {
+  Widget _buildFileList(ColorScheme colorScheme, TextTheme textTheme) {
     if (_isLoading) {
       return Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSkeletonRow(width: 140, height: 16, bottomPadding: 16),
+            _buildSkeletonRow(colorScheme, width: 140, height: 16, bottomPadding: 16),
             const Divider(height: 1),
             const SizedBox(height: 12),
-            _buildSkeletonRow(width: double.infinity, height: 20, bottomPadding: 12),
-            _buildSkeletonRow(width: 200, height: 18, bottomPadding: 12),
-            _buildSkeletonRow(width: double.infinity, height: 20, bottomPadding: 12),
+            _buildSkeletonRow(colorScheme, width: double.infinity, height: 20, bottomPadding: 12),
+            _buildSkeletonRow(colorScheme, width: 200, height: 18, bottomPadding: 12),
+            _buildSkeletonRow(colorScheme, width: double.infinity, height: 20, bottomPadding: 12),
             Padding(
               padding: const EdgeInsets.only(left: 24),
-              child: _buildSkeletonRow(width: 180, height: 18, bottomPadding: 12),
+              child: _buildSkeletonRow(colorScheme, width: 180, height: 18, bottomPadding: 12),
             ),
             Padding(
               padding: const EdgeInsets.only(left: 24),
-              child: _buildSkeletonRow(width: 160, height: 18, bottomPadding: 12),
+              child: _buildSkeletonRow(colorScheme, width: 160, height: 18, bottomPadding: 12),
             ),
-            _buildSkeletonRow(width: double.infinity, height: 20, bottomPadding: 12),
-            _buildSkeletonRow(width: 120, height: 18, bottomPadding: 0),
+            _buildSkeletonRow(colorScheme, width: double.infinity, height: 20, bottomPadding: 12),
+            _buildSkeletonRow(colorScheme, width: 120, height: 18, bottomPadding: 0),
           ],
         ),
       );
@@ -1524,30 +1524,27 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .errorContainer
-                      .withValues(alpha: 0.3),
+                  color: colorScheme.errorContainer.withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.cloud_off_rounded,
                   size: 40,
-                  color: Theme.of(context).colorScheme.error,
+                  color: colorScheme.error,
                 ),
               ),
               const SizedBox(height: 24),
               Text(
                 S.of(context).loadFailed,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
               ),
               const SizedBox(height: 8),
               Text(
                 _errorMessage!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                 textAlign: TextAlign.center,
                 maxLines: 3,
@@ -1576,22 +1573,19 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primaryContainer
-                      .withValues(alpha: 0.3),
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.folder_open_rounded,
                   size: 40,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: colorScheme.primary,
                 ),
               ),
               const SizedBox(height: 24),
               Text(
                 S.of(context).noFiles,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
               ),
@@ -1614,7 +1608,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                 Icon(
                   Icons.folder_outlined,
                   size: 20,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -1622,7 +1616,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                     _showTranslation
                         ? S.of(context).resourceFilesTranslated(_translationCache.length)
                         : S.of(context).resourceFiles,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -1640,14 +1634,8 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: _showTranslation
-                              ? Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.3)
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.2),
+                              ? colorScheme.primary.withValues(alpha: 0.3)
+                              : colorScheme.onSurface.withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
@@ -1660,19 +1648,15 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                                   height: 16,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
+                                    color: colorScheme.primary,
                                   ),
                                 )
                               : Icon(
                                   Icons.g_translate,
                                   size: 16,
                                   color: _showTranslation
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withValues(alpha: 0.7),
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurface.withValues(alpha: 0.7),
                                 ),
                           if (!_isTranslating) ...[
                             const SizedBox(width: 4),
@@ -1682,11 +1666,8 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                                 color: _showTranslation
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.7),
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurface.withValues(alpha: 0.7),
                               ),
                             ),
                           ],
@@ -1706,7 +1687,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
+                color: colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
@@ -1720,7 +1701,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                   const SizedBox(width: 8),
                   Text(
                     _translationProgress,
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: textTheme.bodySmall,
                   ),
                 ],
               ),
@@ -2097,7 +2078,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     return originalName;
   }
 
-  Widget _buildSkeletonRow({
+  Widget _buildSkeletonRow(ColorScheme colorScheme, {
     required double width,
     required double height,
     double bottomPadding = 0,
@@ -2112,10 +2093,7 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
             width: width,
             height: height,
             decoration: BoxDecoration(
-              color: Theme.of(context)
-                  .colorScheme
-                  .surfaceContainerHighest
-                  .withValues(alpha: value),
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: value),
               borderRadius: BorderRadius.circular(4),
             ),
           );

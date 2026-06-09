@@ -33,11 +33,10 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     final currentTrack = ref.watch(currentTrackProvider);
     final isPlaying = ref.watch(isPlayingProvider);
     final isTrackLoading = ref.watch(isTrackLoadingProvider).valueOrNull ?? false;
-    final authState = ref.watch(authProvider);
+    // .select() agar miniplayer tidak rebuild saat seluruh auth state berubah
+    final host = ref.watch(authProvider.select((s) => s.host ?? ''));
+    final token = ref.watch(authProvider.select((s) => s.token ?? ''));
     final isMiniPlayerVisible = ref.watch(miniPlayerVisibilityProvider);
-
-    // 启用自动字幕加载器
-    ref.watch(lyricAutoLoaderProvider);
 
     return currentTrack.when(
       data: (track) {
@@ -67,8 +66,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
             track.artworkUrl!.startsWith('file://')) {
           workCoverUrl = track.artworkUrl;
         } else if (track.workId != null) {
-          final host = authState.host ?? '';
-          final token = authState.token ?? '';
           if (host.isNotEmpty) {
             var normalizedHost = host;
             if (!normalizedHost.startsWith('http://') &&
@@ -99,6 +96,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                   isPlaying && hasLyrics && currentLyric != null;
 
               final cs = Theme.of(context).colorScheme;
+              final tt = Theme.of(context).textTheme;
               final dividerColor = cs.outline.withValues(alpha: 0.15);
 
               // Listener (not GestureDetector!) to detect UPWARD swipes
@@ -166,8 +164,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                                       children: [
                                         Text(
                                           track.title,
-                                          style: Theme.of(context).textTheme.bodyMedium
-                                              ?.copyWith(
+                                          style: tt.bodyMedium?.copyWith(
                                             fontWeight: FontWeight.w500,
                                           ),
                                           maxLines: 1,
@@ -177,8 +174,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                                           const SizedBox(height: 1),
                                           Text(
                                             track.artist!,
-                                            style: Theme.of(context).textTheme.bodySmall
-                                                ?.copyWith(
+                                            style: tt.bodySmall?.copyWith(
                                               color: cs.onSurfaceVariant,
                                             ),
                                             maxLines: 1,
@@ -203,8 +199,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                                                 const EdgeInsets.only(top: 2),
                                             child: Text(
                                               currentLyric,
-                                              style: Theme.of(context).textTheme.labelSmall
-                                                  ?.copyWith(
+                                              style: tt.labelSmall?.copyWith(
                                                 color: cs.primary,
                                                 fontWeight: FontWeight.w600,
                                               ),

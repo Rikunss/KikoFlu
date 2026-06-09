@@ -31,6 +31,7 @@ class CircleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     // 如果提供了自定义样式参数，使用自定义样式
     if (fontSize != null || padding != null || borderRadius != null) {
       return GestureDetector(
@@ -57,14 +58,14 @@ class CircleChip extends StatelessWidget {
           padding:
               padding ?? const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.secondaryContainer,
+            color: cs.secondaryContainer,
             borderRadius: BorderRadius.circular(borderRadius ?? 12),
           ),
           child: Text(
             circleName,
             style: TextStyle(
               fontSize: fontSize ?? 11,
-              color: Theme.of(context).colorScheme.onSecondaryContainer,
+              color: cs.onSecondaryContainer,
               fontWeight: fontWeight ?? FontWeight.w500,
             ),
           ),

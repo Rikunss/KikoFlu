@@ -55,6 +55,8 @@ class HistoryWorkCard extends ConsumerWidget {
     final token = ref.watch(authProvider.select((s) => s.token ?? ''));
     final work = record.work;
 
+    final cs = Theme.of(context).colorScheme;
+
     final httpHeaders = StorageService.serverCookieHeaders;
 
     return Card(
@@ -131,7 +133,7 @@ class HistoryWorkCard extends ConsumerWidget {
                       right: 8,
                       bottom: 8,
                       child: Material(
-                        color: Theme.of(context).colorScheme.primary,
+                        color: cs.primary,
                         shape: const CircleBorder(),
                         elevation: 4,
                         child: InkWell(
@@ -142,7 +144,7 @@ class HistoryWorkCard extends ConsumerWidget {
                             child: Icon(
                               Icons.play_arrow,
                               size: 24,
-                              color: Theme.of(context).colorScheme.onPrimary,
+                              color: cs.onPrimary,
                             ),
                           ),
                         ),
@@ -164,7 +166,7 @@ class HistoryWorkCard extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
+                      color: cs.onSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -189,7 +191,7 @@ class HistoryWorkCard extends ConsumerWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Theme.of(context).colorScheme.secondary,
+                                color: cs.secondary,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -202,7 +204,7 @@ class HistoryWorkCard extends ConsumerWidget {
                                     fontSize: 10,
                                     fontWeight: FontWeight.w500,
                                     color:
-                                        Theme.of(context).colorScheme.primary,
+                                        cs.primary,
                                   ),
                                 ),
                                 if (record.playlistTotal > 0)
@@ -211,7 +213,7 @@ class HistoryWorkCard extends ConsumerWidget {
                                     style: TextStyle(
                                       fontSize: 10,
                                       color:
-                                          Theme.of(context).colorScheme.outline,
+                                          cs.outline,
                                     ),
                                   ),
                               ],
@@ -219,10 +221,8 @@ class HistoryWorkCard extends ConsumerWidget {
                             const SizedBox(height: 6),
                             LinearProgressIndicator(
                               value: progressValue,
-                              backgroundColor: Theme.of(context)
-                                  .colorScheme
-                                  .surfaceContainerHighest,
-                              color: Theme.of(context).colorScheme.primary,
+                              backgroundColor: cs.surfaceContainerHighest,
+                              color: cs.primary,
                               minHeight: 3,
                               borderRadius: BorderRadius.circular(1.5),
                             ),
@@ -235,7 +235,7 @@ class HistoryWorkCard extends ConsumerWidget {
                       S.of(context).notPlayedYet,
                       style: TextStyle(
                         fontSize: 11,
-                        color: Theme.of(context).colorScheme.outline,
+                        color: cs.outline,
                       ),
                     ),
                 ],

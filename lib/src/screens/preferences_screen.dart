@@ -235,6 +235,10 @@ class PreferencesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+    final platform = theme.platform;
     final priority = ref.watch(subtitleLibraryPriorityProvider);
     final defaultSort = ref.watch(defaultSortProvider);
     final translationSource = ref.watch(translationSourceProvider);
@@ -250,8 +254,7 @@ class PreferencesScreen extends ConsumerWidget {
             child: Column(
               children: [
                 ListTile(
-                  leading: Icon(Icons.library_books,
-                      color: Theme.of(context).colorScheme.primary),
+                  leading: Icon(Icons.library_books, color: colorScheme.primary),
                   title: Text(S.of(context).subtitleLibraryPriority),
                   subtitle: Text(S.of(context).currentSettingLabel(priority.localizedName(context))),
                   trailing: const Icon(Icons.arrow_forward_ios),
@@ -259,10 +262,9 @@ class PreferencesScreen extends ConsumerWidget {
                     _showSubtitleLibraryPriorityDialog(context, ref);
                   },
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: colorScheme.outlineVariant),
                 ListTile(
-                  leading: Icon(Icons.sort,
-                      color: Theme.of(context).colorScheme.primary),
+                  leading: Icon(Icons.sort, color: colorScheme.primary),
                   title: Text(S.of(context).defaultSortSettingTitle),
                   subtitle: Text(
                       '${defaultSort.order.localizedLabel(context)} - ${defaultSort.direction.localizedLabel(context)}'),
@@ -271,10 +273,9 @@ class PreferencesScreen extends ConsumerWidget {
                     _showDefaultSortDialog(context, ref);
                   },
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: colorScheme.outlineVariant),
                 ListTile(
-                  leading: Icon(Icons.translate,
-                      color: Theme.of(context).colorScheme.primary),
+                  leading: Icon(Icons.translate, color: colorScheme.primary),
                   title: Text(S.of(context).translationSource),
                   subtitle: Text(S.of(context).currentSettingLabel(translationSource.localizedName(context))),
                   trailing: const Icon(Icons.arrow_forward_ios),
@@ -283,10 +284,9 @@ class PreferencesScreen extends ConsumerWidget {
                   },
                 ),
                 if (translationSource == TranslationSource.llm) ...[
-                  Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                  Divider(color: colorScheme.outlineVariant),
                   ListTile(
-                    leading: Icon(Icons.settings_input_component,
-                        color: Theme.of(context).colorScheme.primary),
+                    leading: Icon(Icons.settings_input_component, color: colorScheme.primary),
                     title: Text(S.of(context).llmSettings),
                     subtitle: Text(S.of(context).llmSettingsSubtitle),
                     trailing: const Icon(Icons.arrow_forward_ios),
@@ -299,10 +299,9 @@ class PreferencesScreen extends ConsumerWidget {
                     },
                   ),
                 ],
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: colorScheme.outlineVariant),
                 ListTile(
-                  leading: Icon(Icons.audio_file,
-                      color: Theme.of(context).colorScheme.primary),
+                  leading: Icon(Icons.audio_file, color: colorScheme.primary),
                   title: Text(S.of(context).audioFormatPreference),
                   subtitle: Text(S.of(context).audioFormatSubtitle),
                   trailing: const Icon(Icons.arrow_forward_ios),
@@ -314,10 +313,9 @@ class PreferencesScreen extends ConsumerWidget {
                     );
                   },
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: colorScheme.outlineVariant),
                 ListTile(
-                  leading: Icon(Icons.block,
-                      color: Theme.of(context).colorScheme.primary),
+                  leading: Icon(Icons.block, color: colorScheme.primary),
                   title: Text(S.of(context).blockingSettings),
                   subtitle: Text(S.of(context).blockingSettingsSubtitle),
                   trailing: const Icon(Icons.arrow_forward_ios),
@@ -329,10 +327,9 @@ class PreferencesScreen extends ConsumerWidget {
                     );
                   },
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: colorScheme.outlineVariant),
                 SwitchListTile(
-                  secondary: Icon(Icons.sync,
-                      color: Theme.of(context).colorScheme.primary),
+                  secondary: Icon(Icons.sync, color: colorScheme.primary),
                   title: Text(S.of(context).progressSync),
                   subtitle: Text(
                     ref.watch(progressSyncProvider)
@@ -354,18 +351,16 @@ class PreferencesScreen extends ConsumerWidget {
                   },
                 ),
                 // 仅在 Android, Windows 和 macOS 平台上显示音频直通设置
-                if (Theme.of(context).platform == TargetPlatform.android ||
-                    Theme.of(context).platform == TargetPlatform.windows ||
-                    Theme.of(context).platform == TargetPlatform.macOS) ...[
-                  Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                if (platform == TargetPlatform.android ||
+                    platform == TargetPlatform.windows ||
+                    platform == TargetPlatform.macOS) ...[
+                  Divider(color: colorScheme.outlineVariant),
                   SwitchListTile(
-                    secondary: Icon(Icons.surround_sound,
-                        color: Theme.of(context).colorScheme.primary),
+                    secondary: Icon(Icons.surround_sound, color: colorScheme.primary),
                     title: Text(S.of(context).audioPassthrough),
                     subtitle: Text(
-                      (Theme.of(context).platform == TargetPlatform.windows ||
-                              Theme.of(context).platform ==
-                                  TargetPlatform.macOS)
+                      (platform == TargetPlatform.windows ||
+                              platform == TargetPlatform.macOS)
                           ? S.of(context).audioPassthroughDescWindows
                           : S.of(context).audioPassthroughDescAndroid,
                       style: const TextStyle(fontSize: 12),
@@ -402,9 +397,9 @@ class PreferencesScreen extends ConsumerWidget {
                         SnackBarUtil.showSuccess(
                           context,
                           value
-                              ? ((Theme.of(context).platform ==
+                              ? ((platform ==
                                           TargetPlatform.windows ||
-                                      Theme.of(context).platform ==
+                                      platform ==
                                           TargetPlatform.macOS)
                                   ? S.of(context).exclusiveModeEnabled
                                   : S.of(context).audioPassthroughEnabled)
@@ -419,16 +414,16 @@ class PreferencesScreen extends ConsumerWidget {
           ),
           // Equalizer settings
           const SizedBox(height: 16),
-          _buildEqualizerCard(context, ref),
+          _buildEqualizerCard(context, ref, colorScheme),
           // Crossfade settings
           const SizedBox(height: 16),
-          _buildCrossfadeCard(context, ref),
+          _buildCrossfadeCard(context, ref, colorScheme, textTheme),
         ],
       ),
     );
   }
 
-  Widget _buildEqualizerCard(BuildContext context, WidgetRef ref) {
+  Widget _buildEqualizerCard(BuildContext context, WidgetRef ref, ColorScheme colorScheme) {
     final eqEnabled = ref.watch(equalizerEnabledProvider);
     final eqPreset = ref.watch(equalizerActivePresetProvider);
     final isSupported = ref.watch(equalizerDeviceSupportProvider);
@@ -440,10 +435,7 @@ class PreferencesScreen extends ConsumerWidget {
 
     return Card(
       child: ListTile(
-        leading: Icon(
-          Icons.equalizer,
-          color: Theme.of(context).colorScheme.primary,
-        ),
+        leading: Icon(Icons.equalizer, color: colorScheme.primary),
         title: Text(S.of(context).equalizerTitle),
         subtitle: Text(
           eqEnabled && isSupported
@@ -454,7 +446,7 @@ class PreferencesScreen extends ConsumerWidget {
           style: TextStyle(
             fontSize: 12,
             color: eqEnabled && isSupported
-                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.8)
+                ? colorScheme.primary.withValues(alpha: 0.8)
                 : null,
           ),
         ),
@@ -470,7 +462,7 @@ class PreferencesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCrossfadeCard(BuildContext context, WidgetRef ref) {
+  Widget _buildCrossfadeCard(BuildContext context, WidgetRef ref, ColorScheme colorScheme, TextTheme textTheme) {
     final crossfadeMs = ref.watch(crossfadeDurationProvider);
     final crossfadeEnabled = crossfadeMs > 0;
 
@@ -478,8 +470,7 @@ class PreferencesScreen extends ConsumerWidget {
       child: Column(
         children: [
           SwitchListTile(
-            secondary: Icon(Icons.swap_horiz,
-                color: Theme.of(context).colorScheme.primary),
+            secondary: Icon(Icons.swap_horiz, color: colorScheme.primary),
             title: Text(S.of(context).crossfadeTitle),
             subtitle: Text(
               crossfadeEnabled
@@ -487,7 +478,7 @@ class PreferencesScreen extends ConsumerWidget {
                   : S.of(context).gaplessPlaybackEnabled,
               style: TextStyle(
                 color: crossfadeEnabled
-                    ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.8)
+                    ? colorScheme.primary.withValues(alpha: 0.8)
                     : null,
               ),
             ),
@@ -509,7 +500,7 @@ class PreferencesScreen extends ConsumerWidget {
             },
           ),
           if (crossfadeEnabled) ...[
-            Divider(height: 1, color: Theme.of(context).colorScheme.outlineVariant),
+            Divider(height: 1, color: colorScheme.outlineVariant),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Column(
@@ -519,16 +510,16 @@ class PreferencesScreen extends ConsumerWidget {
                     children: [
                       Text(
                         S.of(context).crossfadeDurationLabel,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        style: textTheme.bodyMedium,
                       ),
                       const Spacer(),
                       Text(
                         crossfadeMs >= 1000
                             ? '${(crossfadeMs / 1000).toStringAsFixed(1)}s'
                             : '${crossfadeMs}ms',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        style: textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
+                              color: colorScheme.primary,
                             ),
                       ),
                     ],
@@ -554,15 +545,15 @@ class PreferencesScreen extends ConsumerWidget {
                     children: [
                       Text(
                         S.of(context).crossfadeMinLabel,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
                             ),
                       ),
                       const Spacer(),
                       Text(
                         S.of(context).crossfadeMaxLabel,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
                             ),
                       ),
                     ],
@@ -571,7 +562,7 @@ class PreferencesScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -580,13 +571,13 @@ class PreferencesScreen extends ConsumerWidget {
                         Icon(
                           Icons.info_outline,
                           size: 16,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: colorScheme.primary,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             S.of(context).crossfadeDescription,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            style: textTheme.bodySmall?.copyWith(
                                   height: 1.4,
                                 ),
                           ),

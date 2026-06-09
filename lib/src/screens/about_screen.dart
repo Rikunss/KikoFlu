@@ -224,7 +224,9 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
   }
 
   Widget _buildErrorState(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -247,14 +249,14 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
             const SizedBox(height: 20),
             Text(
               S.of(context).loadFailed,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: tt.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
             ),
             const SizedBox(height: 8),
             Text(
               S.of(context).failedToLoadAbout,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              style: tt.bodySmall?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
               textAlign: TextAlign.center,
@@ -278,6 +280,7 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
 
   Widget _buildUpdateCard(
       BuildContext context, ColorScheme cs, dynamic updateInfo) {
+    final tt = Theme.of(context).textTheme;
     final s = S.of(context);
     return Card(
       elevation: 0,
@@ -315,7 +318,7 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
                   children: [
                     Text(
                       s.newVersionFound,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      style: tt.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: cs.onSecondaryContainer,
                           ),
@@ -324,7 +327,7 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
                     Text(
                       s.newVersionAvailable(
                           updateInfo.latestVersion, updateInfo.currentVersion),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      style: tt.bodySmall?.copyWith(
                             color: cs.onSecondaryContainer,
                           ),
                     ),
@@ -353,7 +356,9 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
     Widget? trailing,
     VoidCallback? onTap,
   }) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final tt = theme.textTheme;
+    final cs = theme.colorScheme;
     return Card(
       elevation: 0,
       color: cs.surfaceContainerLow,
@@ -388,7 +393,7 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      style: tt.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                       maxLines: 1,
@@ -397,7 +402,7 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      style: tt.bodySmall?.copyWith(
                             color: cs.onSurfaceVariant,
                           ),
                       maxLines: 1,

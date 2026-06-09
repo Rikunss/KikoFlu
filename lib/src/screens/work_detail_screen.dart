@@ -513,8 +513,14 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+    final mediaQuerySize = MediaQuery.of(context).size;
+    final orientation = MediaQuery.orientationOf(context);
+
     // 根据主题亮度设置状态栏图标颜色
-    final brightness = Theme.of(context).brightness;
+    final brightness = theme.brightness;
     final systemOverlayStyle = SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: brightness == Brightness.light
@@ -534,7 +540,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                 _copyToClipboard(formatRJCode(widget.work.id), S.of(context).rjNumberLabel),
             child: Text(
               formatRJCode(widget.work.id),
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              style: textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
@@ -572,15 +578,14 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                     ? Padding(
                         key: const ValueKey('progress_loading'),
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Theme.of(context).colorScheme.primary,
+                        child: Center(                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: colorScheme.primary,
+                              ),
                             ),
-                          ),
                         ),
                       )
                     : TextButton(
@@ -603,8 +608,8 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
                                 color: _currentProgress != null
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context).colorScheme.onSurface,
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurface,
                               ),
                             ),
                             const SizedBox(width: 4),
@@ -613,8 +618,8 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                                   _currentProgress),
                               size: 22,
                               color: _currentProgress != null
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.onSurface,
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurface,
                             ),
                           ],
                         ),
@@ -623,17 +628,29 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
             ),
           ],
         ),
-        body: _buildBody(),
+        body: _buildBody(
+          theme: theme,
+          colorScheme: colorScheme,
+          textTheme: textTheme,
+          mediaQuerySize: mediaQuerySize,
+          orientation: orientation,
+        ),
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody({
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required TextTheme textTheme,
+    required Size mediaQuerySize,
+    required Orientation orientation,
+  }) {
     final (host, token) = ref.watch(authProvider.select(
       (s) => (s.host ?? '', s.token ?? ''),
     ));
     final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+        orientation == Orientation.landscape;
 
     // 使用已有的work信息（来自列表），详细信息加载后再更新
     final work = _detailedWork ?? widget.work;
@@ -669,10 +686,10 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
               width: isLandscape ? null : double.infinity,
               constraints: BoxConstraints(
                 maxHeight: isLandscape
-                    ? MediaQuery.of(context).size.height * 0.8
+                    ? mediaQuerySize.height * 0.8
                     : 500,
                 maxWidth: isLandscape
-                    ? MediaQuery.of(context).size.width * 0.45
+                    ? mediaQuerySize.width * 0.45
                     : double.infinity,
               ),
               child: PrivacyBlurCover(
@@ -744,7 +761,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
+                            color: colorScheme.primary,
                             borderRadius: BorderRadius.circular(6),
                             boxShadow: [
                               BoxShadow(
@@ -757,7 +774,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                           child: Text(
                             S.of(context).subtitleBadge,
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onPrimary,
+                              color: colorScheme.onPrimary,
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                               height: 1.1,
@@ -813,7 +830,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                                 child: Icon(
                                   Icons.open_in_new,
                                   size: 18,
-                                  color: Theme.of(context).colorScheme.primary,
+                                  color: colorScheme.primary,
                                 ),
                               ),
                             ),
@@ -837,21 +854,15 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                                         height: 16,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary,
+                                          color: colorScheme.primary,
                                         ),
                                       )
                                     : Icon(
                                         Icons.g_translate,
                                         size: 18,
                                         color: _showTranslation
-                                            ? Theme.of(context)
-                                                .colorScheme
-                                                .primary
-                                            : Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
+                                            ? colorScheme.primary
+                                            :colorScheme.onSurface
                                                 .withValues(alpha: 0.6),
                                       ),
                               ),
@@ -860,7 +871,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                         ),
                     ],
                   ),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -876,9 +887,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
           if (_errorMessage != null)
             Card(
               elevation: 0,
-              color: Theme.of(context)
-                  .colorScheme
-                  .errorContainer
+              color:colorScheme.errorContainer
                   .withValues(alpha: 0.25),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -892,16 +901,14 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .errorContainer
+                        color: colorScheme.errorContainer
                             .withValues(alpha: 0.6),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.error_outline_rounded,
                         size: 20,
-                        color: Theme.of(context).colorScheme.error,
+                        color: colorScheme.error,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -909,9 +916,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                       child: Text(
                         _errorMessage!,
                         style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onErrorContainer,
+                          color:colorScheme.onErrorContainer,
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
@@ -921,7 +926,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                       onPressed: _loadWorkDetail,
                       style: TextButton.styleFrom(
                         foregroundColor:
-                            Theme.of(context).colorScheme.error,
+                            colorScheme.error,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                       ),
@@ -957,7 +962,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
               if (!hasAnyItem) return const SizedBox.shrink();
               return Card(
                 elevation: 0,
-                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                color: colorScheme.surfaceContainerLow,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -1060,7 +1065,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primaryContainer,
+                              color: colorScheme.primaryContainer,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
@@ -1068,9 +1073,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                               children: [
                                 Icon(
                                   Icons.person,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onPrimaryContainer,
+                                  color:colorScheme.onPrimaryContainer,
                                   size: 14,
                                 ),
                                 const SizedBox(width: 4),
@@ -1083,9 +1086,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                                 Text(
                                   '$_currentRating',
                                   style: TextStyle(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onPrimaryContainer,
+                                    color: colorScheme.onPrimaryContainer,
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -1099,7 +1100,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                       if (showPrice)
                         Text(
                           S.of(context).priceInYen(work.price!),
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: textTheme.bodyMedium?.copyWith(
                                 color: Colors.red[700],
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12,
@@ -1116,10 +1117,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                             const SizedBox(width: 4),
                             Text(
                               _formatDuration(work.duration!),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
+                              style: textTheme.bodyMedium?.copyWith(
                                     color: Colors.blue[700],
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
@@ -1133,7 +1131,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                         Text(
                           S.of(context).soldCount(
                               _formatNumber(context, work.dlCount!)),
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: textTheme.bodyMedium?.copyWith(
                                 color: Colors.grey[600],
                                 fontSize: 12,
                               ),
@@ -1152,7 +1150,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
               (work.vas != null && work.vas!.isNotEmpty))
             Card(
               elevation: 0,
-              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              color: colorScheme.surfaceContainerLow,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -1165,13 +1163,13 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                     Row(
                       children: [
                         Icon(Icons.groups, size: 18,
-                            color: Theme.of(context).colorScheme.primary),
+                            color: colorScheme.primary),
                         const SizedBox(width: 6),
                         Text(
                           S.of(context).circleAndVaSection,
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          style: textTheme.labelLarge?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.primary,
+                                color: colorScheme.primary,
                               ),
                         ),
                       ],
@@ -1230,7 +1228,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
           if (work.tags != null && work.tags!.isNotEmpty)
             Card(
               elevation: 0,
-              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              color: colorScheme.surfaceContainerLow,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -1243,13 +1241,13 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                     Row(
                       children: [
                         Icon(Icons.label, size: 18,
-                            color: Theme.of(context).colorScheme.primary),
+                            color: colorScheme.primary),
                         const SizedBox(width: 6),
                         Text(
                           S.of(context).tagLabel,
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          style: textTheme.labelLarge?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.primary,
+                                color: colorScheme.primary,
                               ),
                         ),
                       ],
@@ -1287,16 +1285,14 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primaryContainer
+                        color:colorScheme.primaryContainer
                             .withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Icon(
                         Icons.add,
                         size: 16,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: colorScheme.primary,
                       ),
                     ),
                   ),
@@ -1314,9 +1310,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primaryContainer
+                  color: colorScheme.primaryContainer
                       .withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(6),
                 ),
@@ -1326,14 +1320,14 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                     Icon(
                       Icons.add,
                       size: 16,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: colorScheme.primary,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       S.of(context).addTag,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: colorScheme.primary,
                       ),
                     ),
                   ],
@@ -1354,7 +1348,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
               }
               return Card(
                 elevation: 0,
-                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                color: colorScheme.surfaceContainerLow,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -1367,13 +1361,13 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                       Row(
                         children: [
                           Icon(Icons.calendar_today, size: 18,
-                              color: Theme.of(context).colorScheme.primary),
+                              color: colorScheme.primary),
                           const SizedBox(width: 6),
                           Text(
                             S.of(context).releaseDate,
-                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            style: textTheme.labelLarge?.copyWith(
                                   fontWeight: FontWeight.w600,
-                                  color: Theme.of(context).colorScheme.primary,
+                                  color: colorScheme.primary,
                                 ),
                           ),
                         ],
@@ -1381,7 +1375,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                       const SizedBox(height: 10),
                       Text(
                         work.release!.split('T')[0],
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        style: textTheme.bodyMedium?.copyWith(
                               fontSize: 14,
                             ),
                       ),
@@ -1398,7 +1392,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
               work.otherLanguageEditions!.isNotEmpty)
             Card(
               elevation: 0,
-              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              color: colorScheme.surfaceContainerLow,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -1411,13 +1405,13 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                     Row(
                       children: [
                         Icon(Icons.translate, size: 18,
-                            color: Theme.of(context).colorScheme.primary),
+                            color: colorScheme.primary),
                         const SizedBox(width: 6),
                         Text(
                           S.of(context).otherEditions,
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          style: textTheme.labelLarge?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.primary,
+                                color: colorScheme.primary,
                               ),
                         ),
                       ],
@@ -1448,9 +1442,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .secondaryContainer
+                              color:colorScheme.secondaryContainer
                                   .withValues(alpha: 0.7),
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -1460,9 +1452,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                                 Icon(
                                   Icons.translate,
                                   size: 14,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSecondaryContainer,
+                                  color:colorScheme.onSecondaryContainer,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -1470,9 +1460,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSecondaryContainer,
+                                    color: colorScheme.onSecondaryContainer,
                                   ),
                                 ),
                               ],

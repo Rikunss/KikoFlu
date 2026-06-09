@@ -180,6 +180,8 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
       // Jump to estimated position first — this forces ListView to build
       // the target item. Then fine-tune with smooth animation.
       // Uses jumpTo (no animation) to avoid competing scroll animations.
+      // Note: can't use cached mediaQueryHeight here because this method
+      // runs outside build() scope — called from postFrameCallback.
       final centrePadding = MediaQuery.of(context).size.height * 0.38;
       // Typical lyric item height: fontSize~20 × lineHeight~1.5 + vertical padding 28
       const approxItemHeight = 58.0;
@@ -235,8 +237,11 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
     final position = ref.watch(positionProvider);
     final lyricSettings = ref.watch(playerLyricSettingsProvider);
     final autoTranslateEnabled = ref.watch(autoTranslateLyricsProvider);
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+    final mediaQueryHeight = MediaQuery.of(context).size.height;
+    final paddingTop = MediaQuery.of(context).padding.top;
 
     // ---- Auto-translate banner listener -------------------------------
     // Detect auto-translate state transitions (only when feature is enabled)
@@ -326,7 +331,7 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
     // ---- Focus Lyrics UI ------------------------------------------------
     // Large top/bottom padding ensures the active line sits at the visual
     // centre even for the first / last lyrics.
-    final centrePadding = MediaQuery.of(context).size.height * 0.38;
+    final centrePadding = mediaQueryHeight * 0.38;
 
     return Stack(
       children: [
@@ -334,7 +339,7 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
         // AnimatedSize at top: grows downward when appearing (shrink-down),
         // collapses upward when hiding (shrink-up).
         Positioned(
-          top: MediaQuery.of(context).padding.top + 4,
+          top: paddingTop + 4,
           left: 0,
           right: 0,
           child: IgnorePointer(
@@ -495,7 +500,7 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
         // -----------------------------------------------------------------
         if (_indicatorLabel != null)
           Positioned(
-            top: MediaQuery.of(context).padding.top + 60,
+            top: paddingTop + 60,
             left: 0,
             right: 0,
             child: IgnorePointer(

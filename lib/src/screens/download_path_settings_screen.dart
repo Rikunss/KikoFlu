@@ -147,6 +147,7 @@ class _DownloadPathSettingsScreenState
   }
 
   Future<bool> _showMigrationConfirmDialog(String newPath) async {
+    final cs = Theme.of(context).colorScheme;
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -160,7 +161,7 @@ class _DownloadPathSettingsScreenState
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: SelectableText(
@@ -280,6 +281,8 @@ class _DownloadPathSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final hasCustomPath = DownloadPathService.hasCustomPath();
 
     return Scaffold(
@@ -295,7 +298,7 @@ class _DownloadPathSettingsScreenState
                   const SizedBox(height: 24),
                   Text(
                     S.of(context).migratingFiles,
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: tt.titleMedium,
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -316,7 +319,7 @@ class _DownloadPathSettingsScreenState
                       children: [
                         Icon(
                           Icons.info_outline,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: cs.primary,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -334,7 +337,7 @@ class _DownloadPathSettingsScreenState
                 // 当前路径
                 Text(
                   S.of(context).currentDownloadPath,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: tt.titleMedium,
                 ),
                 const SizedBox(height: 8),
                 Card(
@@ -351,18 +354,14 @@ class _DownloadPathSettingsScreenState
                                     hasCustomPath
                                         ? Icons.folder_special
                                         : Icons.folder,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
+                                    color: cs.onSurfaceVariant,
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
                                     hasCustomPath ? S.of(context).customPath : S.of(context).defaultPath,
                                     style: TextStyle(
                                       fontWeight: FontWeight.w600,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
+                                      color: cs.onSurfaceVariant,
                                     ),
                                   ),
                                 ],
@@ -371,9 +370,7 @@ class _DownloadPathSettingsScreenState
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .surfaceContainerHighest,
+                                  color: cs.surfaceContainerHighest,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: SelectableText(
@@ -415,16 +412,13 @@ class _DownloadPathSettingsScreenState
                   ],
                 ] else ...[
                   Card(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .errorContainer
-                        .withValues(alpha: 0.3),
+                    color: cs.errorContainer.withValues(alpha: 0.3),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Text(
                         S.of(context).platformNotSupportCustomPath,
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+                          color: cs.error,
                         ),
                       ),
                     ),
@@ -445,14 +439,12 @@ class _DownloadPathSettingsScreenState
                             Icon(
                               Icons.help_outline,
                               size: 20,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              color: cs.onSurfaceVariant,
                             ),
                             const SizedBox(width: 8),
                             Text(
                               S.of(context).usageInstructions,
-                              style: Theme.of(context).textTheme.titleSmall,
+                              style: tt.titleSmall,
                             ),
                           ],
                         ),

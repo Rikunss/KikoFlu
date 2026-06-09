@@ -269,6 +269,9 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
   }
 
   Widget _buildBody(WorksState worksState) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
     // 错误状态或空状态 - 统一显示
     if (worksState.works.isEmpty) {
       // 如果有错误，显示错误信息
@@ -280,18 +283,18 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
               Icon(
                 Icons.error_outline,
                 size: 64,
-                color: Theme.of(context).colorScheme.error,
+                color: cs.error,
               ),
               const SizedBox(height: 16),
               Text(
                 S.of(context).loadFailed,
-                style: Theme.of(context).textTheme.titleLarge,
+                style: tt.titleLarge,
               ),
               const SizedBox(height: 8),
               Text(
                 worksState.error!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                style: tt.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -326,17 +329,17 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.audiotrack,
-                size: 64, color: Theme.of(context).colorScheme.outline),
+                size: 64, color: cs.outline),
             const SizedBox(height: 16),
             Text(
               S.of(context).noWorks,
-              style: Theme.of(context).textTheme.titleLarge,
+              style: tt.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
               S.of(context).checkNetworkOrRetry,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              style: tt.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
                   ),
             ),
           ],
@@ -366,18 +369,22 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
   }
 
   Widget _buildLayoutView(WorksState worksState) {
+    // Cache MediaQuery sekali untuk menghindari lookup berulang
+    final size = MediaQuery.of(context).size;
+    final orientation = MediaQuery.orientationOf(context);
+
     switch (worksState.layoutType) {
       case LayoutType.bigGrid:
         return _buildGridView(
           worksState,
           crossAxisCount:
-              ResponsiveGridHelper.getBigGridCrossAxisCount(context),
+              ResponsiveGridHelper.getBigGridCrossAxisCountForSize(size, orientation),
         );
       case LayoutType.smallGrid:
         return _buildGridView(
           worksState,
           crossAxisCount:
-              ResponsiveGridHelper.getSmallGridCrossAxisCount(context),
+              ResponsiveGridHelper.getSmallGridCrossAxisCountForOrientation(orientation),
         );
       case LayoutType.list:
         return _buildListView(worksState);
@@ -385,11 +392,10 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
   }
 
   Widget _buildGridView(WorksState worksState, {required int crossAxisCount}) {
+    final cs = Theme.of(context).colorScheme;
     final isAllMode = worksState.displayMode == DisplayMode.all;
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
-
-    // 横屏模式下使用更大的间距，让布局更优雅
     final spacing = isLandscape ? 24.0 : 8.0;
     final padding = isLandscape ? 24.0 : 8.0;
 
@@ -440,13 +446,13 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
                       Icon(
                         Icons.check_circle_outline,
                         size: 16,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: cs.onSurfaceVariant,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         S.of(context).reachedEnd,
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          color: cs.onSurfaceVariant,
                           fontSize: 14,
                         ),
                       ),
@@ -457,7 +463,7 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
                     Text(
                       S.of(context).excludedNWorks(worksState.rawWorks.length - worksState.works.length),
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: cs.onSurfaceVariant,
                         fontSize: 12,
                       ),
                     ),
@@ -498,7 +504,7 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
                     Text(
                       S.of(context).pageExcludedNWorks(worksState.rawWorks.length - worksState.works.length),
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: cs.onSurfaceVariant,
                         fontSize: 12,
                       ),
                     ),
@@ -529,6 +535,7 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
   }
 
   Widget _buildListView(WorksState worksState) {
+    final cs = Theme.of(context).colorScheme;
     final isAllMode = worksState.displayMode == DisplayMode.all;
 
     Widget scrollView = CustomScrollView(
@@ -565,15 +572,15 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
                       children: [
                         Icon(
                           Icons.check_circle_outline,
-                          size: 16,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          size: 16,                          color:
+                                cs.onSurfaceVariant,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           S.of(context).reachedEnd,
                           style: TextStyle(
                             color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                                cs.onSurfaceVariant,
                             fontSize: 14,
                           ),
                         ),
@@ -704,6 +711,7 @@ class _WorksAppBarControls extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
     final (layoutType, subtitleFilter, displayMode) = ref.watch(
       worksProvider.select((s) => (s.layoutType, s.subtitleFilter, s.displayMode)),
     );
@@ -730,10 +738,7 @@ class _WorksAppBarControls extends ConsumerWidget {
         Container(
           height: 28,
           width: 1,
-          color: Theme.of(context)
-              .colorScheme
-              .outlineVariant
-              .withValues(alpha: 0.5),
+          color: cs.outlineVariant.withValues(alpha: 0.5),
           margin: const EdgeInsets.symmetric(horizontal: 2),
         ),
         // Layout toggle
@@ -752,7 +757,7 @@ class _WorksAppBarControls extends ConsumerWidget {
                 ? Icons.closed_caption
                 : Icons.closed_caption_disabled,
             color: subtitleFilter == 1
-                ? Theme.of(context).colorScheme.primary
+                ? cs.primary
                 : null,
           ),
           iconSize: 22,

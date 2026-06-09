@@ -3,14 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'blur_hash_widget.dart';
-import '../models/audio_track.dart';
 import '../models/work.dart';
 import '../providers/auth_provider.dart';
 import '../providers/work_card_display_provider.dart';
 import '../providers/subtitle_library_provider.dart';
-import '../services/audio_player_service.dart';
-import '../services/cache_service.dart';
-import '../services/download_service.dart';
+
 import '../services/log_service.dart';
 import '../services/storage_service.dart';
 import '../services/blurhash_service.dart';
@@ -20,6 +17,7 @@ import '../utils/string_utils.dart';
 import '../../l10n/app_localizations.dart';
 import 'add_to_playlist_dialog.dart';
 import 'file_selection_dialog.dart';
+import 'play_next_selection_dialog.dart';
 import 'tag_chip.dart';
 import 'va_chip.dart';
 import 'work_bookmark_manager.dart';
@@ -151,26 +149,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
         return;
       }
 
-      // Flatten all audio files from the tree
-      List<dynamic> flattenAudioFiles(List<dynamic> files) {
-        final result = <dynamic>[];
-        for (final file in files) {
-          if (file['type'] == 'folder') {
-            if (file['children'] != null) {
-              result.addAll(flattenAudioFiles(file['children']));
-            }
-          } else {
-            final name = file['title'] ?? file['name'] ?? '';
-            final ext = name.split('.').last.toLowerCase();
-            if (['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'opus'].contains(ext)) {
-              result.add(file);
-            }
-          }
-        }
-        return result;
-      }
-
-      final audioFiles = flattenAudioFiles(allFiles);
+      final audioFiles = _convertApiFilesToAudioFiles(allFiles, host, token);
       if (audioFiles.isEmpty) {
         if (mounted) {
           SnackBarUtil.showWarning(context, s.noAudioTracks);
@@ -178,92 +157,16 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
         return;
       }
 
-      // Build track URLs
-      final downloadService = DownloadService.instance;
+      if (!mounted) return;
 
-      String? coverUrl;
-      if (host.isNotEmpty) {
-        String normalizedUrl = host;
-        if (!host.startsWith('http://') && !host.startsWith('https://')) {
-          normalizedUrl = 'https://$host';
-        }
-        coverUrl = token.isNotEmpty
-            ? '$normalizedUrl/api/cover/${widget.work.id}?token=$token'
-            : '$normalizedUrl/api/cover/${widget.work.id}';
-      }
-
-      final vaNames = widget.work.vas?.map((va) => va.name).toList() ?? [];
-      final artistInfo = vaNames.isNotEmpty ? vaNames.join(', ') : null;
-
-      final tracks = <AudioTrack>[];
-      for (final file in audioFiles) {
-        final fileHash = file['hash'] as String?;
-        final fileTitle = file['title'] ?? file['name'] ?? s.unknown;
-
-        String audioUrl = '';
-        if (fileHash != null) {
-          // 1. Local downloaded file
-          final localPath = await downloadService.getDownloadedFilePath(
-            widget.work.id,
-            fileHash,
-          );
-          if (localPath != null) {
-            audioUrl = 'file://$localPath';
-          } else {
-            // 2. Cache
-            final cachedPath = await CacheService.getCachedAudioFile(fileHash);
-            if (cachedPath != null) {
-              audioUrl = 'file://$cachedPath';
-            }
-          }
-        }
-
-        // 3. Network URL
-        if (audioUrl.isEmpty) {
-          if (file['mediaDownloadUrl'] != null &&
-              file['mediaDownloadUrl'].toString().isNotEmpty) {
-            audioUrl = file['mediaDownloadUrl'];
-          } else if (file['mediaStreamUrl'] != null &&
-              file['mediaStreamUrl'].toString().isNotEmpty) {
-            audioUrl = file['mediaStreamUrl'];
-          } else if (host.isNotEmpty && fileHash != null) {
-            String normalizedUrl = host;
-            if (!host.startsWith('http://') && !host.startsWith('https://')) {
-              normalizedUrl = 'https://$host';
-            }
-            audioUrl = '$normalizedUrl/api/media/stream/$fileHash?token=$token';
-          }
-        }
-
-        if (audioUrl.isNotEmpty) {
-          tracks.add(AudioTrack(
-            id: fileHash ?? fileTitle,
-            url: audioUrl,
-            title: fileTitle,
-            artist: artistInfo,
-            album: widget.work.title,
-            artworkUrl: coverUrl,
-            duration: file['duration'] != null
-                ? Duration(milliseconds: (file['duration'] * 1000).round())
-                : null,
-            workId: widget.work.id,
-            hash: fileHash,
-          ));
-        }
-      }
-
-      if (tracks.isEmpty) {
-        if (mounted) {
-          SnackBarUtil.showWarning(context, s.playbackFailed(s.unknown));
-        }
-        return;
-      }
-
-      await AudioPlayerService.instance.insertTracksAfterCurrent(tracks);
-
-      if (mounted) {
-        SnackBarUtil.showSuccess(context, s.playingNextTracks(tracks.length));
-      }
+      // Show track selection dialog (handles track building + queueing internally)
+      await PlayNextSelectionDialog.show(
+        context: context,
+        work: widget.work,
+        audioFiles: audioFiles,
+        host: host,
+        token: token,
+      );
     } catch (e) {
       LogService.instance.error('Play Next failed: $e', tag: 'Playback');
       if (mounted) {
@@ -281,10 +184,29 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
   }
 
   Future<void> _handleDownload() async {
-    await showDialog(
-      context: context,
-      builder: (ctx) => FileSelectionDialog(work: widget.work),
-    );
+    try {
+      final api = ref.read(kikoeruApiServiceProvider);
+      final authState = ref.read(authProvider);
+      final host = authState.host ?? '';
+      final token = authState.token ?? '';
+
+      final allFiles = await api.getWorkTracks(widget.work.id);
+      final audioFiles = _convertApiFilesToAudioFiles(allFiles, host, token);
+
+      if (!mounted) return;
+
+      final workWithChildren = widget.work.copyWith(children: audioFiles);
+
+      await showDialog(
+        context: context,
+        builder: (ctx) => FileSelectionDialog(work: workWithChildren),
+      );
+    } catch (e) {
+      if (mounted) {
+        SnackBarUtil.showError(
+            context, S.of(context).loadFileListFailed(e.toString()));
+      }
+    }
   }
 
   Future<void> _handleMarkProgress() async {
@@ -333,10 +255,26 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Cache theme & orientation sekali saja untuk menghindari pemanggilan berulang
+    final theme = Theme.of(context);
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
     // Gunakan `select()` agar kartu tidak rebuild saat field auth lain berubah
     final host = ref.watch(authProvider.select((s) => s.host ?? ''));
     final token = ref.watch(authProvider.select((s) => s.token ?? ''));
-    final displaySettings = ref.watch(workCardDisplayProvider);
+    // Hanya watch field yang benar-benar dipakai, bukan seluruh object
+    final displaySettings = ref.watch(workCardDisplayProvider.select((s) => (
+      s.showRating,
+      s.showPrice,
+      s.showSales,
+      s.showReleaseDate,
+      s.showCircle,
+      s.showDuration,
+      s.showSubtitleTag,
+    )));
 
     // Gunakan select() pada subtitleLibraryProvider agar kartu hanya rebuild
     // saat status subtitle work ini saja yang berubah, bukan seluruh set.
@@ -354,30 +292,39 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
           );
         };
 
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
-
     // 横屏模式：4列显示中等卡片，5列显示紧凑卡片
     // 竖屏模式：2列显示中等卡片，3列显示紧凑卡片
     if (widget.crossAxisCount >= 5 ||
         (widget.crossAxisCount == 3 && !isLandscape)) {
-      return _buildCompactCard(context, host, token, cardOnTap, displaySettings,
+      return _buildCompactCard(context, theme, isLandscape, devicePixelRatio,
+          screenWidth, host, token, cardOnTap, displaySettings,
           hasSubtitle, hasLocalSubtitle);
     } else if (widget.crossAxisCount >= 2) {
-      return _buildMediumCard(context, host, token, cardOnTap, displaySettings,
+      return _buildMediumCard(context, theme, isLandscape, devicePixelRatio,
+          screenWidth, host, token, cardOnTap, displaySettings,
           hasSubtitle, hasLocalSubtitle);
     } else {
-      return _buildFullCard(context, host, token, cardOnTap, displaySettings,
+      return _buildFullCard(context, theme, isLandscape, devicePixelRatio,
+          screenWidth, host, token, cardOnTap, displaySettings,
           hasSubtitle, hasLocalSubtitle);
     }
   }
 
   // 紧凑卡片 (3列布局)
-  Widget _buildCompactCard(BuildContext context, String host, String token,
-      VoidCallback cardOnTap, WorkCardDisplaySettings displaySettings,
+  Widget _buildCompactCard(BuildContext context, ThemeData theme,
+      bool isLandscape, double devicePixelRatio, double screenWidth,
+      String host, String token,
+      VoidCallback cardOnTap, (bool,bool,bool,bool,bool,bool,bool) displaySettings,
       bool hasSubtitle, bool hasLocalSubtitle) {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final (
+      showRating,
+      showPrice,
+      showSales,
+      showReleaseDate,
+      showCircle,
+      showDuration,
+      showSubtitleTag,
+    ) = displaySettings;
     final titleFontSize = isLandscape ? 13.5 : 11.0;
 
     return AnimatedScale(
@@ -406,30 +353,30 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
               aspectRatio: 1.0,
               child: Stack(
                 children: [
-                  _buildCoverImage(context, host, token),
+                  _buildCoverImage(context, host, token, theme, isLandscape, devicePixelRatio, screenWidth),
                   // RJ号标签 (左上角)
                   Positioned(
                     top: 4,
                     left: 4,
-                    child: _buildRjTag(),
+                    child: _buildRjTag(isLandscape),
                   ),
                   // 字幕标签 (左下角)
-                  if (displaySettings.showSubtitleTag && (hasSubtitle))
+                  if (showSubtitleTag && (hasSubtitle))
                     Positioned(
                       bottom: 4,
                       left: 4,
                       child: _buildSubtitleTag(
-                        context,
+                        context, isLandscape,
                         isLocal: hasLocalSubtitle,
                       ),
                     ),
                   // 日期标签 (右下角)
-                  if (displaySettings.showReleaseDate &&
-                      widget.work.release != null)
+                  if (showReleaseDate &&
+                            widget.work.release != null)
                     Positioned(
                       bottom: 4,
                       right: 4,
-                      child: _buildDateTag(),
+                      child: _buildDateTag(isLandscape),
                     ),
                 ],
               ),
@@ -444,7 +391,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                   // 标题
                   Text(
                     widget.work.title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           height: 1.1,
                           fontSize: titleFontSize,
@@ -461,11 +408,20 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
   }
 
   // 中等卡片 (2列布局)
-  Widget _buildMediumCard(BuildContext context, String host, String token,
-      VoidCallback cardOnTap, WorkCardDisplaySettings displaySettings,
+  Widget _buildMediumCard(BuildContext context, ThemeData theme,
+      bool isLandscape, double devicePixelRatio, double screenWidth,
+      String host, String token,
+      VoidCallback cardOnTap, (bool,bool,bool,bool,bool,bool,bool) displaySettings,
       bool hasSubtitle, bool hasLocalSubtitle) {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final (
+      showRating,
+      showPrice,
+      showSales,
+      showReleaseDate,
+      showCircle,
+      showDuration,
+      showSubtitleTag,
+    ) = displaySettings;
     final titleFontSize = isLandscape ? 14.5 : 12.0;
     final bodyFontSize = isLandscape ? 13.5 : 10.0;
     final priceFontSize = isLandscape ? 13.5 : 10.0;
@@ -498,28 +454,28 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
               aspectRatio: 1.3,
               child: Stack(
                 children: [
-                  _buildCoverImage(context, host, token),
+                  _buildCoverImage(context, host, token, theme, isLandscape, devicePixelRatio, screenWidth),
                   Positioned(
                     top: 6,
                     left: 6,
-                    child: _buildRjTag(),
+                    child: _buildRjTag(isLandscape),
                   ),
                   // 字幕标签 (左下角)
-                  if (displaySettings.showSubtitleTag && (hasSubtitle))
+                  if (showSubtitleTag && (hasSubtitle))
                     Positioned(
                       bottom: 6,
                       left: 6,
                       child: _buildSubtitleTag(
-                        context,
+                        context, isLandscape,
                         isLocal: hasLocalSubtitle,
                       ),
                     ),
-                  if (displaySettings.showReleaseDate &&
+                  if (showReleaseDate &&
                       widget.work.release != null)
                     Positioned(
                       bottom: 6,
                       right: 6,
-                      child: _buildDateTag(),
+                      child: _buildDateTag(isLandscape),
                     ),
                 ],
               ),
@@ -534,7 +490,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                   // 标题
                   Text(
                     widget.work.title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           height: 1.1,
                           fontSize: titleFontSize,
@@ -542,27 +498,27 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                   ),
                   const SizedBox(height: 3),
                   // 社团名称
-                  if (displaySettings.showCircle)
+                  if (showCircle)
                     Text(
                       widget.work.name ?? '',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      style: theme.textTheme.bodySmall?.copyWith(
                             color: Colors.grey[600],
                             fontSize: bodyFontSize,
                           ),
                     ),
-                  if (displaySettings.showCircle) const SizedBox(height: 3),
+                  if (showCircle) const SizedBox(height: 3),
                   // 价格
-                  if (displaySettings.showPrice && widget.work.price != null)
+                  if (showPrice && widget.work.price != null)
                     Text(
                       S.of(context).priceInYen(widget.work.price!),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      style: theme.textTheme.bodySmall?.copyWith(
                             color: Colors.red[700],
                             fontWeight: FontWeight.w600,
                             fontSize: priceFontSize,
                           ),
                     ),
                   // 评分信息
-                  if (displaySettings.showRating &&
+                  if (showRating &&
                       widget.work.rateAverage != null &&
                       widget.work.rateCount != null &&
                       (widget.work.rateCount! > 0 ||
@@ -579,7 +535,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                         Text(
                           '${widget.work.rateAverage!.toStringAsFixed(1)} (${widget.work.rateCount})',
                           style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                              theme.textTheme.bodySmall?.copyWith(
                                     color: Colors.amber[700],
                                     fontWeight: FontWeight.w500,
                                     fontSize: ratingFontSize,
@@ -589,7 +545,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                     ),
                   ],
                   // 时长信息
-                  if (displaySettings.showDuration &&
+                  if (showDuration &&
                       widget.work.duration != null &&
                       widget.work.duration! > 0) ...[
                     const SizedBox(height: 3),
@@ -605,7 +561,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                           formatDuration(
                               Duration(seconds: widget.work.duration!)),
                           style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                              theme.textTheme.bodySmall?.copyWith(
                                     color: Colors.blue[700],
                                     fontSize: bodyFontSize,
                                     fontWeight: FontWeight.w500,
@@ -616,10 +572,10 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                   ],
                   const SizedBox(height: 4),
                   if (widget.work.vas != null && widget.work.vas!.isNotEmpty)
-                    _buildVoiceActorsRow(context),
+                    _buildVoiceActorsRow(context, isLandscape),
                   const SizedBox(height: 2),
                   if (widget.work.tags != null && widget.work.tags!.isNotEmpty)
-                    _buildTagsRow(context),
+                    _buildTagsRow(context, isLandscape),
                   const SizedBox(height: 2),
                 ],
               ),
@@ -632,11 +588,20 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
   }
 
   // 完整卡片 (列表布局)
-  Widget _buildFullCard(BuildContext context, String host, String token,
-      VoidCallback cardOnTap, WorkCardDisplaySettings displaySettings,
+  Widget _buildFullCard(BuildContext context, ThemeData theme,
+      bool isLandscape, double devicePixelRatio, double screenWidth,
+      String host, String token,
+      VoidCallback cardOnTap, (bool,bool,bool,bool,bool,bool,bool) displaySettings,
       bool hasSubtitle, bool hasLocalSubtitle) {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final (
+      showRating,
+      showPrice,
+      showSales,
+      showReleaseDate,
+      showCircle,
+      showDuration,
+      showSubtitleTag,
+    ) = displaySettings;
     final rjFontSize = isLandscape ? 11.0 : 10.0;
     final titleFontSize = isLandscape ? 16.0 : 14.0;
 
@@ -673,7 +638,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: _buildCoverImage(context, host, token),
+                          child: _buildCoverImage(context, host, token, theme, isLandscape, devicePixelRatio, screenWidth),
                         ),
                         // RJ号标签
                         Positioned(
@@ -697,12 +662,12 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                           ),
                         ),
                         // 字幕标签 (左下角)
-                        if (displaySettings.showSubtitleTag && (hasSubtitle))
+                        if (showSubtitleTag && (hasSubtitle))
                           Positioned(
                             bottom: 2,
                             left: 2,
                             child: _buildSubtitleTag(
-                              context,
+                              context, isLandscape,
                               isLocal: hasLocalSubtitle,
                             ),
                           ),
@@ -714,7 +679,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                   Expanded(
                     child: Text(
                       widget.work.title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                             height: 1.3,
                             fontSize: titleFontSize,
@@ -731,24 +696,21 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                   // 社团和价格行
                   Row(
                     children: [
-                      if (displaySettings.showCircle)
+                      if (showCircle)
                         Expanded(
                           child: Text(
                             widget.work.name ?? '',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
+                            style: theme.textTheme.bodyMedium?.copyWith(
                                   color: Colors.grey[600],
                                 ),
                           ),
                         ),
-                      if (displaySettings.showPrice &&
+                      if (showPrice &&
                           widget.work.price != null)
                         Text(
                           S.of(context).priceInYen(widget.work.price!),
                           style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                              theme.textTheme.bodySmall?.copyWith(
                                     color: Colors.red[700],
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -759,21 +721,21 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                   // 日期和下载数
                   Row(
                     children: [
-                      if (displaySettings.showReleaseDate &&
+                      if (showReleaseDate &&
                           widget.work.release != null)
                         Text(
                           widget.work.release!,
                           style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                              theme.textTheme.bodySmall?.copyWith(
                                     color: Colors.grey[500],
                                   ),
                         ),
                       // 评分信息
-                      if (displaySettings.showRating &&
+                      if (showRating &&
                           widget.work.rateAverage != null &&
                           widget.work.rateCount != null &&
                           widget.work.rateCount! > 0) ...[
-                        if (displaySettings.showReleaseDate &&
+                        if (showReleaseDate &&
                             widget.work.release != null)
                           const SizedBox(width: 8),
                         Icon(
@@ -785,14 +747,14 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                         Text(
                           '${widget.work.rateAverage!.toStringAsFixed(1)} (${widget.work.rateCount})',
                           style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                              theme.textTheme.bodySmall?.copyWith(
                                     color: Colors.amber[700],
                                     fontWeight: FontWeight.w500,
                                   ),
                         ),
                       ],
                       // 时长信息
-                      if (displaySettings.showDuration &&
+                      if (showDuration &&
                           widget.work.duration != null &&
                           widget.work.duration! > 0) ...[
                         const SizedBox(width: 8),
@@ -806,19 +768,19 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                           formatDuration(
                               Duration(seconds: widget.work.duration!)),
                           style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                              theme.textTheme.bodySmall?.copyWith(
                                     color: Colors.blue[700],
                                     fontWeight: FontWeight.w500,
                                   ),
                         ),
                       ],
                       const Spacer(),
-                      if (displaySettings.showSales &&
+                      if (showSales &&
                           widget.work.dlCount != null)
                         Text(
                           S.of(context).soldCount('${widget.work.dlCount}'),
                           style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                              theme.textTheme.bodySmall?.copyWith(
                                     color: Colors.grey[500],
                                   ),
                         ),
@@ -827,11 +789,11 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                   const SizedBox(height: 8),
                   // 声优
                   if (widget.work.vas != null && widget.work.vas!.isNotEmpty)
-                    _buildVoiceActorsWrap(context),
+                    _buildVoiceActorsWrap(context, isLandscape),
                   const SizedBox(height: 6),
                   // 标签
                   if (widget.work.tags != null && widget.work.tags!.isNotEmpty)
-                    _buildTagsWrap(context),
+                    _buildTagsWrap(context, isLandscape),
                 ],
               ),
             ],
@@ -842,22 +804,19 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     );
   }
 
-  Widget _buildCoverImage(BuildContext context, String host, String token) {
+  Widget _buildCoverImage(BuildContext context, String host, String token,
+      ThemeData theme, bool isLandscape, double devicePixelRatio, double screenWidth) {
     // 使用缓存网络图片，减少滚动时的解码与网络开销，提升流畅度
     if (host.isEmpty) {
       return _buildPlaceholder(context);
     }
 
     final url = widget.work.getCoverImageUrl(host, token: token);
-    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     // Hitung ukuran decode berdasarkan lebar card sebenarnya (kurangi padding & spacing)
     int targetWidth;
     if (widget.crossAxisCount >= 2) {
-      final isLandscape =
-          MediaQuery.orientationOf(context) == Orientation.landscape;
       final padding = isLandscape ? 24.0 : 8.0;
       final spacing = isLandscape ? 24.0 : 8.0;
-      final screenWidth = MediaQuery.sizeOf(context).width;
       final availableWidth =
           screenWidth - 2 * padding - (widget.crossAxisCount - 1) * spacing;
       targetWidth =
@@ -937,9 +896,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     );
   }
 
-  Widget _buildRjTag() {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+  Widget _buildRjTag(bool isLandscape) {
     final fontSize = isLandscape ? 13.0 : 11.0;
 
     return Container(
@@ -959,9 +916,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     );
   }
 
-  Widget _buildDateTag() {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+  Widget _buildDateTag(bool isLandscape) {
     final fontSize = isLandscape ? 13.0 : 10.0;
 
     return Container(
@@ -981,9 +936,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     );
   }
 
-  Widget _buildSubtitleTag(BuildContext context, {bool isLocal = false}) {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+  Widget _buildSubtitleTag(BuildContext context, bool isLandscape, {bool isLocal = false}) {
     final iconSize = isLandscape ? 16.0 : 14.0;
 
     return Container(
@@ -1002,9 +955,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     );
   }
 
-  Widget _buildTagsRow(BuildContext context) {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+  Widget _buildTagsRow(BuildContext context, bool isLandscape) {
     final fontSize = isLandscape ? 13.0 : 10.0;
 
     return Container(
@@ -1025,9 +976,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     );
   }
 
-  Widget _buildVoiceActorsRow(BuildContext context) {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+  Widget _buildVoiceActorsRow(BuildContext context, bool isLandscape) {
     final fontSize = isLandscape ? 13.0 : 10.0;
 
     return Container(
@@ -1048,9 +997,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     );
   }
 
-  Widget _buildTagsWrap(BuildContext context) {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+  Widget _buildTagsWrap(BuildContext context, bool isLandscape) {
     final fontSize = isLandscape ? 13.0 : 11.0;
 
     return Wrap(
@@ -1068,9 +1015,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     );
   }
 
-  Widget _buildVoiceActorsWrap(BuildContext context) {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+  Widget _buildVoiceActorsWrap(BuildContext context, bool isLandscape) {
     final fontSize = isLandscape ? 13.0 : 11.0;
 
     return Wrap(
@@ -1110,4 +1055,61 @@ class _MenuListTile extends StatelessWidget {
       onTap: () => Navigator.pop(context, {'action': value}),
     );
   }
+}
+
+/// Convert raw API file list to [AudioFile] list with proper type normalization.
+/// The API returns `type: 'audio'` for audio files, but FileSelectionDialog
+/// and PlayNextSelectionDialog expect `type: 'file'`.
+List<AudioFile> _convertApiFilesToAudioFiles(
+    List<dynamic> files, String host, String token) {
+  String normalizedHost = host;
+  if (host.isNotEmpty &&
+      !host.startsWith('http://') &&
+      !host.startsWith('https://')) {
+    if (host.contains('localhost') ||
+        host.startsWith('127.0.0.1') ||
+        host.startsWith('192.168.')) {
+      normalizedHost = 'http://$host';
+    } else {
+      normalizedHost = 'https://$host';
+    }
+  }
+
+  return files.map((file) {
+    final type = file['type'] as String?;
+    final title = file['title'] as String? ?? file['name'] as String? ?? '';
+    final hash = file['hash'] as String?;
+    final size = file['size'] as int?;
+    final duration = file['duration'];
+
+    // Build download URL
+    String? downloadUrl;
+    if (file['mediaDownloadUrl'] != null &&
+        file['mediaDownloadUrl'].toString().isNotEmpty) {
+      downloadUrl = file['mediaDownloadUrl'];
+    } else if (file['mediaStreamUrl'] != null &&
+        file['mediaStreamUrl'].toString().isNotEmpty) {
+      downloadUrl = file['mediaStreamUrl'];
+    } else if (normalizedHost.isNotEmpty &&
+        hash != null &&
+        type != 'folder') {
+      downloadUrl = '$normalizedHost/api/media/stream/$hash?token=$token';
+    }
+
+    List<AudioFile>? children;
+    if (file['children'] != null && file['children'] is List) {
+      children = _convertApiFilesToAudioFiles(
+          file['children'] as List<dynamic>, host, token);
+    }
+
+    return AudioFile(
+      title: title,
+      hash: hash,
+      type: type == 'folder' ? 'folder' : 'file',
+      children: children,
+      size: size,
+      mediaDownloadUrl: downloadUrl,
+      duration: duration,
+    );
+  }).toList();
 }

@@ -276,6 +276,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Widget _buildHostLatencyActions(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final normalized = _normalizedHostString(_hostValue);
     final serverCookie = _serverCookieController.text.trim();
     final result = normalized.isEmpty ? null : _latencyResults[normalized];
@@ -284,7 +286,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ? S.of(context).enterServerAddressToTest
         : _describeLatencyResult(result, includePlaceholder: true);
     final color = normalized.isEmpty
-        ? Theme.of(context).colorScheme.onSurfaceVariant
+        ? cs.onSurfaceVariant
         : _latencyColorForResult(context, result);
 
     return Row(
@@ -314,7 +316,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Text(
             statusText,
             style:
-                Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
+                tt.bodySmall?.copyWith(color: color),
             textAlign: TextAlign.right,
           ),
         ),
@@ -489,6 +491,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   // 竖屏布局
   Widget _buildPortraitLayout() {
     final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: SingleChildScrollView(
@@ -531,7 +534,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Text(
                       'KikoFlu',
                       style:
-                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          tt.headlineMedium?.copyWith(
                                 color: cs.primary,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -569,6 +572,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   // 横屏布局
   Widget _buildLandscapeLayout() {
     final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Row(
@@ -606,7 +610,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 16),
                   Text(
                     'KikoFlu',
-                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                    style: tt.headlineLarge?.copyWith(
                           color: cs.primary,
                           fontWeight: FontWeight.bold,
                         ),
@@ -651,6 +655,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   // 表单字段列表
   List<Widget> _buildFormFields() {
+    final cs = Theme.of(context).colorScheme;
     return [
       // Username field
       TextFormField(
@@ -761,7 +766,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // Cookie field (collapsible)
       Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(12),
         ),
         child: ExpansionTile(
@@ -769,13 +774,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             children: [
               Icon(Icons.security,
                   size: 18,
-                  color: Theme.of(context).colorScheme.primary),
+                  color: cs.primary),
               const SizedBox(width: 8),
               const Text('Cookie'),
             ],
           ),
-          iconColor: Theme.of(context).colorScheme.primary,
-          collapsedIconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          iconColor: cs.primary,
+          collapsedIconColor: cs.onSurfaceVariant,
           tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           shape: RoundedRectangleBorder(
@@ -831,7 +836,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           icon: const Icon(Icons.person_outline),
           label: Text(S.of(context).guestMode),
           style: OutlinedButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.secondary,
+            foregroundColor: cs.secondary,
           ),
         ),
 
@@ -845,7 +850,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ? S.of(context).noAccountTapToRegister
               : S.of(context).haveAccountTapToLogin,
           style: TextStyle(
-            color: Theme.of(context).colorScheme.primary,
+            color: cs.primary,
           ),
         ),
       ),

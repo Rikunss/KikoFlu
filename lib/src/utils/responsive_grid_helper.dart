@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 /// 响应式布局工具类
 /// 根据屏幕尺寸和方向自动计算最佳列数
+///
+/// 所有方法现已拆分为 *_ForSize 变体，接受显式的 Size 和 Orientation
+/// 参数，避免在 build 中重复调用 MediaQuery.of(context)。
 class ResponsiveGridHelper {
   /// 根据屏幕尺寸计算大网格的列数
   ///
@@ -10,10 +13,7 @@ class ResponsiveGridHelper {
   /// - 横屏：
   ///   - 屏幕宽度 < 1200px 或宽高比 < 1.3：3列
   ///   - 屏幕宽度 >= 1200px 且宽高比 >= 1.3：4列
-  static int getBigGridCrossAxisCount(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final orientation = MediaQuery.orientationOf(context);
-
+  static int getBigGridCrossAxisCountForSize(Size size, Orientation orientation) {
     // 竖屏固定2列
     if (orientation == Orientation.portrait) {
       return 2;
@@ -24,8 +24,6 @@ class ResponsiveGridHelper {
     final width = size.width;
 
     // 宽度较小或宽高比不够宽时使用3列
-    // 例如：iPad 横屏 (1024x768, 比例1.33) -> 4列
-    // 例如：MacBook/PC (1920x1080, 比例1.78) -> 4列
     if (width < 1200 || aspectRatio < 1.3) {
       return 3;
     }
@@ -38,8 +36,7 @@ class ResponsiveGridHelper {
   /// 逻辑：
   /// - 竖屏：固定3列
   /// - 横屏：固定5列
-  static int getSmallGridCrossAxisCount(BuildContext context) {
-    final orientation = MediaQuery.orientationOf(context);
+  static int getSmallGridCrossAxisCountForOrientation(Orientation orientation) {
     return orientation == Orientation.landscape ? 5 : 3;
   }
 
@@ -48,40 +45,36 @@ class ResponsiveGridHelper {
   static double getRecommendedCardMinWidth(int crossAxisCount) {
     switch (crossAxisCount) {
       case 2:
-        return 160.0; // 竖屏2列
+        return 160.0;
       case 3:
-        return 220.0; // 横屏3列（较窄屏幕）
+        return 220.0;
       case 4:
-        return 200.0; // 横屏4列（宽屏）
+        return 200.0;
       case 5:
-        return 140.0; // 小网格5列
+        return 140.0;
       default:
         return 180.0;
     }
   }
 
-  /// 获取屏幕宽度分类
-  static ScreenWidthClass getScreenWidthClass(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-
+  /// 获取屏幕宽度分类 (compact / medium / expanded / large)
+  static ScreenWidthClass getScreenWidthClassForWidth(double width) {
     if (width < 600) {
-      return ScreenWidthClass.compact; // 手机
+      return ScreenWidthClass.compact;
     } else if (width < 840) {
-      return ScreenWidthClass.medium; // 小平板
+      return ScreenWidthClass.medium;
     } else if (width < 1200) {
-      return ScreenWidthClass.expanded; // 大平板
+      return ScreenWidthClass.expanded;
     } else {
-      return ScreenWidthClass.large; // 桌面
+      return ScreenWidthClass.large;
     }
   }
 
   /// 获取推荐的间距
-  static double getRecommendedSpacing(BuildContext context) {
-    final orientation = MediaQuery.orientationOf(context);
-    final widthClass = getScreenWidthClass(context);
+  static double getRecommendedSpacingForSize(Size size, Orientation orientation) {
+    final widthClass = getScreenWidthClassForWidth(size.width);
 
     if (orientation == Orientation.landscape) {
-      // 横屏使用更大的间距
       return widthClass == ScreenWidthClass.large ? 24.0 : 16.0;
     }
 
@@ -89,12 +82,10 @@ class ResponsiveGridHelper {
   }
 
   /// 获取推荐的边距
-  static double getRecommendedPadding(BuildContext context) {
-    final orientation = MediaQuery.orientationOf(context);
-    final widthClass = getScreenWidthClass(context);
+  static double getRecommendedPaddingForSize(Size size, Orientation orientation) {
+    final widthClass = getScreenWidthClassForWidth(size.width);
 
     if (orientation == Orientation.landscape) {
-      // 横屏使用更大的边距
       return widthClass == ScreenWidthClass.large ? 24.0 : 16.0;
     }
 
@@ -102,10 +93,50 @@ class ResponsiveGridHelper {
   }
 
   /// 判断是否为宽屏设备
-  static bool isWideScreen(BuildContext context) {
-    final size = MediaQuery.of(context).size;
+  static bool isWideScreenForSize(Size size) {
     final aspectRatio = size.width / size.height;
     return aspectRatio >= 1.6;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // Legacy convenience methods — still accept BuildContext
+  // internally delegate to the *_ForSize overloads.
+  // Prefer the *_ForSize variants in performance-sensitive builds.
+  // ═══════════════════════════════════════════════════════════
+
+  static int getBigGridCrossAxisCount(BuildContext context) {
+    return getBigGridCrossAxisCountForSize(
+      MediaQuery.of(context).size,
+      MediaQuery.orientationOf(context),
+    );
+  }
+
+  static int getSmallGridCrossAxisCount(BuildContext context) {
+    return getSmallGridCrossAxisCountForOrientation(
+      MediaQuery.orientationOf(context),
+    );
+  }
+
+  static ScreenWidthClass getScreenWidthClass(BuildContext context) {
+    return getScreenWidthClassForWidth(MediaQuery.of(context).size.width);
+  }
+
+  static double getRecommendedSpacing(BuildContext context) {
+    return getRecommendedSpacingForSize(
+      MediaQuery.of(context).size,
+      MediaQuery.orientationOf(context),
+    );
+  }
+
+  static double getRecommendedPadding(BuildContext context) {
+    return getRecommendedPaddingForSize(
+      MediaQuery.of(context).size,
+      MediaQuery.orientationOf(context),
+    );
+  }
+
+  static bool isWideScreen(BuildContext context) {
+    return isWideScreenForSize(MediaQuery.of(context).size);
   }
 }
 

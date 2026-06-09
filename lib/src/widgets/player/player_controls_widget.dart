@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -21,9 +22,6 @@ import '../../../l10n/app_localizations.dart';
 class PlayerControlsWidget extends ConsumerStatefulWidget {
   final bool isLandscape;
   final AudioPlayerState audioState;
-  final bool isPlaying;
-  final AsyncValue<Duration> position;
-  final AsyncValue<Duration?> duration;
   final bool isSeekingManually;
   final double seekValue;
   final ValueChanged<double> onSeekChanged;
@@ -44,9 +42,6 @@ class PlayerControlsWidget extends ConsumerStatefulWidget {
     super.key,
     required this.isLandscape,
     required this.audioState,
-    required this.isPlaying,
-    required this.position,
-    required this.duration,
     required this.isSeekingManually,
     required this.seekValue,
     required this.onSeekChanged,
@@ -151,6 +146,8 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
   Widget _buildMenuItemForButton(
       BuildContext context, WidgetRef ref, PlayerButtonType buttonType,
       [StateSetter? setState]) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     switch (buttonType) {
       case PlayerButtonType.seekBackward:
         return ListTile(
@@ -180,15 +177,15 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           leading: Icon(
             timerState.isActive ? Icons.timer : Icons.timer_outlined,
             color: timerState.isActive
-                ? Theme.of(context).colorScheme.primary
+                ? cs.primary
                 : null,
           ),
           title: Text(S.of(context).sleepTimer),
           trailing: timerState.isActive && timerState.remainingTime != null
               ? Text(
                   timerState.formattedTime,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                  style: tt.bodyMedium?.copyWith(
+                        color: cs.primary,
                       ),
                 )
               : null,
@@ -203,8 +200,8 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           title: Text(S.of(context).playbackSpeed),
           trailing: Text(
             '${widget.audioState.speed.toStringAsFixed(1)}x',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
+            style: tt.bodyMedium?.copyWith(
+                  color: cs.primary,
                 ),
           ),
           onTap: () {
@@ -221,7 +218,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               LoopMode.all => Icons.repeat_on,
             },
             color: widget.audioState.repeatMode != LoopMode.off
-                ? Theme.of(context).colorScheme.primary
+                ? cs.primary
                 : null,
           ),
           title: Text(S.of(context).repeatMode),
@@ -231,9 +228,9 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               LoopMode.one => S.of(context).repeatOne,
               LoopMode.all => S.of(context).repeatAll,
             },
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            style: tt.bodyMedium?.copyWith(
                   color: widget.audioState.repeatMode != LoopMode.off
-                      ? Theme.of(context).colorScheme.primary
+                      ? cs.primary
                       : null,
                 ),
           ),
@@ -256,14 +253,14 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                 ? Icons.bookmark
                 : Icons.bookmark_border,
             color: widget.currentProgress != null
-                ? Theme.of(context).colorScheme.primary
+                ? cs.primary
                 : null,
           ),
           title: Text(S.of(context).addMark),
           trailing: widget.currentProgress != null
               ? Icon(
                   Icons.check_circle,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: cs.primary,
                   size: 20,
                 )
               : null,
@@ -296,8 +293,8 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               title: Text(S.of(context).volume),
               trailing: Text(
                 '${(currentVolume * 100).round()}%',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
+                style: tt.bodyMedium?.copyWith(
+                      color: cs.primary,
                     ),
               ),
             ),
@@ -308,7 +305,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                   Icon(
                     Icons.volume_down,
                     size: 20,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: cs.onSurfaceVariant,
                   ),
                   Expanded(
                     child: Slider(
@@ -327,7 +324,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                   Icon(
                     Icons.volume_up,
                     size: 20,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: cs.onSurfaceVariant,
                   ),
                 ],
               ),
@@ -342,14 +339,14 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
         return ListTile(
           leading: Icon(
             Icons.tune,
-            color: hasOffset ? Theme.of(context).colorScheme.primary : null,
+            color: hasOffset ? cs.primary : null,
           ),
           title: Text(S.of(context).subtitleTimingAdjustment),
           trailing: hasOffset
               ? Text(
                   '${timelineOffset.inMilliseconds}ms',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                  style: tt.bodyMedium?.copyWith(
+                        color: cs.primary,
                       ),
                 )
               : null,
@@ -369,7 +366,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
             return ListTile(
               leading: Icon(
                 Icons.picture_in_picture_alt,
-                color: isEnabled ? Theme.of(context).colorScheme.primary : null,
+                color: isEnabled ? cs.primary : null,
               ),
               title: Text(S.of(context).floatingSubtitle),
               trailing: Transform.scale(
@@ -392,7 +389,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
         return ListTile(
           leading: Icon(
             Icons.equalizer,
-            color: Theme.of(context).colorScheme.primary,
+            color: cs.primary,
           ),
           title: Text(S.of(context).equalizerTitle),
           onTap: () {
@@ -408,6 +405,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
   }
 
   Widget _buildButton(BuildContext context, WidgetRef ref,
+      ColorScheme colorScheme,
       PlayerButtonType buttonType, bool isLandscape) {
     final iconSize = isLandscape ? 24.0 : null;
 
@@ -477,7 +475,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                   icon: Icon(
                     Icons.speed,
                     color: widget.audioState.speed != 1.0
-                        ? Theme.of(context).colorScheme.primary
+                        ? colorScheme.primary
                         : null,
                   ),
                   iconSize: iconSize,
@@ -495,7 +493,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                     style: TextStyle(
                       fontSize: 9,
                       height: 1.0,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: colorScheme.primary,
                       fontWeight: FontWeight.w500,
                       fontFeatures: const [
                         FontFeature.tabularFigures(),
@@ -530,7 +528,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                   LoopMode.all => Icons.repeat_on,
                 },
                 color: widget.audioState.repeatMode != LoopMode.off
-                    ? Theme.of(context).colorScheme.primary
+                    ? colorScheme.primary
                     : null,
               ),
               iconSize: iconSize,
@@ -549,7 +547,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                     ? Icons.bookmark
                     : Icons.bookmark_border,
                 color: widget.currentProgress != null
-                    ? Theme.of(context).colorScheme.primary
+                    ? colorScheme.primary
                     : null,
               ),
               iconSize: iconSize,
@@ -585,8 +583,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                 );
               },
               icon: Badge(
-                isLabelVisible: hasOffset,
-                backgroundColor: Theme.of(context).colorScheme.primary,
+                isLabelVisible: hasOffset,                                backgroundColor: colorScheme.primary,
                 child: const Icon(Icons.tune),
               ),
             ),
@@ -606,7 +603,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                 isEnabled
                     ? Icons.picture_in_picture_alt
                     : Icons.picture_in_picture_alt_outlined,
-                color: isEnabled ? Theme.of(context).colorScheme.primary : null,
+                color: isEnabled ? colorScheme.primary : null,
               ),
               iconSize: iconSize,
             ),
@@ -636,9 +633,13 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
     final iconSize = widget.isLandscape ? 24.0 : 48.0;
     final playButtonSize = widget.isLandscape ? 64.0 : 72.0;
     final playIconSize = widget.isLandscape ? 32.0 : 36.0;
+    final isPlaying = ref.watch(isPlayingProvider);
 
     return Column(
       children: [
@@ -647,8 +648,8 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           children: [
             Consumer(
               builder: (context, ref, child) {
-                final pos = widget.position.value ?? Duration.zero;
-                final dur = widget.duration.value ?? Duration.zero;
+                final pos = ref.watch(positionProvider).value ?? Duration.zero;
+                final dur = ref.watch(durationProvider).value ?? Duration.zero;
 
                 final seekValue = (widget.isSeekingManually
                         ? widget.seekValue
@@ -662,7 +663,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                   child: WaveformSeeker(
                     value: seekValue,
                     duration: dur,
-                    isPlaying: widget.isPlaying,
+                    isPlaying: isPlaying,
                     gradientColors: widget.gradientColors,
                     onChanged: widget.onSeekChanged,
                     onChangeEnd: widget.onSeekEnd,
@@ -674,8 +675,8 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
             // Time labels - Material Design 3
             Consumer(
               builder: (context, ref, child) {
-                final pos = widget.position.value ?? Duration.zero;
-                final dur = widget.duration.value ?? Duration.zero;
+                final pos = ref.watch(positionProvider).value ?? Duration.zero;
+                final dur = ref.watch(durationProvider).value ?? Duration.zero;
 
                 final displayPos = widget.isSeekingManually
                     ? Duration(
@@ -690,15 +691,15 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                     children: [
                       Text(
                         _formatDuration(displayPos),
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        style: textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                           fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                       Text(
                         _formatDuration(dur),
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        style: textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                           fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
@@ -723,27 +724,48 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               icon: const Icon(Icons.skip_previous),
               iconSize: iconSize,
             ),
+            // -10s seek button (always visible)
+            IconButton(
+              onPressed: () {
+                ref
+                    .read(audioPlayerControllerProvider.notifier)
+                    .seekBackward(const Duration(seconds: 10));
+                HapticFeedback.lightImpact();
+              },
+              icon: const Icon(Icons.replay_10),
+              iconSize: widget.isLandscape ? 22 : iconSize * 0.7,
+            ),
             Container(
               width: playButtonSize,
               height: playButtonSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              child: IconButton(
+                color: colorScheme.primary,
+              ),                child: IconButton(
                 onPressed: () {
-                  if (widget.isPlaying) {
+                  if (isPlaying) {
                     ref.read(audioPlayerControllerProvider.notifier).pause();
                   } else {
                     ref.read(audioPlayerControllerProvider.notifier).play();
                   }
                 },
                 icon: Icon(
-                  widget.isPlaying ? Icons.pause : Icons.play_arrow,
-                  color: Theme.of(context).colorScheme.onPrimary,
+                  isPlaying ? Icons.pause : Icons.play_arrow,
+                  color: colorScheme.onPrimary,
                 ),
                 iconSize: playIconSize,
               ),
+            ),
+            // +10s seek button (always visible)
+            IconButton(
+              onPressed: () {
+                ref
+                    .read(audioPlayerControllerProvider.notifier)
+                    .seekForward(const Duration(seconds: 10));
+                HapticFeedback.lightImpact();
+              },
+              icon: const Icon(Icons.forward_10),
+              iconSize: widget.isLandscape ? 22 : iconSize * 0.7,
             ),
             IconButton(
               onPressed: () {
@@ -752,7 +774,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               icon: Consumer(
                 builder: (context, ref, child) {
                   final canSkipNext = ref.watch(canSkipNextProvider);
-                  final baseColor = Theme.of(context).colorScheme.onSurface;
+                  final baseColor = colorScheme.onSurface;
                   return Icon(
                     Icons.skip_next,
                     color:
@@ -774,12 +796,20 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                 : ref.watch(playerButtonsConfigMobileProvider);
             final visibleButtons = config.getVisibleButtons(isDesktop);
 
+            // Filter out seekBackward/seekForward from config visible buttons
+            // since they are ALREADY always visible in the main controls row above.
+            // Showing them in both places creates 4 seek buttons (duplication).
+            final dedupedButtons = visibleButtons.where(
+              (b) => b != PlayerButtonType.seekBackward &&
+                     b != PlayerButtonType.seekForward,
+            ).toList();
+
             return Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                ...visibleButtons
+                ...dedupedButtons
                     .map((type) =>
-                        _buildButton(context, ref, type, widget.isLandscape))
+                        _buildButton(context, ref, colorScheme, type, widget.isLandscape))
                     ,
                 // More menu button (always visible)
                 Column(
@@ -823,9 +853,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                                   isFloatingLyricEnabled);
 
                           return Badge(
-                            isLabelVisible: shouldShowBadge,
-                            backgroundColor:
-                                Theme.of(context).colorScheme.primary,
+                            isLabelVisible: shouldShowBadge,                                backgroundColor: colorScheme.primary,
                             child: const Icon(Icons.more_horiz),
                           );
                         },
