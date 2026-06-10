@@ -1,6 +1,4 @@
-import 'dart:collection';
 import '../models/history_record.dart';
-import '../models/work.dart';
 import 'history_database.dart';
 
 /// Statistics computed from playback history.

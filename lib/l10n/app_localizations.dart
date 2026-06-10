@@ -6096,6 +6096,42 @@ abstract class S {
   /// **'Anyone can view'**
   String get playlistPrivacyPublicDesc;
 
+  /// No description provided for @convertWavAfterDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Convert WAV to FLAC/ALAC'**
+  String get convertWavAfterDownload;
+
+  /// No description provided for @convertWavAfterDownloadDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'After downloading a WAV file, automatically convert to lossless FLAC (or ALAC on iOS) to save ~50% storage space'**
+  String get convertWavAfterDownloadDesc;
+
+  /// No description provided for @convertWavAfterDownloadEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled — WAV files will be converted after download'**
+  String get convertWavAfterDownloadEnabled;
+
+  /// No description provided for @convertWavAfterDownloadDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled — WAV files are saved as-is'**
+  String get convertWavAfterDownloadDisabled;
+
+  /// No description provided for @convertWavFfmpegNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'FFmpeg not found on your system. Install FFmpeg or check your PATH.'**
+  String get convertWavFfmpegNotFound;
+
+  /// No description provided for @convertingAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Converting audio…'**
+  String get convertingAudio;
+
   /// No description provided for @clearTranslationCache.
   ///
   /// In en, this message translates to:

@@ -69,6 +69,9 @@ dependencies:
   # Share
   share_plus: ^10.1.4
 
+  # Notifications
+  flutter_local_notifications: ^18.0.1
+
   # System Integration
   url_launcher: ^6.2.2
   open_filex: ^4.5.0
@@ -85,6 +88,8 @@ dependencies:
   blurhash_dart: ^1.2.1
   home_widget: ^0.9.3
 
+  # FFmpeg (Android) — bundles static FFmpeg binaries for audio conversion
+  ffmpeg_kit_flutter_new_audio: ^2.0.0
 dependency_overrides:
   # Local fork of audio_service with null-safety fixes for Android destroy sequence.
   # The upstream plugin crashes with NullPointerException when AudioService.instance

@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../../l10n/app_localizations.dart';
 import '../download_path_settings_screen.dart';
 import '../../services/cache_service.dart';
 import '../../services/download_path_service.dart';
+import '../../services/audio_conversion_service.dart';
 import '../../providers/settings_provider.dart';
 import '../../utils/snackbar_util.dart';
 
@@ -31,6 +36,14 @@ class _DownloadsStorageScreenState
   void initState() {
     super.initState();
     _refreshCacheInfo();
+    // Trigger runtime encoder detection (Android) so dropdown shows available formats.
+    unawaited(
+      AudioConversionService.instance.checkAllEncoders().then((_) {
+        if (mounted) setState(() {});
+      }).catchError((Object e) {
+        debugPrint('[AudioConversion] Encoder check failed: $e');
+      }),
+    );
   }
 
   Future<void> _refreshCacheInfo() async {
@@ -75,6 +88,10 @@ class _DownloadsStorageScreenState
                   children: [
                     const SizedBox(height: 8),
 
+                    // ── WAV Conversion Format Selector ──
+                    _buildConversionCard(context, ref),
+                    const SizedBox(height: 16),
+
                     // ── Download Path ──
                     _buildDownloadPathCard(context, ref),
                     const SizedBox(height: 16),
@@ -100,6 +117,288 @@ class _DownloadsStorageScreenState
         ],
       ),
     );
+  }
+
+  // ──────────────────────────────────────────────
+  // WAV Conversion Format Selector
+  // ──────────────────────────────────────────────
+
+  Widget _buildConversionCard(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final s = S.of(context);
+    final currentFormat = ref.watch(wavConversionFormatProvider);
+    final platform = Theme.of(context).platform;
+
+    // Determine which formats are available on this platform
+    const allFormats = WavConversionFormat.values;
+    final unsupportedFormats = allFormats
+        .where((f) => !AudioConversionService.instance.isFormatSupportedOnPlatform(f))
+        .toList();
+
+    // Describe the conversion engine
+    String engineText;
+    if (!kIsWeb && (platform == TargetPlatform.windows ||
+        platform == TargetPlatform.macOS ||
+        platform == TargetPlatform.linux)) {
+      engineText = 'via system FFmpeg';
+    } else if (platform == TargetPlatform.android) {
+      engineText = 'via MediaCodec';
+    } else if (platform == TargetPlatform.iOS) {
+      engineText = 'via AVFoundation';
+    } else {
+      engineText = 'not available';
+    }
+
+    return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header row
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
+                  child: Icon(Icons.transform_rounded,
+                      color: colorScheme.primary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.convertWavAfterDownload,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        s.convertWavAfterDownloadDesc,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Format dropdown
+            Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: colorScheme.outlineVariant,
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<WavConversionFormat>(
+                  value: currentFormat,
+                  isExpanded: true,
+                  icon: Icon(Icons.arrow_drop_down_rounded,
+                      color: colorScheme.primary),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                  selectedItemBuilder: (ctx) {
+                    return allFormats.map((f) {
+                      final isSupported = AudioConversionService.instance
+                          .isFormatSupportedOnPlatform(f);
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _formatIcon(f),
+                              size: 18,
+                              color: isSupported
+                                  ? colorScheme.onSurface
+                                  : colorScheme.onSurface.withValues(alpha: 0.3),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              f == WavConversionFormat.none
+                                  ? 'Keep WAV (no conversion)'
+                                  : 'WAV → ${f.displayName} (${f.extension})',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: f == WavConversionFormat.none
+                                    ? colorScheme.onSurface
+                                    : colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList();
+                  },
+                  items: allFormats.map((f) {
+                    final isSupported = AudioConversionService.instance
+                        .isFormatSupportedOnPlatform(f);
+                    return DropdownMenuItem<WavConversionFormat>(
+                      value: f,
+                      enabled: isSupported,
+                      child: Row(
+                        children: [
+                          Icon(
+                            _formatIcon(f),
+                            size: 20,
+                            color: isSupported
+                                ? colorScheme.onSurface
+                                : colorScheme.onSurface.withValues(alpha: 0.3),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  f == WavConversionFormat.none
+                                      ? 'No conversion'
+                                      : '${f.displayName} (${f.extension})',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                    color: isSupported
+                                        ? colorScheme.onSurface
+                                        : colorScheme.onSurface
+                                            .withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                Text(
+                                  _formatSubtitle(f, engineText, isSupported),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: isSupported
+                                        ? colorScheme.onSurfaceVariant
+                                        : colorScheme.onSurfaceVariant
+                                            .withValues(alpha: 0.3),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (!isSupported)
+                            Icon(Icons.block,
+                                size: 16,
+                                color: colorScheme.error.withValues(alpha: 0.6)),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (WavConversionFormat? value) {
+                    if (value == null) return;
+                    if (!AudioConversionService.instance
+                        .isFormatSupportedOnPlatform(value)) {
+                      return;
+                    }
+                    ref
+                        .read(wavConversionFormatProvider.notifier)
+                        .setFormat(value);
+                    if (context.mounted) {
+                      SnackBarUtil.showInfo(
+                        context,
+                        value == WavConversionFormat.none
+                            ? s.convertWavAfterDownloadDisabled
+                            : 'WAV will be converted to ${value.displayName}',
+                      );
+                    }
+                  },
+                ),
+              ),
+            ),
+
+            // Engine badge + unsupported note
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.settings_rounded,
+                    size: 14, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: colorScheme.tertiaryContainer,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    engineText,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onTertiaryContainer,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (unsupportedFormats.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Icon(Icons.info_outline,
+                      size: 14, color: colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      '${unsupportedFormats.map((f) => f.displayName).join(', ')} not available',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _formatIcon(WavConversionFormat f) {
+    switch (f) {
+      case WavConversionFormat.none:
+        return Icons.block_rounded;
+      case WavConversionFormat.flac:
+        return Icons.waves_rounded;
+      case WavConversionFormat.opus:
+        return Icons.graphic_eq_rounded;
+      case WavConversionFormat.mp3:
+        return Icons.audiotrack_rounded;
+      case WavConversionFormat.alac:
+        return Icons.apple_rounded;
+      case WavConversionFormat.aac:
+        return Icons.tune_rounded;
+    }
+  }
+
+  String _formatSubtitle(
+      WavConversionFormat f, String engine, bool supported) {
+    if (!supported) return 'Not available on this device';
+    switch (f) {
+      case WavConversionFormat.none:
+        return 'Keep original WAV file';
+      case WavConversionFormat.flac:
+        return 'Lossless, ~40-60% smaller than WAV';
+      case WavConversionFormat.opus:
+        return 'Best compression, ~80-90% smaller';
+      case WavConversionFormat.mp3:
+        return 'Universal compatibility, ~80-90% smaller';
+      case WavConversionFormat.alac:
+        return 'Apple Lossless, same quality as FLAC';
+      case WavConversionFormat.aac:
+        return 'Efficient lossy, best for iOS';
+    }
   }
 
   // ──────────────────────────────────────────────

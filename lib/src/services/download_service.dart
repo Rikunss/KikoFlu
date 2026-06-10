@@ -2,10 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/download_task.dart';
 import '../utils/file_icon_utils.dart';
+import 'audio_conversion_service.dart';
 import 'cache_service.dart';
+import 'conversion_notification_service.dart';
 import 'storage_service.dart';
 import 'kikoeru_api_service.dart';
 import 'download_path_service.dart';
@@ -22,6 +25,8 @@ class DownloadService {
   final Map<String, CancelToken> _cancelTokens = {};
   final StreamController<List<DownloadTask>> _tasksController =
       StreamController<List<DownloadTask>>.broadcast();
+  final StreamController<String> _conversionController =
+      StreamController<String>.broadcast();
   final List<DownloadTask> _tasks = [];
   final Dio _dio = Dio();
 
@@ -35,6 +40,7 @@ class DownloadService {
   bool _needsSave = false;
 
   Stream<List<DownloadTask>> get tasksStream => _tasksController.stream;
+  Stream<String> get conversionStream => _conversionController.stream;
   List<DownloadTask> get tasks => List.unmodifiable(_tasks);
 
   // 获取正在下载或等待下载的任务数量
@@ -57,6 +63,10 @@ class DownloadService {
     for (final task in _tasks) {
       if (task.status == DownloadStatus.downloading) {
         _updateTask(task.copyWith(status: DownloadStatus.paused));
+      }
+      // Reset tasks stuck in 'converting' (app was killed mid-conversion)
+      if (task.status == DownloadStatus.converting) {
+        _updateTask(task.copyWith(status: DownloadStatus.completed));
       }
     }
   }
@@ -450,14 +460,109 @@ class DownloadService {
 
       _log.info('下载完成: ${task.fileName}', tag: 'Download');
 
+      // ── WAV → FLAC/ALAC conversion hook ──
+      final isWav = filePath.toLowerCase().endsWith('.wav');
+      String? convertedPath;
+      if (isWav) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final formatStr = prefs.getString('wav_conversion_format') ?? 'none';
+          final format = WavConversionFormat.values.firstWhere(
+            (f) => f.value == formatStr,
+            orElse: () => WavConversionFormat.none,
+          );
+          if (format != WavConversionFormat.none) {
+            // Update task status to show "Converting..." in the UI
+            final currentTask =
+                _tasks.firstWhere((t) => t.id == task.id, orElse: () => task);
+            _updateTask(currentTask.copyWith(status: DownloadStatus.converting), immediate: true);
+
+            _log.info('开始转换: $filePath → ${format.displayName}', tag: 'Download');
+            _conversionController.add('start:${task.fileName}');
+            unawaited(ConversionNotificationService.instance.showProgress(
+              fileName: task.fileName, progress: 0.0,
+            ));
+            var lastProgressMs = 0;
+            const progressThrottleMs = 200;
+            String? currentEta;
+            convertedPath = await AudioConversionService.instance.convert(
+              filePath, format,
+              onProgress: (progress, {eta}) {
+                final now = DateTime.now().millisecondsSinceEpoch;
+                if (eta != null) currentEta = eta;
+                if (now - lastProgressMs > progressThrottleMs || progress >= 1.0) {
+                  lastProgressMs = now;
+                  final t = _tasks.firstWhere((t) => t.id == task.id, orElse: () => task);
+                  _updateTask(t.copyWith(
+                    status: DownloadStatus.converting,
+                    downloadedBytes: (progress * 100).round(),
+                    totalBytes: 100,
+                    eta: currentEta,
+                  ));
+                  unawaited(ConversionNotificationService.instance.showProgress(
+                    fileName: task.fileName, progress: progress, eta: currentEta,
+                  ));
+                }
+              },
+            );
+            if (convertedPath != null) {
+              _log.info('转换成功: $convertedPath', tag: 'Download');
+              _conversionController.add('success:${format.displayName}:${task.fileName}');
+              unawaited(ConversionNotificationService.instance.showCompleted(
+                fileName: task.fileName,
+                formatName: format.displayName,
+              ));
+            } else {
+              _log.warning('转换失败，保留原始WAV: $filePath', tag: 'Download');
+              _conversionController.add('fail:${format.displayName}:${task.fileName}');
+              unawaited(ConversionNotificationService.instance.showFailed(
+                fileName: task.fileName,
+                formatName: format.displayName,
+              ));
+            }
+          }
+        } catch (e) {
+          _log.error('转换异常: $e', tag: 'Download');
+          _conversionController.add('fail:${task.fileName}');
+          unawaited(ConversionNotificationService.instance.showFailed(
+            fileName: task.fileName,
+          ));
+          // Reset task status so it doesn't stay stuck in "converting"
+          try {
+            final stuckTask = _tasks.firstWhere((t) => t.id == task.id, orElse: () => task);
+            _updateTask(stuckTask.copyWith(status: DownloadStatus.completed), immediate: true);
+          } catch (_) {}
+        }
+      }
+
       // 从 _tasks 获取当前版本以保留进度数据
       final currentTask =
           _tasks.firstWhere((t) => t.id == task.id, orElse: () => task);
-      final completedTask = currentTask.copyWith(
+
+      // Update task info if conversion changed the file
+      var updatedTask = currentTask.copyWith(
         status: DownloadStatus.completed,
         completedAt: DateTime.now(),
       );
-      _updateTask(completedTask, immediate: true); // 完成时立即保存
+      if (convertedPath != null) {
+        final convertedFile = File(convertedPath);
+        final physicalName = convertedPath.split('/').last;
+        _log.info('[Download] Conversion success: $physicalName', tag: 'Download');
+
+        // Preserve relative path from original fileName, just replace extension
+        final originalStem = task.fileName.replaceAll(
+          RegExp(r'\.wav$', caseSensitive: false), '');
+        final newExt = convertedPath.split('.').last;
+        final newFileName = '$originalStem.$newExt';
+        _log.info('[Download] newFileName=$newFileName', tag: 'Download');
+        // Update fileName and totalBytes to reflect converted file
+        updatedTask = updatedTask.copyWith(
+          fileName: newFileName,
+          totalBytes: await convertedFile.length(),
+          downloadedBytes: await convertedFile.length(),
+        );
+      }
+      _updateTask(updatedTask, immediate: true); // 完成时立即保存
       _cancelTokens.remove(task.id);
     } catch (e) {
       if (e is DioException && e.type == DioExceptionType.cancel) {
@@ -1205,6 +1310,7 @@ class DownloadService {
     _saveTimer?.cancel();
     _saveTimer = null;
     _tasksController.close();
+    _conversionController.close();
     for (final token in _cancelTokens.values) {
       token.cancel();
     }

@@ -27,19 +27,29 @@ final currentTrackProvider = StreamProvider<AudioTrack?>((ref) {
   return service.currentTrackStream;
 });
 
-// Player State Provider
+/// Player State Provider.
+///
+/// When hi-res is active, uses a dedicated stream controller
+/// ([HiResAudioService.playbackStateStream]) for accurate state reporting.
+/// Otherwise, forwards [just_audio.playerStateStream].
 final playerStateProvider = StreamProvider<PlayerState>((ref) {
   final service = ref.watch(audioPlayerServiceProvider);
   return service.playerStateStream;
 });
 
-// Position Provider
+/// Position Provider — always reads from [AudioPlayerService.positionStream].
+///
+/// This stream is backed by a single unified [StreamController] that
+/// collects position updates from both just_audio forwarding AND
+/// hi-res polling. No provider switching needed — the UI always
+/// subscribes to the same stream.
 final positionProvider = StreamProvider<Duration>((ref) {
   final service = ref.watch(audioPlayerServiceProvider);
   return service.positionStream;
 });
 
-// Duration Provider
+/// Duration Provider — always reads from [AudioPlayerService.durationStream].
+/// Same unified-controller approach as positionProvider.
 final durationProvider = StreamProvider<Duration?>((ref) {
   final service = ref.watch(audioPlayerServiceProvider);
   return service.durationStream;

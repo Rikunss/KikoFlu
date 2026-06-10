@@ -3316,6 +3316,25 @@ class SZh extends S {
   String get playlistPrivacyPublicDesc => '任何人都可以查看';
 
   @override
+  String get convertWavAfterDownload => '下载WAV时自动转换为FLAC/ALAC';
+
+  @override
+  String get convertWavAfterDownloadDesc =>
+      '下载WAV文件后自动转换为无损FLAC（iOS为ALAC），节省约50%存储空间';
+
+  @override
+  String get convertWavAfterDownloadEnabled => '已启用 — WAV下载后将自动转换';
+
+  @override
+  String get convertWavAfterDownloadDisabled => '已禁用 — WAV文件保持原样';
+
+  @override
+  String get convertWavFfmpegNotFound => '未找到FFmpeg。请安装FFmpeg或检查PATH设置。';
+
+  @override
+  String get convertingAudio => '正在转换音频…';
+
+  @override
   String get clearTranslationCache => '清除翻译缓存';
 
   @override
@@ -7035,6 +7054,18 @@ class SZhHant extends SZh {
 
   @override
   String get playlistPrivacyPublicDesc => '任何人都可以查看';
+
+  @override
+  String get convertWavAfterDownload => '下載後轉換為 FLAC/ALAC';
+
+  @override
+  String get convertWavAfterDownloadEnabled => '已啟用 - WAV 將轉換為 FLAC/ALAC';
+
+  @override
+  String get convertWavAfterDownloadDisabled => '未啟用 - 保持原始 WAV 格式';
+
+  @override
+  String get convertingAudio => '正在轉換音訊…';
 
   @override
   String get clearTranslationCache => '清除翻譯快取';

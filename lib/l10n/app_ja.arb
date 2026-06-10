@@ -1000,6 +1000,13 @@
   "playlistPrivacyPrivateDesc": "自分だけが閲覧可能",
   "playlistPrivacyUnlistedDesc": "リンクを知っている人だけが閲覧可能",
   "playlistPrivacyPublicDesc": "誰でも閲覧可能",
+  "convertWavAfterDownload": "WAVをFLAC/ALACに変換",
+  "convertWavAfterDownloadDesc": "WAVファイルのダウンロード後、自動的にロスレスFLAC（iOSはALAC）に変換してストレージを約50%節約",
+  "convertWavAfterDownloadEnabled": "有効 — ダウンロード後にWAVを変換します",
+  "convertWavAfterDownloadDisabled": "無効 — WAVファイルをそのまま保存",
+  "convertWavFfmpegNotFound": "FFmpegが見つかりません。FFmpegをインストールするか、PATHを確認してください。",
+  "convertingAudio": "音声を変換中…",
+
   "clearTranslationCache": "翻訳キャッシュをクリア",
   "translationCacheCleared": "翻訳キャッシュをクリアしました",
   "platformHintAndroid": "Android: システムのファイルピッカーを使用します。ストレージ権限が必要な場合があります",

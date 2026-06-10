@@ -110,7 +110,7 @@ class AudioFormatInfo {
         final request = await client
             .getUrl(uri)
             .timeout(const Duration(seconds: 5));
-        request.headers.set('Range', 'bytes=0-65535');
+        request.headers.set('Range', 'bytes=0-262143');
         final response = await request
             .close()
             .timeout(const Duration(seconds: 5));
@@ -120,13 +120,13 @@ class AudioFormatInfo {
           return extensionInfo;
         }
 
-        // Read up to ~64 KB
+        // Read up to ~256 KB (large enough for ID3v2 with album art + first MPEG frame)
         final chunks = <List<int>>[];
         int totalRead = 0;
         await for (final chunk in response) {
           chunks.add(chunk);
           totalRead += chunk.length;
-          if (totalRead >= 65536) break;
+          if (totalRead >= 262144) break;
         }
 
         final bytes = Uint8List(totalRead);
@@ -218,7 +218,8 @@ class AudioFormatInfo {
 
       final raf = await file.open(mode: FileMode.read);
       try {
-        const readSize = 32768;
+        // 512 KB — large enough for files with heavy ID3v2 tags or ISOBMFF moov
+        const readSize = 524288;
         final data = await raf.read(readSize);
         if (data.length < 4) return fromUrl(filePath);
 
@@ -277,21 +278,43 @@ class AudioFormatInfo {
   // ---------------------------------------------------------------------------
 
   /// Parse FLAC STREAMINFO metadata block.
-  /// File offset 0: "fLaC" (4 bytes)
-  /// File offset 4: METADATA_BLOCK_HEADER (4 bytes: is_last|type|length)
-  /// File offset 8: STREAMINFO (34 bytes)
-  ///   sample_rate:       20 bits at offset 18, lower nibble of byte 18 + bytes 19-20
-  ///   channels-1:         3 bits at offset 21 bits 7-5
-  ///   bits-per-sample-1:  5 bits at offset 21 bits 4-0
+  ///
+  /// FLAC file structure (bytes 0-41):
+  ///   [0-3]    "fLaC" magic
+  ///   [4-7]    METADATA_BLOCK_HEADER (4 bytes: is_last|type|length)  
+  ///   [8-41]   STREAMINFO payload (34 bytes)
+  ///
+  /// STREAMINFO payload byte layout (relative to byte 8):
+  ///   [0-1]    minBlockSize (16 bits)
+  ///   [2-3]    maxBlockSize (16 bits)
+  ///   [4-6]    minFrameSize (24 bits)
+  ///   [7-9]    maxFrameSize (24 bits)
+  ///   [10-17]  8 bytes of bit-packed fields:
+  ///             20 bits sample rate (Hz)
+  ///              3 bits (channels - 1)
+  ///              5 bits (bits per sample - 1)
+  ///             36 bits total samples per channel
+  ///   [18-33]  16 bytes MD5 signature
+  ///
+  /// The 20-bit sample rate starts at file offset 18 (STREAMINFO byte 10),
+  /// taking all 8 bits of bytes 18 & 19 + the upper 4 bits of byte 20.
   static AudioFormatInfo _parseFlacHeader(Uint8List data) {
     if (data.length < 42) {
       return const AudioFormatInfo(codec: 'FLAC');
     }
 
+    // 20-bit sample rate: all of data[18..19] + top nibble of data[20]
     final int sampleRate =
-        ((data[18] & 0x0F) << 16) | (data[19] << 8) | data[20];
-    final int channels = ((data[21] >> 5) & 0x07) + 1;
-    final int bitsPerSample = (data[21] & 0x1F) + 1;
+        ((data[18] & 0xFF) << 12) |
+        ((data[19] & 0xFF) << 4) |
+        ((data[20] >> 4) & 0x0F);
+
+    // 3-bit channels-1 at data[20] bits 3-1
+    final int channels = ((data[20] >> 1) & 0x07) + 1;
+
+    // 5-bit sampleDepth-1 at data[20] bit 0 + data[21] bits 7-4
+    final int bitsPerSample =
+        (((data[20] & 0x01) << 4) | ((data[21] >> 4) & 0x0F)) + 1;
 
     return AudioFormatInfo(
       codec: 'FLAC',
@@ -421,13 +444,18 @@ class AudioFormatInfo {
   // M4A / MP4 (ISOBMFF) parser
   // ---------------------------------------------------------------------------
 
-  /// Recursively search the ISOBMFF box hierarchy for an `mp4a` box and parse
-  /// its audio sample entry fields.
+  /// Parse an M4A/MP4 ISOBMFF file to extract audio sample entry fields.
+  ///
+  /// First tries recursive ISOBMFF tree traversal via [_findBox]; if that
+  /// fails (because `stsd` is not in the container type list), falls back to
+  /// a flat binary scan via [_findBoxTypeFlat] for `mp4a` or `alac` patterns.
   ///
   /// Box header: size (4 bytes BE) + type (4 bytes ASCII)
-  /// Container boxes we traverse: moov, trak, mdia, minf, dinf, stbl, stsd, udta
+  /// Container boxes we traverse: moov, trak, mdia, minf, dinf, stbl, udta
+  /// (Note: `stsd` is NOT a container type in this implementation, so sample
+  /// entries nested inside it require the flat scan fallback.)
   ///
-  /// mp4a (AudioSampleEntry) layout (after 8-byte header):
+  /// mp4a/alac (AudioSampleEntry) layout (after 8-byte header):
   ///   [0-5]   reserved (6 bytes)
   ///   [6-7]   data reference index
   ///   [8-9]   version
@@ -439,28 +467,85 @@ class AudioFormatInfo {
   ///   [22-23] packet size
   ///   [24-27] sample rate (16.16 fixed-point BE)
   static AudioFormatInfo _parseM4aHeader(Uint8List data) {
-    // Recursively search for "mp4a" box within the ISOBMFF hierarchy
-    Uint8List? mp4aBox = _findBox(data, 0, data.length, 'mp4a');
-    if (mp4aBox == null || mp4aBox.length < 36) {
-      return const AudioFormatInfo(codec: 'M4A');
+    // Try ISOBMFF tree traversal for 'mp4a' first, then 'alac'
+    Uint8List? sampleEntry = _findBox(data, 0, data.length, 'mp4a');
+    String detectedCodec = 'M4A';
+    if (sampleEntry == null || sampleEntry.length < 36) {
+      sampleEntry = _findBox(data, 0, data.length, 'alac');
+      if (sampleEntry != null && sampleEntry.length >= 36) {
+        detectedCodec = 'ALAC';
+      }
     }
 
-    // mp4a box fields relative to box data start (offset 8 from box header)
-    // Since _findBox returns data starting from the box header,
-    // the fields start at offset 8 (after size + type)
+    // If tree traversal failed (stsd is not in container types, so _findBox
+    // never descends into it), try a flat pattern scan for sample entry types.
+    if (sampleEntry == null || sampleEntry.length < 36) {
+      final int mp4aOffset = _findBoxTypeFlat(data, 'mp4a');
+      if (mp4aOffset >= 0) {
+        final int boxSize = _read32(data, mp4aOffset - 4);
+        if (boxSize >= 36) {
+          sampleEntry = data.sublist(mp4aOffset - 4, (mp4aOffset - 4 + boxSize).clamp(0, data.length));
+        }
+      }
+    }
+    if (sampleEntry == null || sampleEntry.length < 36) {
+      final int alacOffset = _findBoxTypeFlat(data, 'alac');
+      if (alacOffset >= 0) {
+        final int boxSize = _read32(data, alacOffset - 4);
+        if (boxSize >= 36) {
+          sampleEntry = data.sublist(alacOffset - 4, (alacOffset - 4 + boxSize).clamp(0, data.length));
+          detectedCodec = 'ALAC';
+        }
+      }
+    }
+
+    if (sampleEntry == null || sampleEntry.length < 36) {
+      return AudioFormatInfo(codec: detectedCodec);
+    }
+
+    // mp4a/alac box fields relative to box data start (offset 8 from box header)
+    // Since sampleEntry starts from the box header, fields start at offset 8.
     const int base = 8;
 
-    final channels = _read16(mp4aBox, base + 16);
-    final bitsPerSample = _read16(mp4aBox, base + 18);
-    final sampleRateFixed = _read32(mp4aBox, base + 24);
+    final channels = _read16(sampleEntry, base + 16);
+    final bitsPerSample = _read16(sampleEntry, base + 18);
+    final sampleRateFixed = _read32(sampleEntry, base + 24);
     final sampleRate = sampleRateFixed >> 16; // 16.16 fixed-point
 
     return AudioFormatInfo(
-      codec: 'M4A',
+      codec: detectedCodec,
       sampleRate: sampleRate > 0 ? sampleRate : null,
       bitDepth: bitsPerSample > 0 ? bitsPerSample : null,
       channels: channels > 0 ? channels : null,
     );
+  }
+
+  /// Flat binary scan for a 4-byte ISOBMFF box type string in [data].
+  /// Returns the offset of the type string (i.e., where 'm', 'p', '4', 'a'
+  /// or 'a', 'l', 'a', 'c' starts), or -1 if not found.
+  ///
+  /// This is a fallback when [_findBox] fails due to container box limitations
+  /// (e.g. `stsd` is not in the container list, so audio sample entries nested
+  /// inside it are never reached).
+  static int _findBoxTypeFlat(Uint8List data, String type) {
+    if (type.length != 4) return -1;
+    final t0 = type.codeUnitAt(0);
+    final t1 = type.codeUnitAt(1);
+    final t2 = type.codeUnitAt(2);
+    final t3 = type.codeUnitAt(3);
+    for (int i = 4; i < data.length - 4; i++) {
+      if (data[i] == t0 &&
+          data[i + 1] == t1 &&
+          data[i + 2] == t2 &&
+          data[i + 3] == t3) {
+        // Validate: preceding 4 bytes should form a plausible box size
+        final int size = _read32(data, i - 4);
+        if (size >= 8 && size <= data.length - i + 4) {
+          return i;
+        }
+      }
+    }
+    return -1;
   }
 
   /// Depth-first search for an ISOBMFF box by [targetType] within [data] from

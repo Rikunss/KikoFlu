@@ -3442,6 +3442,28 @@ class SRu extends S {
   String get playlistPrivacyPublicDesc => 'Может просматривать любой';
 
   @override
+  String get convertWavAfterDownload => 'Конвертировать WAV в FLAC/ALAC';
+
+  @override
+  String get convertWavAfterDownloadDesc =>
+      'После загрузки WAV автоматически конвертировать в lossless FLAC (или ALAC на iOS) для экономии ~50% места';
+
+  @override
+  String get convertWavAfterDownloadEnabled =>
+      'Включено — WAV будут конвертированы после загрузки';
+
+  @override
+  String get convertWavAfterDownloadDisabled =>
+      'Отключено — WAV сохраняются как есть';
+
+  @override
+  String get convertWavFfmpegNotFound =>
+      'FFmpeg не найден. Установите FFmpeg или проверьте PATH.';
+
+  @override
+  String get convertingAudio => 'Конвертация аудио…';
+
+  @override
   String get clearTranslationCache => 'Очистить кэш переводов';
 
   @override

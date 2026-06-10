@@ -129,12 +129,34 @@ class LyricState {
 // 字幕控制器
 class LyricController extends StateNotifier<LyricState> {
   final Ref ref;
+  /// Generation counter to cancel stale async operations (rapid track changes).
+  /// Incremented each time a new lyric load starts. Async operations check
+  /// this after each await and bail out if a newer generation is active.
+  int _currentLoadGeneration = 0;
+
+  /// Returns true if [generation] is stale (a newer load was started).
+  bool _isStale(int generation) => generation != _currentLoadGeneration;
+
+  /// Clears translation state on stale load generation.
+  void _clearStaleTranslation() {
+    if (state.isTranslated) {
+      state = LyricState(
+        lyrics: state.lyrics,
+        isLoading: state.isLoading,
+        error: state.error,
+        lyricUrl: state.lyricUrl,
+        timelineOffset: state.timelineOffset,
+      );
+    }
+  }
 
   LyricController(this.ref) : super(LyricState());
 
   // 根据音频轨道查找并加载字幕
   Future<void> loadLyricForTrack(
       AudioTrack track, List<dynamic> allFiles) async {
+    final myGen = ++_currentLoadGeneration;
+
     LogService.instance.debug(
         '[Lyric] 尝试加载: track="${track.title}", workId=${track.workId}, 文件数=${allFiles.length}', tag: 'Playback');
     state = state.copyWith(isLoading: true, error: null);
@@ -150,9 +172,13 @@ class LyricController extends StateNotifier<LyricState> {
       if (isLibraryFirst) {
         // 优先级1：从字幕库查找匹配的字幕文件
         final libraryLyricPath = await _findLyricInLibrary(track);
+        if (_isStale(myGen)) {
+          LogService.instance.debug('[Lyric] 取消加载（已过期）: gen=$myGen, current=$_currentLoadGeneration', tag: 'Playback');
+          return;
+        }
         if (libraryLyricPath != null) {
           LogService.instance.debug('[Lyric] 从字幕库加载: $libraryLyricPath', tag: 'Playback');
-          await loadLyricFromLocalFile(libraryLyricPath);
+          await loadLyricFromLocalFile(libraryLyricPath, generation: myGen);
           return;
         }
       }
@@ -165,15 +191,21 @@ class LyricController extends StateNotifier<LyricState> {
         if (!isLibraryFirst) {
           LogService.instance.debug('[Lyric] 文件树未找到，尝试字幕库', tag: 'Playback');
           final libraryLyricPath = await _findLyricInLibrary(track);
+          if (_isStale(myGen)) {
+            LogService.instance.debug('[Lyric] 取消加载（已过期）: gen=$myGen, current=$_currentLoadGeneration', tag: 'Playback');
+            return;
+          }
           if (libraryLyricPath != null) {
             LogService.instance.debug('[Lyric] 从字幕库加载: $libraryLyricPath', tag: 'Playback');
-            await loadLyricFromLocalFile(libraryLyricPath);
+            await loadLyricFromLocalFile(libraryLyricPath, generation: myGen);
             return;
           }
         }
 
         LogService.instance.debug('[Lyric] 未找到匹配字幕: track="${track.title}"', tag: 'Playback');
-        state = LyricState(lyrics: [], isLoading: false);
+        if (!_isStale(myGen)) {
+          state = LyricState(lyrics: [], isLoading: false);
+        }
         return;
       }
 
@@ -189,7 +221,9 @@ class LyricController extends StateNotifier<LyricState> {
       final workId = track.workId;
 
       if (hash == null || host.isEmpty || workId == null) {
-        state = LyricState(lyrics: [], isLoading: false);
+        if (!_isStale(myGen)) {
+          state = LyricState(lyrics: [], isLoading: false);
+        }
         return;
       }
 
@@ -209,6 +243,11 @@ class LyricController extends StateNotifier<LyricState> {
         fileName: fileName,
       );
 
+      if (_isStale(myGen)) {
+        LogService.instance.debug('[Lyric] 取消加载（已过期）: gen=$myGen, current=$_currentLoadGeneration', tag: 'Playback');
+        return;
+      }
+
       if (cachedContent != null) {
         LogService.instance.debug('[Lyric] 从缓存加载字幕: $hash', tag: 'Playback');
         content = cachedContent;
@@ -225,6 +264,11 @@ class LyricController extends StateNotifier<LyricState> {
           ),
         );
 
+        if (_isStale(myGen)) {
+          LogService.instance.debug('[Lyric] 取消加载（已过期）: gen=$myGen, current=$_currentLoadGeneration', tag: 'Playback');
+          return;
+        }
+
         if (response.statusCode == 200) {
           // 使用智能编码检测解码字节
           final (decodedContent, encoding) =
@@ -238,12 +282,19 @@ class LyricController extends StateNotifier<LyricState> {
             hash: hash,
             content: content,
           );
+
+          if (_isStale(myGen)) {
+            LogService.instance.debug('[Lyric] 取消加载（已过期）: gen=$myGen, current=$_currentLoadGeneration', tag: 'Playback');
+            return;
+          }
         } else {
-          state = LyricState(
-            lyrics: [],
-            isLoading: false,
-            error: 'HTTP ${response.statusCode}',
-          );
+          if (!_isStale(myGen)) {
+            state = LyricState(
+              lyrics: [],
+              isLoading: false,
+              error: 'HTTP ${response.statusCode}',
+            );
+          }
           return;
         }
       }
@@ -251,34 +302,42 @@ class LyricController extends StateNotifier<LyricState> {
       // 4. 解析字幕
       final lyrics = LyricParser.parse(content); // 自动检测格式
       LogService.instance.debug('[Lyric] 解析完成: ${lyrics.length} 行字幕', tag: 'Playback');
-      state = LyricState(
-        lyrics: lyrics,
-        isLoading: false,
-        lyricUrl: lyricUrl,
-      );
 
-      // 5. 自动翻译（如果启用）
-      if (lyrics.isNotEmpty) {
-        _autoTranslateIfEnabled();
+      if (!_isStale(myGen)) {
+        // Clear stale translation before setting new lyrics
+        _clearStaleTranslation();
+        state = LyricState(
+          lyrics: lyrics,
+          isLoading: false,
+          lyricUrl: lyricUrl,
+        );
+
+        // 5. 自动翻译（如果启用）
+        if (lyrics.isNotEmpty) {
+          _autoTranslateIfEnabled(generation: myGen);
+        }
       }
     } catch (e) {
       LogService.instance.error('[Lyric] 加载失败: $e', tag: 'Playback');
-      state = LyricState(
-        lyrics: [],
-        isLoading: false,
-        error: '加载字幕失败: $e',
-      );
+      if (!_isStale(myGen)) {
+        state = LyricState(
+          lyrics: [],
+          isLoading: false,
+          error: '加载字幕失败: $e',
+        );
+      }
     }
   }
 
   /// 如果启用了自动翻译，触发歌词翻译
-  Future<void> _autoTranslateIfEnabled() async {
+  Future<void> _autoTranslateIfEnabled({int? generation}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final enabled = prefs.getBool('auto_translate_lyrics') ?? false;
+      if (generation != null && _isStale(generation)) return;
       if (enabled && state.lyrics.isNotEmpty && !state.isTranslated) {
         LogService.instance.debug('[Lyric] 自动翻译已启用，开始翻译歌词', tag: 'Playback');
-        await toggleTranslation();
+        await toggleTranslation(generation: generation);
       }
     } catch (e) {
       LogService.instance.debug('[Lyric] 自动翻译失败（静默）: $e', tag: 'Playback');
@@ -286,6 +345,11 @@ class LyricController extends StateNotifier<LyricState> {
   }
 
   // 从字幕库查找匹配的字幕文件（使用数据库查询）
+  ///
+  /// Performance note: File.exists() is called at most TWICE per invocation
+  /// (once for a perfect match early return, once for the final best-match
+  /// verification), instead of once per database record. With 2000+ subtitle
+  /// files this avoids up to 2000 sequential async IO calls (~1-10s delay).
   Future<String?> _findLyricInLibrary(AudioTrack track) async {
     try {
       final trackTitle = track.title;
@@ -301,34 +365,51 @@ class LyricController extends StateNotifier<LyricState> {
           await SubtitleLibraryService.getSubtitleLibraryDirectory();
       final libraryRoot = libraryDir.path;
 
+      // ── Scan a list of records and return the best match ───────────
+      // Scans without File.exists() in the hot loop. Perfect matches
+      // verify existence immediately. The final best match is verified
+      // once before returning. This avoids N async IO calls for N records.
+      Future<String?> scanRecords(List<SubtitleFileRecord> records) async {
+        String? bestMatchPath;
+        double bestScore = 0.0;
+
+        for (final record in records) {
+          final (isMatch, score) =
+              SubtitleLibraryService.checkMatch(record.fileName, trackTitle);
+          if (!isMatch || score <= bestScore) continue;
+
+          final absolutePath = record.absolutePath(libraryRoot);
+          bestScore = score;
+          bestMatchPath = absolutePath;
+
+          if (score == 1.0) {
+            // Perfect match — verify existence before early return.
+            if (await File(absolutePath).exists()) {
+              return absolutePath;
+            }
+            // File deleted (stale DB entry) — reset and keep scanning.
+            bestScore = 0.0;
+            bestMatchPath = null;
+          }
+        }
+
+        // Verify the best non-perfect match exists.
+        if (bestMatchPath != null && !await File(bestMatchPath).exists()) {
+          bestMatchPath = null;
+        }
+        return bestMatchPath;
+      }
+
       // 优先级1: 通过 workId 查询数据库
       if (workId != null) {
         final records =
             await SubtitleDatabase.instance.getFilesByWorkId(workId);
         if (records.isNotEmpty) {
-          String? bestMatchPath;
-          double bestScore = 0.0;
-
-          for (final record in records) {
-            final (isMatch, score) =
-                SubtitleLibraryService.checkMatch(record.fileName, trackTitle);
-            if (isMatch && score > bestScore) {
-              final absolutePath = record.absolutePath(libraryRoot);
-              // 验证文件是否仍存在（DB 可能过期）
-              if (!await File(absolutePath).exists()) continue;
-              bestScore = score;
-              bestMatchPath = absolutePath;
-              if (score == 1.0) {
-                LogService.instance.debug(
-                    '[Lyric] 在数据库中找到完美匹配 (workId=$workId): ${record.fileName}', tag: 'Playback');
-                return absolutePath;
-              }
-            }
-          }
-
-          if (bestMatchPath != null) {
-            LogService.instance.debug('[Lyric] 在数据库中找到最佳匹配 (workId=$workId, score=$bestScore)', tag: 'Playback');
-            return bestMatchPath;
+          final result = await scanRecords(records);
+          if (result != null) {
+            LogService.instance.debug(
+                '[Lyric] 在数据库中找到匹配 (workId=$workId)', tag: 'Playback');
+            return result;
           }
         }
       }
@@ -337,27 +418,11 @@ class LyricController extends StateNotifier<LyricState> {
       final savedRecords = await SubtitleDatabase.instance
           .getFilesByCategory(SubtitleLibraryService.savedFolderName);
       if (savedRecords.isNotEmpty) {
-        String? bestMatchPath;
-        double bestScore = 0.0;
-
-        for (final record in savedRecords) {
-          final (isMatch, score) =
-              SubtitleLibraryService.checkMatch(record.fileName, trackTitle);
-          if (isMatch && score > bestScore) {
-            final absolutePath = record.absolutePath(libraryRoot);
-            if (!await File(absolutePath).exists()) continue;
-            bestScore = score;
-            bestMatchPath = absolutePath;
-            if (score == 1.0) {
-              LogService.instance.debug('[Lyric] 在"已保存"中找到完美匹配: ${record.fileName}', tag: 'Playback');
-              return absolutePath;
-            }
-          }
-        }
-
-        if (bestMatchPath != null) {
-          LogService.instance.debug('[Lyric] 在"已保存"中找到最佳匹配 (score=$bestScore)', tag: 'Playback');
-          return bestMatchPath;
+        final result = await scanRecords(savedRecords);
+        if (result != null) {
+          LogService.instance.debug(
+              '[Lyric] 在"已保存"中找到匹配', tag: 'Playback');
+          return result;
         }
       }
 
@@ -475,11 +540,6 @@ class LyricController extends StateNotifier<LyricState> {
     return bestMatchFile;
   }
 
-  // 清空字幕
-  void clearLyrics() {
-    state = LyricState();
-  }
-
   /// 调整字幕轴偏移
   void adjustTimelineOffset(Duration offset) {
     state = state.copyWith(timelineOffset: offset);
@@ -491,7 +551,8 @@ class LyricController extends StateNotifier<LyricState> {
   }
 
   /// 切换歌词翻译（首次点击翻译，之后切换原文/翻译）
-  Future<void> toggleTranslation() async {
+  Future<void> toggleTranslation({int? generation}) async {
+    if (generation != null && _isStale(generation)) return;
     if (state.lyrics.isEmpty || state.isTranslating) return;
 
     // 已有翻译结果，切换显示
@@ -604,6 +665,14 @@ class LyricController extends StateNotifier<LyricState> {
         }
       }
 
+      // Double-check generation before applying results — the translation
+      // API calls may have taken long enough for a new track to load.
+      if (generation != null && _isStale(generation)) {
+        LogService.instance.debug('[Lyric] 取消翻译结果（已过期）', tag: 'Playback');
+        state = state.copyWith(isTranslating: false);
+        return;
+      }
+
       // 构建翻译后的歌词列表（保留原时间戳）
       final translated = List<LyricLine>.from(state.lyrics);
       for (int i = 0; i < indexMap.length; i++) {
@@ -621,6 +690,11 @@ class LyricController extends StateNotifier<LyricState> {
       state = state.copyWith(isTranslating: false);
       rethrow;
     }
+  }
+
+  // 清空字幕
+  void clearLyrics() {
+    state = LyricState();
   }
 
   /// 清除翻译结果
@@ -675,7 +749,8 @@ class LyricController extends StateNotifier<LyricState> {
 
   // 手动加载字幕文件
   /// 从本地文件路径加载字幕（用于字幕库）
-  Future<void> loadLyricFromLocalFile(String filePath) async {
+  /// 接受可选的 [generation] 用于协调快速切换时的陈旧操作取消。
+  Future<void> loadLyricFromLocalFile(String filePath, {int? generation}) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
@@ -684,21 +759,36 @@ class LyricController extends StateNotifier<LyricState> {
       // 读取文件内容
       final file = File(filePath);
       if (!await file.exists()) {
-        state = LyricState(
-          lyrics: [],
-          isLoading: false,
-          error: '文件不存在',
-        );
+        if (generation == null || !_isStale(generation)) {
+          state = LyricState(
+            lyrics: [],
+            isLoading: false,
+            error: '文件不存在',
+          );
+        }
         return;
       }
 
       // 使用智能编码检测读取文件
       final (content, encoding) =
           await EncodingUtils.readFileWithEncoding(file);
+
+      if (generation != null && _isStale(generation)) {
+        LogService.instance.debug('[Lyric] 取消本地文件加载（已过期）', tag: 'Playback');
+        return;
+      }
+
       LogService.instance.debug('[Lyric] 检测到文件编码: $encoding', tag: 'Playback');
 
       // 解析字幕
       final lyrics = LyricParser.parse(content);
+
+      if (generation != null && _isStale(generation)) {
+        LogService.instance.debug('[Lyric] 取消本地文件加载（已过期）', tag: 'Playback');
+        return;
+      }
+
+      _clearStaleTranslation();
       state = LyricState(
         lyrics: lyrics,
         isLoading: false,
@@ -708,16 +798,19 @@ class LyricController extends StateNotifier<LyricState> {
       LogService.instance.debug('[Lyric] 成功从本地文件加载字幕，共 ${lyrics.length} 行', tag: 'Playback');
     } catch (e) {
       LogService.instance.error('[Lyric] 从本地文件加载字幕失败: $e', tag: 'Playback');
-      state = LyricState(
-        lyrics: [],
-        isLoading: false,
-        error: '加载字幕失败: $e',
-      );
+      if (generation == null || !_isStale(generation)) {
+        state = LyricState(
+          lyrics: [],
+          isLoading: false,
+          error: '加载字幕失败: $e',
+        );
+      }
       rethrow;
     }
   }
 
   Future<void> loadLyricManually(dynamic lyricFile, {int? workId}) async {
+    final myGen = ++_currentLoadGeneration;
     state = state.copyWith(isLoading: true, error: null);
 
     try {
@@ -728,11 +821,13 @@ class LyricController extends StateNotifier<LyricState> {
       final hash = lyricFile['hash'];
 
       if (hash == null || host.isEmpty) {
-        state = LyricState(
-          lyrics: [],
-          isLoading: false,
-          error: '缺少必要信息',
-        );
+        if (!_isStale(myGen)) {
+          state = LyricState(
+            lyrics: [],
+            isLoading: false,
+            error: '缺少必要信息',
+          );
+        }
         return;
       }
 
@@ -769,6 +864,11 @@ class LyricController extends StateNotifier<LyricState> {
             )
           : null;
 
+      if (_isStale(myGen)) {
+        LogService.instance.debug('[Lyric] 取消手动加载（已过期）', tag: 'Playback');
+        return;
+      }
+
       if (cachedContent != null) {
         LogService.instance.debug('[Lyric] 手动加载 - 从缓存加载字幕: $hash', tag: 'Playback');
         content = cachedContent;
@@ -785,6 +885,11 @@ class LyricController extends StateNotifier<LyricState> {
           ),
         );
 
+        if (_isStale(myGen)) {
+          LogService.instance.debug('[Lyric] 取消手动加载（已过期）', tag: 'Playback');
+          return;
+        }
+
         if (response.statusCode == 200) {
           // 使用智能编码检测解码字节
           final (decodedContent, encoding) =
@@ -800,29 +905,42 @@ class LyricController extends StateNotifier<LyricState> {
               content: content,
             );
           }
+
+          if (_isStale(myGen)) {
+            LogService.instance.debug('[Lyric] 取消手动加载（已过期）', tag: 'Playback');
+            return;
+          }
         } else {
-          state = LyricState(
-            lyrics: [],
-            isLoading: false,
-            error: 'HTTP ${response.statusCode}',
-          );
+          if (!_isStale(myGen)) {
+            state = LyricState(
+              lyrics: [],
+              isLoading: false,
+              error: 'HTTP ${response.statusCode}',
+            );
+          }
           return;
         }
       }
 
       // 4. 解析字幕
       final lyrics = LyricParser.parse(content);
-      state = LyricState(
-        lyrics: lyrics,
-        isLoading: false,
-        lyricUrl: lyricUrl,
-      );
+
+      if (!_isStale(myGen)) {
+        _clearStaleTranslation();
+        state = LyricState(
+          lyrics: lyrics,
+          isLoading: false,
+          lyricUrl: lyricUrl,
+        );
+      }
     } catch (e) {
-      state = LyricState(
-        lyrics: [],
-        isLoading: false,
-        error: '加载字幕失败: $e',
-      );
+      if (!_isStale(myGen)) {
+        state = LyricState(
+          lyrics: [],
+          isLoading: false,
+          error: '加载字幕失败: $e',
+        );
+      }
       rethrow;
     }
   }

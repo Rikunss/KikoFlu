@@ -26,7 +26,7 @@ Future<void> showWorkInfoPanel(
   if (!context.mounted || work == null) return;
 
   // Fetch tracks (file tree)
-  final List<dynamic>? workTracks = await _fetchWorkTracks(ref, currentTrack.workId);
+  final List<dynamic> workTracks = await _fetchWorkTracks(ref, currentTrack.workId);
   if (!context.mounted) return;
 
   await showModalBottomSheet(
@@ -37,7 +37,7 @@ Future<void> showWorkInfoPanel(
     builder: (context) => _WorkInfoPanel(
       work: work,
       currentTrack: currentTrack,
-      workTracks: workTracks ?? [],
+      workTracks: workTracks,
     ),
   );
 }
@@ -220,7 +220,7 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
     final tracks = _cachedTracks ?? await _buildTrackList();
     final startIndex = tracks.indexWhere((t) => t.id == track.id);
     if (startIndex >= 0) {
-      if (context.mounted) {
+      if (mounted) {
         Navigator.pop(context); // close the panel
       }
       ref.read(audioPlayerControllerProvider.notifier).playTracks(
@@ -241,7 +241,6 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
   }
 
   IconData _formatFileIcon(String title) {
-    final lower = title.toLowerCase();
     return Icons.audiotrack;
   }
 
@@ -307,7 +306,7 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.close, size: 20),
+                      icon: const Icon(Icons.close, size: 20),
                       onPressed: () => Navigator.pop(context),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -604,11 +603,11 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                       children: [
                         // Rating
                         if (work.rateAverage != null && work.rateAverage! > 0) ...[
-                          Icon(Icons.star, size: 14, color: Colors.amber),
+                          const Icon(Icons.star, size: 14, color: Colors.amber),
                           const SizedBox(width: 2),
                           Text(
                             work.rateAverage!.toStringAsFixed(1),
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.amber),
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.amber),
                           ),
                           if (work.rateCount != null) ...[
                             const SizedBox(width: 2),

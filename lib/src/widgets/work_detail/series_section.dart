@@ -6,9 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/work.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/series_works_provider.dart';
-import '../../providers/work_detail_display_provider.dart';
 import '../../screens/work_detail_screen.dart';
-import '../blur_hash_widget.dart';
 import '../privacy_blur_cover.dart';
 import '../../../l10n/app_localizations.dart';
 

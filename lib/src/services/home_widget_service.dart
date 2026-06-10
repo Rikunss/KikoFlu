@@ -16,7 +16,7 @@ class HomeWidgetService {
   /// Initialize the home widget plugin.
   Future<void> init() async {
     try {
-      await HomeWidget.registerBackgroundCallback(backgroundCallback);
+      await HomeWidget.registerInteractivityCallback(backgroundCallback);
     } catch (e) {
       _log.warning('[HomeWidget] init failed: $e');
     }

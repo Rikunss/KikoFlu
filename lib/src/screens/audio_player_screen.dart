@@ -166,11 +166,13 @@ class _LyricHintBanner extends ConsumerWidget {
 class _PortraitLyricView extends ConsumerStatefulWidget {
   final Duration? seekingPosition;
   final VoidCallback onBackToCover;
+  final List<Color>? gradientColors;
 
   const _PortraitLyricView({
     super.key,
     required this.seekingPosition,
     required this.onBackToCover,
+    this.gradientColors,
   });
 
   @override
@@ -226,6 +228,7 @@ class _PortraitLyricViewState extends ConsumerState<_PortraitLyricView> {
           FullLyricDisplay(
             seekingPosition: widget.seekingPosition,
             isPortrait: true, isLocked: true,
+            gradientColors: widget.gradientColors,
           ),
           if (_showUnlockButton)
             Positioned(
@@ -275,6 +278,7 @@ class _PortraitLyricViewState extends ConsumerState<_PortraitLyricView> {
       FullLyricDisplay(
         seekingPosition: widget.seekingPosition,
         isPortrait: true,
+        gradientColors: widget.gradientColors,
         onLongPress: _enterLyricFullscreen,
       ),
       const Positioned(left: 16, bottom: 16, child: _TranslateButton()),
@@ -520,6 +524,28 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       }
     } finally {
       if (mounted) setState(() => _isFavLoading = false);
+    }
+  }
+
+  /// Called when [track]'s workId differs from [_currentWorkId].
+  /// Extracts gradient colors immediately and defers progress/favorite API
+  /// calls to let the route entrance animation settle.
+  void _onTrackChanged(AudioTrack track) {
+    if (track.workId != null && _currentWorkId != track.workId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && track.workId != null &&
+            _extractedCoverForWorkId != track.workId) {
+          _extractedCoverForWorkId = track.workId;
+          setState(() { _currentWorkId = track.workId; _currentProgress = null; _isFavorited = false; });
+          _extractGradientColors(track.workId, track.artworkUrl);
+          Future.delayed(const Duration(milliseconds: 400), () {
+            if (mounted && _currentWorkId == track.workId) {
+              _loadCurrentProgress(track.workId!);
+              _checkFavoriteStatus(track.workId!);
+            }
+          });
+        }
+      });
     }
   }
 
@@ -993,26 +1019,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
           );
         }
 
-        if (track.workId != null && _currentWorkId != track.workId) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && track.workId != null &&
-                _extractedCoverForWorkId != track.workId) {
-              _extractedCoverForWorkId = track.workId;
-              setState(() { _currentWorkId = track.workId; _currentProgress = null; _isFavorited = false; });
-              // Gradient extraction runs immediately — needed for seekbar
-              // colour theming on the first frame.
-              _extractGradientColors(track.workId, track.artworkUrl);
-              // Defer non-critical API calls (progress + favorite check) to
-              // let the route entrance animation (~300ms) settle first.
-              Future.delayed(const Duration(milliseconds: 400), () {
-                if (mounted && _currentWorkId == track.workId) {
-                  _loadCurrentProgress(track.workId!);
-                  _checkFavoriteStatus(track.workId!);
-                }
-              });
-            }
-          });
-        }
+        _onTrackChanged(track);
 
         final workCoverUrl = _buildWorkCoverUrl(track.workId, track.artworkUrl);
 
@@ -1049,6 +1056,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   ? _PortraitLyricView(
                       key: const ValueKey('PortraitLyricView'),
                       seekingPosition: _seekingPosition,
+                      gradientColors: _gradientColors,
                       onBackToCover: () => setState(() => _showLyricView = false),
                     )
                   : _buildCoverContent(track, workCoverUrl),
@@ -1245,23 +1253,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
           );
         }
 
-        if (track.workId != null && _currentWorkId != track.workId) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && track.workId != null &&
-                _extractedCoverForWorkId != track.workId) {
-              _extractedCoverForWorkId = track.workId;
-              setState(() { _currentWorkId = track.workId; _currentProgress = null; _isFavorited = false; });
-              _extractGradientColors(track.workId, track.artworkUrl);
-              // Defer non-critical API calls to let route animation settle.
-              Future.delayed(const Duration(milliseconds: 400), () {
-                if (mounted && _currentWorkId == track.workId) {
-                  _loadCurrentProgress(track.workId!);
-                  _checkFavoriteStatus(track.workId!);
-                }
-              });
-            }
-          });
-        }
+        _onTrackChanged(track);
 
         final workCoverUrl = _buildWorkCoverUrl(track.workId, track.artworkUrl);
 
@@ -1440,7 +1432,10 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     );
                   }
                   return Stack(children: [
-                    FullLyricDisplay(seekingPosition: _seekingPosition),
+                    FullLyricDisplay(
+                      seekingPosition: _seekingPosition,
+                      gradientColors: _gradientColors,
+                    ),
                     const Positioned(
                         right: 16, bottom: 16, child: _TranslateButton()),
                   ]);

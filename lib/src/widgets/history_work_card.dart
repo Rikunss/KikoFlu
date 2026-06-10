@@ -429,7 +429,6 @@ class HistoryWorkCard extends ConsumerWidget {
   /// Resume playback from where the user left off.
   Future<void> _resumePlayback(BuildContext context, WidgetRef ref) async {
     final work = record.work;
-    final s = S.of(context);
 
     final tracks = await _buildTracks(record: record, context: context, ref: ref);
 

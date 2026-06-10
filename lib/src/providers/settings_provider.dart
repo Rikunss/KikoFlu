@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/sort_options.dart';
+import '../services/audio_conversion_service.dart';
 import '../services/progress_sync_service.dart';
 
 /// Triggers when Settings screen should refresh cache-related information.
@@ -996,6 +997,63 @@ class AutoTranslateLyricsNotifier extends StateNotifier<bool> {
 final autoTranslateLyricsProvider =
     StateNotifierProvider<AutoTranslateLyricsNotifier, bool>((ref) {
   return AutoTranslateLyricsNotifier();
+});
+
+/// Convert WAV files to another format after download.
+class WavConversionFormatNotifier extends StateNotifier<WavConversionFormat> {
+  static const String _preferenceKeyNew = 'wav_conversion_format';
+  static const String _preferenceKeyOld = 'convert_wav_after_download';
+
+  WavConversionFormatNotifier() : super(WavConversionFormat.none) {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Try new key (string-based)
+      final savedValue = prefs.getString(_preferenceKeyNew);
+      if (savedValue != null) {
+        final format = WavConversionFormat.values.firstWhere(
+          (f) => f.value == savedValue,
+          orElse: () => WavConversionFormat.none,
+        );
+        state = format;
+        return;
+      }
+
+      // Migrate from old bool key
+      final oldEnabled = prefs.getBool(_preferenceKeyOld);
+      if (oldEnabled == true) {
+        state = WavConversionFormat.flac; // old default
+        // Save to new key and remove old
+        await prefs.setString(_preferenceKeyNew, WavConversionFormat.flac.value);
+        await prefs.remove(_preferenceKeyOld);
+      }
+    } catch (e) {
+      state = WavConversionFormat.none;
+    }
+  }
+
+  Future<void> setFormat(WavConversionFormat format) async {
+    state = format;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_preferenceKeyNew, format.value);
+      // Clean up old key if present
+      if (prefs.containsKey(_preferenceKeyOld)) {
+        await prefs.remove(_preferenceKeyOld);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
+final wavConversionFormatProvider =
+    StateNotifierProvider<WavConversionFormatNotifier, WavConversionFormat>((ref) {
+  return WavConversionFormatNotifier();
 });
 
 /// Show FPS overlay (debug only — persisted in SharedPreferences).

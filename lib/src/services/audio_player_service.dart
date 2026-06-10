@@ -89,10 +89,31 @@ class AudioPlayerService {
   bool _hiResActive = false;
   Duration _lastHiResPosition = Duration.zero;
   Duration? _lastHiResDuration;
-  Timer? _hiResPositionTimer;
   StreamSubscription? _hiResPlaybackSub;
   StreamSubscription? _hiResBufferingSub;
-  bool _wasHiResPlaying = false;
+  // Subscriptions to native-pushed position/duration (50ms interval from Kotlin Handler)
+  StreamSubscription<int>? _nativePositionSub;
+  StreamSubscription<int>? _nativeDurationSub;
+  StreamSubscription<bool>? _trackEndedSub;
+
+  // ── Unified position & duration streams ──
+  //
+  // Instead of switching streams between just_audio and hi-res polling
+  // (which requires provider rebuild tricks), we use a single controller
+  // that both just_audio forwarding AND native-pushed events write to.
+  // UI always reads from the same stream — no race conditions.
+  //
+  // Position is pushed from native Kotlin via Handler loop at 50ms intervals
+  // (matching just_audio's ~50ms event-driven updates). Duration is pushed
+  // once when ExoPlayer reports a valid value. No Dart-side polling necessary.
+  final StreamController<Duration> _unifiedPositionController =
+      StreamController<Duration>.broadcast();
+  final StreamController<Duration?> _unifiedDurationController =
+      StreamController<Duration?>.broadcast();
+  final StreamController<PlayerState> _unifiedPlayerStateController =
+      StreamController<PlayerState>.broadcast();
+  StreamSubscription<Duration>? _justAudioPositionSub;
+  StreamSubscription<Duration?>? _justAudioDurationSub;
 
   // Stream controllers
   final StreamController<List<AudioTrack>> _queueController =
@@ -118,6 +139,14 @@ class AudioPlayerService {
         androidShowNotificationBadge: true,
       ),
     );
+
+    // Enable hi-res ExoPlayer on Android for lossless format support
+    // (FLAC, WAV, ALAC via FFmpeg). Without this, ALAC files would go
+    // through just_audio's ExoPlayer which uses the buggy Qualcomm decoder.
+    setHiResEnabled(true);
+    if (_hiResEnabled) {
+      _log.info('[AudioPlayerService] Hi-Res ExoPlayer enabled on Android — ALAC/FLAC/WAV will use FFmpeg decoder');
+    }
 
     // Set initial playback state for all platforms
     _updatePlaybackState();
@@ -237,8 +266,13 @@ class AudioPlayerService {
   }
 
   void _setupPlayerListeners() {
-    // Listen to player state changes
+    // Listen to player state changes — forward to unified controller
     _player.playerStateStream.listen((state) {
+      // Forward to unified player state controller for non-hi-res playback
+      if (!_hiResActive) {
+        _unifiedPlayerStateController.add(state);
+      }
+
       if (state.processingState == ProcessingState.completed) {
         if (Platform.isMacOS) {
           // macOS: Use dedicated handler to prevent duplicate triggers
@@ -256,49 +290,32 @@ class AudioPlayerService {
       _updatePlaybackState();
     });
 
-    // macOS specific: Additional position-based completion detection
-    if (Platform.isMacOS) {
-      Duration lastPosition = Duration.zero;
-      _player.positionStream.listen((position) {
-        final duration = _player.duration;
+    // Forward just_audio position to the unified stream controller
+    // so the UI always gets position updates from a single stream.
+    // When hi-res is active, the polling timer writes to this same controller.
+    _justAudioPositionSub = _player.positionStream.listen((position) {
+      if (!_hiResActive) {
+        _unifiedPositionController.add(position);
+      }
 
-        // Reset completion flag when track changes or seeks backward
-        if (position < lastPosition - const Duration(seconds: 1)) {
-          _completionHandled = false;
-        }
-
-        // Fallback: detect completion when position reaches duration
-        if (duration != null &&
-            position >= duration - const Duration(milliseconds: 100) &&
-            _player.playing &&
-            !_completionHandled) {
-          // Check if position is stuck at the end
-          if (lastPosition != Duration.zero &&
-              (position - lastPosition).inMilliseconds.abs() < 50 &&
-              position >= duration - const Duration(milliseconds: 100)) {
-            _completionHandled = true;
-            _handleTrackCompletion();
-          }
-        }
-
-        lastPosition = position;
+      // Throttled playback state update (~1s interval)
+      final now = DateTime.now();
+      if (now.difference(_lastStateUpdate) >= const Duration(seconds: 1)) {
+        _lastStateUpdate = now;
         _updatePlaybackState();
-      });
+      }
+    });
 
-      // Start periodic completion check timer as final fallback
+    // Forward just_audio duration to the unified stream controller
+    _justAudioDurationSub = _player.durationStream.listen((duration) {
+      if (!_hiResActive) {
+        _unifiedDurationController.add(duration);
+      }
+    });
+
+    // macOS specific: periodic completion check timer
+    if (Platform.isMacOS) {
       _startCompletionCheckTimer();
-    } else {
-      // Other platforms: Throttled position stream for playback state updates.
-      // Calling _updatePlaybackState() on every ~200ms tick creates unnecessary
-      // PlaybackState rebuilds → StreamProvider rebuilds → UI rebuilds.
-      // Throttling to ~1s is sufficient for system media controls / lock screen.
-      _player.positionStream.listen((position) {
-        final now = DateTime.now();
-        if (now.difference(_lastStateUpdate) >= const Duration(seconds: 1)) {
-          _lastStateUpdate = now;
-          _updatePlaybackState();
-        }
-      });
     }
   }
 
@@ -624,10 +641,9 @@ class AudioPlayerService {
   Future<void> _handleTrackCompletion() async {
     if (_isCrossfading) return; // Guard against re-entry
 
-    // For hi-res tracks, stop polling before switching
-    if (_hiResActive) {
-      _stopHiResPolling();
-    }
+    // For hi-res tracks — don't cancel native subs here because
+    // LoopMode.one needs them active after seek+play.
+    // _stopHiResPlayback() handles cleanup when actually switching tracks.
 
     if (_appLoopMode == LoopMode.one) {
       // Single track repeat - replay current track
@@ -773,6 +789,8 @@ class AudioPlayerService {
     if (_hiResActive) {
       await _hiResService.seekTo(position.inMilliseconds);
       _lastHiResPosition = position;
+      // Immediately emit position so the UI updates without waiting for next native push tick
+      _unifiedPositionController.add(_lastHiResPosition);
       _updatePlaybackState();
       return;
     }
@@ -802,7 +820,10 @@ class AudioPlayerService {
   Future<void> skipToNext() async {
     _cancelCrossfade();
     if (_hiResActive) {
-      _stopHiResPolling();
+      _nativePositionSub?.cancel();
+      _nativePositionSub = null;
+      _nativeDurationSub?.cancel();
+      _nativeDurationSub = null;
     }
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       if (_crossfadeDuration > Duration.zero) {
@@ -820,7 +841,10 @@ class AudioPlayerService {
   Future<void> skipToPrevious() async {
     _cancelCrossfade();
     if (_hiResActive) {
-      _stopHiResPolling();
+      _nativePositionSub?.cancel();
+      _nativePositionSub = null;
+      _nativeDurationSub?.cancel();
+      _nativeDurationSub = null;
     }
     if (_queue.isNotEmpty && _currentIndex > 0) {
       if (_crossfadeDuration > Duration.zero) {
@@ -838,7 +862,10 @@ class AudioPlayerService {
   Future<void> skipToIndex(int index) async {
     _cancelCrossfade();
     if (_hiResActive) {
-      _stopHiResPolling();
+      _nativePositionSub?.cancel();
+      _nativePositionSub = null;
+      _nativeDurationSub?.cancel();
+      _nativeDurationSub = null;
     }
     if (index >= 0 && index < _queue.length) {
       if (_crossfadeDuration > Duration.zero && currentTrack != null) {
@@ -891,7 +918,10 @@ class AudioPlayerService {
   Future<void> clearQueue() async {
     _cancelCrossfade();
     if (_hiResActive) {
-      _stopHiResPolling();
+      _nativePositionSub?.cancel();
+      _nativePositionSub = null;
+      _nativeDurationSub?.cancel();
+      _nativeDurationSub = null;
       await _hiResService.stop();
       _hiResActive = false;
     }
@@ -948,7 +978,7 @@ class AudioPlayerService {
 
     if (newTracks.isEmpty) {
       // All tracks already exist — just skip to the first one
-      if (!_queue.isEmpty && _currentIndex < _queue.length - 1) {
+      if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
         _currentIndex++;
         await _loadTrack(_queue[_currentIndex]);
         await play();
@@ -1033,12 +1063,14 @@ class AudioPlayerService {
   }
 
   // Getters and Streams
-  Stream<PlayerState> get playerStateStream =>
-      _hiResActive ? _hiResPlayerStateController.stream : _player.playerStateStream;
-  Stream<Duration> get positionStream =>
-      _hiResActive ? _hiResPositionController.stream : _player.positionStream;
-  Stream<Duration?> get durationStream =>
-      _hiResActive ? _hiResDurationController.stream : _player.durationStream;
+  /// Unified player state stream — always reads from the same controller
+  /// regardless of whether hi-res or just_audio is active.
+  Stream<PlayerState> get playerStateStream => _unifiedPlayerStateController.stream;
+  /// Unified position stream — always reads from the same controller
+  /// regardless of whether hi-res or just_audio is active.
+  Stream<Duration> get positionStream => _unifiedPositionController.stream;
+  /// Unified duration stream — always reads from the same controller.
+  Stream<Duration?> get durationStream => _unifiedDurationController.stream;
   Stream<List<AudioTrack>> get queueStream => _queueController.stream;
   Stream<AudioTrack?> get currentTrackStream => _currentTrackController.stream;
   Stream<bool> get trackLoadingStream => _trackLoadingController.stream;
@@ -1115,13 +1147,7 @@ class AudioPlayerService {
     _hiResEnabled = enabled && Platform.isAndroid;
   }
 
-  // Hi-res position / duration / player state stream controllers
-  final StreamController<Duration> _hiResPositionController =
-      StreamController<Duration>.broadcast();
-  final StreamController<Duration?> _hiResDurationController =
-      StreamController<Duration?>.broadcast();
-  final StreamController<PlayerState> _hiResPlayerStateController =
-      StreamController<PlayerState>.broadcast();
+
 
   AudioTrack? get currentTrack =>
       _queue.isNotEmpty && _currentIndex < _queue.length
@@ -1155,20 +1181,19 @@ class AudioPlayerService {
     final formatInfo = await _detectAudioFormatDirect(track);
     if (formatInfo == null) return false;
 
-    // If we have an exact sample rate, use it
+    // Check codec first — lossless formats (FLAC, WAV, ALAC/M4A) should always
+    // use the hi-res player for proper decoder support (e.g. FFmpeg for ALAC).
+    final codec = formatInfo.codec.toUpperCase();
+    if (codec == 'FLAC' || codec == 'WAV' || codec == 'M4A') {
+      return true;
+    }
+
+    // For other formats, use sample rate as the hi-res indicator
     if (formatInfo.sampleRate != null) {
       return formatInfo.sampleRate! > 48000;
     }
 
-    // For URL-only tracks without detected sample rate, use format heuristics
-    switch (formatInfo.codec.toUpperCase()) {
-      case 'FLAC':
-      case 'WAV':
-      case 'M4A':
-        return true; // These formats commonly have hi-res variants
-      default:
-        return false;
-    }
+    return false;
   }
 
   /// Load a track through the hi-res ExoPlayer instead of just_audio.
@@ -1179,7 +1204,6 @@ class AudioPlayerService {
     await _stopHiResPlayback();
 
     _hiResActive = true;
-    _wasHiResPlaying = false;
 
     // Update media item for system notification
     await _updateMediaItem(
@@ -1218,45 +1242,48 @@ class AudioPlayerService {
       return;
     }
 
-    // Start monitoring hi-res position / state
-    _startHiResPolling();
+    // Start native position push (Kotlin Handler pushes every 50ms)
+    _nativePositionSub?.cancel();
+    _nativePositionSub = _hiResService.nativePositionStream.listen((posMs) {
+      if (!_hiResActive) return;
+      _lastHiResPosition = Duration(milliseconds: posMs);
+      _unifiedPositionController.add(_lastHiResPosition);
+    });
 
-    // Listen to hi-res playback events
+    // Duration is pushed once from native when ExoPlayer is ready
+    _nativeDurationSub?.cancel();
+    _nativeDurationSub = _hiResService.nativeDurationStream.listen((durMs) {
+      if (!_hiResActive) return;
+      if (durMs > 0) {
+        _lastHiResDuration = Duration(milliseconds: durMs);
+        _unifiedDurationController.add(_lastHiResDuration);
+      }
+    });
+
+    // Listen to hi-res playback events — forward to _unifiedPlayerStateController only.
+    // Do NOT use isPlaying changes for completion detection (too many false positives).
     _hiResPlaybackSub?.cancel();
     _hiResPlaybackSub = _hiResService.playbackStateStream.listen((isPlaying) {
       if (!_hiResActive) return;
-      _hiResPlayerStateController.add(PlayerState(
-        isPlaying,
-        ProcessingState.ready,
-      ));
+      _unifiedPlayerStateController.add(PlayerState(isPlaying, ProcessingState.ready));
+    });
 
-      // Completion detection: was playing → now stopped near end
-      if (_wasHiResPlaying &&
-          !isPlaying &&
-          _lastHiResDuration != null &&
-          _lastHiResDuration! > Duration.zero &&
-          _lastHiResPosition >= _lastHiResDuration! - const Duration(seconds: 1)) {
-        _handleTrackCompletion();
-      }
-      _wasHiResPlaying = isPlaying;
+    // Listen to reliable track-ended event from native STATE_ENDED.
+    _trackEndedSub?.cancel();
+    _trackEndedSub = _hiResService.trackEndedStream.listen((_) {
+      if (!_hiResActive) return;
+      _handleTrackCompletion();
     });
 
     // Subscribe to buffering events
     _hiResBufferingSub?.cancel();
     _hiResBufferingSub = _hiResService.bufferingStream.listen((buffering) {
       if (!_hiResActive) return;
-      _hiResPlayerStateController.add(PlayerState(
+      _unifiedPlayerStateController.add(PlayerState(
         _hiResService.isPlaying,
         buffering ? ProcessingState.buffering : ProcessingState.ready,
       ));
     });
-
-    // Load duration
-    final durMs = await _hiResService.getDuration();
-    if (durMs > 0) {
-      _lastHiResDuration = Duration(milliseconds: durMs);
-      _hiResDurationController.add(_lastHiResDuration);
-    }
 
     _isSwitchingTrack = false;
     _trackLoadingController.add(false);
@@ -1265,37 +1292,26 @@ class AudioPlayerService {
 
   /// Stop the hi-res player and clean up resources.
   Future<void> _stopHiResPlayback() async {
-    _stopHiResPolling();
+    _nativePositionSub?.cancel();
+    _nativePositionSub = null;
+    _nativeDurationSub?.cancel();
+    _nativeDurationSub = null;
     _hiResPlaybackSub?.cancel();
     _hiResPlaybackSub = null;
     _hiResBufferingSub?.cancel();
     _hiResBufferingSub = null;
+    _trackEndedSub?.cancel();
+    _trackEndedSub = null;
 
     if (_hiResActive) {
       await _hiResService.stop();
       _hiResActive = false;
       _lastHiResPosition = Duration.zero;
       _lastHiResDuration = null;
-      _wasHiResPlaying = false;
+      // Emit zero position so the UI resets
+      _unifiedPositionController.add(Duration.zero);
+      _unifiedDurationController.add(null);
     }
-  }
-
-  /// Start periodic position polling from the hi-res player.
-  void _startHiResPolling() {
-    _hiResPositionTimer?.cancel();
-    _hiResPositionTimer =
-        Timer.periodic(const Duration(milliseconds: 250), (_) async {
-      if (!_hiResActive) return;
-      final posMs = await _hiResService.getPosition();
-      _lastHiResPosition = Duration(milliseconds: posMs);
-      _hiResPositionController.add(_lastHiResPosition);
-    });
-  }
-
-  /// Stop hi-res position polling.
-  void _stopHiResPolling() {
-    _hiResPositionTimer?.cancel();
-    _hiResPositionTimer = null;
   }
 
   // Audio settings
@@ -1466,14 +1482,16 @@ class AudioPlayerService {
     _completionCheckTimer?.cancel();
     _smtcSubscription?.cancel();
     _smtcSubscription = null;
+    _justAudioPositionSub?.cancel();
+    _justAudioDurationSub?.cancel();
     await _stopHiResPlayback();
     await _cleanupTempPlaybackFile();
+    await _unifiedPositionController.close();
+    await _unifiedDurationController.close();
+    await _unifiedPlayerStateController.close();
     await _queueController.close();
     await _currentTrackController.close();
     await _audioFormatController.close();
-    await _hiResPositionController.close();
-    await _hiResDurationController.close();
-    await _hiResPlayerStateController.close();
     await _player.dispose();
   }
 

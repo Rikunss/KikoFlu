@@ -7,14 +7,24 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.Metadata
+import androidx.media3.common.text.CueGroup
+import androidx.media3.decoder.ffmpeg.FfmpegAudioRenderer
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.RenderersFactory
+import androidx.media3.exoplayer.audio.AudioRendererEventListener
 import androidx.media3.exoplayer.audio.AudioSink
-import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.metadata.MetadataOutput
+import androidx.media3.exoplayer.text.TextOutput
+import androidx.media3.exoplayer.video.VideoRendererEventListener
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
@@ -50,6 +60,57 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
     private var currentBitDepth: Int = 0
     private var currentChannels: Int = 0
     private var channel: MethodChannel? = null
+
+    // ── Native position push (Handler loop every 50ms) ──
+    // Instead of Dart polling via MethodChannel (which adds roundtrip latency),
+    // Kotlin pushes position & duration to Dart at 50ms intervals (~20 fps)
+    // for smooth progress bar updates matching just_audio's native event rate.
+    private var positionPushHandler: Handler? = null
+    @Volatile
+    private var positionPushActive = false
+    // Tracks last pushed duration to avoid duplicate MethodChannel calls
+    private var lastPushedDurationMs = -1L
+    private val positionPushRunnable = object : Runnable {
+        override fun run() {
+            // Guard: don't execute if push was stopped
+            if (!positionPushActive) return
+            val player = exoPlayer ?: run {
+                positionPushHandler?.postDelayed(this, 50)
+                return
+            }
+
+            // Push position — always, no guard needed
+            val posMs = player.currentPosition.toInt()
+            channel?.invokeMethod("onPositionChanged", posMs)
+
+            // Push duration every tick — ExoPlayer eventually reports a valid value
+            val durMs = player.duration
+            if (durMs > 0 && durMs != androidx.media3.common.C.TIME_UNSET && durMs != lastPushedDurationMs) {
+                channel?.invokeMethod("onDurationChanged", durMs.toInt())
+                lastPushedDurationMs = durMs
+            }
+
+            // Schedule next tick in 50ms (only if still active)
+            if (positionPushActive) {
+                positionPushHandler?.postDelayed(this, 50)
+            }
+        }
+    }
+
+    private fun startPositionPush() {
+        positionPushActive = true
+        if (positionPushHandler == null) {
+            positionPushHandler = Handler(Looper.getMainLooper())
+        }
+        positionPushHandler?.removeCallbacks(positionPushRunnable)
+        // Immediate first tick, then every 50ms
+        positionPushHandler?.post(positionPushRunnable)
+    }
+
+    private fun stopPositionPush() {
+        positionPushActive = false
+        positionPushHandler?.removeCallbacks(positionPushRunnable)
+    }
 
     // AAudio exclusive AudioSink mode
     private var useAaudioSink = false
@@ -188,56 +249,97 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                 .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC)
                 .build()
 
-            if (useAaudioSink) {
-                android.util.Log.i("HiResAudio", "Creating ExoPlayer with AAudio AudioSink")
-                // Use custom RenderersFactory that overrides buildAudioSink
-                val renderersFactory = object : DefaultRenderersFactory(context) {
+            // ── RenderersFactory: prepend FfmpegAudioRenderer for ALAC FFmpeg decoding ──
+            // Approach 1: Enable ServiceLoader-based extension discovery (EXTENSION_RENDERER_MODE_PREFER)
+            //   DefaultRenderersFactory uses ServiceLoader to find Renderer implementations
+            //   via META-INF/services/androidx.media3.exoplayer.Renderer. We registered
+            //   FfmpegAudioRenderer there so it gets auto-discovered.
+            // Approach 2: Wrap DefaultRenderersFactory via RenderersFactory SAM to explicitly
+            //   prepend FfmpegAudioRenderer at position 0 in the renderers array.
+            // ──────────────────────────────────────────────────────────────────────────────
+            val baseFactory: DefaultRenderersFactory = if (useAaudioSink) {
+                android.util.Log.i("HiResAudio", "Creating ExoPlayer with AAudio AudioSink + FFmpeg ALAC")
+                val aaudioSinkInstance = AaudioAudioSink({ sr, ch, bits, deviceId ->
+                    val ptr = ExclusiveAudioPlugin.nativeCreatePlayerStatic()
+                    if (ptr != 0L) {
+                        val inited = ExclusiveAudioPlugin.nativeInitPlayerStatic(ptr, sr, ch, bits, deviceId)
+                        if (!inited) {
+                            ExclusiveAudioPlugin.nativeDestroyPlayerStatic(ptr)
+                            0L
+                        } else ptr
+                    } else 0L
+                },
+                /* onExclusiveStatusChanged */ { isExclusive ->
+                    val status = mapOf(
+                        "enabled" to useAaudioSink,
+                        "volumeLocked" to false,
+                        "aaudioAvailable" to true,
+                        "aaudioActive" to true,
+                        "aaudioExclusive" to isExclusive,
+                        "mixerBypassed" to isExclusive,
+                        "aaudioSampleRate" to 0,
+                        "aaudioLatencyMs" to 0.0,
+                        "currentVolume" to 0,
+                        "maxVolume" to 0,
+                        "androidSdk" to android.os.Build.VERSION.SDK_INT
+                    )
+                    channel?.invokeMethod("onExclusiveModeChanged", status)
+                    android.util.Log.i("HiResAudio", "Playback stream exclusive status: $isExclusive")
+                },
+                /* bitPerfectMode */ bitPerfectMode)
+
+                object : DefaultRenderersFactory(context) {
                     override fun buildAudioSink(
                         ctx: Context,
                         enableFloatOutput: Boolean,
                         enableAudioTrackPlaybackParams: Boolean
                     ): AudioSink? {
-                        return AaudioAudioSink({ sr, ch, bits, deviceId ->
-                            val ptr = ExclusiveAudioPlugin.nativeCreatePlayerStatic()
-                            if (ptr != 0L) {
-                                val inited = ExclusiveAudioPlugin.nativeInitPlayerStatic(ptr, sr, ch, bits, deviceId)
-                                if (!inited) {
-                                    ExclusiveAudioPlugin.nativeDestroyPlayerStatic(ptr)
-                                    0L
-                                } else ptr
-                            } else 0L
-                        },
-                        /* onExclusiveStatusChanged */ { isExclusive ->
-                            // Report authoritative exclusive mode status from the playback stream
-                            val status = mapOf(
-                                "enabled" to useAaudioSink,
-                                "volumeLocked" to false,
-                                "aaudioAvailable" to true,
-                                "aaudioActive" to true,
-                                "aaudioExclusive" to isExclusive,
-                                "mixerBypassed" to isExclusive,
-                                "aaudioSampleRate" to 0,
-                                "aaudioLatencyMs" to 0.0,
-                                "currentVolume" to 0,
-                                "maxVolume" to 0,
-                                "androidSdk" to android.os.Build.VERSION.SDK_INT
-                            )
-                            channel?.invokeMethod("onExclusiveModeChanged", status)
-                            android.util.Log.i("HiResAudio", "Playback stream exclusive status: $isExclusive")
-                        },
-                        /* bitPerfectMode */ bitPerfectMode)
+                        return aaudioSinkInstance
                     }
                 }
-                exoPlayer = ExoPlayer.Builder(context, renderersFactory)
-                    .setAudioAttributes(audioAttributes, true)
-                    .setHandleAudioBecomingNoisy(true)
-                    .build()
             } else {
-                exoPlayer = ExoPlayer.Builder(context)
-                    .setAudioAttributes(audioAttributes, true)
-                    .setHandleAudioBecomingNoisy(true)
-                    .build()
+                android.util.Log.i("HiResAudio", "Creating ExoPlayer with FFmpeg ALAC")
+                DefaultRenderersFactory(context)
             }
+
+            // Enable ServiceLoader-based extension renderer discovery
+            // This finds FfmpegAudioRenderer via META-INF/services/ and adds it
+            // to the renderers list in PREFER mode (before MediaCodecAudioRenderer).
+            baseFactory.setExtensionRendererMode(
+                DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+            )
+
+            // Wrap base factory to ALSO prepend FfmpegAudioRenderer explicitly.
+            // This provides redundancy: if ServiceLoader fails, the explicit prepend
+            // still works. If ServiceLoader succeeds, FfmpegAudioRenderer appears twice
+            // but ExoPlayer picks the first one at index 0.
+            val renderersFactory = RenderersFactory { handler, _, audioListener, _, _ ->
+                android.util.Log.i("HiResAudio", "RenderersFactory.createRenderers() called — prepending FfmpegAudioRenderer")
+                val baseRenderers = baseFactory.createRenderers(
+                    handler,
+                    object : VideoRendererEventListener {},
+                    audioListener,
+                    object : TextOutput {
+                        override fun onCues(cueGroup: CueGroup) {}
+                    },
+                    object : MetadataOutput {
+                        override fun onMetadata(metadata: Metadata) {}
+                    }
+                )
+                android.util.Log.i("HiResAudio", "Base factory returned ${baseRenderers.size} renderers")
+                for ((i, r) in baseRenderers.withIndex()) {
+                    android.util.Log.i("HiResAudio", "  Renderer[$i] = ${r::class.java.name}")
+                }
+                val ffmpeg = FfmpegAudioRenderer(handler, audioListener)
+                android.util.Log.i("HiResAudio", "FfmpegAudioRenderer created, prepending at position 0")
+                android.util.Log.i("HiResAudio", "FfmpegLibrary.isAvailable() = ${FfmpegAudioRenderer::class.java.name}: check supportsFormat")
+                arrayOf<Renderer>(ffmpeg) + baseRenderers
+            }
+
+            exoPlayer = ExoPlayer.Builder(context, renderersFactory)
+                .setAudioAttributes(audioAttributes, true)
+                .setHandleAudioBecomingNoisy(true)
+                .build()
 
             exoPlayer?.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -273,6 +375,12 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                             channel?.invokeMethod("onPlaybackStateChanged", mapOf(
                                 "isPlaying" to false
                             ))
+                            // Push dedicated track-ended event — this is the ONLY reliable
+                            // way to detect track completion. onIsPlayingChanged(false) can
+                            // fire for transient reasons (audio focus, format change) and
+                            // should NOT be used for completion detection to avoid false
+                            // positives that destroy the AudioTrack mid-playback.
+                            channel?.invokeMethod("onTrackEnded", true)
                         }
                         Player.STATE_BUFFERING -> {
                             channel?.invokeMethod("onBuffering", mapOf(
@@ -513,6 +621,7 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
 
                 currentSampleRate = sampleRate
                 currentBitDepth = bitDepth
+                lastPushedDurationMs = -1L // Reset for new track
 
                 try {
                     val player = getOrCreatePlayer()
@@ -529,20 +638,26 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                     player.prepare()
                     player.play()
 
+                    // Start native position push at 50ms intervals
+                    startPositionPush()
+
                     result.success(true)
                 } catch (e: Exception) {
                     result.error("PLAY_ERROR", "Failed to play: ${e.message}", null)
                 }
             }
             "pause" -> {
+                stopPositionPush()
                 exoPlayer?.pause()
                 result.success(true)
             }
             "resume" -> {
                 exoPlayer?.play()
+                startPositionPush()
                 result.success(true)
             }
             "stop" -> {
+                stopPositionPush()
                 exoPlayer?.stop()
                 exoPlayer?.seekTo(0)
                 isPlaying = false
@@ -764,6 +879,7 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
     }
 
     private fun releasePlayer() {
+        stopPositionPush()
         try {
             exoPlayer?.stop()
             exoPlayer?.release()

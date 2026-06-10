@@ -65,6 +65,9 @@ class MainActivity : AudioServiceActivity() {
         exclusiveAudioPlugin?.attachChannel(exclusiveChannel)
         exclusiveChannel.setMethodCallHandler(exclusiveAudioPlugin)
 
+        // 注册 Audio Conversion 插件 (WAV → FLAC)
+        AudioConversionPlugin.register(flutterEngine)
+
         // Forward pending widget intents
         handleWidgetIntent(intent)
     }

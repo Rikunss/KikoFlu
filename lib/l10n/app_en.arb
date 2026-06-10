@@ -1001,6 +1001,13 @@
   "playlistPrivacyPrivateDesc": "Only you can view",
   "playlistPrivacyUnlistedDesc": "Only people with the link can view",
   "playlistPrivacyPublicDesc": "Anyone can view",
+  "convertWavAfterDownload": "Convert WAV to FLAC/ALAC",
+  "convertWavAfterDownloadDesc": "After downloading a WAV file, automatically convert to lossless FLAC (or ALAC on iOS) to save ~50% storage space",
+  "convertWavAfterDownloadEnabled": "Enabled — WAV files will be converted after download",
+  "convertWavAfterDownloadDisabled": "Disabled — WAV files are saved as-is",
+  "convertWavFfmpegNotFound": "FFmpeg not found on your system. Install FFmpeg or check your PATH.",
+  "convertingAudio": "Converting audio…",
+
   "clearTranslationCache": "Clear Translation Cache",
   "translationCacheCleared": "Translation cache cleared",
   "platformHintAndroid": "Android: System file picker will be used, storage permission may be required",

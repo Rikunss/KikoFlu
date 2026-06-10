@@ -17,6 +17,7 @@ import 'src/utils/theme.dart';
 import 'src/utils/global_keys.dart';
 import 'src/utils/platform_utils.dart';
 import 'src/services/audio_player_service.dart';
+import 'src/services/conversion_notification_service.dart';
 import 'src/services/download_service.dart';
 import 'src/services/floating_lyric_service.dart';
 import 'src/services/home_widget_service.dart';
@@ -171,10 +172,18 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     _checkForUpdatesSilently();
     _initHomeWidget();
     _setupWidgetActionHandler();
+    _initConversionNotifications();
 
     // Heavy download disk scan (fire-and-forget, runs after app is visible)
     DownloadService.instance.syncWithDiskAfterInit().catchError((e) {
       debugPrint('[Main] Disk sync failed: $e');
+    });
+  }
+
+  void _initConversionNotifications() {
+    if (!Platform.isAndroid) return;
+    ConversionNotificationService.instance.initialize().catchError((e) {
+      debugPrint('[Main] Failed to init conversion notifications: $e');
     });
   }
 

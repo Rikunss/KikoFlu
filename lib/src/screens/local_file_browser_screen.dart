@@ -108,7 +108,9 @@ class _LocalFileBrowserScreenState
             final name = f.path.split(Platform.pathSeparator).last;
             if (name == 'work_metadata.json' ||
                 name == 'cover.jpg' ||
-                name.endsWith('.downloading')) continue;
+                name.endsWith('.downloading')) {
+              continue;
+            }
             fileCount++;
             try {
               totalBytes += await f.length();
@@ -188,6 +190,7 @@ class _LocalFileBrowserScreenState
     if (value is Map) {
       return value
           .map((key, val) => MapEntry(key.toString(), _deepSanitize(val)));
+
     }
     if (value is List) {
       return value.map(_deepSanitize).toList();

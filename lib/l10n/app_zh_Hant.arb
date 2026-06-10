@@ -1138,5 +1138,12 @@
   "smartPlaylistSubtitle": "基於規則自動生成",
   "searchRules": "搜尋規則",
   "activeRules": "啟用規則 ({count})",
-  "regularPlaylist": "普通播放清單"
+  "regularPlaylist": "普通播放清單",
+
+  "convertWavAfterDownload": "下載後轉換為 FLAC/ALAC",
+  "convertWavAfterDownloadSubtitle": "將下載的 WAV 自動轉換為 FLAC（桌面）或 ALAC（iOS），節省儲存空間",
+  "convertWavAfterDownloadEnabled": "已啟用 - WAV 將轉換為 FLAC/ALAC",
+  "convertWavAfterDownloadDisabled": "未啟用 - 保持原始 WAV 格式",
+  "conversionRequiresFfmpeg": "需要安裝 FFmpeg",
+  "convertingAudio": "正在轉換音訊…"
 }

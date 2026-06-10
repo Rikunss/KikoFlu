@@ -1000,6 +1000,13 @@
   "playlistPrivacyPrivateDesc": "Только вы можете просматривать",
   "playlistPrivacyUnlistedDesc": "Могут просматривать только те, у кого есть ссылка",
   "playlistPrivacyPublicDesc": "Может просматривать любой",
+  "convertWavAfterDownload": "Конвертировать WAV в FLAC/ALAC",
+  "convertWavAfterDownloadDesc": "После загрузки WAV автоматически конвертировать в lossless FLAC (или ALAC на iOS) для экономии ~50% места",
+  "convertWavAfterDownloadEnabled": "Включено — WAV будут конвертированы после загрузки",
+  "convertWavAfterDownloadDisabled": "Отключено — WAV сохраняются как есть",
+  "convertWavFfmpegNotFound": "FFmpeg не найден. Установите FFmpeg или проверьте PATH.",
+  "convertingAudio": "Конвертация аудио…",
+
   "clearTranslationCache": "Очистить кэш переводов",
   "translationCacheCleared": "Кэш переводов очищен",
   "platformHintAndroid": "Android: Будет использован системный выбор файлов, может потребоваться разрешение на хранилище",

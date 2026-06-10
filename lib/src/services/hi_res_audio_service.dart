@@ -33,6 +33,14 @@ class HiResAudioService {
       StreamController<UsbRoutingState>.broadcast();
   final StreamController<String> _outputDeviceController =
       StreamController<String>.broadcast();
+  // Streams for native-pushed position & duration (50ms interval from Kotlin Handler)
+  final StreamController<int> _nativePositionController =
+      StreamController<int>.broadcast();
+  final StreamController<int> _nativeDurationController =
+      StreamController<int>.broadcast();
+  // Stream for track-ended event — pushed by native when ExoPlayer reaches STATE_ENDED
+  final StreamController<bool> _trackEndedController =
+      StreamController<bool>.broadcast();
 
   bool _isPlaying = false;
   bool _isUsbRouted = false;
@@ -66,6 +74,17 @@ class HiResAudioService {
   /// Values: 'usb_dac', 'usb_detected', 'wired_headphones', 'bluetooth', 'builtin', 'unknown'
   Stream<String> get outputDeviceStream =>
       _outputDeviceController.stream;
+
+  /// Stream of position updates pushed from native Kotlin Handler every 50ms.
+  /// Only emits while ExoPlayer is actively playing.
+  Stream<int> get nativePositionStream => _nativePositionController.stream;
+
+  /// Stream of duration — pushed once from native when ExoPlayer reports a valid value.
+  Stream<int> get nativeDurationStream => _nativeDurationController.stream;
+
+  /// Stream of track-ended events — pushed by native when ExoPlayer reaches STATE_ENDED.
+  /// This is the ONLY reliable signal for track completion.
+  Stream<bool> get trackEndedStream => _trackEndedController.stream;
 
   /// Whether the player is currently playing.
   bool get isPlaying => _isPlaying;
@@ -138,6 +157,22 @@ class HiResAudioService {
         final deviceType = outArgs['activeDeviceType'] as String? ?? 'unknown';
         _log.info('Output device changed: $deviceType', tag: 'USB');
         _outputDeviceController.add(deviceType);
+        break;
+      case 'onPositionChanged':
+        // Position pushed from native Handler every 50ms
+        final posMs = call.arguments as int? ?? 0;
+        _nativePositionController.add(posMs);
+        break;
+      case 'onDurationChanged':
+        // Duration pushed once from native when ExoPlayer is ready
+        final durMs = call.arguments as int? ?? 0;
+        if (durMs > 0) {
+          _nativeDurationController.add(durMs);
+        }
+        break;
+      case 'onTrackEnded':
+        // Reliable track-ended signal from native STATE_ENDED
+        _trackEndedController.add(true);
         break;
       default:
         break;
@@ -455,6 +490,9 @@ class HiResAudioService {
     _usbDevicesController.close();
     _usbRoutingController.close();
     _outputDeviceController.close();
+    _nativePositionController.close();
+    _nativeDurationController.close();
+    _trackEndedController.close();
   }
 }
 

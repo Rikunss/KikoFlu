@@ -1190,7 +1190,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                       child: _buildStatTile(
                         icon: Icons.trending_up,
                         iconColor: Colors.green[700]!,
-                        value: totalDlCount > 0 ? '${totalDlCount}' : '—',
+                        value: totalDlCount > 0 ? '$totalDlCount' : '—',
                         label: s.salesLabel,
                       ),
                     ),
@@ -1715,7 +1715,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                                   ),
 
                                 // Progress icon
-                                if (progressIcon != null) progressIcon!,
+                                if (progressIcon != null) progressIcon,
                               ],
                             ),
                           ],

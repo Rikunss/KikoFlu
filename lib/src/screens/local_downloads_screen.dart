@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:async';
 import 'dart:io';
 
 import '../../l10n/app_localizations.dart';
@@ -104,8 +105,27 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
   SortOrder _sortOrder = SortOrder.downloadDate;
   SortDirection _sortDirection = SortDirection.desc;
 
+  // ── Reactive subscriptions ──
+  StreamSubscription<List<DownloadTask>>? _tasksSub;
+  List<DownloadTask> _allTasks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _allTasks = DownloadService.instance.tasks;
+    // Listen to task stream for all updates (new downloads, status changes, conversion completion).
+    // Only _tasksSub is needed — _updateTask() always triggers _tasksController.add(),
+    // which delivers the freshest data. No need for conversionStream: it fires BEFORE
+    // _updateTask(), so reading tasks from it would return stale (still "converting") data.
+    _tasksSub = DownloadService.instance.tasksStream.listen((tasks) {
+      if (!mounted) return;
+      setState(() => _allTasks = tasks);
+    });
+  }
+
   @override
   void dispose() {
+    _tasksSub?.cancel();
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -384,126 +404,120 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<DownloadTask>>(
-      stream: DownloadService.instance.tasksStream,
-      initialData: DownloadService.instance.tasks,
-      builder: (context, snapshot) {
-        final tasks = snapshot.data ?? [];
-        final completed = tasks.where((t) => t.status == DownloadStatus.completed).toList();
+    final tasks = _allTasks;
+    final completed = tasks.where((t) => t.status == DownloadStatus.completed).toList();
 
-        // Group by workId
-        final Map<int, List<DownloadTask>> allGrouped = {};
-        for (final task in completed) {
-          allGrouped.putIfAbsent(task.workId, () => []).add(task);
-        }
+    // Group by workId
+    final Map<int, List<DownloadTask>> allGrouped = {};
+    for (final task in completed) {
+      allGrouped.putIfAbsent(task.workId, () => []).add(task);
+    }
 
-        // Filter + sort
-        final grouped = _filterTasks(allGrouped);
-        final sortedIds = _sortWorkIds(grouped);
+    // Filter + sort
+    final grouped = _filterTasks(allGrouped);
+    final sortedIds = _sortWorkIds(grouped);
 
-        // Pagination
-        final total = sortedIds.length;
-        final totalPages = (total / _pageSize).ceil();
-        final start = (_currentPage - 1) * _pageSize;
-        final end = (start + _pageSize).clamp(0, total);
-        final pageIds = sortedIds.sublist(start, end);
-        final pageMap = Map<int, List<DownloadTask>>.fromEntries(
-          pageIds.map((id) => MapEntry(id, grouped[id]!)),
-        );
-
-        return Column(children: [
-          _DownloadTopBar(
-            isSelectionMode: _isSelectionMode,
-            selectedCount: _selectedWorkIds.length,
-            totalWorkCount: allGrouped.length,
-            isSearchVisible: _isSearchVisible,
-            onToggleSelectionMode: _toggleSelectionMode,
-            onSelectAll: () => _selectAll(allGrouped),
-            onDeselectAll: _deselectAll,
-            onDeleteSelected: () => _deleteSelectedWorks(allGrouped),
-            onRefresh: _refreshMetadata,
-            onOpenFolder: _openDownloadFolder,
-            onToggleSearch: _toggleSearch,
-            onShowSort: _showSortDialog,
-          ),
-          if (_isSearchVisible) _buildSearchBar(),
-          Expanded(
-            child: allGrouped.isEmpty
-                ? _emptyState(context, S.of(context).noLocalDownloads, Icons.download_outlined)
-                : grouped.isEmpty
-                    ? _emptyState(context, S.of(context).noResults, Icons.search_off)
-                    : OverscrollNextPageDetector(
-                        hasNextPage: _currentPage < totalPages,
-                        isLoading: false,
-                        onNextPage: () async {
-                          _nextPage(totalPages);
-                          await Future.delayed(const Duration(milliseconds: 50));
-                          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToTop());
-                        },
-                        child: CustomScrollView(
-                          // ignore: deprecated_member_use
-                          cacheExtent: ScrollOptimization.cacheExtent, controller: _scrollController,
-                          physics: ScrollOptimization.physics,
-                          slivers: [
-                            SliverPadding(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                              sliver: SliverGrid(
-                                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                                  maxCrossAxisExtent: 210,
-                                  childAspectRatio: 0.72,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                ),
-                                delegate: SliverChildBuilderDelegate(
-                                  (context, index) {
-                                    final id = pageIds[index];
-                                    final workTasks = pageMap[id]!;
-                                    return RepaintBoundary(
-                                      key: ValueKey('dl_$id'),
-                                      child: _DownloadWorkCard(
-                                      workId: id,
-                                      workTasks: workTasks,
-                                      firstTask: workTasks.first,
-                                      isSelected: _selectedWorkIds.contains(id),
-                                      isSelectionMode: _isSelectionMode,
-                                      onTap: _isSelectionMode
-                                          ? () => _toggleWorkSelection(id)
-                                          : () => _openWorkDetail(id, workTasks.first),
-                                      onLongPress: !_isSelectionMode
-                                          ? () => setState(() {
-                                              _isSelectionMode = true;
-                                              _toggleWorkSelection(id);
-                                            })
-                                          : null,
-                                      ),
-                                    );
-                                  },
-                                  childCount: pageMap.length,
-                                ),
-                              ),
-                            ),
-                            SliverPadding(
-                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                              sliver: SliverToBoxAdapter(
-                                child: PaginationBar(
-                                  currentPage: _currentPage,
-                                  totalCount: total,
-                                  pageSize: _pageSize,
-                                  hasMore: _currentPage < totalPages,
-                                  isLoading: false,
-                                  onPreviousPage: _previousPage,
-                                  onNextPage: () => _nextPage(totalPages),
-                                  onGoToPage: _goToPage,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-          ),
-        ]);
-      },
+    // Pagination
+    final total = sortedIds.length;
+    final totalPages = (total / _pageSize).ceil();
+    final start = (_currentPage - 1) * _pageSize;
+    final end = (start + _pageSize).clamp(0, total);
+    final pageIds = sortedIds.sublist(start, end);
+    final pageMap = Map<int, List<DownloadTask>>.fromEntries(
+      pageIds.map((id) => MapEntry(id, grouped[id]!)),
     );
+
+    return Column(children: [
+      _DownloadTopBar(
+        isSelectionMode: _isSelectionMode,
+        selectedCount: _selectedWorkIds.length,
+        totalWorkCount: allGrouped.length,
+        isSearchVisible: _isSearchVisible,
+        onToggleSelectionMode: _toggleSelectionMode,
+        onSelectAll: () => _selectAll(allGrouped),
+        onDeselectAll: _deselectAll,
+        onDeleteSelected: () => _deleteSelectedWorks(allGrouped),
+        onRefresh: _refreshMetadata,
+        onOpenFolder: _openDownloadFolder,
+        onToggleSearch: _toggleSearch,
+        onShowSort: _showSortDialog,
+      ),
+      if (_isSearchVisible) _buildSearchBar(),
+      Expanded(
+        child: allGrouped.isEmpty
+            ? _emptyState(context, S.of(context).noLocalDownloads, Icons.download_outlined)
+            : grouped.isEmpty
+                ? _emptyState(context, S.of(context).noResults, Icons.search_off)
+                : OverscrollNextPageDetector(
+                    hasNextPage: _currentPage < totalPages,
+                    isLoading: false,
+                    onNextPage: () async {
+                      _nextPage(totalPages);
+                      await Future.delayed(const Duration(milliseconds: 50));
+                      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToTop());
+                    },
+                    child: CustomScrollView(
+                      // ignore: deprecated_member_use
+                      cacheExtent: ScrollOptimization.cacheExtent, controller: _scrollController,
+                      physics: ScrollOptimization.physics,
+                      slivers: [
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                          sliver: SliverGrid(
+                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 210,
+                              childAspectRatio: 0.72,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                            ),
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final id = pageIds[index];
+                                final workTasks = pageMap[id]!;
+                                return RepaintBoundary(
+                                  key: ValueKey('dl_$id'),
+                                  child: _DownloadWorkCard(
+                                  workId: id,
+                                  workTasks: workTasks,
+                                  firstTask: workTasks.first,
+                                  isSelected: _selectedWorkIds.contains(id),
+                                  isSelectionMode: _isSelectionMode,
+                                  onTap: _isSelectionMode
+                                      ? () => _toggleWorkSelection(id)
+                                      : () => _openWorkDetail(id, workTasks.first),
+                                  onLongPress: !_isSelectionMode
+                                      ? () => setState(() {
+                                          _isSelectionMode = true;
+                                          _toggleWorkSelection(id);
+                                        })
+                                      : null,
+                                  ),
+                                );
+                              },
+                              childCount: pageMap.length,
+                            ),
+                          ),
+                        ),
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                          sliver: SliverToBoxAdapter(
+                            child: PaginationBar(
+                              currentPage: _currentPage,
+                              totalCount: total,
+                              pageSize: _pageSize,
+                              hasMore: _currentPage < totalPages,
+                              isLoading: false,
+                              onPreviousPage: _previousPage,
+                              onNextPage: () => _nextPage(totalPages),
+                              onGoToPage: _goToPage,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+      ),
+    ]);
   }
 
   Widget _buildSearchBar() {
@@ -913,7 +927,7 @@ class _DownloadWorkCard extends StatelessWidget {
 /// ===================================================================
 /// Work card cover — fetches auth only when needed (not per-card)
 /// ===================================================================
-class _WorkCardCover extends ConsumerWidget {
+class _WorkCardCover extends ConsumerStatefulWidget {
   final int workId;
   final Work? work;
   final DownloadTask firstTask;
@@ -925,54 +939,97 @@ class _WorkCardCover extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Prefer local cover
-    if (firstTask.workMetadata != null) {
-      final relPath = firstTask.workMetadata!['localCoverPath'] as String?;
-      if (relPath != null) {
-        return FutureBuilder<Directory>(
-          future: DownloadService.instance.getDownloadDirectory(),
-          builder: (context, snap) {
-            if (snap.hasData) {
-              final path = '${snap.data!.path}/$workId/$relPath';
-              final file = File(path);
-              if (file.existsSync()) {
-                final dpr = MediaQuery.devicePixelRatioOf(context);
-                return Hero(
-                  tag: 'offline_work_cover_$workId',
-                  child: PrivacyBlurCover(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(file,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      cacheWidth: (210 * dpr).round(),
-                    ),
-                  ),
-                );
-              }
-            }
-            return _buildPlaceholder(context);
-          },
-        );
-      }
-    }
+  ConsumerState<_WorkCardCover> createState() => _WorkCardCoverState();
+}
 
-    // Fallback to network cover — narrow auth watch with select()
-    final host = ref.watch(authProvider.select((s) => s.host));
-    if (work != null && host != null && host.isNotEmpty) {
+class _WorkCardCoverState extends ConsumerState<_WorkCardCover> {
+  /// Cached local cover file path (resolved once in initState)
+  String? _coverPath;
+
+  /// Whether we've finished trying to resolve the local cover
+  bool _resolved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveCover();
+  }
+
+  Future<void> _resolveCover() async {
+    final meta = widget.firstTask.workMetadata;
+    if (meta == null) {
+      if (mounted) setState(() => _resolved = true);
+      return;
+    }
+    final relPath = meta['localCoverPath'] as String?;
+    if (relPath == null) {
+      if (mounted) setState(() => _resolved = true);
+      return;
+    }
+    try {
+      final dir = await DownloadService.instance.getDownloadDirectory();
+      final path = '${dir.path}/${widget.workId}/$relPath';
+      final file = File(path);
+      if (await file.exists()) {
+        if (mounted) setState(() => _coverPath = path);
+        return;
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _resolved = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    // Grid: maxCrossAxisExtent=210, childAspectRatio=0.72
+    // Card full height ≈ 210/0.72 ≈ 292px. Info area ≈ 94px. Cover ≈ 198px.
+    final cacheWidth = (210 * dpr).round();
+    final cacheHeight = ((210 / 0.72 - 94.0) * dpr).round();
+
+    // ── Local cached cover ──
+    if (_coverPath != null) {
       return Hero(
-        tag: 'offline_work_cover_$workId',
+        tag: 'offline_work_cover_${widget.workId}',
         child: PrivacyBlurCover(
-          borderRadius: BorderRadius.circular(8),                          child: CachedNetworkImage(
-                            imageUrl: work!.getCoverImageUrl(host),
-                            cacheKey: 'work_cover_${work!.id}',
-                            httpHeaders: StorageService.serverCookieHeaders,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => _buildPlaceholder(context),
+          borderRadius: BorderRadius.circular(8),
+          child: RepaintBoundary(
+            child: Image.file(
+              File(_coverPath!),
+              fit: BoxFit.cover,
+              width: double.infinity,
+              cacheWidth: cacheWidth,
+              cacheHeight: cacheHeight,
+              filterQuality: FilterQuality.low,
+            ),
           ),
         ),
       );
     }
+
+    // ── Still resolving — show placeholder ──
+    if (!_resolved) return _buildPlaceholder(context);
+
+    // ── Fallback to network cover ──
+    final host = ref.watch(authProvider.select((s) => s.host));
+    if (widget.work != null && host != null && host.isNotEmpty) {
+      return Hero(
+        tag: 'offline_work_cover_${widget.workId}',
+        child: PrivacyBlurCover(
+          borderRadius: BorderRadius.circular(8),
+          child: RepaintBoundary(
+            child: CachedNetworkImage(
+              imageUrl: widget.work!.getCoverImageUrl(host),
+              cacheKey: 'work_cover_${widget.work!.id}',
+              httpHeaders: StorageService.serverCookieHeaders,
+              fit: BoxFit.cover,
+              memCacheWidth: cacheWidth,
+              errorWidget: (_, __, ___) => _buildPlaceholder(context),
+            ),
+          ),
+        ),
+      );
+    }
+
     return _buildPlaceholder(context);
   }
 

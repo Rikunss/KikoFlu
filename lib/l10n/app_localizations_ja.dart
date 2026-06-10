@@ -3333,6 +3333,26 @@ class SJa extends S {
   String get playlistPrivacyPublicDesc => '誰でも閲覧可能';
 
   @override
+  String get convertWavAfterDownload => 'WAVをFLAC/ALACに変換';
+
+  @override
+  String get convertWavAfterDownloadDesc =>
+      'WAVファイルのダウンロード後、自動的にロスレスFLAC（iOSはALAC）に変換してストレージを約50%節約';
+
+  @override
+  String get convertWavAfterDownloadEnabled => '有効 — ダウンロード後にWAVを変換します';
+
+  @override
+  String get convertWavAfterDownloadDisabled => '無効 — WAVファイルをそのまま保存';
+
+  @override
+  String get convertWavFfmpegNotFound =>
+      'FFmpegが見つかりません。FFmpegをインストールするか、PATHを確認してください。';
+
+  @override
+  String get convertingAudio => '音声を変換中…';
+
+  @override
   String get clearTranslationCache => '翻訳キャッシュをクリア';
 
   @override

@@ -1000,6 +1000,13 @@
   "playlistPrivacyPrivateDesc": "只有您可以查看",
   "playlistPrivacyUnlistedDesc": "知道链接的人才能查看",
   "playlistPrivacyPublicDesc": "任何人都可以查看",
+  "convertWavAfterDownload": "下载WAV时自动转换为FLAC/ALAC",
+  "convertWavAfterDownloadDesc": "下载WAV文件后自动转换为无损FLAC（iOS为ALAC），节省约50%存储空间",
+  "convertWavAfterDownloadEnabled": "已启用 — WAV下载后将自动转换",
+  "convertWavAfterDownloadDisabled": "已禁用 — WAV文件保持原样",
+  "convertWavFfmpegNotFound": "未找到FFmpeg。请安装FFmpeg或检查PATH设置。",
+  "convertingAudio": "正在转换音频…",
+
   "clearTranslationCache": "清除翻译缓存",
   "translationCacheCleared": "翻译缓存已清除",
   "platformHintAndroid": "Android: 将使用系统文件选择器，可能需要存储权限",

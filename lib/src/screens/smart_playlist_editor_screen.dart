@@ -486,7 +486,7 @@ class _SmartPlaylistEditorScreenState
     if (_subtitleFilter != 'any') {
       parts.add(_subtitleFilter == 'yes' ? 'Subbed' : 'No sub');
     }
-    return 'Search: ${parts.join(', ')} · Sort: ${_sortField.value} ${_sortDirection}';
+    return 'Search: ${parts.join(', ')} · Sort: ${_sortField.value} $_sortDirection';
   }
 
   Widget _buildRuleInputSection({
@@ -545,7 +545,7 @@ class _SmartPlaylistEditorScreenState
     required ValueChanged<String> onChanged,
   }) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 20),

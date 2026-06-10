@@ -3423,6 +3423,28 @@ class SEn extends S {
   String get playlistPrivacyPublicDesc => 'Anyone can view';
 
   @override
+  String get convertWavAfterDownload => 'Convert WAV to FLAC/ALAC';
+
+  @override
+  String get convertWavAfterDownloadDesc =>
+      'After downloading a WAV file, automatically convert to lossless FLAC (or ALAC on iOS) to save ~50% storage space';
+
+  @override
+  String get convertWavAfterDownloadEnabled =>
+      'Enabled — WAV files will be converted after download';
+
+  @override
+  String get convertWavAfterDownloadDisabled =>
+      'Disabled — WAV files are saved as-is';
+
+  @override
+  String get convertWavFfmpegNotFound =>
+      'FFmpeg not found on your system. Install FFmpeg or check your PATH.';
+
+  @override
+  String get convertingAudio => 'Converting audio…';
+
+  @override
   String get clearTranslationCache => 'Clear Translation Cache';
 
   @override

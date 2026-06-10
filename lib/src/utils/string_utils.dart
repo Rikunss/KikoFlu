@@ -55,10 +55,15 @@ Set<String> extractAudioFormats(List<AudioFile>? children) {
   // Normalize common extensions
   final normalized = <String>{};
   for (final f in formats) {
-    if (f == 'M4A' || f == 'M4B') normalized.add('AAC');
-    else if (f == 'OGG') normalized.add('OGG');
-    else if (f == 'OPUS') normalized.add('Opus');
-    else normalized.add(f);
+    if (f == 'M4A' || f == 'M4B') {
+      normalized.add('AAC');
+    } else if (f == 'OGG') {
+      normalized.add('OGG');
+    } else if (f == 'OPUS') {
+      normalized.add('Opus');
+    } else {
+      normalized.add(f);
+    }
   }
   // Sort: FLAC > WAV > MP3 > AAC > OGG > Opus > rest
   final priority = ['FLAC', 'WAV', 'MP3', 'AAC', 'OGG', 'Opus'];
