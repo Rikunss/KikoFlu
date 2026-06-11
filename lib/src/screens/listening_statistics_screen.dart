@@ -105,6 +105,7 @@ class _StatsContentState extends ConsumerState<_StatsContent>
     with SingleTickerProviderStateMixin {
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeIn;
+  late final TabController _chartTabCtrl;
 
   @override
   void initState() {
@@ -115,12 +116,12 @@ class _StatsContentState extends ConsumerState<_StatsContent>
     );
     _fadeIn = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic);
     _animCtrl.forward();
+    _chartTabCtrl = TabController(length: 3, vsync: this);
   }
 
   @override
   void didUpdateWidget(covariant _StatsContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Re-trigger animation when stats change
     if (oldWidget.stats.totalWorksPlayed != widget.stats.totalWorksPlayed) {
       _animCtrl.forward(from: 0.0);
     }
@@ -129,11 +130,14 @@ class _StatsContentState extends ConsumerState<_StatsContent>
   @override
   void dispose() {
     _animCtrl.dispose();
+    _chartTabCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final S l10n = S.of(context);
+
     if (widget.stats.totalWorksPlayed == 0) {
       return _EmptyStats();
     }
@@ -157,21 +161,89 @@ class _StatsContentState extends ConsumerState<_StatsContent>
           ),
           const SizedBox(height: 28),
 
-          // ── Daily Activity ──
+          // ── Tabbed Chart (Daily / Weekly / Monthly) ──
           FadeTransition(
             opacity: _fadeIn,
             child: _SectionHeader(
               icon: Icons.bar_chart_rounded,
-              title: S.of(context).statsDailyActivity,
-
+              title: l10n.statsDailyActivity,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           FadeTransition(
             opacity: _fadeIn,
-            child: _DailyActivityChart(activity: widget.stats.dailyActivity),
+            child: _ChartTabBar(tabCtrl: _chartTabCtrl),
+          ),
+          const SizedBox(height: 4),
+          FadeTransition(
+            opacity: _fadeIn,
+            child: SizedBox(
+              height: 200,
+              child: TabBarView(
+                controller: _chartTabCtrl,
+                children: [
+                  _DailyActivityChart(activity: widget.stats.dailyActivity),
+                  _WeeklyChart(weekly: widget.stats.weeklyStats),
+                  _MonthlyChart(monthly: widget.stats.monthlyStats),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 28),
+
+          // ── Activity Heatmap ──
+          FadeTransition(
+            opacity: _fadeIn,
+            child: _SectionHeader(
+              icon: Icons.grid_on_rounded,
+              title: l10n.statsHeatmap,
+            ),
+          ),
+          const SizedBox(height: 4),
+          FadeTransition(
+            opacity: _fadeIn,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                l10n.statsHeatmapDesc,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+          FadeTransition(
+            opacity: _fadeIn,
+            child: _ActivityHeatmap(activity: widget.stats.dailyActivity),
+          ),
+          const SizedBox(height: 28),
+
+          // ── Milestones ──
+          if (widget.stats.milestones.isNotEmpty) ...[
+            FadeTransition(
+              opacity: _fadeIn,
+              child: _SectionHeader(
+                icon: Icons.emoji_events_rounded,
+                title: l10n.statsMilestones,
+              ),
+            ),
+            const SizedBox(height: 4),
+            FadeTransition(
+              opacity: _fadeIn,
+              child: Text(
+                l10n.statsMilestoneDesc,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            FadeTransition(
+              opacity: _fadeIn,
+              child: _MilestonesSection(milestones: widget.stats.milestones),
+            ),
+            const SizedBox(height: 28),
+          ],
 
           // ── Top VAs ──
           if (widget.stats.topVAs.isNotEmpty) ...[
@@ -179,7 +251,7 @@ class _StatsContentState extends ConsumerState<_StatsContent>
               opacity: _fadeIn,
               child: _SectionHeader(
                 icon: Icons.mic_rounded,
-                title: S.of(context).statsTopVAs,
+                title: l10n.statsTopVAs,
               ),
             ),
             const SizedBox(height: 8),
@@ -205,7 +277,7 @@ class _StatsContentState extends ConsumerState<_StatsContent>
               opacity: _fadeIn,
               child: _SectionHeader(
                 icon: Icons.group_rounded,
-                title: S.of(context).statsTopCircles,
+                title: l10n.statsTopCircles,
               ),
             ),
             const SizedBox(height: 8),
@@ -230,7 +302,7 @@ class _StatsContentState extends ConsumerState<_StatsContent>
             opacity: _fadeIn,
             child: _SectionHeader(
               icon: Icons.history_rounded,
-              title: S.of(context).statsRecentPlays,
+              title: l10n.statsRecentPlays,
             ),
           ),
           const SizedBox(height: 8),
@@ -681,6 +753,518 @@ class _CompletionRingCard extends StatelessWidget {
             const Spacer(),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Chart Tab Bar
+// ═══════════════════════════════════════════════════════════════
+
+class _ChartTabBar extends StatelessWidget {
+  final TabController tabCtrl;
+
+  const _ChartTabBar({required this.tabCtrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      height: 36,
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: TabBar(
+        controller: tabCtrl,
+        indicator: BoxDecoration(
+          color: cs.primaryContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        labelColor: cs.onPrimaryContainer,
+        unselectedLabelColor: cs.onSurfaceVariant,
+        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        unselectedLabelStyle: const TextStyle(fontSize: 13),
+        dividerColor: Colors.transparent,
+        tabs: [
+          Tab(text: S.of(context).statsTabDaily),
+          Tab(text: S.of(context).statsTabWeekly),
+          Tab(text: S.of(context).statsTabMonthly),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Weekly Chart
+// ═══════════════════════════════════════════════════════════════
+
+class _WeeklyChart extends StatelessWidget {
+  final List<WeeklyStats> weekly;
+
+  const _WeeklyChart({required this.weekly});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    if (weekly.isEmpty) return const SizedBox.shrink();
+
+    final maxCount = weekly.fold<int>(0, (m, w) => w.playCount > m ? w.playCount : m);
+    const maxBarHeight = 80.0;
+
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
+        child: SizedBox(
+          height: 150,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Y-axis legend
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 6),
+                child: Row(children: [
+                  Text('$maxCount',
+                      style: tt.labelSmall?.copyWith(fontSize: 9, color: cs.onSurfaceVariant)),
+                  const SizedBox(width: 4),
+                  Expanded(child: Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.3))),
+                ]),
+              ),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(weekly.length, (i) {
+                    final w = weekly[i];
+                    final barHeight = maxCount > 0
+                        ? (w.playCount / maxCount) * maxBarHeight
+                        : 0.0;
+                    final isLatest = i == weekly.length - 1;
+
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (w.playCount > 0)
+                              Text('${w.playCount}', style: tt.labelSmall?.copyWith(fontSize: 8, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
+                            const SizedBox(height: 2),
+                            Container(
+                              height: barHeight.clamp(0.0, maxBarHeight),
+                              decoration: BoxDecoration(
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                gradient: LinearGradient(
+                                  colors: isLatest
+                                      ? [cs.tertiary, cs.tertiary.withValues(alpha: 0.5)]
+                                      : [cs.primary.withValues(alpha: 0.6), cs.primary.withValues(alpha: 0.25)],
+                                  begin: Alignment.bottomCenter, end: Alignment.topCenter,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text('W${4 - i}', style: tt.labelSmall?.copyWith(fontSize: 8, color: cs.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Monthly Chart
+// ═══════════════════════════════════════════════════════════════
+
+class _MonthlyChart extends StatelessWidget {
+  final List<MonthlyStats> monthly;
+
+  const _MonthlyChart({required this.monthly});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    if (monthly.isEmpty) return const SizedBox.shrink();
+
+    final maxCount = monthly.fold<int>(0, (m, m2) => m2.playCount > m ? m2.playCount : m);
+    const maxBarHeight = 80.0;
+
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 18, 12, 12),
+        child: SizedBox(
+          height: 150,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 6),
+                child: Row(children: [
+                  Text('$maxCount', style: tt.labelSmall?.copyWith(fontSize: 9, color: cs.onSurfaceVariant)),
+                  const SizedBox(width: 4),
+                  Expanded(child: Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.3))),
+                ]),
+              ),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(monthly.length, (i) {
+                    final m = monthly[i];
+                    final barHeight = maxCount > 0
+                        ? (m.playCount / maxCount) * maxBarHeight
+                        : 0.0;
+                    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (m.playCount > 0)
+                              Text('${m.playCount}', style: tt.labelSmall?.copyWith(fontSize: 8, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
+                            const SizedBox(height: 2),
+                            Container(
+                              height: barHeight.clamp(0.0, maxBarHeight),
+                              decoration: BoxDecoration(
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.green.withValues(alpha: 0.6),
+                                    Colors.teal.withValues(alpha: 0.3),
+                                  ],
+                                  begin: Alignment.bottomCenter, end: Alignment.topCenter,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(months[m.month - 1], style: tt.labelSmall?.copyWith(fontSize: 8, color: cs.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Activity Heatmap (GitHub-style)
+// ═══════════════════════════════════════════════════════════════
+
+class _ActivityHeatmap extends StatelessWidget {
+  final List<DailyActivity> activity;
+
+  const _ActivityHeatmap({required this.activity});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (activity.isEmpty) return const SizedBox.shrink();
+
+    // We have 14 days of daily activity. Build a GitHub-style grid by
+    // grouping into weeks. Each column = 1 week of 7 days.
+    final dayData = <DateTime, int>{};
+    for (final a in activity) {
+      final d = DateTime(a.date.year, a.date.month, a.date.day);
+      dayData[d] = a.playCount;
+    }
+
+    // Build 2 weeks of data (14 days = 2 columns of 7 days)
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final cells = <int>[];
+    for (int dayOffset = 13; dayOffset >= 0; dayOffset--) {
+      final d = today.subtract(Duration(days: dayOffset));
+      cells.add(dayData[d] ?? 0);
+    }
+
+    // Build 6+ weeks of data for the full 12-week heatmap (but we only have
+    // 14 days, so reuse a wider range). Actually, we should use the
+    // listening stats dailyActivity but we only have 14 days.
+    // For now, show what we have as a compact grid.
+
+    final maxVal = cells.fold<int>(0, (m, v) => v > m ? v : m);
+
+    Color cellColor(int count) {
+      if (count == 0) return cs.surfaceContainerHighest.withValues(alpha: 0.4);
+      final intensity = count / (maxVal > 0 ? maxVal : 1);
+      return Color.lerp(
+        cs.primary.withValues(alpha: 0.2),
+        cs.primary,
+        intensity.clamp(0.0, 1.0),
+      )!;
+    }
+
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Grid row: 2 weeks × 7 days, laid out as 7 rows × 2 cols
+            // (7 rows = day-of-week, 2 cols = weeks)
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cellSize = (constraints.maxWidth - 12) / 14;
+                return Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: List.generate(14, (i) {
+                    final count = cells[i];
+                    return Tooltip(
+                      message: '$count plays',
+                      child: Container(
+                        width: cellSize.clamp(8.0, 20.0),
+                        height: cellSize.clamp(8.0, 20.0),
+                        decoration: BoxDecoration(
+                          color: cellColor(count),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            // Legend row
+            Row(
+              children: [
+                Text('Less', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 9, color: cs.onSurfaceVariant)),
+                const SizedBox(width: 4),
+                ...[0, 1, 2, 3].map((level) => Container(
+                  width: 10,
+                  height: 10,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: cellColor(level * (maxVal ~/ 4)),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                )),
+                const SizedBox(width: 4),
+                Text('More', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 9, color: cs.onSurfaceVariant)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Milestones Section
+// ═══════════════════════════════════════════════════════════════
+
+/// Maps milestone [iconId] to Material [IconData].
+IconData _milestoneIcon(String id) {
+  switch (id) {
+    case 'play_circle': return Icons.play_circle_rounded;
+    case 'library_music': return Icons.library_music_rounded;
+    case 'headphones': return Icons.headphones_rounded;
+    case 'emoji_events': return Icons.emoji_events_rounded;
+    case 'check_circle': return Icons.check_circle_rounded;
+    case 'timer': return Icons.timer_rounded;
+    case 'schedule': return Icons.schedule_rounded;
+    case 'star': return Icons.star_rounded;
+    case 'local_fire_department': return Icons.local_fire_department_rounded;
+    case 'whatshot': return Icons.whatshot_rounded;
+    default: return Icons.flag_rounded;
+  }
+}
+
+/// Localized milestone title from [id].
+String _milestoneTitle(BuildContext context, String id) {
+  final s = S.of(context);
+  switch (id) {
+    case 'first_work': return s.statsMilestoneFirstSteps;
+    case 'ten_works': return s.statsMilestoneGettingStarted;
+    case 'fifty_works': return s.statsMilestoneListener;
+    case 'hundred_works': return s.statsMilestoneCentury;
+    case 'first_complete': return s.statsMilestoneComplete;
+    case 'ten_hours': return s.statsMilestoneDoubleDigits;
+    case 'fifty_hours': return s.statsMilestoneLongHaul;
+    case 'hundred_hours': return s.statsMilestoneHundredHours;
+    case 'week_streak_7': return s.statsMilestoneConsistent;
+    case 'week_streak_30': return s.statsMilestoneUnstoppable;
+    default: return id;
+  }
+}
+
+/// Localized milestone description from [id].
+String _milestoneDesc(BuildContext context, String id) {
+  final s = S.of(context);
+  switch (id) {
+    case 'first_work': return s.statsMilestoneFirstStepsDesc;
+    case 'ten_works': return s.statsMilestoneGettingStartedDesc;
+    case 'fifty_works': return s.statsMilestoneListenerDesc;
+    case 'hundred_works': return s.statsMilestoneCenturyDesc;
+    case 'first_complete': return s.statsMilestoneCompleteDesc;
+    case 'ten_hours': return s.statsMilestoneDoubleDigitsDesc;
+    case 'fifty_hours': return s.statsMilestoneLongHaulDesc;
+    case 'hundred_hours': return s.statsMilestoneHundredHoursDesc;
+    case 'week_streak_7': return s.statsMilestoneConsistentDesc;
+    case 'week_streak_30': return s.statsMilestoneUnstoppableDesc;
+    default: return id;
+  }
+}
+
+class _MilestonesSection extends StatelessWidget {
+  final List<Milestone> milestones;
+
+  const _MilestonesSection({required this.milestones});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: List.generate(milestones.length, (i) {
+            final m = milestones[i];
+            return _MilestoneCard(
+              index: i,
+              totalCount: milestones.length,
+              milestone: m,
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+class _MilestoneCard extends StatelessWidget {
+  final int index;
+  final int totalCount;
+  final Milestone milestone;
+
+  const _MilestoneCard({
+    required this.index,
+    required this.totalCount,
+    required this.milestone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    final icon = _milestoneIcon(milestone.iconId);
+    final title = _milestoneTitle(context, milestone.id);
+    final desc = _milestoneDesc(context, milestone.id);
+    final achieved = milestone.achieved;
+    final progress = milestone.progress.clamp(0.0, 1.0);
+
+    return Padding(
+      padding: EdgeInsets.only(top: index > 0 ? 6 : 0, bottom: index < totalCount - 1 ? 6 : 0),
+      child: Row(
+        children: [
+          // Icon
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: achieved
+                  ? Colors.amber.withValues(alpha: 0.2)
+                  : cs.surfaceContainerHighest,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: achieved ? Colors.amber.shade700 : cs.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Title + description
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: tt.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: achieved ? Colors.amber.shade700 : cs.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  desc,
+                  style: tt.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Progress bar or check
+          SizedBox(
+            width: 56,
+            child: achieved
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle_rounded, size: 18, color: Colors.green.shade600),
+                      const SizedBox(width: 4),
+                      Text(S.of(context).statsCompleted, style: tt.labelSmall?.copyWith(fontSize: 10, color: Colors.green.shade600, fontWeight: FontWeight.w600)),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(2),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 4,
+                          backgroundColor: cs.surfaceContainerHighest,
+                          valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${(progress * 100).round()}%',
+                        style: tt.labelSmall?.copyWith(fontSize: 9, color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+          ),
+        ],
       ),
     );
   }

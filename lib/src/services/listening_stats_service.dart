@@ -1,5 +1,27 @@
+import 'dart:async';
+
 import '../models/history_record.dart';
 import 'history_database.dart';
+import 'playback_history_service.dart';
+
+/// A personal milestone achieved by the user.
+class Milestone {
+  final String id;
+  final String title;
+  final String description;
+  final bool achieved;
+  final double progress;
+  final String iconId; // mapped to IconData in UI
+
+  const Milestone({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.achieved,
+    required this.progress,
+    required this.iconId,
+  });
+}
 
 /// Statistics computed from playback history.
 class ListeningStats {
@@ -24,6 +46,12 @@ class ListeningStats {
   /// Daily play count for the last 14 days (most recent first).
   final List<DailyActivity> dailyActivity;
 
+  /// Weekly stats for the last 4 weeks.
+  final List<WeeklyStats> weeklyStats;
+
+  /// Monthly stats for the last 6 months.
+  final List<MonthlyStats> monthlyStats;
+
   /// Top voice actors by play count.
   final List<VaStat> topVAs;
 
@@ -33,6 +61,9 @@ class ListeningStats {
   /// Most recently played works.
   final List<HistoryRecord> recentPlays;
 
+  /// Personal milestones achieved or in progress.
+  final List<Milestone> milestones;
+
   const ListeningStats({
     required this.totalWorksPlayed,
     required this.completedWorks,
@@ -41,9 +72,12 @@ class ListeningStats {
     required this.currentStreakDays,
     required this.longestStreakDays,
     required this.dailyActivity,
+    required this.weeklyStats,
+    required this.monthlyStats,
     required this.topVAs,
     required this.topCircles,
     required this.recentPlays,
+    required this.milestones,
   });
 
   /// Empty stats when no history exists.
@@ -55,9 +89,12 @@ class ListeningStats {
     currentStreakDays: 0,
     longestStreakDays: 0,
     dailyActivity: [],
+    weeklyStats: [],
+    monthlyStats: [],
     topVAs: [],
     topCircles: [],
     recentPlays: [],
+    milestones: [],
   );
 }
 
@@ -67,6 +104,34 @@ class DailyActivity {
   final int playCount;
 
   const DailyActivity({required this.date, required this.playCount});
+}
+
+/// Weekly play stats.
+class WeeklyStats {
+  final DateTime startDate;
+  final int playCount;
+  final double listeningHours;
+
+  const WeeklyStats({
+    required this.startDate,
+    required this.playCount,
+    required this.listeningHours,
+  });
+}
+
+/// Monthly play stats.
+class MonthlyStats {
+  final int year;
+  final int month;
+  final int playCount;
+  final double listeningHours;
+
+  const MonthlyStats({
+    required this.year,
+    required this.month,
+    required this.playCount,
+    required this.listeningHours,
+  });
 }
 
 /// Voice actor play statistics.
@@ -92,6 +157,27 @@ class ListeningStatsService {
 
   ListeningStats? _cached;
   DateTime? _lastFetch;
+  StreamSubscription? _historySub;
+  bool _initialized = false;
+
+  /// Start listening to [PlaybackHistoryService.historyUpdatedStream] so the
+  /// cache is automatically invalidated whenever a new history record is written.
+  /// Safe to call multiple times.
+  void subscribeToHistoryUpdates() {
+    if (_initialized) return;
+    _initialized = true;
+    _historySub = PlaybackHistoryService.instance.historyUpdatedStream.listen((_) {
+      _cached = null;
+      _lastFetch = null;
+    });
+  }
+
+  /// Stop listening to history updates.
+  void unsubscribeFromHistoryUpdates() {
+    _historySub?.cancel();
+    _historySub = null;
+    _initialized = false;
+  }
 
   /// Compute statistics from history database.
   /// Results are cached for 30 seconds to avoid recomputation.
@@ -227,6 +313,133 @@ class ListeningStatsService {
       ..sort((a, b) => b.playCount.compareTo(a.playCount));
     final topCircles = sortedCircles.take(5).toList();
 
+    // ── Weekly stats (last 4 weeks) ──
+    final weeklyStats = <WeeklyStats>[];
+    for (int w = 3; w >= 0; w--) {
+      final weekStart = today.subtract(Duration(days: today.weekday - 1 + w * 7));
+      final weekEnd = weekStart.add(const Duration(days: 7));
+      int weekPlayCount = 0;
+      double weekHours = 0.0;
+      for (final record in allRecords) {
+        if (record.lastPlayedTime.isAfter(weekStart.subtract(const Duration(hours: 1))) &&
+            record.lastPlayedTime.isBefore(weekEnd)) {
+          weekPlayCount++;
+          weekHours += record.lastPositionMs / 3600000.0;
+        }
+      }
+      weeklyStats.add(WeeklyStats(
+        startDate: weekStart,
+        playCount: weekPlayCount,
+        listeningHours: double.parse(weekHours.toStringAsFixed(1)),
+      ));
+    }
+
+    // ── Monthly stats (last 6 months) ──
+    final monthlyStats = <MonthlyStats>[];
+    for (int m = 5; m >= 0; m--) {
+      final monthDate = DateTime(today.year, today.month - m, 1);
+      int monthPlayCount = 0;
+      double monthHours = 0.0;
+      for (final record in allRecords) {
+        if (record.lastPlayedTime.year == monthDate.year &&
+            record.lastPlayedTime.month == monthDate.month) {
+          monthPlayCount++;
+          monthHours += record.lastPositionMs / 3600000.0;
+        }
+      }
+      monthlyStats.add(MonthlyStats(
+        year: monthDate.year,
+        month: monthDate.month,
+        playCount: monthPlayCount,
+        listeningHours: double.parse(monthHours.toStringAsFixed(1)),
+      ));
+    }
+
+    // ── Milestones ──
+    final totalHours = approximateTime.inMinutes / 60.0;
+    final milestones = <Milestone>[
+      Milestone(
+        id: 'first_work',
+        title: 'First Steps',
+        description: 'Play your first work',
+        achieved: totalWorks > 0,
+        progress: totalWorks > 0 ? 1.0 : 0.0,
+        iconId: 'play_circle',
+      ),
+      Milestone(
+        id: 'ten_works',
+        title: 'Getting Started',
+        description: 'Play 10 different works',
+        achieved: totalWorks >= 10,
+        progress: (totalWorks / 10).clamp(0.0, 1.0),
+        iconId: 'library_music',
+      ),
+      Milestone(
+        id: 'fifty_works',
+        title: 'Dedicated Listener',
+        description: 'Play 50 different works',
+        achieved: totalWorks >= 50,
+        progress: (totalWorks / 50).clamp(0.0, 1.0),
+        iconId: 'headphones',
+      ),
+      Milestone(
+        id: 'hundred_works',
+        title: 'Century Mark',
+        description: 'Play 100 different works',
+        achieved: totalWorks >= 100,
+        progress: (totalWorks / 100).clamp(0.0, 1.0),
+        iconId: 'emoji_events',
+      ),
+      Milestone(
+        id: 'first_complete',
+        title: 'Complete!',
+        description: 'Finish your first work',
+        achieved: completed > 0,
+        progress: completed > 0 ? 1.0 : 0.0,
+        iconId: 'check_circle',
+      ),
+      Milestone(
+        id: 'ten_hours',
+        title: 'Double Digits',
+        description: 'Listen for 10 hours total',
+        achieved: totalHours >= 10,
+        progress: (totalHours / 10).clamp(0.0, 1.0),
+        iconId: 'timer',
+      ),
+      Milestone(
+        id: 'fifty_hours',
+        title: 'Long Haul',
+        description: 'Listen for 50 hours total',
+        achieved: totalHours >= 50,
+        progress: (totalHours / 50).clamp(0.0, 1.0),
+        iconId: 'schedule',
+      ),
+      Milestone(
+        id: 'hundred_hours',
+        title: '100 Hours Club',
+        description: 'Listen for 100 hours total',
+        achieved: totalHours >= 100,
+        progress: (totalHours / 100).clamp(0.0, 1.0),
+        iconId: 'star',
+      ),
+      Milestone(
+        id: 'week_streak_7',
+        title: 'Consistent',
+        description: 'Reach a 7-day streak',
+        achieved: longestStreak >= 7,
+        progress: (longestStreak / 7).clamp(0.0, 1.0),
+        iconId: 'local_fire_department',
+      ),
+      Milestone(
+        id: 'week_streak_30',
+        title: 'Unstoppable',
+        description: 'Reach a 30-day streak',
+        achieved: longestStreak >= 30,
+        progress: (longestStreak / 30).clamp(0.0, 1.0),
+        iconId: 'whatshot',
+      ),
+    ];
+
     // ── Recent plays ──
     final sortedByTime = List<HistoryRecord>.from(allRecords)
       ..sort((a, b) => b.lastPlayedTime.compareTo(a.lastPlayedTime));
@@ -240,9 +453,12 @@ class ListeningStatsService {
       currentStreakDays: currentStreak,
       longestStreakDays: longestStreak,
       dailyActivity: dailyActivity,
+      weeklyStats: weeklyStats,
+      monthlyStats: monthlyStats,
       topVAs: topVAs,
       topCircles: topCircles,
       recentPlays: recentPlays,
+      milestones: milestones,
     );
     _lastFetch = DateTime.now();
     return _cached!;

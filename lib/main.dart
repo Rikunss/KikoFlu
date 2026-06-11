@@ -24,6 +24,12 @@ import 'src/services/home_widget_service.dart';
 import 'src/services/mpv_config_service.dart';
 import 'src/services/playback_history_service.dart';
 import 'src/services/progress_sync_service.dart';
+import 'src/services/listening_stats_service.dart';
+import 'src/services/bookmark_service.dart';
+import 'src/services/app_lock_service.dart';
+import 'src/services/screen_state_service.dart';
+import 'src/services/subtitle_library_file_watcher.dart';
+import 'src/screens/lock_screen.dart';
 import 'src/models/work.dart';
 import 'package:flutter/services.dart';
 import 'l10n/app_localizations.dart';
@@ -173,6 +179,11 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     _initHomeWidget();
     _setupWidgetActionHandler();
     _initConversionNotifications();
+    _initBookmarkService();
+    _initScreenStateService();
+    _initListeningStatsSubscription();
+    _initSubtitleLibraryFileWatcher();
+    _setupAppLockTileHandler();
 
     // Heavy download disk scan (fire-and-forget, runs after app is visible)
     DownloadService.instance.syncWithDiskAfterInit().catchError((e) {
@@ -184,6 +195,41 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     if (!Platform.isAndroid) return;
     ConversionNotificationService.instance.initialize().catchError((e) {
       debugPrint('[Main] Failed to init conversion notifications: $e');
+    });
+  }
+
+  void _initBookmarkService() {
+    BookmarkService.instance.initialize().catchError((e) {
+      debugPrint('[Main] Failed to init bookmark service: $e');
+    });
+  }
+
+  void _initScreenStateService() {
+    ScreenStateService.instance.initialize();
+  }
+
+  void _initListeningStatsSubscription() {
+    ListeningStatsService.instance.subscribeToHistoryUpdates();
+  }
+
+  void _initSubtitleLibraryFileWatcher() {
+    SubtitleLibraryFileWatcher.instance.start();
+  }
+
+  void _setupAppLockTileHandler() {
+    if (!Platform.isAndroid) return;
+    const tileChannel = MethodChannel('com.kikoeru.flutter/app_lock_tile');
+    tileChannel.setMethodCallHandler((call) async {
+      if (call.method == 'tileToggled') {
+        final enabled = call.arguments as bool? ?? false;
+        // Sync the in-memory AppLockService with the tile's toggle
+        // The native TileService already updated SharedPreferences.
+        // The UI will adapt on next build via _buildHomeScreen() check.
+        debugPrint('[AppLockTile] Toggled to $enabled');
+        if (mounted) {
+          setState(() {});
+        }
+      }
     });
   }
 
@@ -211,6 +257,19 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     super.dispose();
   }
 
+  /// Called when the operating system notifies the app of memory pressure.
+  /// Clears Flutter's in-memory image cache to free decoded image data.
+  /// This is especially important after increasing [ImageCache.maximumSize]
+  /// to 500 images (100 MB) — on low-end devices, the larger cache could
+  /// otherwise contribute to Out-Of-Memory (OOM) kills when background apps
+  /// consume additional memory.
+  @override
+  void didHaveMemoryPressure() {
+    super.didHaveMemoryPressure();
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -220,6 +279,23 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
         state == AppLifecycleState.detached) {
       PlaybackHistoryService.instance
           .flushNow(reason: FlushReason.appBackground);
+
+      // Track background time for auto-relock
+      if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.inactive ||
+          state == AppLifecycleState.hidden) {
+        if (AppLockService.instance.isEnabled) {
+          AppLockService.instance.notifyAppBackgrounded();
+        }
+      }
+    }
+
+    // Auto-relock check when app returns to foreground
+    if (state == AppLifecycleState.resumed) {
+      if (AppLockService.instance.isEnabled &&
+          AppLockService.instance.notifyAppForegrounded()) {
+        setState(() {});
+      }
     }
 
     // On Android, when the app is swiped away from recent apps (detached),
@@ -348,9 +424,19 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
 
   Widget _buildHomeScreen() {
     final authState = ref.watch(authProvider);
-    return authState.currentUser != null
-        ? const MainScreen()
-        : const LoginScreen();
+    if (authState.currentUser == null) {
+      return const LoginScreen();
+    }
+
+    // If app lock is enabled, show lock screen before MainScreen
+    // Use lockGeneration as key to force fresh LockScreen on auto-relock
+    if (AppLockService.instance.isEnabled) {
+      return _LockScreenWrapper(
+        key: ValueKey('lock_${AppLockService.instance.lockGeneration}'),
+      );
+    }
+
+    return const MainScreen();
   }
 }
 
@@ -368,6 +454,74 @@ class _FpsOverlayGlobal extends ConsumerWidget {
       top: MediaQuery.of(context).padding.top + 8,
       right: 4,
       child: const FpsOverlay(),
+    );
+  }
+}
+
+/// Wrapper widget that shows the [LockScreen] until the user authenticates,
+/// then replaces it with [MainScreen].
+class _LockScreenWrapper extends ConsumerStatefulWidget {
+  const _LockScreenWrapper({super.key});
+
+  @override
+  ConsumerState<_LockScreenWrapper> createState() => _LockScreenWrapperState();
+}
+
+class _LockScreenWrapperState extends ConsumerState<_LockScreenWrapper>
+    with SingleTickerProviderStateMixin {
+  bool _unlocked = false;
+  late final AnimationController _exitCtrl;
+  late final Animation<double> _fadeAnim;
+  late final Animation<double> _scaleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _exitCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _fadeAnim = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _exitCtrl, curve: Curves.easeOutCubic),
+    );
+    _scaleAnim = Tween<double>(begin: 1.0, end: 0.85).animate(
+      CurvedAnimation(parent: _exitCtrl, curve: Curves.easeOutCubic),
+    );
+  }
+
+  @override
+  void dispose() {
+    _exitCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onUnlocked() {
+    _exitCtrl.forward().then((_) {
+      if (mounted) {
+        setState(() => _unlocked = true);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_unlocked) {
+      return const MainScreen();
+    }
+    // Stack MainScreen underneath + LockScreen overlay with exit animation
+    return Stack(
+      children: [
+        const MainScreen(),
+        FadeTransition(
+          opacity: _fadeAnim,
+          child: ScaleTransition(
+            scale: _scaleAnim,
+            child: LockScreen(
+              onUnlocked: _onUnlocked,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

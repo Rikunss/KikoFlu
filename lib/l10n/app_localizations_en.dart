@@ -3756,6 +3756,94 @@ class SEn extends S {
       'Start listening to works and your stats will appear here.';
 
   @override
+  String get statsTabDaily => 'Daily';
+
+  @override
+  String get statsTabWeekly => 'Weekly';
+
+  @override
+  String get statsTabMonthly => 'Monthly';
+
+  @override
+  String get statsWeeklyReport => 'Weekly Report (4 weeks)';
+
+  @override
+  String get statsMonthlyReport => 'Monthly Report (6 months)';
+
+  @override
+  String get statsHeatmap => 'Activity Heatmap';
+
+  @override
+  String get statsHeatmapDesc => 'Listening activity over the last 12 weeks';
+
+  @override
+  String get statsMilestones => 'Milestones';
+
+  @override
+  String get statsMilestoneDesc =>
+      'Achievements earned through your listening journey';
+
+  @override
+  String get statsMilestoneFirstSteps => 'First Steps';
+
+  @override
+  String get statsMilestoneFirstStepsDesc => 'Play your first work';
+
+  @override
+  String get statsMilestoneGettingStarted => 'Getting Started';
+
+  @override
+  String get statsMilestoneGettingStartedDesc => 'Play 10 different works';
+
+  @override
+  String get statsMilestoneListener => 'Dedicated Listener';
+
+  @override
+  String get statsMilestoneListenerDesc => 'Play 50 different works';
+
+  @override
+  String get statsMilestoneCentury => 'Century Mark';
+
+  @override
+  String get statsMilestoneCenturyDesc => 'Play 100 different works';
+
+  @override
+  String get statsMilestoneComplete => 'Complete!';
+
+  @override
+  String get statsMilestoneCompleteDesc => 'Finish your first work';
+
+  @override
+  String get statsMilestoneDoubleDigits => 'Double Digits';
+
+  @override
+  String get statsMilestoneDoubleDigitsDesc => 'Listen for 10 hours total';
+
+  @override
+  String get statsMilestoneLongHaul => 'Long Haul';
+
+  @override
+  String get statsMilestoneLongHaulDesc => 'Listen for 50 hours total';
+
+  @override
+  String get statsMilestoneHundredHours => '100 Hours Club';
+
+  @override
+  String get statsMilestoneHundredHoursDesc => 'Listen for 100 hours total';
+
+  @override
+  String get statsMilestoneConsistent => 'Consistent';
+
+  @override
+  String get statsMilestoneConsistentDesc => 'Reach a 7-day streak';
+
+  @override
+  String get statsMilestoneUnstoppable => 'Unstoppable';
+
+  @override
+  String get statsMilestoneUnstoppableDesc => 'Reach a 30-day streak';
+
+  @override
   String get bitPerfectPlayback => 'Bit-Perfect Playback';
 
   @override
@@ -3854,6 +3942,110 @@ class SEn extends S {
   }
 
   @override
+  String get backupTitle => 'Backup & Restore';
+
+  @override
+  String get backupSubtitle => 'Export or restore all app data';
+
+  @override
+  String get backupInfoDescription =>
+      'Create a backup of your app data including accounts, settings, history, playlists, and subtitle library. Restore from a backup file at any time.';
+
+  @override
+  String get backupExportTitle => 'Export';
+
+  @override
+  String get backupExportSubtitle => 'Create a full backup';
+
+  @override
+  String get backupCreateBackup => 'Create Backup';
+
+  @override
+  String get backupCreateBackupDesc => 'Save all data to a .zip file';
+
+  @override
+  String get backupExportSuccess => 'Backup Created';
+
+  @override
+  String backupSavedTo(Object path, Object size) {
+    return 'Backup saved to:\n$path\n\nFile size: $size';
+  }
+
+  @override
+  String backupExportFailed(Object error) {
+    return 'Backup failed:\n$error';
+  }
+
+  @override
+  String get backupSelectExportDir => 'Select backup destination';
+
+  @override
+  String get backupRestoreTitle => 'Restore';
+
+  @override
+  String get backupRestoreSubtitle => 'Restore from a backup';
+
+  @override
+  String get backupRestoreFromBackup => 'Restore from Backup';
+
+  @override
+  String get backupRestoreFromBackupDesc =>
+      'Select a .zip backup file to restore';
+
+  @override
+  String get backupSelectImportFile => 'Select backup file';
+
+  @override
+  String get backupRestoreConfirmTitle => 'Restore Data?';
+
+  @override
+  String get backupRestoreConfirmMessage =>
+      'This will replace all current app data with the data from the backup. The app needs to be restarted after restore.\n\nContinue?';
+
+  @override
+  String get backupRestoreSuccessTitle => 'Restore Complete';
+
+  @override
+  String get backupRestoreSuccess => 'All data has been restored successfully.';
+
+  @override
+  String get backupRestoreWarnings => 'Warnings:';
+
+  @override
+  String backupRestoreFailed(Object error) {
+    return 'Restore failed:\n$error';
+  }
+
+  @override
+  String get backupRestartApp => 'Restart App';
+
+  @override
+  String get backupRestartRequired => 'Restart Required';
+
+  @override
+  String get backupRestartRequiredDesc =>
+      'Please restart the app for the restored data to take full effect.';
+
+  @override
+  String get backupError => 'Backup Error';
+
+  @override
+  String get backupDataIncluded => 'Data Included';
+
+  @override
+  String get backupDatabases => 'Databases';
+
+  @override
+  String get backupHiveBoxes => 'App State';
+
+  @override
+  String get backupPreferences => 'Preferences';
+
+  @override
+  String get backupAllSettings =>
+      'All settings, smart playlists, and preferences';
+
+  @override
   String get smartPlaylist => 'Smart Playlist';
 
   @override
@@ -3872,4 +4064,143 @@ class SEn extends S {
 
   @override
   String get regularPlaylist => 'Regular Playlist';
+
+  @override
+  String get audioBookmarksTitle => 'Bookmarks';
+
+  @override
+  String get audioBookmarksEmpty => 'No bookmarks yet';
+
+  @override
+  String get audioBookmarksEmptyTrack =>
+      'No bookmarks for this track.\nTap the bookmark icon to add one.';
+
+  @override
+  String get audioBookmarksHint =>
+      'Bookmark your favorite moments while listening';
+
+  @override
+  String audioBookmarkAdded(Object position) {
+    return 'Bookmark added at $position';
+  }
+
+  @override
+  String get audioBookmarksView => 'View';
+
+  @override
+  String get audioBookmarksEditNote => 'Edit Note';
+
+  @override
+  String get audioBookmarksNoteHint => 'Add a note for this bookmark...';
+
+  @override
+  String get audioBookmarksDeleteConfirm => 'Delete this bookmark?';
+
+  @override
+  String get appLockTitle => 'App Lock';
+
+  @override
+  String get appLockEnabledSubtitle =>
+      'Enabled — requires biometric or PIN to open app';
+
+  @override
+  String get appLockDisabledSubtitle =>
+      'Disabled — app opens without authentication';
+
+  @override
+  String get appLockDisableConfirmTitle => 'Disable App Lock?';
+
+  @override
+  String get appLockDisableConfirmMessage =>
+      'This will turn off all app lock protection, including biometric and PIN.';
+
+  @override
+  String get appLockDisable => 'Disable';
+
+  @override
+  String get appLockDisabledToast => 'App Lock disabled';
+
+  @override
+  String get appLockEnterPin => 'Enter your PIN';
+
+  @override
+  String get appLockAuthenticating => 'Authenticating…';
+
+  @override
+  String get appLockWrongPin => 'Wrong PIN. Try again.';
+
+  @override
+  String get appLockUseBiometric => 'Use Fingerprint / Face ID';
+
+  @override
+  String get appLockBiometricReason => 'Unlock KikoFlu';
+
+  @override
+  String get appLockBiometric => 'Biometric';
+
+  @override
+  String get appLockBiometricEnabledSubtitle =>
+      'Enabled — fingerprint or face unlock available';
+
+  @override
+  String get appLockBiometricDisabledSubtitle => 'Disabled — PIN-only mode';
+
+  @override
+  String get appLockBiometricNotAvailable =>
+      'Biometric is not available or not enrolled on this device';
+
+  @override
+  String get appLockBiometricEnableReason => 'Enable biometric unlock';
+
+  @override
+  String get appLockBiometricSubtitle =>
+      'Use your device\'s fingerprint or face to unlock faster';
+
+  @override
+  String get appLockSetupTitle => 'Set Up App Lock';
+
+  @override
+  String get appLockSetupPinSubtitle => 'Enter a PIN to secure your app';
+
+  @override
+  String get appLockSetupConfirmSubtitle => 'Confirm your PIN';
+
+  @override
+  String get appLockChangePin => 'Change PIN';
+
+  @override
+  String get appLockChangePinSubtitle => 'Set a new PIN code';
+
+  @override
+  String get appLockPinMismatch => 'PINs don\'t match. Try again.';
+
+  @override
+  String get appLockPinChanged => 'PIN changed successfully';
+
+  @override
+  String get appLockDigits => 'digits';
+
+  @override
+  String get appLockAutoLock => 'Auto-lock';
+
+  @override
+  String get appLockAutoLockNever => 'Never';
+
+  @override
+  String get appLockAutoLockImmediately => 'Immediately';
+
+  @override
+  String get appLockAutoLock1Min => '1 minute';
+
+  @override
+  String get appLockAutoLock5Min => '5 minutes';
+
+  @override
+  String get appLockAutoLock15Min => '15 minutes';
+
+  @override
+  String get appLockAutoLock30Min => '30 minutes';
+
+  @override
+  String get appLockAutoLockMinutes => 'minutes';
 }

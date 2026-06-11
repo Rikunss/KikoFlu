@@ -124,6 +124,13 @@ class HistoryDatabase {
     );
   }
 
+  /// Close the database connection. After closing, the database will
+  /// be re-opened lazily on the next access.
+  Future<void> close() async {
+    await _database?.close();
+    _database = null;
+  }
+
   Future<void> clear() async {
     final db = await instance.database;
     await db.delete('history');

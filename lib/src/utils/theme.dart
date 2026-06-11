@@ -545,6 +545,12 @@ class AppTheme {
       colorScheme: theme.colorScheme.copyWith(
         surface: const Color(0xFF000000),
       ),
+      appBarTheme: theme.appBarTheme.copyWith(
+        backgroundColor: const Color(0xFF000000),
+      ),
+      navigationBarTheme: theme.navigationBarTheme.copyWith(
+        backgroundColor: const Color(0xFF000000),
+      ),
     );
   }
 

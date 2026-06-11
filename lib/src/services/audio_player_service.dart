@@ -89,11 +89,13 @@ class AudioPlayerService {
   bool _hiResActive = false;
   Duration _lastHiResPosition = Duration.zero;
   Duration? _lastHiResDuration;
+  Duration _lastHiResBufferedPosition = Duration.zero;
   StreamSubscription? _hiResPlaybackSub;
   StreamSubscription? _hiResBufferingSub;
   // Subscriptions to native-pushed position/duration (50ms interval from Kotlin Handler)
   StreamSubscription<int>? _nativePositionSub;
   StreamSubscription<int>? _nativeDurationSub;
+  StreamSubscription<int>? _nativeBufferedPositionSub;
   StreamSubscription<bool>? _trackEndedSub;
 
   // ── Unified position & duration streams ──
@@ -357,7 +359,7 @@ class AudioPlayerService {
           playing: playing,
           updatePosition: _hiResActive ? _lastHiResPosition : _player.position,
           bufferedPosition:
-              _hiResActive ? _lastHiResPosition : _player.bufferedPosition,
+              _hiResActive ? _lastHiResBufferedPosition : _player.bufferedPosition,
           speed: _hiResActive ? 1.0 : _player.speed,
         ));
 
@@ -828,6 +830,8 @@ class AudioPlayerService {
       _nativePositionSub = null;
       _nativeDurationSub?.cancel();
       _nativeDurationSub = null;
+      _nativeBufferedPositionSub?.cancel();
+      _nativeBufferedPositionSub = null;
     }
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       if (_crossfadeDuration > Duration.zero) {
@@ -849,6 +853,8 @@ class AudioPlayerService {
       _nativePositionSub = null;
       _nativeDurationSub?.cancel();
       _nativeDurationSub = null;
+      _nativeBufferedPositionSub?.cancel();
+      _nativeBufferedPositionSub = null;
     }
     if (_queue.isNotEmpty && _currentIndex > 0) {
       if (_crossfadeDuration > Duration.zero) {
@@ -870,6 +876,8 @@ class AudioPlayerService {
       _nativePositionSub = null;
       _nativeDurationSub?.cancel();
       _nativeDurationSub = null;
+      _nativeBufferedPositionSub?.cancel();
+      _nativeBufferedPositionSub = null;
     }
     if (index >= 0 && index < _queue.length) {
       if (_crossfadeDuration > Duration.zero && currentTrack != null) {
@@ -926,6 +934,8 @@ class AudioPlayerService {
       _nativePositionSub = null;
       _nativeDurationSub?.cancel();
       _nativeDurationSub = null;
+      _nativeBufferedPositionSub?.cancel();
+      _nativeBufferedPositionSub = null;
       await _hiResService.stop();
       _hiResActive = false;
     }
@@ -1082,6 +1092,12 @@ class AudioPlayerService {
 
   Duration get position => _hiResActive ? _lastHiResPosition : _player.position;
   Duration? get duration => _hiResActive ? _lastHiResDuration : _player.duration;
+
+  /// The buffered position reported by just_audio or the native hi-res ExoPlayer.
+  /// For hi-res tracks, the native Kotlin Handler pushes [nativeBufferedPositionStream]
+  /// every 50ms so the UI can track buffer health and estimate download speed.
+  Duration get bufferedPosition =>
+      _hiResActive ? _lastHiResBufferedPosition : _player.bufferedPosition;
   bool get playing => _hiResActive ? _hiResService.isPlaying : _player.playing;
   PlayerState get playerState => _hiResActive
       ? PlayerState(_hiResService.isPlaying, ProcessingState.ready)
@@ -1264,6 +1280,14 @@ class AudioPlayerService {
       }
     });
 
+    // Buffered position pushed from native at ~50ms intervals
+    _nativeBufferedPositionSub?.cancel();
+    _nativeBufferedPositionSub =
+        _hiResService.nativeBufferedPositionStream.listen((bufPosMs) {
+      if (!_hiResActive) return;
+      _lastHiResBufferedPosition = Duration(milliseconds: bufPosMs);
+    });
+
     // Listen to hi-res playback events — forward to _unifiedPlayerStateController only.
     // Do NOT use isPlaying changes for completion detection (too many false positives).
     _hiResPlaybackSub?.cancel();
@@ -1300,6 +1324,8 @@ class AudioPlayerService {
     _nativePositionSub = null;
     _nativeDurationSub?.cancel();
     _nativeDurationSub = null;
+    _nativeBufferedPositionSub?.cancel();
+    _nativeBufferedPositionSub = null;
     _hiResPlaybackSub?.cancel();
     _hiResPlaybackSub = null;
     _hiResBufferingSub?.cancel();
@@ -1312,6 +1338,7 @@ class AudioPlayerService {
       _hiResActive = false;
       _lastHiResPosition = Duration.zero;
       _lastHiResDuration = null;
+      _lastHiResBufferedPosition = Duration.zero;
       // Emit zero position so the UI resets
       _unifiedPositionController.add(Duration.zero);
       _unifiedDurationController.add(null);

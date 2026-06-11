@@ -462,7 +462,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 builder: (context, constraints) {
                   final count = navItems.length;
                   final itemWidth = constraints.maxWidth / count;
-                  final pillWidth = (itemWidth * 0.48).clamp(28.0, itemWidth * 0.6);
+                  final maxPill = itemWidth * 0.6;
+                  final pillWidth = (itemWidth * 0.48)
+                      .clamp(28.0, maxPill < 28.0 ? 28.0 : maxPill);
                   final pillLeft = _currentIndex * itemWidth + (itemWidth - pillWidth) / 2;
 
                   return SizedBox(

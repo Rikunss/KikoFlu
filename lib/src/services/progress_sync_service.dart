@@ -89,7 +89,7 @@ class ProgressSyncService {
 
   void _startPeriodicSync() {
     _stopPeriodicSync();
-    _periodicTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    _periodicTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!_enabled || _currentWorkId == null) return;
       final service = AudioPlayerService.instance;
       if (!service.playing) return;

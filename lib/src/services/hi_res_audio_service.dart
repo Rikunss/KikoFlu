@@ -38,12 +38,17 @@ class HiResAudioService {
       StreamController<int>.broadcast();
   final StreamController<int> _nativeDurationController =
       StreamController<int>.broadcast();
+  // Stream for native-pushed buffered position (same 50ms interval as position).
+  // Used by [StreamingSpeedTracker] to estimate download speed for hi-res tracks.
+  final StreamController<int> _nativeBufferedPositionController =
+      StreamController<int>.broadcast();
   // Stream for track-ended event — pushed by native when ExoPlayer reaches STATE_ENDED
   final StreamController<bool> _trackEndedController =
       StreamController<bool>.broadcast();
 
   bool _isPlaying = false;
   bool _isUsbRouted = false;
+  String _lastOutputDeviceType = 'unknown';
 
   HiResAudioService._() {
     _channel.setMethodCallHandler(_handleMethodCall);
@@ -75,12 +80,43 @@ class HiResAudioService {
   Stream<String> get outputDeviceStream =>
       _outputDeviceController.stream;
 
+  /// The last known output device type. Always has a value — starts with
+  /// 'unknown' and updates whenever [onOutputDeviceChanged] fires from native.
+  /// Use this to avoid the "broadcast stream loses initial event" problem
+  /// when a provider subscribes after the initial event was already emitted.
+  String get lastOutputDeviceType => _lastOutputDeviceType;
+
+  /// Actively query the native side for the current output device type.
+  /// Unlike the push-based [outputDeviceStream], this makes a synchronous
+  /// method call and returns the result. Use this at startup to get the
+  /// initial device type that was emitted before the Dart handler was ready.
+  ///
+  /// Returns a string like 'builtin', 'speaker', 'wired_headphones',
+  /// 'bluetooth', 'usb_dac', 'usb_detected', or 'unknown'.
+  Future<String> queryActiveOutputDeviceType() async {
+    try {
+      final type = await _channel.invokeMethod<String>('getActiveOutputDeviceType');
+      if (type != null && type.isNotEmpty) {
+        _lastOutputDeviceType = type;
+        return type;
+      }
+    } catch (_) {}
+    return 'unknown';
+  }
+
   /// Stream of position updates pushed from native Kotlin Handler every 50ms.
   /// Only emits while ExoPlayer is actively playing.
   Stream<int> get nativePositionStream => _nativePositionController.stream;
 
   /// Stream of duration — pushed once from native when ExoPlayer reports a valid value.
   Stream<int> get nativeDurationStream => _nativeDurationController.stream;
+
+  /// Stream of buffered position — pushed from native at ~50ms intervals.
+  /// The buffered position represents the point up to which media data is
+  /// available for playback without re-buffering. Used to estimate download
+  /// speed for hi-res streaming tracks.
+  Stream<int> get nativeBufferedPositionStream =>
+      _nativeBufferedPositionController.stream;
 
   /// Stream of track-ended events — pushed by native when ExoPlayer reaches STATE_ENDED.
   /// This is the ONLY reliable signal for track completion.
@@ -155,6 +191,7 @@ class HiResAudioService {
         final outArgs = call.arguments;
         if (outArgs is! Map) break;
         final deviceType = outArgs['activeDeviceType'] as String? ?? 'unknown';
+        _lastOutputDeviceType = deviceType;
         _log.info('Output device changed: $deviceType', tag: 'USB');
         _outputDeviceController.add(deviceType);
         break;
@@ -162,6 +199,13 @@ class HiResAudioService {
         // Position pushed from native Handler every 50ms
         final posMs = call.arguments as int? ?? 0;
         _nativePositionController.add(posMs);
+        break;
+      case 'onBufferedPositionChanged':
+        // Buffered position pushed from native Handler every 50ms
+        final bufPosMs = call.arguments as int? ?? 0;
+        if (bufPosMs >= 0) {
+          _nativeBufferedPositionController.add(bufPosMs);
+        }
         break;
       case 'onDurationChanged':
         // Duration pushed once from native when ExoPlayer is ready
@@ -492,6 +536,7 @@ class HiResAudioService {
     _outputDeviceController.close();
     _nativePositionController.close();
     _nativeDurationController.close();
+    _nativeBufferedPositionController.close();
     _trackEndedController.close();
   }
 }

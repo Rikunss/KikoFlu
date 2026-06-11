@@ -83,6 +83,14 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
             val posMs = player.currentPosition.toInt()
             channel?.invokeMethod("onPositionChanged", posMs)
 
+            // Push buffered position — used by Dart-side StreamingSpeedTracker
+            // to estimate download speed. ExoPlayer reports the position up to
+            // which media data is available for playback without re-buffering.
+            val bufPosMs = player.bufferedPosition.toInt()
+            if (bufPosMs >= 0) {
+                channel?.invokeMethod("onBufferedPositionChanged", bufPosMs)
+            }
+
             // Push duration every tick — ExoPlayer eventually reports a valid value
             val durMs = player.duration
             if (durMs > 0 && durMs != androidx.media3.common.C.TIME_UNSET && durMs != lastPushedDurationMs) {
@@ -860,6 +868,9 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 setBitPerfectMode(enabled)
                 result.success(true)
+            }
+            "getActiveOutputDeviceType" -> {
+                result.success(getActiveOutputDeviceType())
             }
             "release" -> {
                 releasePlayer()

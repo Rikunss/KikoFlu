@@ -124,6 +124,13 @@ class StorageService {
     return null;
   }
 
+  /// Close all open Hive boxes so their files can be safely copied.
+  static Future<void> closeBoxes() async {
+    await _settingsBox.close();
+    await _userBox.close();
+    await _cacheBox.close();
+  }
+
   /// Returns HTTP headers with server cookie if configured.
   /// Only includes the Cookie header when a non-empty value exists.
   static Map<String, String> get serverCookieHeaders {

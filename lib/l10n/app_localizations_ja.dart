@@ -3652,6 +3652,93 @@ class SJa extends S {
   String get statsNoDataDesc => '作品を聴き始めると、統計データがここに表示されます。';
 
   @override
+  String get statsTabDaily => '日別';
+
+  @override
+  String get statsTabWeekly => '週別';
+
+  @override
+  String get statsTabMonthly => '月別';
+
+  @override
+  String get statsWeeklyReport => '週別レポート（4週間）';
+
+  @override
+  String get statsMonthlyReport => '月別レポート（6ヶ月）';
+
+  @override
+  String get statsHeatmap => 'アクティビティヒートマップ';
+
+  @override
+  String get statsHeatmapDesc => '過去12週間の聴取アクティビティ';
+
+  @override
+  String get statsMilestones => '実績';
+
+  @override
+  String get statsMilestoneDesc => 'あなたのリスニング旅で獲得した実績';
+
+  @override
+  String get statsMilestoneFirstSteps => '最初の一歩';
+
+  @override
+  String get statsMilestoneFirstStepsDesc => '最初の作品を再生';
+
+  @override
+  String get statsMilestoneGettingStarted => '始めたばかり';
+
+  @override
+  String get statsMilestoneGettingStartedDesc => '10作品を再生';
+
+  @override
+  String get statsMilestoneListener => '熱心なリスナー';
+
+  @override
+  String get statsMilestoneListenerDesc => '50作品を再生';
+
+  @override
+  String get statsMilestoneCentury => '100作品達成';
+
+  @override
+  String get statsMilestoneCenturyDesc => '100作品を再生';
+
+  @override
+  String get statsMilestoneComplete => 'コンプリート！';
+
+  @override
+  String get statsMilestoneCompleteDesc => '最初の作品を完走';
+
+  @override
+  String get statsMilestoneDoubleDigits => '二桁突入';
+
+  @override
+  String get statsMilestoneDoubleDigitsDesc => '合計10時間聴取';
+
+  @override
+  String get statsMilestoneLongHaul => 'ロングホール';
+
+  @override
+  String get statsMilestoneLongHaulDesc => '合計50時間聴取';
+
+  @override
+  String get statsMilestoneHundredHours => '100時間クラブ';
+
+  @override
+  String get statsMilestoneHundredHoursDesc => '合計100時間聴取';
+
+  @override
+  String get statsMilestoneConsistent => '継続は力なり';
+
+  @override
+  String get statsMilestoneConsistentDesc => '7日間連続達成';
+
+  @override
+  String get statsMilestoneUnstoppable => '止められない';
+
+  @override
+  String get statsMilestoneUnstoppableDesc => '30日間連続達成';
+
+  @override
   String get bitPerfectPlayback => 'ビットパーフェクト再生';
 
   @override
@@ -3748,6 +3835,107 @@ class SJa extends S {
   }
 
   @override
+  String get backupTitle => 'バックアップと復元';
+
+  @override
+  String get backupSubtitle => 'アプリデータのエクスポートまたは復元';
+
+  @override
+  String get backupInfoDescription =>
+      'アカウント、設定、履歴、プレイリスト、字幕ライブラリを含むアプリデータのバックアップを作成します。いつでもバックアップファイルから復元できます。';
+
+  @override
+  String get backupExportTitle => 'エクスポート';
+
+  @override
+  String get backupExportSubtitle => 'フルバックアップを作成';
+
+  @override
+  String get backupCreateBackup => 'バックアップを作成';
+
+  @override
+  String get backupCreateBackupDesc => 'すべてのデータを.zipファイルに保存';
+
+  @override
+  String get backupExportSuccess => 'バックアップを作成しました';
+
+  @override
+  String backupSavedTo(Object path, Object size) {
+    return 'バックアップ保存先：\n$path\n\nファイルサイズ：$size';
+  }
+
+  @override
+  String backupExportFailed(Object error) {
+    return 'バックアップ失敗：\n$error';
+  }
+
+  @override
+  String get backupSelectExportDir => 'バックアップ保存先を選択';
+
+  @override
+  String get backupRestoreTitle => '復元';
+
+  @override
+  String get backupRestoreSubtitle => 'バックアップから復元';
+
+  @override
+  String get backupRestoreFromBackup => 'バックアップから復元';
+
+  @override
+  String get backupRestoreFromBackupDesc => '復元する .zip バックアップファイルを選択';
+
+  @override
+  String get backupSelectImportFile => 'バックアップファイルを選択';
+
+  @override
+  String get backupRestoreConfirmTitle => 'データを復元しますか？';
+
+  @override
+  String get backupRestoreConfirmMessage =>
+      '現在のすべてのアプリデータがバックアップのデータで置き換えられます。復元後にアプリの再起動が必要です。\n\n続行しますか？';
+
+  @override
+  String get backupRestoreSuccessTitle => '復元完了';
+
+  @override
+  String get backupRestoreSuccess => 'すべてのデータが正常に復元されました。';
+
+  @override
+  String get backupRestoreWarnings => '警告：';
+
+  @override
+  String backupRestoreFailed(Object error) {
+    return '復元失敗：\n$error';
+  }
+
+  @override
+  String get backupRestartApp => 'アプリを再起動';
+
+  @override
+  String get backupRestartRequired => '再起動が必要です';
+
+  @override
+  String get backupRestartRequiredDesc => '復元したデータを完全に反映するにはアプリを再起動してください。';
+
+  @override
+  String get backupError => 'バックアップエラー';
+
+  @override
+  String get backupDataIncluded => '含まれるデータ';
+
+  @override
+  String get backupDatabases => 'データベース';
+
+  @override
+  String get backupHiveBoxes => 'アプリ状態';
+
+  @override
+  String get backupPreferences => '環境設定';
+
+  @override
+  String get backupAllSettings => 'すべての設定、スマートプレイリスト、環境設定';
+
+  @override
   String get smartPlaylist => 'スマートプレイリスト';
 
   @override
@@ -3766,4 +3954,136 @@ class SJa extends S {
 
   @override
   String get regularPlaylist => '通常プレイリスト';
+
+  @override
+  String get audioBookmarksTitle => 'ブックマーク';
+
+  @override
+  String get audioBookmarksEmpty => 'ブックマークはまだありません';
+
+  @override
+  String get audioBookmarksEmptyTrack =>
+      'このトラックにはブックマークがありません。\nブックマークアイコンをタップして追加してください。';
+
+  @override
+  String get audioBookmarksHint => 'お気に入りの瞬間をブックマーク';
+
+  @override
+  String audioBookmarkAdded(Object position) {
+    return '$position にブックマークを追加しました';
+  }
+
+  @override
+  String get audioBookmarksView => '表示';
+
+  @override
+  String get audioBookmarksEditNote => 'メモを編集';
+
+  @override
+  String get audioBookmarksNoteHint => 'このブックマークにメモを追加...';
+
+  @override
+  String get audioBookmarksDeleteConfirm => 'このブックマークを削除しますか？';
+
+  @override
+  String get appLockTitle => 'アプリロック';
+
+  @override
+  String get appLockEnabledSubtitle => '有効 — アプリを開くには生体認証またはPINが必要です';
+
+  @override
+  String get appLockDisabledSubtitle => '無効 — 認証なしでアプリを開けます';
+
+  @override
+  String get appLockDisableConfirmTitle => 'アプリロックを無効にしますか？';
+
+  @override
+  String get appLockDisableConfirmMessage => 'アプリロック保護（生体認証とPIN）がすべて無効になります。';
+
+  @override
+  String get appLockDisable => '無効にする';
+
+  @override
+  String get appLockDisabledToast => 'アプリロックを無効にしました';
+
+  @override
+  String get appLockEnterPin => 'PINを入力';
+
+  @override
+  String get appLockAuthenticating => '認証中…';
+
+  @override
+  String get appLockWrongPin => 'PINが違います。もう一度お試しください。';
+
+  @override
+  String get appLockUseBiometric => '指紋 / Face IDを使用';
+
+  @override
+  String get appLockBiometricReason => 'KikoFlu のロック解除';
+
+  @override
+  String get appLockBiometric => '生体認証';
+
+  @override
+  String get appLockBiometricEnabledSubtitle => '有効 — 指紋または顔認証が利用可能';
+
+  @override
+  String get appLockBiometricDisabledSubtitle => '無効 — PINのみモード';
+
+  @override
+  String get appLockBiometricNotAvailable => 'このデバイスでは生体認証が利用できないか、登録されていません';
+
+  @override
+  String get appLockBiometricEnableReason => '生体認証ロックを有効にする';
+
+  @override
+  String get appLockBiometricSubtitle => 'デバイスの指紋または顔認証で素早くロック解除';
+
+  @override
+  String get appLockSetupTitle => 'アプリロックを設定';
+
+  @override
+  String get appLockSetupPinSubtitle => 'アプリを保護するPINを入力';
+
+  @override
+  String get appLockSetupConfirmSubtitle => 'PINを確認';
+
+  @override
+  String get appLockChangePin => 'PIN変更';
+
+  @override
+  String get appLockChangePinSubtitle => '新しいPINコードを設定';
+
+  @override
+  String get appLockPinMismatch => 'PINが一致しません。もう一度お試しください。';
+
+  @override
+  String get appLockPinChanged => 'PINを変更しました';
+
+  @override
+  String get appLockDigits => '桁';
+
+  @override
+  String get appLockAutoLock => '自動ロック';
+
+  @override
+  String get appLockAutoLockNever => 'ロックしない';
+
+  @override
+  String get appLockAutoLockImmediately => 'すぐに';
+
+  @override
+  String get appLockAutoLock1Min => '1分';
+
+  @override
+  String get appLockAutoLock5Min => '5分';
+
+  @override
+  String get appLockAutoLock15Min => '15分';
+
+  @override
+  String get appLockAutoLock30Min => '30分';
+
+  @override
+  String get appLockAutoLockMinutes => '分';
 }

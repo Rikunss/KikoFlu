@@ -3780,6 +3780,95 @@ class SRu extends S {
       'Начните слушать работы, и статистика появится здесь.';
 
   @override
+  String get statsTabDaily => 'День';
+
+  @override
+  String get statsTabWeekly => 'Неделя';
+
+  @override
+  String get statsTabMonthly => 'Месяц';
+
+  @override
+  String get statsWeeklyReport => 'Недельный отчёт (4 недели)';
+
+  @override
+  String get statsMonthlyReport => 'Месячный отчёт (6 месяцев)';
+
+  @override
+  String get statsHeatmap => 'Тепловая карта';
+
+  @override
+  String get statsHeatmapDesc => 'Активность за последние 12 недель';
+
+  @override
+  String get statsMilestones => 'Достижения';
+
+  @override
+  String get statsMilestoneDesc =>
+      'Достижения, полученные во время вашего пути прослушивания';
+
+  @override
+  String get statsMilestoneFirstSteps => 'Первые шаги';
+
+  @override
+  String get statsMilestoneFirstStepsDesc => 'Воспроизведите первую работу';
+
+  @override
+  String get statsMilestoneGettingStarted => 'Начало положено';
+
+  @override
+  String get statsMilestoneGettingStartedDesc =>
+      'Воспроизведите 10 разных работ';
+
+  @override
+  String get statsMilestoneListener => 'Преданный слушатель';
+
+  @override
+  String get statsMilestoneListenerDesc => 'Воспроизведите 50 разных работ';
+
+  @override
+  String get statsMilestoneCentury => 'Сотня';
+
+  @override
+  String get statsMilestoneCenturyDesc => 'Воспроизведите 100 разных работ';
+
+  @override
+  String get statsMilestoneComplete => 'Завершено!';
+
+  @override
+  String get statsMilestoneCompleteDesc => 'Закончите первую работу';
+
+  @override
+  String get statsMilestoneDoubleDigits => 'Две цифры';
+
+  @override
+  String get statsMilestoneDoubleDigitsDesc => 'Прослушайте 10 часов';
+
+  @override
+  String get statsMilestoneLongHaul => 'Марафонец';
+
+  @override
+  String get statsMilestoneLongHaulDesc => 'Прослушайте 50 часов';
+
+  @override
+  String get statsMilestoneHundredHours => 'Клуб 100 часов';
+
+  @override
+  String get statsMilestoneHundredHoursDesc => 'Прослушайте 100 часов';
+
+  @override
+  String get statsMilestoneConsistent => 'Постоянство';
+
+  @override
+  String get statsMilestoneConsistentDesc => 'Достигните 7-дневной серии';
+
+  @override
+  String get statsMilestoneUnstoppable => 'Неудержимый';
+
+  @override
+  String get statsMilestoneUnstoppableDesc => 'Достигните 30-дневной серии';
+
+  @override
   String get bitPerfectPlayback => 'Бит-перфект воспроизведение';
 
   @override
@@ -3882,6 +3971,111 @@ class SRu extends S {
   }
 
   @override
+  String get backupTitle => 'Резервное копирование и восстановление';
+
+  @override
+  String get backupSubtitle => 'Экспорт или восстановление данных приложения';
+
+  @override
+  String get backupInfoDescription =>
+      'Создайте резервную копию данных приложения, включая аккаунты, настройки, историю, плейлисты и библиотеку субтитров. Восстановите данные из файла резервной копии в любое время.';
+
+  @override
+  String get backupExportTitle => 'Экспорт';
+
+  @override
+  String get backupExportSubtitle => 'Создать полную резервную копию';
+
+  @override
+  String get backupCreateBackup => 'Создать резервную копию';
+
+  @override
+  String get backupCreateBackupDesc => 'Сохранить все данные в .zip файл';
+
+  @override
+  String get backupExportSuccess => 'Резервная копия создана';
+
+  @override
+  String backupSavedTo(Object path, Object size) {
+    return 'Резервная копия сохранена:\n$path\n\nРазмер файла: $size';
+  }
+
+  @override
+  String backupExportFailed(Object error) {
+    return 'Резервное копирование не удалось:\n$error';
+  }
+
+  @override
+  String get backupSelectExportDir =>
+      'Выберите место сохранения резервной копии';
+
+  @override
+  String get backupRestoreTitle => 'Восстановление';
+
+  @override
+  String get backupRestoreSubtitle => 'Восстановить из резервной копии';
+
+  @override
+  String get backupRestoreFromBackup => 'Восстановить из резервной копии';
+
+  @override
+  String get backupRestoreFromBackupDesc =>
+      'Выберите .zip файл резервной копии для восстановления';
+
+  @override
+  String get backupSelectImportFile => 'Выберите файл резервной копии';
+
+  @override
+  String get backupRestoreConfirmTitle => 'Восстановить данные?';
+
+  @override
+  String get backupRestoreConfirmMessage =>
+      'Это заменит все текущие данные приложения данными из резервной копии. После восстановления приложение нужно перезапустить.\n\nПродолжить?';
+
+  @override
+  String get backupRestoreSuccessTitle => 'Восстановление завершено';
+
+  @override
+  String get backupRestoreSuccess => 'Все данные успешно восстановлены.';
+
+  @override
+  String get backupRestoreWarnings => 'Предупреждения:';
+
+  @override
+  String backupRestoreFailed(Object error) {
+    return 'Восстановление не удалось:\n$error';
+  }
+
+  @override
+  String get backupRestartApp => 'Перезапустить приложение';
+
+  @override
+  String get backupRestartRequired => 'Требуется перезапуск';
+
+  @override
+  String get backupRestartRequiredDesc =>
+      'Перезапустите приложение, чтобы восстановленные данные вступили в силу.';
+
+  @override
+  String get backupError => 'Ошибка резервного копирования';
+
+  @override
+  String get backupDataIncluded => 'Включённые данные';
+
+  @override
+  String get backupDatabases => 'Базы данных';
+
+  @override
+  String get backupHiveBoxes => 'Состояние приложения';
+
+  @override
+  String get backupPreferences => 'Предпочтения';
+
+  @override
+  String get backupAllSettings =>
+      'Все настройки, умные плейлисты и предпочтения';
+
+  @override
   String get smartPlaylist => 'Умный плейлист';
 
   @override
@@ -3900,4 +4094,144 @@ class SRu extends S {
 
   @override
   String get regularPlaylist => 'Обычный плейлист';
+
+  @override
+  String get audioBookmarksTitle => 'Закладки';
+
+  @override
+  String get audioBookmarksEmpty => 'Закладок пока нет';
+
+  @override
+  String get audioBookmarksEmptyTrack =>
+      'Нет закладок для этого трека.\nНажмите на значок закладки, чтобы добавить.';
+
+  @override
+  String get audioBookmarksHint =>
+      'Отмечайте любимые моменты во время прослушивания';
+
+  @override
+  String audioBookmarkAdded(Object position) {
+    return 'Закладка добавлена в $position';
+  }
+
+  @override
+  String get audioBookmarksView => 'Просмотр';
+
+  @override
+  String get audioBookmarksEditNote => 'Редактировать заметку';
+
+  @override
+  String get audioBookmarksNoteHint => 'Добавить заметку для этой закладки...';
+
+  @override
+  String get audioBookmarksDeleteConfirm => 'Удалить эту закладку?';
+
+  @override
+  String get appLockTitle => 'Блокировка приложения';
+
+  @override
+  String get appLockEnabledSubtitle =>
+      'Включено — требуется биометрия или PIN для открытия';
+
+  @override
+  String get appLockDisabledSubtitle =>
+      'Отключено — приложение открывается без аутентификации';
+
+  @override
+  String get appLockDisableConfirmTitle => 'Отключить блокировку приложения?';
+
+  @override
+  String get appLockDisableConfirmMessage =>
+      'Это отключит всю защиту приложения, включая биометрию и PIN-код.';
+
+  @override
+  String get appLockDisable => 'Отключить';
+
+  @override
+  String get appLockDisabledToast => 'Блокировка приложения отключена';
+
+  @override
+  String get appLockEnterPin => 'Введите PIN-код';
+
+  @override
+  String get appLockAuthenticating => 'Аутентификация…';
+
+  @override
+  String get appLockWrongPin => 'Неверный PIN-код. Попробуйте снова.';
+
+  @override
+  String get appLockUseBiometric => 'Использовать отпечаток / Face ID';
+
+  @override
+  String get appLockBiometricReason => 'Разблокировать KikoFlu';
+
+  @override
+  String get appLockBiometric => 'Биометрия';
+
+  @override
+  String get appLockBiometricEnabledSubtitle =>
+      'Включено — отпечаток или лицо доступны';
+
+  @override
+  String get appLockBiometricDisabledSubtitle => 'Отключено — только PIN-код';
+
+  @override
+  String get appLockBiometricNotAvailable =>
+      'Биометрия недоступна или не настроена на этом устройстве';
+
+  @override
+  String get appLockBiometricEnableReason =>
+      'Включить биометрическую разблокировку';
+
+  @override
+  String get appLockBiometricSubtitle =>
+      'Используйте отпечаток пальца или лицо для быстрой разблокировки';
+
+  @override
+  String get appLockSetupTitle => 'Настройка блокировки приложения';
+
+  @override
+  String get appLockSetupPinSubtitle => 'Введите PIN-код для защиты приложения';
+
+  @override
+  String get appLockSetupConfirmSubtitle => 'Подтвердите PIN-код';
+
+  @override
+  String get appLockChangePin => 'Изменить PIN';
+
+  @override
+  String get appLockChangePinSubtitle => 'Установить новый PIN-код';
+
+  @override
+  String get appLockPinMismatch => 'PIN-коды не совпадают. Попробуйте снова.';
+
+  @override
+  String get appLockPinChanged => 'PIN-код успешно изменён';
+
+  @override
+  String get appLockDigits => 'цифр';
+
+  @override
+  String get appLockAutoLock => 'Автоблокировка';
+
+  @override
+  String get appLockAutoLockNever => 'Никогда';
+
+  @override
+  String get appLockAutoLockImmediately => 'Сразу';
+
+  @override
+  String get appLockAutoLock1Min => '1 минута';
+
+  @override
+  String get appLockAutoLock5Min => '5 минут';
+
+  @override
+  String get appLockAutoLock15Min => '15 минут';
+
+  @override
+  String get appLockAutoLock30Min => '30 минут';
+
+  @override
+  String get appLockAutoLockMinutes => 'минут';
 }

@@ -86,7 +86,42 @@ final hiResPlaybackStateProvider = StreamProvider<bool>((ref) {
 final activeOutputDeviceProvider = StreamProvider<String>((ref) {
   // On Android, use the native HiResAudioService for precise device detection
   if (Platform.isAndroid) {
-    return HiResAudioService.instance.outputDeviceStream;
+    final hiRes = HiResAudioService.instance;
+    // Emit cached value first (avoids "broadcast stream loses initial event" bug),
+    // then actively query native for the REAL current device type (since the
+    // startup push from attachChannel() was likely lost before Dart handler
+    // was set up). Then forward live stream events for device plug/unplug.
+    final controller = StreamController<String>.broadcast();
+    controller.add(hiRes.lastOutputDeviceType);
+
+    // Guard: if a live push event arrives before the async query completes,
+    // skip the stale query result so we don't overwrite real-time data.
+    var hasLiveData = false;
+
+    // Query native for the actual current device type (async).
+    // This fires after the cached value so the pill renders immediately
+    // (never stuck in 'loading') and then updates to the correct type.
+    hiRes.queryActiveOutputDeviceType().then((type) {
+      if (!controller.isClosed && !hasLiveData) {
+        controller.add(type);
+      }
+    });
+
+    final sub = hiRes.outputDeviceStream.listen(
+      (type) {
+        if (!controller.isClosed) {
+          hasLiveData = true;
+          controller.add(type);
+        }
+      },
+    );
+
+    ref.onDispose(() {
+      sub.cancel();
+      controller.close();
+    });
+
+    return controller.stream;
   }
 
   // On desktop/iOS, create a lightweight controller that listens to

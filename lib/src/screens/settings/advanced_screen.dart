@@ -13,6 +13,7 @@ import '../about_screen.dart';
 import '../log_screen.dart';
 import '../preferences_screen.dart';
 import '../ui_settings_screen.dart';
+import 'backup_restore_screen.dart';
 
 /// MD3 Advanced screen consolidating Device Info, Display & Sorting,
 /// Content Filtering, and Debug & Legacy tools.
@@ -156,7 +157,26 @@ class _AdvancedScreenState extends ConsumerState<AdvancedScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // ── 4. Developer Tools ──
+                    // ── 4. Data Management ──
+                    Card(
+                      elevation: 0,
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        children: [
+                          _buildTile(
+                            context,
+                            Icons.backup_rounded,
+                            s.backupTitle,
+                            s.backupSubtitle,
+                            () => _navigate(const BackupRestoreScreen()),
+                            isLast: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // ── 5. Developer Tools ──
                     Card(
                       elevation: 0,
                       clipBehavior: Clip.antiAlias,

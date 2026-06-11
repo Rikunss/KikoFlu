@@ -78,6 +78,10 @@ enum _BannerPhase { hidden, translating, done }
 ///   - Smooth 300ms transitions via AnimatedDefaultTextStyle
 ///   - Lyrics are left-aligned for better readability
 ///   - No background card decorations — purely typographic focus
+///
+/// Performance: Position tracking via ref.listenManual (no rebuild). Only
+/// setState() is called when the active lyric index actually changes (~3s
+/// intervals) instead of rebuilding the entire ListView every 200ms.
 /// ===================================================================
 class FullLyricDisplay extends ConsumerStatefulWidget {
   final Duration? seekingPosition;
@@ -104,13 +108,22 @@ class FullLyricDisplay extends ConsumerStatefulWidget {
 class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _itemKeys = {};
-  int? _lastAutoScrollIndex; // change detection for auto-scroll
   List<LyricLine>? _lastRawLyrics; // track change detection
   bool _autoScroll = true;
   bool _autoScrollPausedByDrag = false;
   bool _isUserScrolling = false;
   double _dragStartOffset = 0;
   Timer? _autoScrollTimer;
+
+  /// Index of the currently active (highlighted) lyric line.
+  /// Updated by [_onPositionChanged] which runs on every position tick
+  /// (~200ms) via [ref.listenManual]. Only triggers [setState] when the
+  /// value actually changes, avoiding unnecessary rebuilds of the ListView.
+  int _activeIndex = -1;
+
+  /// Whether [_activeIndex] has been initialized from the current position.
+  /// Prevents redundant work in [build()] on subsequent frames.
+  bool _activeIndexInitialized = false;
 
   // Indicator overlay — ValueNotifier so AnimatedBuilder can rebuild
   // the indicator independently without triggering full widget rebuild.
@@ -147,33 +160,26 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
   @override
   void initState() {
     super.initState();
-    // Register auto-translate listener ONCE — position changes are handled
-    // reactively via ref.watch directly in build() instead, avoiding the
-    // timing issues with StreamProvider + ref.listen re-registration.
+    // Register auto-translate listener ONCE
     ref.listenManual<LyricState>(lyricControllerProvider, _onAutoTranslateChanged);
+
+    // Position listener — runs on every tick (~200ms) but does NOT rebuild
+    // the widget. Only calls setState() when the active index changes (~3s).
+    ref.listenManual(positionProvider, (prev, next) {
+      if (!mounted) return;
+      _onPositionChanged(next.valueOrNull ?? Duration.zero);
+    });
   }
 
   @override
   void didUpdateWidget(FullLyricDisplay oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Detect seek START: when seekingPosition transitions from null → value.
-    // This happens in the same frame the parent's _handleSeekChanged runs.
-    // Crucially, even if seekingPosition is cleared back to null before
-    // build() runs (tap case: seek → immediate position emit → clear),
-    // didUpdateWidget still captures the transition. The grace period
-    // activated here ensures the Consumer builder sees _seekGraceActive
-    // when it runs in the next frame.
-    debugPrint('[SEEK] didUpdateWidget: old=${oldWidget.seekingPosition?.inMilliseconds}ms '
-        'new=${widget.seekingPosition?.inMilliseconds}ms '
-        'autoScroll=$_autoScroll lastAutoIdx=$_lastAutoScrollIndex');
     if (widget.seekingPosition != null &&
         oldWidget.seekingPosition == null) {
-      debugPrint('[SEEK] Seek START detected — resetting lastAutoScrollIndex');
       _cachedSeekPosition = widget.seekingPosition;
       _seekGraceActive = true;
-      // Reset auto-scroll tracking so the next Consumer rebuild always
-      // triggers a scroll (null != any computed index).
-      _lastAutoScrollIndex = null;
+      _activeIndex = -1; // force index change detection on next tick
       _seekGraceTimer?.cancel();
       _seekGraceTimer = Timer(const Duration(seconds: 1), () {
         if (mounted) {
@@ -182,11 +188,7 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
         }
       });
 
-      // Force auto-scroll on seek — the current lyric must immediately
-      // scroll into view even if auto-scroll was previously disabled
-      // by manual lyric dragging or a previous tap-to-seek timer.
-      // Auto-scroll should only stay disabled during manual lyric
-      // dragging (browsing), not after a seek operation.
+      // Force auto-scroll on seek
       _autoScroll = true;
       _autoScrollPausedByDrag = false;
       _autoScrollTimer?.cancel();
@@ -206,11 +208,79 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
     super.dispose();
   }
 
+  /// Callback for position changes — runs on every 200ms tick.
+  /// Computes the effective position (with seek grace period), updates
+  /// [_activeIndex], handles auto-scroll, and calls [setState] ONLY when
+  /// the index changes.
+  void _onPositionChanged(Duration position) {
+    final displayLyrics = ref.read(lyricControllerProvider).displayLyrics;
+    if (displayLyrics.isEmpty) return;
+
+    // Compute effective position with seek grace period
+    final Duration effectivePos;
+    if (widget.seekingPosition != null) {
+      effectivePos = widget.seekingPosition!;
+      // Keep-alive: re-start grace timer on every tick during seek so it
+      // doesn't expire mid-seek. The old Consumer code did this implicitly
+      // by running the timer reset block every 200ms.
+      _cachedSeekPosition = widget.seekingPosition;
+      _seekGraceActive = true;
+      _seekGraceTimer?.cancel();
+      _seekGraceTimer = Timer(const Duration(seconds: 1), () {
+        if (mounted) {
+          _seekGraceActive = false;
+          _cachedSeekPosition = null;
+        }
+      });
+    } else if (_seekGraceActive && _cachedSeekPosition != null) {
+      effectivePos = _cachedSeekPosition!;
+      // End grace if position stream has caught up
+      if (position >= _cachedSeekPosition!) {
+        _seekGraceActive = false;
+        _cachedSeekPosition = null;
+        _seekGraceTimer?.cancel();
+      }
+    } else {
+      effectivePos = position;
+    }
+
+    final newIndex = _getCurrentLyricIndex(effectivePos, displayLyrics);
+
+    if (newIndex < 0) return;
+
+    // Only proceed when the index actually changes — this is the key
+    // optimization that avoids rebuilding the ListView on every 200ms tick.
+    if (newIndex == _activeIndex) return;
+
+    _activeIndex = newIndex;
+
+    // Resume auto-scroll if previously paused by drag
+    if (_autoScrollPausedByDrag) {
+      _autoScrollPausedByDrag = false;
+      _autoScroll = true;
+      _indicatorNotifier.value = 'Auto Scroll';
+      _indicatorTimer?.cancel();
+      _indicatorTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted) _indicatorNotifier.value = null;
+      });
+    }
+
+    // Schedule auto-scroll if active
+    if (_autoScroll) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _scrollToLyric(newIndex, animate: widget.seekingPosition == null);
+        }
+      });
+    }
+
+    setState(() {}); // trigger rebuild for item styling change
+  }
+
   /// Callback for [lyricControllerProvider] changes — handles auto-translate
   /// banner transitions. Registered once in [initState]; reads from
   /// [_autoTranslateEnabled] (synced in build()) instead of capturing a
-  /// local variable by closure (which would be stale across re-registrations
-  /// if this were still in build()).
+  /// local variable by closure (which would be stale across re-registrations).
   void _onAutoTranslateChanged(LyricState? prev, LyricState next) {
     if (!_autoTranslateEnabled || prev == null) return;
 
@@ -329,7 +399,6 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
     int scrollGen = 0,
   }) {
     if (!mounted || attempts <= 0) return;
-    // If a newer scroll superseded this one, bail to avoid stale retry.
     if (scrollGen != _scrollGeneration) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || scrollGen != _scrollGeneration) return;
@@ -342,9 +411,6 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
           curve: _animCurve,
         );
       } else {
-        // Target still not rendered — scroll further DOWN.
-        // attempts decrements (2→1), so (3 - attempts) gives increasing
-        // multipliers: attempts=2→1×30%, attempts=1→2×30%.
         final viewH = _scrollController.position.viewportDimension;
         final multiplier = 3 - attempts; // 2→1, 1→2
         final newOff = (baseOffset + viewH * 0.3 * multiplier)
@@ -367,20 +433,13 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
   /// When the item is off-screen (ListView virtualization), estimates the
   /// scroll offset to jump there first, then fine-tunes after the item renders.
   void _scrollToLyric(int index, {bool animate = true}) {
-    debugPrint('[SCROLL] _scrollToLyric(index=$index, animate=$animate) '
-        'autoScroll=$_autoScroll hasClients=${_scrollController.hasClients} '
-        'hasContext=${_getKeyForIndex(index).currentContext != null}');
-    if (!_autoScroll || !_scrollController.hasClients) {
-      debugPrint('[SCROLL] BLOCKED: _autoScroll=$_autoScroll hasClients=${_scrollController.hasClients}');
-      return;
-    }
-    _scrollGeneration++; // invalidate pending retries from previous seeks
+    if (!_autoScroll || !_scrollController.hasClients) return;
+    _scrollGeneration++;
 
     final key = _getKeyForIndex(index);
     final itemContext = key.currentContext;
 
     if (itemContext != null) {
-      // Item already rendered — fine-tune to exact center.
       Scrollable.ensureVisible(
         itemContext,
         alignment: 0.48,
@@ -388,18 +447,7 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
         curve: _animCurve,
       );
     } else {
-      // Item not rendered yet (ListView virtualization).
-      // Jump to estimated position first — this forces ListView to build
-      // the target item. Then fine-tune with smooth animation.
-      // Uses jumpTo (no animation) to avoid competing scroll animations.
-      // Note: can't use cached mediaQueryHeight here because this method
-      // runs outside build() scope — called from postFrameCallback.
       final centrePadding = MediaQuery.of(context).size.height * 0.38;
-      // Use proportional estimate (index/total × maxScrollExtent) instead of
-      // a hardcoded 58.0px item height constant. The hardcoded constant fails
-      // for large position jumps because the estimation error compounds as
-      // index grows, making the target item never render (hasContext=false
-      // → estimation miss → scroll silently fails).
       final displayLyrics = ref.read(lyricControllerProvider).displayLyrics;
       final totalItems = displayLyrics.length;
       final maxExtent = _scrollController.position.maxScrollExtent;
@@ -408,10 +456,6 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
       final clamped = estimatedOffset.clamp(0.0, maxExtent);
       _scrollController.jumpTo(clamped);
 
-      // Iterative retry: after jumpTo, wait for render then fine-tune.
-      // If item still not rendered (estimation off for variable-height items),
-      // scroll further DOWN in 30% viewport increments (up to 2 retries).
-      // Pass _scrollGeneration so stale retries from previous seeks bail.
       _retryScrollToItem(
         key: key,
         attempts: 2,
@@ -423,7 +467,6 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
   }
 
   /// Tapping a lyric line seeks to that timestamp
-  /// Provides haptic feedback for confirmation.
   void _onLyricTap(int index) {
     final lyricState = ref.read(lyricControllerProvider);
     final displayLyrics = lyricState.displayLyrics;
@@ -433,36 +476,19 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
 
     final targetTime = displayLyrics[index].startTime;
 
-    // Invalidate seek grace period — see reasoning below.
     _seekGraceActive = false;
     _cachedSeekPosition = null;
     _seekGraceTimer?.cancel();
 
-    // Notify parent that a lyric tap triggered a seek. The parent needs
-    // to update _seekingPosition + invalidate its old _seekCompletionSub
-    // (from a previous seekbar interaction), otherwise the parent would
-    // hold a stale _seekingPosition that overrides the lyric display.
     widget.onLyricSeek?.call(targetTime);
 
     ref
         .read(audioPlayerControllerProvider.notifier)
         .seekAndPersist(targetTime);
 
-    // Force re-enable auto-scroll and seek grace for the Consumer builder.
-    // didUpdateWidget CAN detect seekbar seek now (deferred clear in
-    // _listenForSeekCompletion), but for tap-to-seek the explicit reset
-    // here runs BEFORE didUpdateWidget — guaranteeing the Consumer
-    // builder sees the correct state on the very first rebuild without
-    // relying on the deferred-clear mechanism.
-    //
-    // Without this explicit reset, _autoScroll stays false after a
-    // previous manual lyric drag. If the tap targets the same lyric
-    // index (backward/forward seek within the same line), the Consumer
-    // builder's _autoScrollPausedByDrag fallback also never fires
-    // because it requires an index change.
     _autoScroll = true;
     _autoScrollPausedByDrag = false;
-    _lastAutoScrollIndex = null; // force immediate scroll on next rebuild
+    _activeIndex = index;
     _seekGraceActive = true;
     _cachedSeekPosition = targetTime;
     _seekGraceTimer?.cancel();
@@ -489,35 +515,22 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
     final displayLyrics = lyricState.displayLyrics;
     _autoTranslateEnabled = autoTranslateEnabled; // sync for auto-translate listener
 
-    // ---- Track change detection ----------------------------------------
-    // When the raw lyrics list reference changes (track change), reset
-    // all transient state that should not carry over to the new track.
-    //
-    // Critical: also reset seek grace period state. If the user had
-    // dragged the seekbar on the OLD track (caching that seek target),
-    // the grace period would make the NEW track's lyric display use the
-    // old track's position for up to 1s — showing wrong lyrics.
-    //
-    // Also clear the indicator notifier so any showing badge from the
-    // previous track disappears immediately, avoiding stale UI.
+    // ---- Track change detection -----------------------------------------
     if (lyricState.lyrics != _lastRawLyrics) {
       _lastRawLyrics = lyricState.lyrics;
       _autoScrollPausedByDrag = false;
       _autoScroll = true;
       _itemKeys.clear();
-      _lastAutoScrollIndex = null;
+      _activeIndex = -1;
 
-      // Reset seek grace period — must not carry across tracks
       _seekGraceActive = false;
       _cachedSeekPosition = null;
       _seekGraceTimer?.cancel();
       _seekGraceTimer = null;
 
-      // Cancel old auto-scroll timer (from tapped lyric on previous track)
       _autoScrollTimer?.cancel();
       _autoScrollTimer = null;
 
-      // Clear indicator badge from previous track
       _indicatorNotifier.value = null;
       _indicatorTimer?.cancel();
       _indicatorTimer = null;
@@ -525,7 +538,6 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
 
     // ---- Empty / loading / error ----------------------------------------
     if (displayLyrics.isEmpty) {
-      // Show Apple Music-style skeleton shimmer while lyrics load
       if (lyricState.isLoading) {
         return _LyricSkeletonShimmer(gradientColors: widget.gradientColors);
       }
@@ -552,16 +564,28 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
       });
     }
 
+    // ---- Initialize active index on first frame ------------------------
+    // ref.listenManual only fires on the NEXT stream emission (~200ms delay),
+    // so without this, the first build would show no active lyric line.
+    if (!_activeIndexInitialized && displayLyrics.isNotEmpty) {
+      final pos = ref.read(positionProvider).valueOrNull;
+      if (pos != null) {
+        _activeIndex = _getCurrentLyricIndex(pos, displayLyrics);
+      }
+      _activeIndexInitialized = true;
+    }
+
     // ---- Focus Lyrics UI ------------------------------------------------
-    // Large top/bottom padding ensures the active line sits at the visual
-    // centre even for the first / last lyrics.
     final centrePadding = mediaQueryHeight * 0.38;
+
+    // Compute display index — uses seekingPosition override when active
+    final displayIndex = widget.seekingPosition != null
+        ? _getCurrentLyricIndex(widget.seekingPosition!, displayLyrics)
+        : _activeIndex;
 
     return Stack(
       children: [
         // ---- Background ambient gradient from album art -----------------
-        // NOTE: This does NOT depend on position — it stays stable across
-        // 200ms position ticks. Only the Consumer below rebuilds on ticks.
         if (widget.gradientColors != null && widget.gradientColors!.isNotEmpty)
           Positioned.fill(
             child: Container(
@@ -579,7 +603,6 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
           ),
 
         // ---- Auto-translate notification banner -----------------------
-        // NOTE: This does NOT depend on position — stays stable across ticks.
         Positioned(
           top: paddingTop + 4,
           left: 0,
@@ -596,266 +619,160 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
           ),
         ),
 
-        // ---- Position-aware section (rebuilds on every 200ms tick) -----
-        // Only this Consumer watches positionProvider — everything else
-        // in the outer Stack stays stable across position ticks.
-        Consumer(builder: (context, ref, _) {
-          final position = ref.watch(positionProvider).valueOrNull
-              ?? Duration.zero;
+        // ---- Lyric ListView (does NOT depend on positionProvider) ------
+        // This section only rebuilds when [displayLyrics] changes (track
+        // change) or when [_activeIndex] changes (~3s intervals). Position
+        // ticks (~200ms) are handled by the listener in [_onPositionChanged]
+        // which calls setState() only when the active index actually changes.
+        GestureDetector(
+          onLongPress: widget.onLongPress,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is ScrollStartNotification &&
+                  notification.dragDetails != null && mounted) {
+                _isUserScrolling = true;
+                _dragStartOffset = notification.metrics.pixels;
+              } else if (notification is ScrollEndNotification) {
+                _isUserScrolling = false;
+              } else if (notification is ScrollUpdateNotification &&
+                  _isUserScrolling &&
+                  _autoScroll &&
+                  mounted &&
+                  (notification.metrics.pixels - _dragStartOffset)
+                          .abs() >
+                      200) {
+                _autoScroll = false;
+                _autoScrollPausedByDrag = true;
+                _showIndicator('Manual Scroll');
+              }
+              return false;
+            },
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: EdgeInsets.only(
+                left: 28,
+                right: 20,
+                top: centrePadding,
+                bottom: centrePadding,
+              ),
+              itemCount: displayLyrics.length,
+              itemBuilder: (context, index) {
+                final lyric = displayLyrics[index];
+                final isActive = index == displayIndex;
 
-          // --- Seek grace period ----------------------------------------
-          // When the user drags the seekbar, seekingPosition gives the
-          // target position synchronously. But after release, the position
-          // stream takes ~100-500ms to catch up. During that window, the
-          // stale position from the provider would make the lyric display
-          // revert to the old position — which the user perceives as "gak
-          // pindah lirik" when seeking rapidly.
-          //
-          // Fix: cache the last seek target. While grace period is active,
-          // use the cached position instead of the stale provider position.
-          // Grace ends when:
-          //   1. Position stream catches up (position >= cached position)
-          //   2. User starts a new seek
-          //   3. Timeout (500ms safety net)
-          if (widget.seekingPosition != null) {
-            _cachedSeekPosition = widget.seekingPosition;
-            _seekGraceActive = true;
-            // Safety net: force-end grace after 1s in case position stream
-            // never catches up (e.g., rapid seeks glitch the stream).
-            _seekGraceTimer?.cancel();
-            _seekGraceTimer = Timer(
-              const Duration(seconds: 1),
-              () {
-                if (mounted) {
-                  _seekGraceActive = false;
-                  _cachedSeekPosition = null;
+                // ---- Visual parameters --------------------------------
+                Color textColor;
+                FontWeight fontWeight;
+                double fontSize;
+
+                if (isActive) {
+                  textColor = colorScheme.onSurface;
+                  fontWeight = FontWeight.w800;
+                  fontSize = lyricSettings.fullActiveFontSize;
+                } else {
+                  textColor = colorScheme.onSurfaceVariant
+                      .withValues(alpha: 0.55);
+                  fontWeight = FontWeight.w500;
+                  fontSize = lyricSettings.fullInactiveFontSize;
                 }
-              },
-            );
-          }
 
-          Duration effectivePos;
-          if (widget.seekingPosition != null) {
-            effectivePos = widget.seekingPosition!;
-          } else if (_seekGraceActive && _cachedSeekPosition != null) {
-            // Grace period: use cached seek target to prevent stale position
-            effectivePos = _cachedSeekPosition!;
-            // End grace if position stream has caught up
-            if (position >= _cachedSeekPosition!) {
-              _seekGraceActive = false;
-              _cachedSeekPosition = null;
-              _seekGraceTimer?.cancel();
-            }
-          } else {
-            effectivePos = position;
-          }
-
-          final currentIndex =
-              _getCurrentLyricIndex(effectivePos, displayLyrics);
-
-          // --- Debug: log lyric index + auto-scroll state ---
-          debugPrint('[LYRIC] oldIdx=$_lastAutoScrollIndex newIdx=$currentIndex '
-              'effectivePos=${effectivePos.inMilliseconds}ms '
-              'seekingPos=${widget.seekingPosition?.inMilliseconds}ms '
-              'graceActive=$_seekGraceActive cached=${_cachedSeekPosition?.inMilliseconds}ms');
-          debugPrint('[AUTOSCROLL] enabled=$_autoScroll '
-              'pausedByDrag=$_autoScrollPausedByDrag '
-              'scrollGuard=${currentIndex >= 0 && currentIndex != _lastAutoScrollIndex}');
-
-          // --- Auto-scroll on index change ---
-          if (currentIndex >= 0 &&
-              currentIndex != _lastAutoScrollIndex) {
-            _lastAutoScrollIndex = currentIndex;
-
-            debugPrint('[LYRIC RECALC] old=$_lastAutoScrollIndex new=$currentIndex '
-                'pos=${effectivePos.inMilliseconds}ms');
-
-            // Resume auto-scroll if paused by drag
-            if (_autoScrollPausedByDrag) {
-              _autoScrollPausedByDrag = false;
-              _autoScroll = true;
-              _indicatorNotifier.value = 'Auto Scroll';
-              _indicatorTimer?.cancel();
-              _indicatorTimer = Timer(const Duration(seconds: 2), () {
-                if (mounted) _indicatorNotifier.value = null;
-              });
-            }
-
-            // Only scroll if auto-scroll is active (not paused by drag)
-            if (_autoScroll) {
-              final animate = widget.seekingPosition == null;
-              debugPrint('[LYRIC AUTOSCROLL] index=$currentIndex animate=$animate '
-                  'pos=${effectivePos.inMilliseconds}ms');
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  _scrollToLyric(currentIndex, animate: animate);
+                // ---- Build the lyric row ------------------------------
+                Widget textWidget;
+                if (isActive) {
+                  final nextStartTime = index < displayLyrics.length - 1
+                      ? displayLyrics[index + 1].startTime
+                      : lyric.startTime + const Duration(seconds: 5);
+                  textWidget =
+                      _buildActiveLyricText(lyric, nextStartTime);
+                } else {
+                  textWidget = Text(
+                    lyric.text,
+                    textAlign: TextAlign.left,
+                  );
                 }
-              });
-            } else {
-              debugPrint('[SCROLL] BLOCKED because _autoScroll=$_autoScroll');
-            }
-          }
 
-          // --- Seeking overrides ---
-          final displayIndex = widget.seekingPosition != null
-              ? _getCurrentLyricIndex(
-                  widget.seekingPosition!, displayLyrics)
-              : currentIndex;
-
-          return Stack(
-            children: [
-              GestureDetector(
-                onLongPress: widget.onLongPress,
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: (notification) {
-                    if (notification is ScrollStartNotification &&
-                        notification.dragDetails != null && mounted) {
-                      _isUserScrolling = true;
-                      _dragStartOffset = notification.metrics.pixels;
-                    } else if (notification is ScrollEndNotification) {
-                      _isUserScrolling = false;
-                    } else if (notification is ScrollUpdateNotification &&
-                        _isUserScrolling &&
-                        _autoScroll &&
-                        mounted &&
-                        (notification.metrics.pixels - _dragStartOffset)
-                                .abs() >
-                            200) {
-                      _autoScroll = false;
-                      _autoScrollPausedByDrag = true;
-                      _showIndicator('Manual Scroll');
-                    }
-                    return false;
-                  },
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: EdgeInsets.only(
-                      left: 28,
-                      right: 20,
-                      top: centrePadding,
-                      bottom: centrePadding,
+                Widget row = GestureDetector(
+                  key: _getKeyForIndex(index),
+                  onTap: widget.isLocked
+                      ? null
+                      : () => _onLyricTap(index),
+                  onLongPress: widget.onLongPress,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      vertical: isActive ? 20.0 : 14.0,
                     ),
-                    itemCount: displayLyrics.length,
-                    itemBuilder: (context, index) {
-                      final lyric = displayLyrics[index];
-                      final isActive = index == displayIndex;
+                    child: AnimatedDefaultTextStyle(
+                      duration: _animDuration,
+                      curve: _animCurve,
+                      style: (textTheme.bodyLarge ??
+                              const TextStyle())
+                          .copyWith(
+                        color: textColor,
+                        fontWeight: fontWeight,
+                        fontSize: fontSize,
+                        height: lyricSettings.fullLineHeight,
+                      ),
+                      child: textWidget,
+                    ),
+                  ),
+                );
 
-                      // ---- Visual parameters ------------------------
-                      Color textColor;
-                      FontWeight fontWeight;
-                      double fontSize;
+                return row;
+              },
+            ),
+          ),
+        ),
 
-                      if (isActive) {
-                        textColor = colorScheme.onSurface;
-                        fontWeight = FontWeight.w800;
-                        fontSize = lyricSettings.fullActiveFontSize;
-                      } else {
-                        textColor = colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.55);
-                        fontWeight = FontWeight.w500;
-                        fontSize = lyricSettings.fullInactiveFontSize;
-                      }
-
-                      // ---- Build the lyric row ----------------------
-                      Widget textWidget;
-                      if (isActive) {
-                        final nextStartTime = index < displayLyrics.length - 1
-                            ? displayLyrics[index + 1].startTime
-                            : lyric.startTime + const Duration(seconds: 5);
-                        textWidget =
-                            _buildActiveLyricText(lyric, nextStartTime);
-                      } else {
-                        textWidget = Text(
-                          lyric.text,
-                          textAlign: TextAlign.left,
-                        );
-                      }
-
-                      Widget row = GestureDetector(
-                        key: _getKeyForIndex(index),
-                        onTap: widget.isLocked
-                            ? null
-                            : () => _onLyricTap(index),
-                        onLongPress: widget.onLongPress,
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            vertical: isActive ? 20.0 : 14.0,
-                          ),
-                          child: AnimatedDefaultTextStyle(
-                            duration: _animDuration,
-                            curve: _animCurve,
-                            style: (textTheme.bodyLarge ??
-                                    const TextStyle())
-                                .copyWith(
-                              color: textColor,
-                              fontWeight: fontWeight,
-                              fontSize: fontSize,
-                              height: lyricSettings.fullLineHeight,
-                            ),
-                            child: textWidget,
+        // ---- Scroll-mode indicator ------------------------------------
+        // Uses AnimatedBuilder with ValueNotifier so the indicator
+        // can show/hide without rebuilding the parent widget tree.
+        AnimatedBuilder(
+          animation: _indicatorNotifier,
+          builder: (context, _) {
+            final label = _indicatorNotifier.value;
+            if (label == null) return const SizedBox.shrink();
+            return Positioned(
+              top: paddingTop + 60,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _autoScroll
+                              ? Icons.vertical_align_center
+                              : Icons.touch_app,
+                          size: 14,
+                          color: Colors.white70,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                      );
-
-                      return row;
-                    },
+                      ],
+                    ),
                   ),
                 ),
               ),
-
-              // ---- Scroll-mode indicator ----------------------------
-              // Uses AnimatedBuilder with ValueNotifier so the indicator
-              // can show/hide without rebuilding the parent widget tree.
-              AnimatedBuilder(
-                animation: _indicatorNotifier,
-                builder: (context, _) {
-                  final label = _indicatorNotifier.value;
-                  if (label == null) return const SizedBox.shrink();
-                  return Positioned(
-                    top: paddingTop + 60,
-                    left: 0,
-                    right: 0,
-                    child: IgnorePointer(
-                      child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _autoScroll
-                                    ? Icons.vertical_align_center
-                                    : Icons.touch_app,
-                                size: 14,
-                                color: Colors.white70,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                label,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          );
-        }),
+            );
+          },
+        ),
       ],
     );
   }
@@ -924,13 +841,10 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
   /// Progress is calculated as:
   ///   progress = (currentPos - startTime) / (nextStartTime - startTime)
   ///
-  /// Unlike [ShaderMask] + [LinearGradient] which highlights all lines at the same
-  /// x-position simultaneously, this uses a per-character clip path:
-  ///   - Characters before cutoff → sungColor (highlighted)
-  ///   - Characters after cutoff → upcomingColor (dimmed)
-  ///
-  /// This ensures multi-line wrapped lyrics animate sequentially from first word
-  /// to last word, not row-by-row.
+  /// This uses its own Consumer on [positionProvider], but only 1 widget
+  /// (the active lyric line) has this consumer — all other lines use a
+  /// plain [Text] widget. So the karaoke Consumer rebuild only affects
+  /// 1 widget, not the entire ListView.
   Widget _buildActiveLyricText(LyricLine lyric, Duration nextStartTime) {
     final text = lyric.text;
     final lineDuration = nextStartTime - lyric.startTime;
@@ -941,9 +855,6 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
     return Consumer(builder: (context, ref, _) {
       final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
 
-      // Same grace period logic as the main Consumer — use cached seek
-      // target while audio catches up, so karaoke progress doesn't reset
-      // to stale position during the ~100-500ms after seekbar release.
       final Duration effectivePos;
       if (widget.seekingPosition != null) {
         effectivePos = widget.seekingPosition!;
@@ -977,18 +888,15 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           child: LayoutBuilder(builder: (context, constraints) {
             final maxWidth = constraints.maxWidth;
-            // Get or create cached TextPainter + line boundaries
             final karaokeLayout =
                 _getKaraokeLayout(text, inheritedStyle, maxWidth);
             return Stack(
               children: [
-                // Dimmed (upcoming) text — fully visible as base layer
                 Text(
                   text,
                   style: inheritedStyle.copyWith(color: upcomingColor),
                   textAlign: TextAlign.left,
                 ),
-                // Highlighted (sung) text — clipped to karaoke progress
                 ClipPath(
                   clipper: _KaraokeClipper(
                     text: text,
@@ -1094,7 +1002,6 @@ class _KaraokeClipper extends CustomClipper<Path> {
       return path;
     }
 
-    // Find which visual line the cutoff character is on
     final lineStarts = layout.lineStarts;
     int lineIdx = lineStarts.length - 1;
     for (int i = 0; i < lineStarts.length; i++) {
@@ -1104,18 +1011,15 @@ class _KaraokeClipper extends CustomClipper<Path> {
       }
     }
 
-    // Compute top y-position of the cutoff line = sum of heights of previous lines
     double lineTop = 0;
     for (int i = 0; i < lineIdx; i++) {
       lineTop += layout.lineHeights[i];
     }
 
-    // Completed lines: full-width rect from top to start of cutoff line
     if (lineTop > 0) {
       path.addRect(Rect.fromLTWH(0, 0, size.width, lineTop));
     }
 
-    // Cutoff line: partial-width rect from left to caret position
     final tp = layout.textPainter;
     final cutoffPos = tp.getOffsetForCaret(
       TextPosition(offset: cutoffChar), Rect.zero);
@@ -1163,7 +1067,6 @@ class _LyricSkeletonShimmerState extends State<_LyricSkeletonShimmer>
 
   @override
   Widget build(BuildContext context) {
-    // 5 bar widths that mimic varying lyric text lengths
     const barFractions = [0.72, 0.52, 0.82, 0.38, 0.62];
 
     return AnimatedBuilder(

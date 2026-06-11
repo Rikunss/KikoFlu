@@ -88,14 +88,9 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.5.1")
 
     // ExoPlayer FFmpeg extension — provides libffmpegJNI.so for software ALAC/FLAC/etc decoding
-    // Jellyfin community build of AndroidX Media3 FFmpeg decoder (native libs only)
+    // Jellyfin community build of AndroidX Media3 FFmpeg decoder (includes Java + native libs)
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1")
-
-    // We bundle the FfmpegAudioRenderer Java source directly under
-    // android/app/src/main/java/androidx/media3/decoder/ffmpeg/
 
     // Core library desugaring (required by flutter_local_notifications)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-
-
 }

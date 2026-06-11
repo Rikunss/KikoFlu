@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/subtitle_library_service.dart';
+import '../services/subtitle_library_file_watcher.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/text_preview_screen.dart';
 import '../providers/audio_provider.dart';
@@ -877,6 +878,7 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
                 ),
               ),
             ),
+          _buildWatcherStatusBanner(),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -979,6 +981,57 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
     if (_files.isEmpty) return [];
     if (_currentPath == _rootPath || _currentPath.isEmpty) return _files;
     return _findChildren(_files, _currentPath) ?? [];
+  }
+
+  /// Build a status banner when the subtitle library file watcher is not
+  /// running in real-time event mode.
+  ///
+  /// - Orange banner: Android periodic scan fallback (30s poll)
+  /// - Red banner: watcher stopped due to resource limit (non-Android)
+  Widget _buildWatcherStatusBanner() {
+    final watcher = SubtitleLibraryFileWatcher.instance;
+
+    if (watcher.isPeriodicScanActive) {
+      return Material(
+        color: Colors.orange.shade50,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(children: [
+            Icon(Icons.timer_outlined, size: 18, color: Colors.orange.shade800),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Auto-refresh: every 30s (inotify limit reached)',
+                style: TextStyle(fontSize: 13, color: Colors.orange.shade900),
+              ),
+            ),
+          ]),
+        ),
+      );
+    }
+
+    if (watcher.stoppedDueToResourceLimit) {
+      return Material(
+        color: Colors.red.shade50,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(children: [
+            Icon(Icons.warning_amber_rounded, size: 18, color: Colors.red.shade700),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Auto-refresh disabled (resource limit). Manual refresh required.',
+                style: TextStyle(fontSize: 13, color: Colors.red.shade900),
+              ),
+            ),
+          ]),
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   List<Map<String, dynamic>>? _findChildren(List<Map<String, dynamic>> nodes, String target) {

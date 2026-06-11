@@ -56,6 +56,8 @@ class _PlayerButtonsSettingsScreenState
         return Icons.picture_in_picture_alt;
       case PlayerButtonType.equalizer:
         return Icons.equalizer;
+      case PlayerButtonType.bookmark:
+        return Icons.bookmark_rounded;
     }
   }
 

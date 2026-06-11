@@ -28,6 +28,7 @@ import '../widgets/player/work_info_panel.dart' show showWorkInfoPanel;
 import '../utils/artwork_color_extractor.dart';
 import 'work_detail_screen.dart';
 import '../../l10n/app_localizations.dart';
+import '../services/streaming_speed_tracker.dart';
 
 /// 音频播放器主屏幕
 class AudioPlayerScreen extends ConsumerStatefulWidget {
@@ -408,6 +409,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     super.initState();
     _initLyricHint();
     _initSwipeHint();
+    StreamingSpeedTracker.instance.start();
     _dismissCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -771,6 +773,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   void dispose() {
     _seekCompletionSub?.cancel();
     _dismissCtrl.dispose();
+    StreamingSpeedTracker.instance.stop();
     super.dispose();
   }
 
@@ -1203,6 +1206,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                       _AudioInfoBadgeInPlayer(audioFormatAsync: audioFormat),
                       const SizedBox(width: 6),
                       const _OutputDevicePill(),
+                      const SizedBox(width: 6),
+                      const _StreamingSpeedBadge(),
                       if (showUsbBadge) const SizedBox(width: 6),
                       if (showUsbBadge) _UsbDacBadgeInPlayer(dacName: dacName),
                     ],
@@ -1437,6 +1442,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                                 _AudioInfoBadgeInPlayer(audioFormatAsync: audioFormat),
                                 const SizedBox(width: 6),
                                 const _OutputDevicePill(),
+                                const SizedBox(width: 6),
+                                const _StreamingSpeedBadge(),
                                 if (showUsbBadge) const SizedBox(width: 6),
                                 if (showUsbBadge) _UsbDacBadgeInPlayer(dacName: dacName),
                               ],
@@ -1708,6 +1715,96 @@ class _OutputDevicePillState extends ConsumerState<_OutputDevicePill>
             ),
           ),
         );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+/// Real-time streaming speed pill — shows estimated download speed.
+/// Only visible when actively streaming a network URL.
+class _StreamingSpeedBadge extends ConsumerStatefulWidget {
+  const _StreamingSpeedBadge();
+
+  @override
+  ConsumerState<_StreamingSpeedBadge> createState() => _StreamingSpeedBadgeState();
+}
+
+class _StreamingSpeedBadgeState extends ConsumerState<_StreamingSpeedBadge> {
+  SpeedIndicatorState? _lastState;
+
+  @override
+  Widget build(BuildContext context) {
+    final speedAsync = ref.watch(streamingSpeedProvider);
+    return speedAsync.when(
+      data: (state) {
+        if (!state.isVisible) return const SizedBox.shrink();
+
+        final cs = Theme.of(context).colorScheme;
+
+        // Determine color based on state
+        final (Color bg, Color fg) = switch (state.state) {
+          SpeedIndicatorState.streaming => (
+            Colors.green.withValues(alpha: 0.35),
+            Colors.greenAccent,
+          ),
+          SpeedIndicatorState.slow => (
+            Colors.orange.withValues(alpha: 0.35),
+            Colors.orangeAccent,
+          ),
+          SpeedIndicatorState.buffering => (
+            cs.error.withValues(alpha: 0.35),
+            cs.error,
+          ),
+          SpeedIndicatorState.cached => (
+            cs.surfaceContainerHighest.withValues(alpha: 0.8),
+            cs.onSurfaceVariant,
+          ),
+          SpeedIndicatorState.hidden => (Colors.transparent, Colors.transparent),
+        };
+
+        final label = switch (state.state) {
+          SpeedIndicatorState.cached => 'Cached',
+          _ => state.displaySpeed,
+        };
+
+        // Short pulse animation when transitioning from inactive → active
+        final isNew = _lastState == null ||
+            (_lastState == SpeedIndicatorState.hidden &&
+                state.state != SpeedIndicatorState.hidden);
+        _lastState = state.state;
+
+        Widget pill = Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              color: fg,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+          ),
+        );
+
+        if (isNew) {
+          pill = TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.7, end: 1.0),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutBack,
+            builder: (context, scale, child) {
+              return Transform.scale(scale: scale, child: child);
+            },
+            child: pill,
+          );
+        }
+
+        return pill;
       },
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),

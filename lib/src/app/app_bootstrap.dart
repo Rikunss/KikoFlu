@@ -57,8 +57,8 @@ class AppBootstrap {
     await BlurHashService.instance.init();
 
     // Configure ImageCache untuk manajemen memori gambar yang optimal.
-    PaintingBinding.instance.imageCache.maximumSize = 200;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = 50 << 20; // 50 MB
+    PaintingBinding.instance.imageCache.maximumSize = 500;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 100 << 20; // 100 MB
   }
 
   /// Konfigurasi system UI overlay style dan orientasi.

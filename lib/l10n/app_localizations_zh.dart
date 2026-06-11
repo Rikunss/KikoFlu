@@ -3628,6 +3628,93 @@ class SZh extends S {
   String get statsNoDataDesc => '开始收听作品后，统计数据将在此显示。';
 
   @override
+  String get statsTabDaily => '每日';
+
+  @override
+  String get statsTabWeekly => '每周';
+
+  @override
+  String get statsTabMonthly => '每月';
+
+  @override
+  String get statsWeeklyReport => '每周报告（4周）';
+
+  @override
+  String get statsMonthlyReport => '每月报告（6个月）';
+
+  @override
+  String get statsHeatmap => '活动热力图';
+
+  @override
+  String get statsHeatmapDesc => '过去12周的收听活动';
+
+  @override
+  String get statsMilestones => '成就';
+
+  @override
+  String get statsMilestoneDesc => '在收听旅程中获得的成就';
+
+  @override
+  String get statsMilestoneFirstSteps => '第一步';
+
+  @override
+  String get statsMilestoneFirstStepsDesc => '播放第一个作品';
+
+  @override
+  String get statsMilestoneGettingStarted => '初出茅庐';
+
+  @override
+  String get statsMilestoneGettingStartedDesc => '播放10个不同作品';
+
+  @override
+  String get statsMilestoneListener => '忠实听众';
+
+  @override
+  String get statsMilestoneListenerDesc => '播放50个不同作品';
+
+  @override
+  String get statsMilestoneCentury => '百作达成';
+
+  @override
+  String get statsMilestoneCenturyDesc => '播放100个不同作品';
+
+  @override
+  String get statsMilestoneComplete => '完成！';
+
+  @override
+  String get statsMilestoneCompleteDesc => '完成第一个作品';
+
+  @override
+  String get statsMilestoneDoubleDigits => '两位数';
+
+  @override
+  String get statsMilestoneDoubleDigitsDesc => '累计收听10小时';
+
+  @override
+  String get statsMilestoneLongHaul => '持久战';
+
+  @override
+  String get statsMilestoneLongHaulDesc => '累计收听50小时';
+
+  @override
+  String get statsMilestoneHundredHours => '100小时俱乐部';
+
+  @override
+  String get statsMilestoneHundredHoursDesc => '累计收听100小时';
+
+  @override
+  String get statsMilestoneConsistent => '坚持不懈';
+
+  @override
+  String get statsMilestoneConsistentDesc => '达成7天连续';
+
+  @override
+  String get statsMilestoneUnstoppable => '势不可挡';
+
+  @override
+  String get statsMilestoneUnstoppableDesc => '达成30天连续';
+
+  @override
   String get bitPerfectPlayback => '无损位完美播放';
 
   @override
@@ -3724,6 +3811,107 @@ class SZh extends S {
   }
 
   @override
+  String get backupTitle => '备份与恢复';
+
+  @override
+  String get backupSubtitle => '导出或恢复应用数据';
+
+  @override
+  String get backupInfoDescription =>
+      '备份应用数据，包括账户、设置、历史记录、播放列表和字幕库。可随时从备份文件恢复。';
+
+  @override
+  String get backupExportTitle => '导出';
+
+  @override
+  String get backupExportSubtitle => '创建完整备份';
+
+  @override
+  String get backupCreateBackup => '创建备份';
+
+  @override
+  String get backupCreateBackupDesc => '将所有数据保存为 .zip 文件';
+
+  @override
+  String get backupExportSuccess => '备份已创建';
+
+  @override
+  String backupSavedTo(Object path, Object size) {
+    return '备份已保存至：\n$path\n\n文件大小：$size';
+  }
+
+  @override
+  String backupExportFailed(Object error) {
+    return '备份失败：\n$error';
+  }
+
+  @override
+  String get backupSelectExportDir => '选择备份目标位置';
+
+  @override
+  String get backupRestoreTitle => '恢复';
+
+  @override
+  String get backupRestoreSubtitle => '从备份恢复';
+
+  @override
+  String get backupRestoreFromBackup => '从备份恢复';
+
+  @override
+  String get backupRestoreFromBackupDesc => '选择要恢复的 .zip 备份文件';
+
+  @override
+  String get backupSelectImportFile => '选择备份文件';
+
+  @override
+  String get backupRestoreConfirmTitle => '恢复数据？';
+
+  @override
+  String get backupRestoreConfirmMessage =>
+      '这将用备份数据替换所有当前应用数据。恢复后需要重启应用。\n\n是否继续？';
+
+  @override
+  String get backupRestoreSuccessTitle => '恢复完成';
+
+  @override
+  String get backupRestoreSuccess => '所有数据已成功恢复。';
+
+  @override
+  String get backupRestoreWarnings => '警告：';
+
+  @override
+  String backupRestoreFailed(Object error) {
+    return '恢复失败：\n$error';
+  }
+
+  @override
+  String get backupRestartApp => '重启应用';
+
+  @override
+  String get backupRestartRequired => '需要重启';
+
+  @override
+  String get backupRestartRequiredDesc => '请重启应用以使恢复的数据完全生效。';
+
+  @override
+  String get backupError => '备份错误';
+
+  @override
+  String get backupDataIncluded => '包含的数据';
+
+  @override
+  String get backupDatabases => '数据库';
+
+  @override
+  String get backupHiveBoxes => '应用状态';
+
+  @override
+  String get backupPreferences => '偏好设置';
+
+  @override
+  String get backupAllSettings => '所有设置、智能播放列表和偏好';
+
+  @override
   String get smartPlaylist => '智能播放列表';
 
   @override
@@ -3742,6 +3930,137 @@ class SZh extends S {
 
   @override
   String get regularPlaylist => '普通播放列表';
+
+  @override
+  String get audioBookmarksTitle => '书签';
+
+  @override
+  String get audioBookmarksEmpty => '暂无书签';
+
+  @override
+  String get audioBookmarksEmptyTrack => '此音轨暂无书签。\n点击书签图标添加一个。';
+
+  @override
+  String get audioBookmarksHint => '在聆听时标记您喜爱的时刻';
+
+  @override
+  String audioBookmarkAdded(Object position) {
+    return '书签已添加于 $position';
+  }
+
+  @override
+  String get audioBookmarksView => '查看';
+
+  @override
+  String get audioBookmarksEditNote => '编辑备注';
+
+  @override
+  String get audioBookmarksNoteHint => '为此书签添加备注...';
+
+  @override
+  String get audioBookmarksDeleteConfirm => '删除此书签？';
+
+  @override
+  String get appLockTitle => '应用锁';
+
+  @override
+  String get appLockEnabledSubtitle => '已启用 — 需要生物识别或PIN码才能打开应用';
+
+  @override
+  String get appLockDisabledSubtitle => '已禁用 — 打开应用无需验证';
+
+  @override
+  String get appLockDisableConfirmTitle => '关闭应用锁？';
+
+  @override
+  String get appLockDisableConfirmMessage => '这将关闭所有应用锁保护，包括生物识别和PIN码。';
+
+  @override
+  String get appLockDisable => '关闭';
+
+  @override
+  String get appLockDisabledToast => '应用锁已关闭';
+
+  @override
+  String get appLockEnterPin => '输入PIN码';
+
+  @override
+  String get appLockAuthenticating => '正在验证…';
+
+  @override
+  String get appLockWrongPin => 'PIN码错误，请重试。';
+
+  @override
+  String get appLockUseBiometric => '使用指纹 / 面容ID';
+
+  @override
+  String get appLockBiometricReason => '解锁 KikoFlu';
+
+  @override
+  String get appLockBiometric => '生物识别';
+
+  @override
+  String get appLockBiometricEnabledSubtitle => '已启用 — 可使用指纹或面容解锁';
+
+  @override
+  String get appLockBiometricDisabledSubtitle => '已禁用 — 仅PIN码模式';
+
+  @override
+  String get appLockBiometricNotAvailable => '此设备不支持或未录入生物识别';
+
+  @override
+  String get appLockBiometricEnableReason => '启用生物识别解锁';
+
+  @override
+  String get appLockBiometricSubtitle => '使用设备的指纹或面容快速解锁';
+
+  @override
+  String get appLockSetupTitle => '设置应用锁';
+
+  @override
+  String get appLockSetupPinSubtitle => '输入PIN码以保护您的应用';
+
+  @override
+  String get appLockSetupConfirmSubtitle => '确认PIN码';
+
+  @override
+  String get appLockChangePin => '更改PIN码';
+
+  @override
+  String get appLockChangePinSubtitle => '设置新PIN码';
+
+  @override
+  String get appLockPinMismatch => 'PIN码不匹配，请重试。';
+
+  @override
+  String get appLockPinChanged => 'PIN码更改成功';
+
+  @override
+  String get appLockDigits => '位数字';
+
+  @override
+  String get appLockAutoLock => '自动锁定';
+
+  @override
+  String get appLockAutoLockNever => '永不';
+
+  @override
+  String get appLockAutoLockImmediately => '立即';
+
+  @override
+  String get appLockAutoLock1Min => '1分钟';
+
+  @override
+  String get appLockAutoLock5Min => '5分钟';
+
+  @override
+  String get appLockAutoLock15Min => '15分钟';
+
+  @override
+  String get appLockAutoLock30Min => '30分钟';
+
+  @override
+  String get appLockAutoLockMinutes => '分钟';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -7368,6 +7687,93 @@ class SZhHant extends SZh {
   String get statsNoDataDesc => '開始收聽作品後，統計數據將在此顯示。';
 
   @override
+  String get statsTabDaily => '每日';
+
+  @override
+  String get statsTabWeekly => '每週';
+
+  @override
+  String get statsTabMonthly => '每月';
+
+  @override
+  String get statsWeeklyReport => '每週報告（4週）';
+
+  @override
+  String get statsMonthlyReport => '每月報告（6個月）';
+
+  @override
+  String get statsHeatmap => '活動熱力圖';
+
+  @override
+  String get statsHeatmapDesc => '過去12週的收聽活動';
+
+  @override
+  String get statsMilestones => '成就';
+
+  @override
+  String get statsMilestoneDesc => '在收聽旅程中獲得的成就';
+
+  @override
+  String get statsMilestoneFirstSteps => '第一步';
+
+  @override
+  String get statsMilestoneFirstStepsDesc => '播放第一個作品';
+
+  @override
+  String get statsMilestoneGettingStarted => '初出茅廬';
+
+  @override
+  String get statsMilestoneGettingStartedDesc => '播放10個不同作品';
+
+  @override
+  String get statsMilestoneListener => '忠實聽眾';
+
+  @override
+  String get statsMilestoneListenerDesc => '播放50個不同作品';
+
+  @override
+  String get statsMilestoneCentury => '百作達成';
+
+  @override
+  String get statsMilestoneCenturyDesc => '播放100個不同作品';
+
+  @override
+  String get statsMilestoneComplete => '完成！';
+
+  @override
+  String get statsMilestoneCompleteDesc => '完成第一個作品';
+
+  @override
+  String get statsMilestoneDoubleDigits => '兩位數';
+
+  @override
+  String get statsMilestoneDoubleDigitsDesc => '累計收聽10小時';
+
+  @override
+  String get statsMilestoneLongHaul => '持久戰';
+
+  @override
+  String get statsMilestoneLongHaulDesc => '累計收聽50小時';
+
+  @override
+  String get statsMilestoneHundredHours => '100小時俱樂部';
+
+  @override
+  String get statsMilestoneHundredHoursDesc => '累計收聽100小時';
+
+  @override
+  String get statsMilestoneConsistent => '堅持不懈';
+
+  @override
+  String get statsMilestoneConsistentDesc => '達成7天連續';
+
+  @override
+  String get statsMilestoneUnstoppable => '勢不可擋';
+
+  @override
+  String get statsMilestoneUnstoppableDesc => '達成30天連續';
+
+  @override
   String get bitPerfectPlayback => '無損位元完美播放';
 
   @override
@@ -7464,6 +7870,107 @@ class SZhHant extends SZh {
   }
 
   @override
+  String get backupTitle => '備份與還原';
+
+  @override
+  String get backupSubtitle => '匯出或還原應用程式資料';
+
+  @override
+  String get backupInfoDescription =>
+      '備份應用程式資料，包括帳戶、設定、歷史記錄、播放清單和字幕庫。可隨時從備份檔案還原。';
+
+  @override
+  String get backupExportTitle => '匯出';
+
+  @override
+  String get backupExportSubtitle => '建立完整備份';
+
+  @override
+  String get backupCreateBackup => '建立備份';
+
+  @override
+  String get backupCreateBackupDesc => '將所有資料儲存為 .zip 檔案';
+
+  @override
+  String get backupExportSuccess => '備份已建立';
+
+  @override
+  String backupSavedTo(Object path, Object size) {
+    return '備份已儲存至：\n$path\n\n檔案大小：$size';
+  }
+
+  @override
+  String backupExportFailed(Object error) {
+    return '備份失敗：\n$error';
+  }
+
+  @override
+  String get backupSelectExportDir => '選擇備份目標位置';
+
+  @override
+  String get backupRestoreTitle => '還原';
+
+  @override
+  String get backupRestoreSubtitle => '從備份還原';
+
+  @override
+  String get backupRestoreFromBackup => '從備份還原';
+
+  @override
+  String get backupRestoreFromBackupDesc => '選擇要還原的 .zip 備份檔案';
+
+  @override
+  String get backupSelectImportFile => '選擇備份檔案';
+
+  @override
+  String get backupRestoreConfirmTitle => '還原資料？';
+
+  @override
+  String get backupRestoreConfirmMessage =>
+      '這將用備份資料取代所有目前應用程式資料。還原後需要重新啟動應用程式。\n\n是否繼續？';
+
+  @override
+  String get backupRestoreSuccessTitle => '還原完成';
+
+  @override
+  String get backupRestoreSuccess => '所有資料已成功還原。';
+
+  @override
+  String get backupRestoreWarnings => '警告：';
+
+  @override
+  String backupRestoreFailed(Object error) {
+    return '還原失敗：\n$error';
+  }
+
+  @override
+  String get backupRestartApp => '重新啟動應用程式';
+
+  @override
+  String get backupRestartRequired => '需要重新啟動';
+
+  @override
+  String get backupRestartRequiredDesc => '請重新啟動應用程式以使還原的資料完全生效。';
+
+  @override
+  String get backupError => '備份錯誤';
+
+  @override
+  String get backupDataIncluded => '包含的資料';
+
+  @override
+  String get backupDatabases => '資料庫';
+
+  @override
+  String get backupHiveBoxes => '應用程式狀態';
+
+  @override
+  String get backupPreferences => '偏好設定';
+
+  @override
+  String get backupAllSettings => '所有設定、智慧播放清單和偏好';
+
+  @override
   String get smartPlaylist => '智慧播放清單';
 
   @override
@@ -7482,4 +7989,135 @@ class SZhHant extends SZh {
 
   @override
   String get regularPlaylist => '普通播放清單';
+
+  @override
+  String get audioBookmarksTitle => '書籤';
+
+  @override
+  String get audioBookmarksEmpty => '暫無書籤';
+
+  @override
+  String get audioBookmarksEmptyTrack => '此音軌暫無書籤。\n點擊書籤圖示新增一個。';
+
+  @override
+  String get audioBookmarksHint => '在聆聽時標記您喜愛的時刻';
+
+  @override
+  String audioBookmarkAdded(Object position) {
+    return '書籤已新增於 $position';
+  }
+
+  @override
+  String get audioBookmarksView => '檢視';
+
+  @override
+  String get audioBookmarksEditNote => '編輯備註';
+
+  @override
+  String get audioBookmarksNoteHint => '為此書籤新增備註...';
+
+  @override
+  String get audioBookmarksDeleteConfirm => '刪除此書籤？';
+
+  @override
+  String get appLockTitle => '應用程式鎖';
+
+  @override
+  String get appLockEnabledSubtitle => '已啟用 — 需要生物辨識或PIN碼才能開啟應用程式';
+
+  @override
+  String get appLockDisabledSubtitle => '已停用 — 開啟應用程式無需驗證';
+
+  @override
+  String get appLockDisableConfirmTitle => '關閉應用程式鎖？';
+
+  @override
+  String get appLockDisableConfirmMessage => '這將關閉所有應用程式鎖保護，包括生物辨識和PIN碼。';
+
+  @override
+  String get appLockDisable => '關閉';
+
+  @override
+  String get appLockDisabledToast => '應用程式鎖已關閉';
+
+  @override
+  String get appLockEnterPin => '輸入PIN碼';
+
+  @override
+  String get appLockAuthenticating => '正在驗證…';
+
+  @override
+  String get appLockWrongPin => 'PIN碼錯誤，請重試。';
+
+  @override
+  String get appLockUseBiometric => '使用指紋 / Face ID';
+
+  @override
+  String get appLockBiometricReason => '解鎖 KikoFlu';
+
+  @override
+  String get appLockBiometric => '生物辨識';
+
+  @override
+  String get appLockBiometricEnabledSubtitle => '已啟用 — 可使用指紋或臉部辨識解鎖';
+
+  @override
+  String get appLockBiometricDisabledSubtitle => '已停用 — 僅PIN碼模式';
+
+  @override
+  String get appLockBiometricNotAvailable => '此裝置不支援或未設定生物辨識';
+
+  @override
+  String get appLockBiometricEnableReason => '啟用生物辨識解鎖';
+
+  @override
+  String get appLockBiometricSubtitle => '使用裝置的指紋或臉部辨識快速解鎖';
+
+  @override
+  String get appLockSetupTitle => '設定應用程式鎖';
+
+  @override
+  String get appLockSetupPinSubtitle => '輸入PIN碼以保護您的應用程式';
+
+  @override
+  String get appLockSetupConfirmSubtitle => '確認PIN碼';
+
+  @override
+  String get appLockChangePin => '變更PIN碼';
+
+  @override
+  String get appLockChangePinSubtitle => '設定新PIN碼';
+
+  @override
+  String get appLockPinMismatch => 'PIN碼不匹配，請重試。';
+
+  @override
+  String get appLockPinChanged => 'PIN碼變更成功';
+
+  @override
+  String get appLockDigits => '位數字';
+
+  @override
+  String get appLockAutoLock => '自動鎖定';
+
+  @override
+  String get appLockAutoLockNever => '永不';
+
+  @override
+  String get appLockAutoLockImmediately => '立即';
+
+  @override
+  String get appLockAutoLock1Min => '1分鐘';
+
+  @override
+  String get appLockAutoLock5Min => '5分鐘';
+
+  @override
+  String get appLockAutoLock15Min => '15分鐘';
+
+  @override
+  String get appLockAutoLock30Min => '30分鐘';
+
+  @override
+  String get appLockAutoLockMinutes => '分鐘';
 }

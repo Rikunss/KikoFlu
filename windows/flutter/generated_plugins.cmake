@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   connectivity_plus
   desktop_multi_window
   dynamic_color
+  local_auth_windows
   media_kit_libs_windows_audio
   permission_handler_windows
   screen_retriever_windows

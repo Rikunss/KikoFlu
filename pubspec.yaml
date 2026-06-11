@@ -90,6 +90,7 @@ dependencies:
 
   # FFmpeg (Android) — bundles static FFmpeg binaries for audio conversion
   ffmpeg_kit_flutter_new_audio: ^2.0.0
+  local_auth: ^3.0.1
 dependency_overrides:
   # Local fork of audio_service with null-safety fixes for Android destroy sequence.
   # The upstream plugin crashes with NullPointerException when AudioService.instance

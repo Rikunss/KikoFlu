@@ -58,18 +58,27 @@ String _normalizedHostString(String host) {
   return value;
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _serverCookieController = TextEditingController();
 
-  bool _isLogin = true; // true for login, false for register
+  bool _isLogin = true;
   bool _obscurePassword = true;
   bool _isLoading = false;
   late final List<String> _hostOptions;
   String _hostValue = '';
   final Map<String, _LatencyResult> _latencyResults = {};
+
+  // ── Inline validation state ──
+  String? _usernameError;
+  String? _passwordError;
+  String? _hostError;
+
+  // ── Logo pulse animation ──
+  late final AnimationController _pulseCtrl;
 
   @override
   void initState() {
@@ -78,6 +87,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final defaultHost = _normalizedHostString(KikoeruApiService.remoteHost);
     _hostValue = defaultHost;
+
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2500),
+    )..repeat(reverse: true);
   }
 
   @override
@@ -85,13 +99,54 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _usernameController.dispose();
     _passwordController.dispose();
     _serverCookieController.dispose();
+    _pulseCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
+  // ── Inline validation helpers ──
+
+  void _validateUsername(String value) {
+    final s = S.of(context);
+    if (value.trim().isEmpty) {
+      setState(() => _usernameError = s.pleaseEnterUsername);
+    } else if (!_isLogin && value.trim().length < 5) {
+      setState(() => _usernameError = s.usernameMinLength);
+    } else {
+      setState(() => _usernameError = null);
     }
+  }
+
+  void _validatePassword(String value) {
+    final s = S.of(context);
+    if (value.isEmpty) {
+      setState(() => _passwordError = s.pleaseEnterPassword);
+    } else if (!_isLogin && value.length < 5) {
+      setState(() => _passwordError = s.passwordMinLength);
+    } else {
+      setState(() => _passwordError = null);
+    }
+  }
+
+  void _validateHost(String value) {
+    final s = S.of(context);
+    if (value.trim().isEmpty) {
+      setState(() => _hostError = s.pleaseEnterServerAddress);
+    } else {
+      setState(() => _hostError = null);
+    }
+  }
+
+  bool _validateAll() {
+    _validateUsername(_usernameController.text);
+    _validatePassword(_passwordController.text);
+    _validateHost(_hostValue);
+    return _usernameError == null && _passwordError == null && _hostError == null;
+  }
+
+  // ── Form submission ──
+
+  Future<void> _submit() async {
+    if (!_validateAll()) return;
 
     setState(() => _isLoading = true);
 
@@ -99,19 +154,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final password = _passwordController.text;
     final host = _hostValue.trim();
     final serverCookie = _serverCookieController.text.trim();
-
-    if (!_isLogin) {
-      if (username.length < 5) {
-        SnackBarUtil.showError(context, S.of(context).usernameMinLength);
-        setState(() => _isLoading = false);
-        return;
-      }
-      if (password.length < 5) {
-        SnackBarUtil.showError(context, S.of(context).passwordMinLength);
-        setState(() => _isLoading = false);
-        return;
-      }
-    }
 
     try {
       bool success;
@@ -127,15 +169,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       if (success && mounted) {
         if (widget.isAddingAccount) {
-          // Adding account mode - just go back
           Navigator.pop(context, true);
           SnackBarUtil.showSuccess(
               context, S.of(context).accountAdded(username));
         } else {
-          // Normal login - go to main screen
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const MainScreen()),
-            (route) => false, // Remove all previous routes
+            (route) => false,
           );
         }
       } else if (mounted) {
@@ -162,23 +202,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  // 游客登录
   Future<void> _loginAsGuest() async {
-    // 验证服务器地址
     if (_hostValue.trim().isEmpty) {
       SnackBarUtil.showError(context, S.of(context).pleaseEnterServerAddress);
       return;
     }
 
-    // 显示二次确认对话框
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text(S.of(context).guestModeTitle),
-          content: Text(
-            S.of(context).guestModeMessage,
-          ),
+          content: Text(S.of(context).guestModeMessage),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -193,7 +228,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       },
     );
 
-    // 用户取消了操作
     if (confirmed != true) {
       return;
     }
@@ -212,11 +246,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       if (success && mounted) {
         if (widget.isAddingAccount) {
-          // Adding account mode - just go back
           Navigator.pop(context, true);
           SnackBarUtil.showSuccess(context, S.of(context).guestAccountAdded);
         } else {
-          // Normal login - go to main screen
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const MainScreen()),
             (route) => false,
@@ -243,6 +275,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void _toggleMode() {
     setState(() {
       _isLogin = !_isLogin;
+      // Clear inline errors when switching mode
+      _usernameError = null;
+      _passwordError = null;
     });
     ref.read(authProvider.notifier).clearError();
   }
@@ -275,6 +310,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _hostOptions = options;
   }
 
+  // ── Latency / connection test (unchanged) ──
+
   Widget _buildHostLatencyActions(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
@@ -282,12 +319,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final serverCookie = _serverCookieController.text.trim();
     final result = normalized.isEmpty ? null : _latencyResults[normalized];
     final isTesting = result?.state == _LatencyState.testing;
-    final statusText = normalized.isEmpty
-        ? S.of(context).enterServerAddressToTest
-        : _describeLatencyResult(result, includePlaceholder: true);
-    final color = normalized.isEmpty
-        ? cs.onSurfaceVariant
-        : _latencyColorForResult(context, result);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -312,15 +343,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               isTesting ? S.of(context).testing : S.of(context).testConnection),
         ),
         const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            statusText,
-            style:
-                tt.bodySmall?.copyWith(color: color),
-            textAlign: TextAlign.right,
-          ),
-        ),
+        _buildConnectionStatusChip(result, cs, tt),
       ],
+    );
+  }
+
+  Widget _buildConnectionStatusChip(_LatencyResult? result, ColorScheme cs, TextTheme tt) {
+    if (result == null || result.state == _LatencyState.idle) {
+      return const SizedBox.shrink();
+    }
+
+    final (IconData icon, Color color, String label) = switch (result.state) {
+      _LatencyState.testing => (Icons.hourglass_top, cs.primary, S.of(context).testing),
+      _LatencyState.success => (Icons.check_circle, cs.primary, '${result.latencyMs ?? '-'} ms'),
+      _LatencyState.failure => (Icons.error_outline, cs.error, S.of(context).connectionFailed),
+      _LatencyState.idle => (Icons.help_outline, cs.onSurfaceVariant, ''),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: tt.bodySmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -411,60 +471,136 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  String _describeLatencyResult(_LatencyResult? result,
-      {bool includePlaceholder = false}) {
-    final s = S.of(context);
-    if (result == null) {
-      return includePlaceholder ? s.notTestedYet : '';
-    }
-
-    switch (result.state) {
-      case _LatencyState.idle:
-        return includePlaceholder ? s.notTestedYet : '';
-      case _LatencyState.testing:
-        return s.testing;
-      case _LatencyState.success:
-        final latency = result.latencyMs;
-        final statusCode = result.statusCode;
-        final latencyText = latency != null ? '$latency ms' : '- ms';
-        final statusText = statusCode != null ? 'HTTP $statusCode' : 'HTTP -';
-        return s.latencyResultDetail(latencyText, statusText);
-      case _LatencyState.failure:
-        final statusCode = result.statusCode;
-        final error = result.error;
-        final statusSuffix = statusCode != null ? ' (HTTP $statusCode)' : '';
-        if (error != null && error.isNotEmpty) {
-          return s.connectionFailedWithDetail(_shortenMessage(error));
-        }
-        return '${s.connectionFailed}$statusSuffix';
-    }
-  }
-
-  Color _latencyColorForResult(BuildContext context, _LatencyResult? result) {
-    final scheme = Theme.of(context).colorScheme;
-
-    if (result == null || result.state == _LatencyState.idle) {
-      return scheme.onSurfaceVariant;
-    }
-
-    switch (result.state) {
-      case _LatencyState.idle:
-        return scheme.onSurfaceVariant;
-      case _LatencyState.testing:
-        return scheme.primary;
-      case _LatencyState.success:
-        return scheme.secondary;
-      case _LatencyState.failure:
-        return scheme.error;
-    }
-  }
-
   String _shortenMessage(String message, {int maxLength = 60}) {
     if (message.length <= maxLength) {
       return message;
     }
     return '${message.substring(0, maxLength)}...';
   }
+
+  // ── Animated inline error widget ──
+
+  Widget _buildInlineError(String? error) {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      alignment: Alignment.topCenter,
+      child: error != null && error.isNotEmpty
+          ? Padding(
+              padding: const EdgeInsets.only(top: 6, left: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, size: 14,
+                      color: Theme.of(context).colorScheme.error),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      error,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : const SizedBox.shrink(),
+    );
+  }
+
+  // ── Animated decorative circles ──
+
+  Widget _buildDecorativeCircles(ColorScheme cs) {
+    return Stack(
+      children: [
+        Positioned(
+          top: -100,
+          right: -80,
+          child: Container(
+            width: 280,
+            height: 280,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: cs.primary.withValues(alpha: 0.04),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: -60,
+          left: -60,
+          child: Container(
+            width: 200,
+            height: 200,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: cs.tertiary.withValues(alpha: 0.04),
+            ),
+          ),
+        ),
+        Positioned(
+          top: MediaQuery.of(context).size.height * 0.4,
+          right: -30,
+          child: Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: cs.secondary.withValues(alpha: 0.03),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Logo widget with pulse animation ──
+
+  Widget _buildLogo(ColorScheme cs, {double size = 120}) {
+    return AnimatedBuilder(
+      animation: _pulseCtrl,
+      builder: (context, child) {
+        final scale = 1.0 + (_pulseCtrl.value * 0.04);
+        final glowOpacity = 0.15 + (_pulseCtrl.value * 0.12);
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(size * 0.24),
+              boxShadow: [
+                BoxShadow(
+                  color: cs.primary.withValues(alpha: glowOpacity),
+                  blurRadius: 24 + (_pulseCtrl.value * 16),
+                  spreadRadius: 2 + (_pulseCtrl.value * 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(size * 0.24),
+              child: Image.asset(
+                'assets/icons/app_icon_login.png',
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: cs.primaryContainer.withValues(alpha: 0.3),
+                  child: Icon(
+                    Icons.audiotrack,
+                    size: size * 0.5,
+                    color: cs.primary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Main build ──
 
   @override
   Widget build(BuildContext context) {
@@ -479,7 +615,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 : S.of(context).registerAccount)
             : (_isLogin ? S.of(context).login : S.of(context).register)),
         centerTitle: true,
-        // Show back button in adding account mode
         automaticallyImplyLeading: widget.isAddingAccount,
       ),
       body: SafeArea(
@@ -488,209 +623,218 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  // 竖屏布局
+  // ── Portrait layout ──
+
   Widget _buildPortraitLayout() {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Logo/Header
-              Container(
-                height: 120,
-                margin: const EdgeInsets.only(bottom: 32),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              cs.surface,
+              cs.surfaceContainerLow.withValues(alpha: 0.5),
+              cs.surface,
+            ],
+            stops: const [0.0, 0.5, 1.0],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Decorative circles
+            _buildDecorativeCircles(cs),
+
+            // Main content
+            SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Form(
+                key: _formKey,
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: cs.primaryContainer.withValues(alpha: 0.3),
-                        shape: BoxShape.circle,
+                    const SizedBox(height: 16),
+
+                    // Logo
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: _buildLogo(cs),
+                    ),
+
+                    // App name
+                    Text(
+                      'KikoFlu',
+                      style: tt.headlineMedium?.copyWith(
+                        color: cs.primary,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.5,
                       ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/icons/app_icon_login.png',
-                          width: 64,
-                          height: 64,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(
-                              Icons.audiotrack,
-                              size: 36,
-                              color: cs.primary,
-                            );
-                          },
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Kikoeru Client',
+                      style: tt.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // Form card
+                    AnimatedOpacity(
+                      opacity: _isLoading ? 0.6 : 1.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Card(
+                        elevation: 0,
+                        color: cs.surfaceContainerLow,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        margin: EdgeInsets.zero,
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: _buildFormContent(),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'KikoFlu',
-                      style:
-                          tt.headlineMedium?.copyWith(
-                                color: cs.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                    ),
+
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
-              // Form Card
-              AnimatedOpacity(
-                opacity: _isLoading ? 0.55 : 1.0,
-                duration: const Duration(milliseconds: 200),
-                child: Card(
-                  elevation: 0,
-                  color: cs.surfaceContainerLow,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  margin: EdgeInsets.zero,
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: _buildFormFields(),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // 横屏布局
+  // ── Landscape layout ──
+
   Widget _buildLandscapeLayout() {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
-      child: Row(
-        children: [
-          // 左侧：Logo区域
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer.withValues(alpha: 0.3),
-                      shape: BoxShape.circle,
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/icons/app_icon_login.png',
-                        width: 80,
-                        height: 80,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(
-                            Icons.audiotrack,
-                            size: 44,
-                            color: cs.primary,
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'KikoFlu',
-                    style: tt.headlineLarge?.copyWith(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              cs.surface,
+              cs.surfaceContainerLow.withValues(alpha: 0.5),
+              cs.surface,
+            ],
+            stops: const [0.0, 0.5, 1.0],
+          ),
+        ),
+        child: Stack(
+          children: [
+            _buildDecorativeCircles(cs),
+
+            Row(
+              children: [
+                // Left: Logo + branding
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildLogo(cs, size: 96),
+                      const SizedBox(height: 16),
+                      Text(
+                        'KikoFlu',
+                        style: tt.headlineLarge?.copyWith(
                           color: cs.primary,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5,
                         ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Kikoeru Client',
+                        style: tt.bodyMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ),
-          // 右侧：表单区域
-          Expanded(
-            flex: 3,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-              child: Form(
-                key: _formKey,
-                child: AnimatedOpacity(
-                  opacity: _isLoading ? 0.55 : 1.0,
-                  duration: const Duration(milliseconds: 200),
-                  child: Card(
-                    elevation: 0,
-                    color: cs.surfaceContainerLow,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    margin: EdgeInsets.zero,
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: _buildFormFields(),
+                ),
+
+                // Right: Form
+                Expanded(
+                  flex: 3,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 24),
+                    child: Form(
+                      key: _formKey,
+                      child: AnimatedOpacity(
+                        opacity: _isLoading ? 0.6 : 1.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Card(
+                          elevation: 0,
+                          color: cs.surfaceContainerLow,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          margin: EdgeInsets.zero,
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: _buildFormContent(),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // 表单字段列表
-  List<Widget> _buildFormFields() {
+  // ── Form content (shared between portrait & landscape) ──
+
+  Widget _buildFormContent() {
     final cs = Theme.of(context).colorScheme;
-    return [
-      // Username field
-      TextFormField(
-        controller: _usernameController,
-        autofillHints: const [AutofillHints.username],
-        decoration: InputDecoration(
-          labelText: S.of(context).username,
-          prefixIcon: const Icon(Icons.person),
-          border: const OutlineInputBorder(),
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Username field
+        _buildField(
+          controller: _usernameController,
+          label: S.of(context).username,
+          icon: Icons.person_outline,
+          obscure: false,
+          error: _usernameError,
+          autofillHints: const [AutofillHints.username],
+          onChanged: _validateUsername,
         ),
-        validator: (value) {
-          if (value == null || value.trim().isEmpty) {
-            return S.of(context).pleaseEnterUsername;
-          }
-          if (!_isLogin && value.trim().length < 5) {
-            return S.of(context).usernameMinLength;
-          }
-          return null;
-        },
-        textInputAction: TextInputAction.next,
-      ),
 
-      const SizedBox(height: 16),
+        const SizedBox(height: 16),
 
-      // Password field
-      TextFormField(
-        controller: _passwordController,
-        autofillHints: const [AutofillHints.password],
-        obscureText: _obscurePassword,
-        decoration: InputDecoration(
-          labelText: S.of(context).password,
-          prefixIcon: const Icon(Icons.lock),
+        // Password field
+        _buildField(
+          controller: _passwordController,
+          label: S.of(context).password,
+          icon: Icons.lock_outline,
+          obscure: _obscurePassword,
+          error: _passwordError,
+          autofillHints: const [AutofillHints.password],
+          onChanged: _validatePassword,
           suffixIcon: IconButton(
             icon: Icon(
-              _obscurePassword ? Icons.visibility : Icons.visibility_off,
+              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              size: 20,
             ),
             onPressed: () {
               setState(() {
@@ -698,162 +842,280 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               });
             },
           ),
-          border: const OutlineInputBorder(),
         ),
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return S.of(context).pleaseEnterPassword;
-          }
-          if (!_isLogin && value.length < 5) {
-            return S.of(context).passwordMinLength;
-          }
-          return null;
-        },
-        textInputAction: TextInputAction.next,
-      ),
 
-      const SizedBox(height: 16),
+        const SizedBox(height: 16),
 
-      // Host field with dropdown/autocomplete
-      Autocomplete<String>(
-        initialValue: TextEditingValue(text: _hostValue),
-        optionsBuilder: (textEditingValue) {
-          // 始终显示所有推荐选项
-          return _hostOptions;
-        },
-        fieldViewBuilder: (
-          context,
-          textEditingController,
-          focusNode,
-          onFieldSubmitted,
-        ) {
-          return TextFormField(
-            controller: textEditingController,
-            focusNode: focusNode,
-            decoration: InputDecoration(
-              labelText: S.of(context).serverAddress,
-              prefixIcon: const Icon(Icons.dns),
-              border: const OutlineInputBorder(),
-            ),
-            keyboardType: TextInputType.url,
-            onChanged: (value) {
-              setState(() {
-                _hostValue = value;
-              });
-            },
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return S.of(context).pleaseEnterServerAddress;
-              }
-              return null;
-            },
-            textInputAction: TextInputAction.next,
-            onFieldSubmitted: (_) => _submit(),
-          );
-        },
-        onSelected: (selection) {
-          setState(() {
-            _hostValue = selection;
-          });
-        },
-      ),
+        // Server address with autocomplete
+        _buildServerAddressField(cs),
 
-      const SizedBox(height: 8),
-      _buildHostLatencyActions(context),
+        const SizedBox(height: 8),
+        _buildHostLatencyActions(context),
 
-      const SizedBox(height: 15),
+        const SizedBox(height: 16),
 
-      // Cookie field (collapsible)
-      Container(
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: ExpansionTile(
-          title: Row(
-            children: [
-              Icon(Icons.security,
-                  size: 18,
-                  color: cs.primary),
-              const SizedBox(width: 8),
-              const Text('Cookie'),
-            ],
-          ),
-          iconColor: cs.primary,
-          collapsedIconColor: cs.onSurfaceVariant,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          collapsedShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          children: [
-            TextFormField(
-              controller: _serverCookieController,
-              decoration: InputDecoration(
-                labelText: S.of(context).serverCookie,
-                prefixIcon: const Icon(Icons.security),
-                border: const OutlineInputBorder(),
-                helperText: 'Server Cookie',
-              ),
-              textInputAction: TextInputAction.done,
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
+        // Cookie field (collapsible)
+        _buildCookieSection(cs),
 
-      // Submit button
-      FilledButton(
-        onPressed: _isLoading
-            ? null
-            : () {
-                HapticFeedback.lightImpact();
-                _submit();
-              },
-        child: _isLoading
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Text(_isLogin ? S.of(context).login : S.of(context).register),
-      ),
+        const SizedBox(height: 20),
 
-      const SizedBox(height: 12),
-
-      // Guest login button (only show in login mode)
-      if (_isLogin)
-        OutlinedButton.icon(
+        // Submit button
+        FilledButton(
           onPressed: _isLoading
               ? null
               : () {
                   HapticFeedback.lightImpact();
-                  _loginAsGuest();
+                  _submit();
                 },
-          icon: const Icon(Icons.person_outline),
-          label: Text(S.of(context).guestMode),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: cs.secondary,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(double.infinity, 48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
+          child: _isLoading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(
+                  _isLogin ? S.of(context).login : S.of(context).register,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
         ),
 
-      const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
-      // Toggle mode button
-      TextButton(
-        onPressed: _toggleMode,
-        child: Text(
-          _isLogin
-              ? S.of(context).noAccountTapToRegister
-              : S.of(context).haveAccountTapToLogin,
-          style: TextStyle(
-            color: cs.primary,
+        // Guest login
+        if (_isLogin)
+          OutlinedButton.icon(
+            onPressed: _isLoading
+                ? null
+                : () {
+                    HapticFeedback.lightImpact();
+                    _loginAsGuest();
+                  },
+            icon: const Icon(Icons.person_outline, size: 20),
+            label: Text(S.of(context).guestMode),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: cs.secondary,
+              minimumSize: const Size(double.infinity, 44),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              side: BorderSide(color: cs.secondary.withValues(alpha: 0.4)),
+            ),
+          ),
+
+        const SizedBox(height: 12),
+
+        // Toggle mode
+        TextButton(
+          onPressed: _toggleMode,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.1, 0.0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: Text(
+              key: ValueKey(_isLogin),
+              _isLogin
+                  ? S.of(context).noAccountTapToRegister
+                  : S.of(context).haveAccountTapToLogin,
+              style: TextStyle(
+                color: cs.primary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
         ),
+      ],
+    );
+  }
+
+  // ── Reusable form field with inline error ──
+
+  Widget _buildField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required bool obscure,
+    required String? error,
+    Iterable<String>? autofillHints,
+    ValueChanged<String>? onChanged,
+    Widget? suffixIcon,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final hasError = error != null && error.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextFormField(
+          controller: controller,
+          autofillHints: autofillHints,
+          obscureText: obscure,
+          decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: Icon(icon, size: 20),
+            suffixIcon: suffixIcon,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: hasError
+                    ? cs.error
+                    : cs.outline.withValues(alpha: 0.5),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: hasError ? cs.error : cs.primary,
+                width: 2,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: cs.error),
+            ),
+            filled: true,
+            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.3),
+          ),
+          onChanged: onChanged,
+          validator: null, // We use inline validation instead
+          textInputAction: TextInputAction.next,
+        ),
+        _buildInlineError(error),
+      ],
+    );
+  }
+
+  // ── Server address field with Autocomplete ──
+
+  Widget _buildServerAddressField(ColorScheme cs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Autocomplete<String>(
+          initialValue: TextEditingValue(text: _hostValue),
+          optionsBuilder: (textEditingValue) {
+            return _hostOptions;
+          },
+          fieldViewBuilder: (
+            context,
+            textEditingController,
+            focusNode,
+            onFieldSubmitted,
+          ) {
+            return TextFormField(
+              controller: textEditingController,
+              focusNode: focusNode,
+              decoration: InputDecoration(
+                labelText: S.of(context).serverAddress,
+                prefixIcon: const Icon(Icons.dns_outlined, size: 20),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: _hostError != null
+                        ? cs.error
+                        : cs.outline.withValues(alpha: 0.5),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: _hostError != null ? cs.error : cs.primary,
+                    width: 2,
+                  ),
+                ),
+                filled: true,
+                fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.3),
+              ),
+              keyboardType: TextInputType.url,
+              onChanged: (value) {
+                setState(() {
+                  _hostValue = value;
+                });
+                _validateHost(value);
+              },
+              validator: null,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _submit(),
+            );
+          },
+          onSelected: (selection) {
+            setState(() {
+              _hostValue = selection;
+            });
+            _validateHost(selection);
+          },
+        ),
+        _buildInlineError(_hostError),
+      ],
+    );
+  }
+
+  // ── Cookie expansion section ──
+
+  Widget _buildCookieSection(ColorScheme cs) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(14),
       ),
-    ];
+      child: ExpansionTile(
+        title: Row(
+          children: [
+            Icon(Icons.security, size: 18, color: cs.primary),
+            const SizedBox(width: 8),
+            const Text('Cookie'),
+          ],
+        ),
+        iconColor: cs.primary,
+        collapsedIconColor: cs.onSurfaceVariant,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        children: [
+          TextFormField(
+            controller: _serverCookieController,
+            decoration: InputDecoration(
+              labelText: S.of(context).serverCookie,
+              prefixIcon: const Icon(Icons.vpn_key_outlined, size: 20),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              helperText: 'Server Cookie',
+              filled: true,
+              fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.3),
+            ),
+            textInputAction: TextInputAction.done,
+          ),
+        ],
+      ),
+    );
   }
 }

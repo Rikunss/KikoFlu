@@ -95,6 +95,18 @@
             </intent-filter>
         </receiver>
 
+        <!-- Quick Settings Tile for App Lock toggle -->
+        <service
+            android:name=".AppLockTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_lock"
+            android:label="App Lock"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <!-- Home Screen Widget -->
         <receiver
             android:name=".KikoFluWidgetProvider"

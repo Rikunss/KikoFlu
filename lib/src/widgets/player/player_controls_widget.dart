@@ -14,8 +14,10 @@ import '../responsive_dialog.dart';
 import '../subtitle_adjustment_dialog.dart';
 import '../volume_control.dart';
 import '../../screens/equalizer_screen.dart';
+import '../../services/bookmark_service.dart';
 import 'sleep_timer_button.dart';
 import 'sleep_timer_dialog.dart';
+import 'bookmarks_sheet.dart';
 import '../../../l10n/app_localizations.dart';
 
 /// 播放器控制组件
@@ -60,18 +62,72 @@ class PlayerControlsWidget extends ConsumerStatefulWidget {
       _PlayerControlsWidgetState();
 }
 
-class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
+/// Format [Duration] to display string (e.g. "1:23:45" or "3:45").
+/// Top-level so leaf ConsumerWidgets can reuse it.
+String formatDuration(Duration duration) {
+  String twoDigits(int n) => n.toString().padLeft(2, '0');
+  final hours = duration.inHours;
+  final minutes = duration.inMinutes.remainder(60);
+  final seconds = duration.inSeconds.remainder(60);
 
-    if (hours > 0) {
-      return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
-    } else {
-      return '${twoDigits(minutes)}:${twoDigits(seconds)}';
-    }
+  if (hours > 0) {
+    return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
+  } else {
+    return '${twoDigits(minutes)}:${twoDigits(seconds)}';
+  }
+}
+
+class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
+
+  /// Builds seekbar + time labels section.
+  /// The time labels use leaf ConsumerWidgets so only the position text
+  /// rebuilds on every 200ms tick — the Row wrapper stays stable.
+  Widget _buildSeekSection(BuildContext context) {
+    final isPlaying = ref.watch(isPlayingProvider);
+
+    return Column(children: [
+      // Progress slider
+      Consumer(
+        builder: (context, ref, child) {
+          final pos = ref.watch(positionProvider).value ?? Duration.zero;
+          final dur = ref.watch(durationProvider).value ?? Duration.zero;
+
+          final seekValue = (widget.isSeekingManually
+                  ? widget.seekValue
+                  : dur.inMilliseconds > 0
+                      ? pos.inMilliseconds / dur.inMilliseconds
+                      : 0.0)
+              .clamp(0.0, 1.0);
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: WaveformSeeker(
+              value: seekValue,
+              duration: dur,
+              isPlaying: isPlaying,
+              gradientColors: widget.gradientColors,
+              onChanged: widget.onSeekChanged,
+              onChangeEnd: widget.onSeekEnd,
+              onLongPress: widget.onGradientRefresh,
+            ),
+          );
+        },
+      ),
+      // Time labels — leaf ConsumerWidgets avoid rebuilding both Texts on every 200ms tick
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _PositionText(
+              isSeekingManually: widget.isSeekingManually,
+              seekValue: widget.seekValue,
+            ),
+            const _DurationText(),
+          ],
+        ),
+      ),
+    ]);
   }
 
   void _showSpeedDialog(
@@ -401,6 +457,15 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
             );
           },
         );
+      case PlayerButtonType.bookmark:
+        return ListTile(
+          leading: const Icon(Icons.bookmark_rounded),
+          title: Text(S.of(context).audioBookmarksTitle),
+          onTap: () {
+            Navigator.pop(context);
+            BookmarksSheet.show(context);
+          },
+        );
     }
   }
 
@@ -628,6 +693,46 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
             if (!isLandscape) const SizedBox(height: 14),
           ],
         );
+      case PlayerButtonType.bookmark:
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: () {
+                final service = ref.read(bookmarkServiceProvider);
+                final currentTrack = ref.read(currentTrackProvider).valueOrNull;
+                if (currentTrack != null) {
+                  final position = ref.read(positionProvider).valueOrNull ??
+                      Duration.zero;
+                  service.add(
+                    trackId: currentTrack.id,
+                    workId: currentTrack.workId,
+                    position: position,
+                    trackTitle: currentTrack.title,
+                  );
+                  HapticFeedback.lightImpact();
+                  ScaffoldMessenger.of(context).clearSnackBars();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(S.of(context).audioBookmarkAdded(position.inMilliseconds > 0
+                          ? formatDuration(position)
+                          : '0:00')),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 2),
+                      action: SnackBarAction(
+                        label: S.of(context).audioBookmarksView,
+                        onPressed: () => BookmarksSheet.show(context),
+                      ),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.bookmark_add_outlined),
+              iconSize: iconSize,
+            ),
+            if (!isLandscape) const SizedBox(height: 14),
+          ],
+        );
     }
   }
 
@@ -635,7 +740,6 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
     final iconSize = widget.isLandscape ? 24.0 : 48.0;
     final playButtonSize = widget.isLandscape ? 64.0 : 72.0;
     final playIconSize = widget.isLandscape ? 32.0 : 36.0;
@@ -643,73 +747,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
 
     return Column(
       children: [
-        // Progress slider
-        Column(
-          children: [
-            Consumer(
-              builder: (context, ref, child) {
-                final pos = ref.watch(positionProvider).value ?? Duration.zero;
-                final dur = ref.watch(durationProvider).value ?? Duration.zero;
-
-                final seekValue = (widget.isSeekingManually
-                        ? widget.seekValue
-                        : dur.inMilliseconds > 0
-                            ? pos.inMilliseconds / dur.inMilliseconds
-                            : 0.0)
-                    .clamp(0.0, 1.0);
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: WaveformSeeker(
-                    value: seekValue,
-                    duration: dur,
-                    isPlaying: isPlaying,
-                    gradientColors: widget.gradientColors,
-                    onChanged: widget.onSeekChanged,
-                    onChangeEnd: widget.onSeekEnd,
-                    onLongPress: widget.onGradientRefresh,
-                  ),
-                );
-              },
-            ),
-            // Time labels - Material Design 3
-            Consumer(
-              builder: (context, ref, child) {
-                final pos = ref.watch(positionProvider).value ?? Duration.zero;
-                final dur = ref.watch(durationProvider).value ?? Duration.zero;
-
-                final displayPos = widget.isSeekingManually
-                    ? Duration(
-                        milliseconds:
-                            (widget.seekValue * dur.inMilliseconds).round())
-                    : pos;
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _formatDuration(displayPos),
-                        style: textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                      Text(
-                        _formatDuration(dur),
-                        style: textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
+        _buildSeekSection(context),
         SizedBox(height: widget.isLandscape ? 20 : 16),
         // Main controls
         Row(
@@ -868,6 +906,57 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           },
         ),
       ],
+    );
+  }
+}
+
+/// Position time label — watches [positionProvider] independently so
+/// the time labels Row does not rebuild on every 200ms position tick.
+/// Only this single Text widget rebuilds when the position updates.
+class _PositionText extends ConsumerWidget {
+  final bool isSeekingManually;
+  final double seekValue;
+
+  const _PositionText({
+    required this.isSeekingManually,
+    required this.seekValue,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pos = ref.watch(positionProvider).value ?? Duration.zero;
+    final dur = ref.watch(durationProvider).value ?? Duration.zero;
+    final displayPos = isSeekingManually
+        ? Duration(milliseconds: (seekValue * dur.inMilliseconds).round())
+        : pos;
+    final theme = Theme.of(context);
+    return Text(
+      formatDuration(displayPos),
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
+  }
+}
+
+/// Duration time label — watches [durationProvider] independently so
+/// the time labels Row does not rebuild on every 200ms position tick.
+/// Duration rarely changes (only on track change), so this widget
+/// almost never rebuilds, keeping the UI thread free for position updates.
+class _DurationText extends ConsumerWidget {
+  const _DurationText();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dur = ref.watch(durationProvider).value ?? Duration.zero;
+    final theme = Theme.of(context);
+    return Text(
+      formatDuration(dur),
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
     );
   }
 }

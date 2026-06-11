@@ -1,6 +1,12 @@
 package com.meteor.kikoeruflutter
 
+import android.content.BroadcastReceiver
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
+import android.service.quicksettings.TileService
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -11,6 +17,7 @@ class MainActivity : AudioServiceActivity() {
     private var equalizerPlugin: EqualizerPlugin? = null
     private var hiResAudioPlugin: HiResAudioPlugin? = null
     private var exclusiveAudioPlugin: ExclusiveAudioPlugin? = null
+    private var screenStatePlugin: ScreenStatePlugin? = null
     
     // Home widget action channel — used to forward widget button presses to Dart
     companion object {
@@ -20,6 +27,8 @@ class MainActivity : AudioServiceActivity() {
         const val ACTION_SKIP_PREV = "skipPrev"
     }
     private var widgetChannel: MethodChannel? = null
+    private var appLockTileChannel: MethodChannel? = null
+    private var tileReceiver: BroadcastReceiver? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -65,8 +74,25 @@ class MainActivity : AudioServiceActivity() {
         exclusiveAudioPlugin?.attachChannel(exclusiveChannel)
         exclusiveChannel.setMethodCallHandler(exclusiveAudioPlugin)
 
+        // 注册 Screen State 插件 (screen off/on detection for auto-relock)
+        screenStatePlugin = ScreenStatePlugin.getInstance(this)
+        screenStatePlugin?.attachChannel(flutterEngine)
+
         // 注册 Audio Conversion 插件 (WAV → FLAC)
         AudioConversionPlugin.register(flutterEngine)
+
+        // Set up channel for App Lock Quick Settings tile
+        appLockTileChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.kikoeru.flutter/app_lock_tile"
+        ).apply {
+            setMethodCallHandler { call, _ ->
+                if (call.method == "updateAppLockTile") {
+                    requestTileUpdate()
+                }
+            }
+        }
+        registerTileReceiver()
 
         // Forward pending widget intents
         handleWidgetIntent(intent)
@@ -75,6 +101,40 @@ class MainActivity : AudioServiceActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleWidgetIntent(intent)
+    }
+
+    /**
+     * Requests the system to refresh the App Lock Quick Settings tile.
+     * This triggers [AppLockTileService.onStartListening], which re-reads
+     * SharedPreferences and updates the tile icon/subtitle/state.
+     *
+     * [TileService.requestListeningState] is available on API 33+.
+     * On older devices the tile updates the next time it becomes visible.
+     */
+    private fun requestTileUpdate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            TileService.requestListeningState(
+                this,
+                ComponentName(this, AppLockTileService::class.java)
+            )
+        }
+    }
+
+    private fun registerTileReceiver() {
+        tileReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == AppLockTileService.ACTION_TOGGLE) {
+                    val enabled = intent.getBooleanExtra(AppLockTileService.EXTRA_ENABLED, false)
+                    appLockTileChannel?.invokeMethod("tileToggled", enabled)
+                }
+            }
+        }
+        // RECEIVER_EXPORTED requires API 33+; use two-arg overload on older devices
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(tileReceiver, IntentFilter(AppLockTileService.ACTION_TOGGLE), Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(tileReceiver, IntentFilter(AppLockTileService.ACTION_TOGGLE))
+        }
     }
 
     private fun handleWidgetIntent(intent: Intent) {
@@ -101,6 +161,8 @@ class MainActivity : AudioServiceActivity() {
         equalizerPlugin?.cleanup()
         hiResAudioPlugin?.cleanup()
         exclusiveAudioPlugin?.cleanup()
+        screenStatePlugin?.cleanup()
+        tileReceiver?.let { unregisterReceiver(it) }
         super.onDestroy()
     }
 }

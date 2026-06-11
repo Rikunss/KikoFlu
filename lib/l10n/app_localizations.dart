@@ -6702,6 +6702,180 @@ abstract class S {
   /// **'Start listening to works and your stats will appear here.'**
   String get statsNoDataDesc;
 
+  /// No description provided for @statsTabDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily'**
+  String get statsTabDaily;
+
+  /// No description provided for @statsTabWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly'**
+  String get statsTabWeekly;
+
+  /// No description provided for @statsTabMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get statsTabMonthly;
+
+  /// No description provided for @statsWeeklyReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly Report (4 weeks)'**
+  String get statsWeeklyReport;
+
+  /// No description provided for @statsMonthlyReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly Report (6 months)'**
+  String get statsMonthlyReport;
+
+  /// No description provided for @statsHeatmap.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity Heatmap'**
+  String get statsHeatmap;
+
+  /// No description provided for @statsHeatmapDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening activity over the last 12 weeks'**
+  String get statsHeatmapDesc;
+
+  /// No description provided for @statsMilestones.
+  ///
+  /// In en, this message translates to:
+  /// **'Milestones'**
+  String get statsMilestones;
+
+  /// No description provided for @statsMilestoneDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Achievements earned through your listening journey'**
+  String get statsMilestoneDesc;
+
+  /// No description provided for @statsMilestoneFirstSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'First Steps'**
+  String get statsMilestoneFirstSteps;
+
+  /// No description provided for @statsMilestoneFirstStepsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Play your first work'**
+  String get statsMilestoneFirstStepsDesc;
+
+  /// No description provided for @statsMilestoneGettingStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Getting Started'**
+  String get statsMilestoneGettingStarted;
+
+  /// No description provided for @statsMilestoneGettingStartedDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Play 10 different works'**
+  String get statsMilestoneGettingStartedDesc;
+
+  /// No description provided for @statsMilestoneListener.
+  ///
+  /// In en, this message translates to:
+  /// **'Dedicated Listener'**
+  String get statsMilestoneListener;
+
+  /// No description provided for @statsMilestoneListenerDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Play 50 different works'**
+  String get statsMilestoneListenerDesc;
+
+  /// No description provided for @statsMilestoneCentury.
+  ///
+  /// In en, this message translates to:
+  /// **'Century Mark'**
+  String get statsMilestoneCentury;
+
+  /// No description provided for @statsMilestoneCenturyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Play 100 different works'**
+  String get statsMilestoneCenturyDesc;
+
+  /// No description provided for @statsMilestoneComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete!'**
+  String get statsMilestoneComplete;
+
+  /// No description provided for @statsMilestoneCompleteDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish your first work'**
+  String get statsMilestoneCompleteDesc;
+
+  /// No description provided for @statsMilestoneDoubleDigits.
+  ///
+  /// In en, this message translates to:
+  /// **'Double Digits'**
+  String get statsMilestoneDoubleDigits;
+
+  /// No description provided for @statsMilestoneDoubleDigitsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen for 10 hours total'**
+  String get statsMilestoneDoubleDigitsDesc;
+
+  /// No description provided for @statsMilestoneLongHaul.
+  ///
+  /// In en, this message translates to:
+  /// **'Long Haul'**
+  String get statsMilestoneLongHaul;
+
+  /// No description provided for @statsMilestoneLongHaulDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen for 50 hours total'**
+  String get statsMilestoneLongHaulDesc;
+
+  /// No description provided for @statsMilestoneHundredHours.
+  ///
+  /// In en, this message translates to:
+  /// **'100 Hours Club'**
+  String get statsMilestoneHundredHours;
+
+  /// No description provided for @statsMilestoneHundredHoursDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen for 100 hours total'**
+  String get statsMilestoneHundredHoursDesc;
+
+  /// No description provided for @statsMilestoneConsistent.
+  ///
+  /// In en, this message translates to:
+  /// **'Consistent'**
+  String get statsMilestoneConsistent;
+
+  /// No description provided for @statsMilestoneConsistentDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach a 7-day streak'**
+  String get statsMilestoneConsistentDesc;
+
+  /// No description provided for @statsMilestoneUnstoppable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unstoppable'**
+  String get statsMilestoneUnstoppable;
+
+  /// No description provided for @statsMilestoneUnstoppableDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach a 30-day streak'**
+  String get statsMilestoneUnstoppableDesc;
+
   /// No description provided for @bitPerfectPlayback.
   ///
   /// In en, this message translates to:
@@ -6876,6 +7050,192 @@ abstract class S {
   /// **'Translated to {language}'**
   String autoTranslateBannerDone(Object language);
 
+  /// No description provided for @backupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup & Restore'**
+  String get backupTitle;
+
+  /// No description provided for @backupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export or restore all app data'**
+  String get backupSubtitle;
+
+  /// No description provided for @backupInfoDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a backup of your app data including accounts, settings, history, playlists, and subtitle library. Restore from a backup file at any time.'**
+  String get backupInfoDescription;
+
+  /// No description provided for @backupExportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get backupExportTitle;
+
+  /// No description provided for @backupExportSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a full backup'**
+  String get backupExportSubtitle;
+
+  /// No description provided for @backupCreateBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Backup'**
+  String get backupCreateBackup;
+
+  /// No description provided for @backupCreateBackupDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Save all data to a .zip file'**
+  String get backupCreateBackupDesc;
+
+  /// No description provided for @backupExportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup Created'**
+  String get backupExportSuccess;
+
+  /// No description provided for @backupSavedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup saved to:\n{path}\n\nFile size: {size}'**
+  String backupSavedTo(Object path, Object size);
+
+  /// No description provided for @backupExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup failed:\n{error}'**
+  String backupExportFailed(Object error);
+
+  /// No description provided for @backupSelectExportDir.
+  ///
+  /// In en, this message translates to:
+  /// **'Select backup destination'**
+  String get backupSelectExportDir;
+
+  /// No description provided for @backupRestoreTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get backupRestoreTitle;
+
+  /// No description provided for @backupRestoreSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from a backup'**
+  String get backupRestoreSubtitle;
+
+  /// No description provided for @backupRestoreFromBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from Backup'**
+  String get backupRestoreFromBackup;
+
+  /// No description provided for @backupRestoreFromBackupDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a .zip backup file to restore'**
+  String get backupRestoreFromBackupDesc;
+
+  /// No description provided for @backupSelectImportFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Select backup file'**
+  String get backupSelectImportFile;
+
+  /// No description provided for @backupRestoreConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Data?'**
+  String get backupRestoreConfirmTitle;
+
+  /// No description provided for @backupRestoreConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This will replace all current app data with the data from the backup. The app needs to be restarted after restore.\n\nContinue?'**
+  String get backupRestoreConfirmMessage;
+
+  /// No description provided for @backupRestoreSuccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Complete'**
+  String get backupRestoreSuccessTitle;
+
+  /// No description provided for @backupRestoreSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'All data has been restored successfully.'**
+  String get backupRestoreSuccess;
+
+  /// No description provided for @backupRestoreWarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'Warnings:'**
+  String get backupRestoreWarnings;
+
+  /// No description provided for @backupRestoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore failed:\n{error}'**
+  String backupRestoreFailed(Object error);
+
+  /// No description provided for @backupRestartApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart App'**
+  String get backupRestartApp;
+
+  /// No description provided for @backupRestartRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart Required'**
+  String get backupRestartRequired;
+
+  /// No description provided for @backupRestartRequiredDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Please restart the app for the restored data to take full effect.'**
+  String get backupRestartRequiredDesc;
+
+  /// No description provided for @backupError.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup Error'**
+  String get backupError;
+
+  /// No description provided for @backupDataIncluded.
+  ///
+  /// In en, this message translates to:
+  /// **'Data Included'**
+  String get backupDataIncluded;
+
+  /// No description provided for @backupDatabases.
+  ///
+  /// In en, this message translates to:
+  /// **'Databases'**
+  String get backupDatabases;
+
+  /// No description provided for @backupHiveBoxes.
+  ///
+  /// In en, this message translates to:
+  /// **'App State'**
+  String get backupHiveBoxes;
+
+  /// No description provided for @backupPreferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferences'**
+  String get backupPreferences;
+
+  /// No description provided for @backupAllSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'All settings, smart playlists, and preferences'**
+  String get backupAllSettings;
+
   /// No description provided for @smartPlaylist.
   ///
   /// In en, this message translates to:
@@ -6911,6 +7271,264 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Regular Playlist'**
   String get regularPlaylist;
+
+  /// No description provided for @audioBookmarksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmarks'**
+  String get audioBookmarksTitle;
+
+  /// No description provided for @audioBookmarksEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No bookmarks yet'**
+  String get audioBookmarksEmpty;
+
+  /// No description provided for @audioBookmarksEmptyTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'No bookmarks for this track.\nTap the bookmark icon to add one.'**
+  String get audioBookmarksEmptyTrack;
+
+  /// No description provided for @audioBookmarksHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark your favorite moments while listening'**
+  String get audioBookmarksHint;
+
+  /// No description provided for @audioBookmarkAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark added at {position}'**
+  String audioBookmarkAdded(Object position);
+
+  /// No description provided for @audioBookmarksView.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get audioBookmarksView;
+
+  /// No description provided for @audioBookmarksEditNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Note'**
+  String get audioBookmarksEditNote;
+
+  /// No description provided for @audioBookmarksNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a note for this bookmark...'**
+  String get audioBookmarksNoteHint;
+
+  /// No description provided for @audioBookmarksDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this bookmark?'**
+  String get audioBookmarksDeleteConfirm;
+
+  /// No description provided for @appLockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Lock'**
+  String get appLockTitle;
+
+  /// No description provided for @appLockEnabledSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled — requires biometric or PIN to open app'**
+  String get appLockEnabledSubtitle;
+
+  /// No description provided for @appLockDisabledSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled — app opens without authentication'**
+  String get appLockDisabledSubtitle;
+
+  /// No description provided for @appLockDisableConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable App Lock?'**
+  String get appLockDisableConfirmTitle;
+
+  /// No description provided for @appLockDisableConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This will turn off all app lock protection, including biometric and PIN.'**
+  String get appLockDisableConfirmMessage;
+
+  /// No description provided for @appLockDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get appLockDisable;
+
+  /// No description provided for @appLockDisabledToast.
+  ///
+  /// In en, this message translates to:
+  /// **'App Lock disabled'**
+  String get appLockDisabledToast;
+
+  /// No description provided for @appLockEnterPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your PIN'**
+  String get appLockEnterPin;
+
+  /// No description provided for @appLockAuthenticating.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticating…'**
+  String get appLockAuthenticating;
+
+  /// No description provided for @appLockWrongPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong PIN. Try again.'**
+  String get appLockWrongPin;
+
+  /// No description provided for @appLockUseBiometric.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Fingerprint / Face ID'**
+  String get appLockUseBiometric;
+
+  /// No description provided for @appLockBiometricReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock KikoFlu'**
+  String get appLockBiometricReason;
+
+  /// No description provided for @appLockBiometric.
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric'**
+  String get appLockBiometric;
+
+  /// No description provided for @appLockBiometricEnabledSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled — fingerprint or face unlock available'**
+  String get appLockBiometricEnabledSubtitle;
+
+  /// No description provided for @appLockBiometricDisabledSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled — PIN-only mode'**
+  String get appLockBiometricDisabledSubtitle;
+
+  /// No description provided for @appLockBiometricNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric is not available or not enrolled on this device'**
+  String get appLockBiometricNotAvailable;
+
+  /// No description provided for @appLockBiometricEnableReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable biometric unlock'**
+  String get appLockBiometricEnableReason;
+
+  /// No description provided for @appLockBiometricSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use your device\'s fingerprint or face to unlock faster'**
+  String get appLockBiometricSubtitle;
+
+  /// No description provided for @appLockSetupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set Up App Lock'**
+  String get appLockSetupTitle;
+
+  /// No description provided for @appLockSetupPinSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a PIN to secure your app'**
+  String get appLockSetupPinSubtitle;
+
+  /// No description provided for @appLockSetupConfirmSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your PIN'**
+  String get appLockSetupConfirmSubtitle;
+
+  /// No description provided for @appLockChangePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Change PIN'**
+  String get appLockChangePin;
+
+  /// No description provided for @appLockChangePinSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set a new PIN code'**
+  String get appLockChangePinSubtitle;
+
+  /// No description provided for @appLockPinMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'PINs don\'t match. Try again.'**
+  String get appLockPinMismatch;
+
+  /// No description provided for @appLockPinChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN changed successfully'**
+  String get appLockPinChanged;
+
+  /// No description provided for @appLockDigits.
+  ///
+  /// In en, this message translates to:
+  /// **'digits'**
+  String get appLockDigits;
+
+  /// No description provided for @appLockAutoLock.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-lock'**
+  String get appLockAutoLock;
+
+  /// No description provided for @appLockAutoLockNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get appLockAutoLockNever;
+
+  /// No description provided for @appLockAutoLockImmediately.
+  ///
+  /// In en, this message translates to:
+  /// **'Immediately'**
+  String get appLockAutoLockImmediately;
+
+  /// No description provided for @appLockAutoLock1Min.
+  ///
+  /// In en, this message translates to:
+  /// **'1 minute'**
+  String get appLockAutoLock1Min;
+
+  /// No description provided for @appLockAutoLock5Min.
+  ///
+  /// In en, this message translates to:
+  /// **'5 minutes'**
+  String get appLockAutoLock5Min;
+
+  /// No description provided for @appLockAutoLock15Min.
+  ///
+  /// In en, this message translates to:
+  /// **'15 minutes'**
+  String get appLockAutoLock15Min;
+
+  /// No description provided for @appLockAutoLock30Min.
+  ///
+  /// In en, this message translates to:
+  /// **'30 minutes'**
+  String get appLockAutoLock30Min;
+
+  /// No description provided for @appLockAutoLockMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'minutes'**
+  String get appLockAutoLockMinutes;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

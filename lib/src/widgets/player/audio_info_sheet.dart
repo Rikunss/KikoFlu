@@ -5,216 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
-import '../../models/audio_info_model.dart';
 import '../../providers/audio_provider.dart';
 import '../../services/equalizer_service.dart';
 import '../../services/hi_res_audio_service.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/exclusive_audio_service.dart';
 import '../../providers/exclusive_audio_provider.dart';
-
-/// Builds a compact [AudioInfoData] snapshot for the info sheet.
-AudioInfoData _buildAudioInfo(WidgetRef ref) {
-  final track = ref.watch(currentTrackProvider).valueOrNull;
-  final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
-  final totalDuration = ref.watch(durationProvider).valueOrNull;
-  final formatInfo = ref.watch(audioFormatInfoProvider).valueOrNull;
-  final audioState = ref.watch(audioPlayerControllerProvider);
-  final playerStateValue = ref.watch(playerStateProvider).valueOrNull;
-
-  final eqService = EqualizerService.instance;
-  final eqState = eqService.state;
-  final audioService = AudioPlayerService.instance;
-  final currentGain = audioService.currentReplayGain;
-
-  // ── Reactive providers for exclusive audio & USB DAC state ──
-  final exclusiveStateAsync = ref.watch(exclusiveAudioStateProvider);
-  final exclusiveState = exclusiveStateAsync.when(
-    data: (s) => s,
-    loading: () => const ExclusiveModeState(),
-    error: (_, __) => const ExclusiveModeState(),
-  );
-  final dacNameAsync = ref.watch(activeUsbDacNameProvider);
-  final usbDacNameValue = dacNameAsync.when(
-    data: (name) => name,
-    loading: () => '',
-    error: (_, __) => '',
-  );
-  final routingAsync = ref.watch(hiResUsbRoutingProvider);
-  final hiResRouting = routingAsync.when(
-    data: (r) => r,
-    loading: () => const UsbRoutingState(),
-    error: (_, __) => const UsbRoutingState(),
-  );
-  final hiResPlayingAsync = ref.watch(hiResPlaybackStateProvider);
-  final hiResIsPlaying = hiResPlayingAsync.when(
-    data: (p) => p,
-    loading: () => false,
-    error: (_, __) => false,
-  );
-
-  // ── Reactive audio output device type ──
-  final activeDeviceAsync = ref.watch(activeOutputDeviceProvider);
-  final activeDeviceType = activeDeviceAsync.when(
-    data: (t) => t,
-    loading: () => '',
-    error: (_, __) => '',
-  );
-
-  String? fileName;
-  if (track?.url != null) {
-    final uri = track!.url;
-    fileName = uri.split('/').last.split('?').first.split('#').first;
-  }
-
-  String decoder;
-  String output;
-  bool exclusiveMode = false;
-  bool isHiResActive = hiResIsPlaying;
-  final String aaudioFormatDesc;
-  if (Platform.isAndroid) {
-    aaudioFormatDesc = exclusiveState.aaudioExclusive
-        ? 'Exclusive'
-        : exclusiveState.aaudioActive
-            ? 'Shared'
-            : exclusiveState.aaudioAvailable
-                ? 'Available'
-                : 'N/A';
-  } else if (Platform.isWindows) {
-    aaudioFormatDesc = audioService.exclusiveModeEnabled
-        ? 'WASAPI Exclusive'
-        : 'WASAPI Shared';
-  } else if (Platform.isMacOS) {
-    aaudioFormatDesc = audioService.exclusiveModeEnabled
-        ? 'CoreAudio Exclusive'
-        : 'Core Audio';
-  } else if (Platform.isLinux) {
-    aaudioFormatDesc = 'ALSA / PulseAudio';
-  } else {
-    aaudioFormatDesc = 'N/A';
-  }
-
-  final isExclusiveOnAndroid = Platform.isAndroid && (exclusiveState.enabled || hiResRouting.routed);
-  final isExclusiveOnWindows = Platform.isWindows && audioService.exclusiveModeEnabled;
-  final isExclusiveOnMacOS = Platform.isMacOS && audioService.exclusiveModeEnabled;
-
-  if (Platform.isAndroid) {
-    if (audioService.playerState.processingState != ProcessingState.idle) {
-      decoder = isHiResActive ? 'Hi-Res ExoPlayer' : 'ExoPlayer (just_audio)';
-      output = hiResRouting.routed
-          ? 'USB Native (AudioTrack)'
-          : 'Android AudioTrack';
-      exclusiveMode = isExclusiveOnAndroid;
-    } else {
-      decoder = 'Idle';
-      output = '—';
-    }
-  } else if (Platform.isIOS) {
-    decoder = 'AVPlayer (AudioQueue)';
-    output = 'Core Audio';
-  } else if (Platform.isMacOS) {
-    decoder = 'AVPlayer (AudioUnit)';
-    output = isExclusiveOnMacOS ? 'CoreAudio Exclusive' : 'Core Audio';
-    exclusiveMode = isExclusiveOnMacOS;
-  } else if (Platform.isWindows) {
-    decoder = 'just_audio (WASAPI)';
-    output = isExclusiveOnWindows
-        ? 'WASAPI Exclusive (bit-perfect)'
-        : 'WASAPI Shared';
-    exclusiveMode = isExclusiveOnWindows;
-  } else if (Platform.isLinux) {
-    decoder = 'just_audio';
-    output = 'ALSA / PulseAudio';
-  } else {
-    decoder = 'Unknown';
-    output = 'Unknown';
-  }
-
-  String? deviceName;
-  if (Platform.isAndroid) {
-    deviceName = switch (activeDeviceType) {
-      'usb_dac' => 'USB DAC (routed)',
-      'usb_detected' => 'USB DAC (not routed)',
-      'wired_headphones' => 'Wired Headphones',
-      'bluetooth' => 'Bluetooth',
-      'builtin' => 'Built-in Speaker',
-      _ when hiResRouting.routed && hiResIsPlaying => 'USB DAC',
-      _ when activeDeviceType == '' => 'Built-in Speaker',
-      _ => activeDeviceType.isNotEmpty ? activeDeviceType : 'Built-in Speaker',
-    };
-  } else if (Platform.isIOS) {
-    deviceName = 'iPhone / iPad';
-  } else if (Platform.isWindows) {
-    if (isExclusiveOnWindows) {
-      deviceName = 'WASAPI Exclusive Device';
-    } else if (activeDeviceType.isNotEmpty) {
-      deviceName = activeDeviceType == 'wired_headphones'
-          ? 'Headphones'
-          : activeDeviceType == 'builtin'
-              ? 'Built-in Speaker'
-              : activeDeviceType;
-    } else {
-      deviceName = 'Default Output';
-    }
-  } else if (Platform.isLinux) {
-    deviceName = activeDeviceType.isNotEmpty
-        ? activeDeviceType
-        : 'Default ALSA Device';
-  } else if (Platform.isMacOS) {
-    deviceName = isExclusiveOnMacOS
-        ? 'CoreAudio Exclusive Device'
-        : activeDeviceType.isNotEmpty
-            ? activeDeviceType
-            : 'Built-in Output';
-  }
-
-  String playerStateStr;
-  if (playerStateValue == null ||
-      audioService.playerState.processingState == ProcessingState.idle) {
-    playerStateStr = 'Stopped';
-  } else if (audioService.playerState.processingState ==
-          ProcessingState.loading ||
-      audioService.playerState.processingState == ProcessingState.buffering) {
-    playerStateStr = 'Loading';
-  } else if (playerStateValue.playing) {
-    playerStateStr = 'Playing';
-  } else {
-    playerStateStr = 'Paused';
-  }
-
-  return AudioInfoData(
-    fileName: fileName,
-    format: formatInfo?.codec.toUpperCase(),
-    duration: totalDuration,
-    sampleRate: formatInfo?.sampleRate,
-    bitDepth: formatInfo?.bitDepth,
-    channels: formatInfo?.channels,
-    bitrate: formatInfo?.estimatedBitrateKbps,
-    decoder: decoder,
-    equalizerEnabled: eqState.enabled,
-    equalizerPreset: eqState.enabled ? eqState.activePresetId : null,
-    crossfadeDuration: audioState.crossfadeDuration,
-    volume: audioState.volume,
-    speed: audioState.speed,
-    repeatEnabled: audioState.repeatMode != LoopMode.off,
-    shuffleEnabled: audioState.shuffleMode,
-    replayGainEnabled: audioService.replayGainActive,
-    replayGainValue: currentGain?.trackGain,
-    volumeNormalizationEnabled: audioService.volumeNormalizationActive,
-    output: output,
-    exclusiveMode: exclusiveMode,
-    deviceName: deviceName,
-    usbDacConnected: hiResRouting.routed,
-    usbDacDeviceName: usbDacNameValue.isNotEmpty ? usbDacNameValue : null,
-    aaudioFormatDesc: aaudioFormatDesc,
-    androidMixerBypassed: exclusiveState.aaudioExclusive,
-    playerState: playerStateStr,
-    currentPosition: position,
-    totalDuration: totalDuration,
-    outputDevice:
-        Platform.isAndroid ? activeDeviceType : null,
-  );
-}
 
 /// Shows the Audio Information dialog in the center of the screen.
 Future<void> showAudioInfoSheet(BuildContext context, WidgetRef ref) {
@@ -238,6 +34,10 @@ Future<void> showAudioInfoSheet(BuildContext context, WidgetRef ref) {
   );
 }
 
+/// Shell dialog — no ref.watch. Each section is a ConsumerWidget that
+/// independently watches only the providers it needs. This prevents the
+/// entire dialog from rebuilding when a single provider (e.g. position at
+/// 200ms) emits.
 class _AudioInfoDialog extends ConsumerStatefulWidget {
   const _AudioInfoDialog();
 
@@ -248,9 +48,6 @@ class _AudioInfoDialog extends ConsumerStatefulWidget {
 class _AudioInfoDialogState extends ConsumerState<_AudioInfoDialog> {
   @override
   Widget build(BuildContext context) {
-    // Timer setState((){}) tiap 2 detik sudah dihapus — system volume
-    // direfresh dari _SystemVolumeWidget terpisah yang punya timer sendiri.
-    final info = _buildAudioInfo(ref);
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final tt = theme.textTheme;
@@ -280,312 +77,23 @@ class _AudioInfoDialogState extends ConsumerState<_AudioInfoDialog> {
               children: [
                 // ── Title bar ──
                 _TitleBar(cs: cs, tt: tt),
-                // ── Scrollable content ──
+                // ── Scrollable content — each section watches its own providers ──
                 Flexible(
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
                     shrinkWrap: true,
-                    children: [
-                      // ═══ FILE ═══
-                      _SectionCard(
-                        icon: Icons.audiotrack,
-                        title: 'File',
-                        cs: cs,
-                        tt: tt,
-                        children: [
-                          if (info.fileName != null)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
-                              child: Text(
-                                info.fileName!,
-                                style: tt.bodySmall?.copyWith(
-                                  color: cs.onSurfaceVariant,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          // Format pills row
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 6, 12, 2),
-                            child: Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                _FormatPill(
-                                    label: info.format ?? '-',
-                                    color: cs.primary.withValues(alpha: 0.7),
-                                    textColor: cs.onPrimary),
-                                if (info.sampleRate != null)
-                                  _FormatPill(
-                                      label: '${(info.sampleRate! / 1000).toStringAsFixed(info.sampleRate! % 1000 == 0 ? 0 : 1)} kHz',
-                                      color: cs.tertiary.withValues(alpha: 0.7),
-                                      textColor: cs.onTertiary),
-                                if (info.bitDepth != null)
-                                  _FormatPill(
-                                      label: '${info.bitDepth} bit',
-                                      color: cs.secondary.withValues(alpha: 0.7),
-                                      textColor: cs.onSecondary),
-                                if (info.channels != null)
-                                  _FormatPill(
-                                      label: '${info.channels}ch',
-                                      color: cs.surfaceContainerHighest.withValues(alpha: 0.8),
-                                      textColor: cs.onSurfaceVariant),
-                                if (info.isHiRes)
-                                  _FormatPill(
-                                      label: 'HI-RES',
-                                      color: cs.primaryContainer,
-                                      textColor: cs.onPrimaryContainer,
-                                      bold: true),
-                              ],
-                            ),
-                          ),                              Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
-                                child: Text(
-                                  info.duration != null
-                                      ? _fmtDuration(info.duration!)
-                                      : '—',
-                                  style: tt.bodySmall?.copyWith(
-                                    color: cs.onSurface,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                          // Bitrate row (if available)
-                          if (info.bitrate != null) ...[
-                            const SizedBox(height: 2),
-                            _InfoRow(
-                              label: 'Bitrate',
-                              value: info.bitrate! >= 1000
-                                  ? '${(info.bitrate! / 1000).toStringAsFixed(1)} Mbps'
-                                  : '${info.bitrate} kbps',
-                              cs: cs, tt: tt,
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // ═══ AUDIO CHAIN ═══
-                      _SectionCard(
-                        icon: Icons.speaker,
-                        title: 'Audio Chain',
-                        cs: cs,
-                        tt: tt,
-                        children: [
-                          // Engine
-                          _FlowRow(
-                            icon: Icons.memory,
-                            label: 'Engine',
-                            value: info.decoder,
-                            cs: cs, tt: tt,
-                          ),
-                          // Arrow down indicator
-                          _FlowArrow(cs: cs),
-                          // Audio Path
-                          _FlowRow(
-                            icon: Icons.router,
-                            label: 'Path',
-                            value: info.output,
-                            cs: cs, tt: tt,
-                          ),
-                          _FlowArrow(cs: cs),
-                          // Output Device
-                          _FlowRow(
-                            icon: Icons.speaker_group,
-                            label: 'Device',
-                            value: info.deviceName ?? '—',
-                            cs: cs, tt: tt,
-                          ),
-                          const SizedBox(height: 4),
-                          // USB DAC chip (when detected)
-                          if ((info.usbDacDeviceName ?? '').isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.usb, size: 13, color: cs.onSurfaceVariant),
-                                  const SizedBox(width: 6),
-                                  Text('USB DAC', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                                  const SizedBox(width: 6),
-                                  info.usbDacConnected
-                                      ? _MiniChip(info.usbDacDeviceName!, cs.primaryContainer, cs.onPrimaryContainer)
-                                      : _MiniChip('${info.usbDacDeviceName} (not routed)', cs.surfaceContainerHighest, cs.onSurfaceVariant),
-                                ],
-                              ),
-                            ),
-                          const SizedBox(height: 2),
-                          _InfoRow(
-                            label: 'Audio Mode',
-                            value: info.aaudioFormatDesc,
-                            cs: cs, tt: tt,
-                            valueColor: info.androidMixerBypassed
-                                ? const Color(0xFF4CAF50)
-                                : info.aaudioFormatDesc.contains('Exclusive')
-                                    ? cs.primary
-                                    : null,
-                          ),
-                          // Bit-Perfect
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
-                            child: _BitPerfectIndicator(cs: cs, tt: tt),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // ═══ DSP ═══
-                      _SectionCard(
-                        icon: Icons.tune,
-                        title: 'DSP',
-                        cs: cs,
-                        tt: tt,
-                        children: [
-                          _ToggleRow(
-                            icon: Icons.equalizer,
-                            label: 'Equalizer',
-                            enabled: info.equalizerEnabled,
-                            value: info.equalizerPreset != null
-                                ? _formatPresetName(info.equalizerPreset!)
-                                : null,
-                            cs: cs, tt: tt,
-                          ),
-                          _ToggleRow(
-                            icon: Icons.swap_horiz,
-                            label: 'Crossfade',
-                            enabled: info.crossfadeDuration.inMilliseconds > 0,
-                            value: info.crossfadeDuration.inMilliseconds > 0
-                                ? '${info.crossfadeDuration.inMilliseconds} ms'
-                                : null,
-                            cs: cs, tt: tt,
-                          ),
-                          _ToggleRow(
-                            icon: Icons.trending_up,
-                            label: 'ReplayGain',
-                            enabled: info.replayGainEnabled,
-                            value: info.replayGainValue != null
-                                ? '${info.replayGainValue!.toStringAsFixed(1)} dB'
-                                : null,
-                            cs: cs, tt: tt,
-                          ),
-                          _ToggleRow(
-                            icon: Icons.volume_up,
-                            label: 'Vol Norm',
-                            enabled: info.volumeNormalizationEnabled,
-                            cs: cs, tt: tt,
-                          ),
-                          const Divider(height: 12, indent: 12, endIndent: 12),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-                            child: Row(
-                              children: [
-                                Icon(Icons.speed, size: 15, color: cs.onSurfaceVariant),
-                                const SizedBox(width: 8),
-                                Text('Volume · Speed', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                                const Spacer(),
-                                // Sub-widget dengan timer sendiri — tidak rebuild dialog utama
-                                _SystemVolumeWidget(info: info, cs: cs, tt: tt),
-                              ],
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-                            child: Row(
-                              children: [
-                                Icon(Icons.repeat, size: 15, color: cs.onSurfaceVariant),
-                                const SizedBox(width: 8),
-                                Text('Repeat · Shuffle', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                                const Spacer(),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _DotBadge(label: 'Repeat', active: info.repeatEnabled, cs: cs),
-                                    const SizedBox(width: 10),
-                                    _DotBadge(label: 'Shuffle', active: info.shuffleEnabled, cs: cs),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // ═══ STATUS ═══
-                      _SectionCard(
-                        icon: Icons.check_circle_outline,
-                        title: 'Status',
-                        cs: cs,
-                        tt: tt,
-                        children: [
-                          // Player State with colored dot
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 8, height: 8,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: info.playerState == 'Playing'
-                                        ? const Color(0xFF4CAF50)
-                                        : info.playerState == 'Paused'
-                                            ? cs.primary
-                                            : cs.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text('Player State', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                                const Spacer(),
-                                _StateBadge(
-                                  label: info.playerState,
-                                  color: info.playerState == 'Playing'
-                                      ? const Color(0xFF4CAF50)
-                                      : info.playerState == 'Paused'
-                                          ? cs.primary
-                                          : cs.onSurfaceVariant,
-                                ),
-                              ],
-                            ),
-                          ),
-                          _ToggleRow(
-                            icon: Icons.volume_off,
-                            label: 'Exclusive Mode',
-                            enabled: info.exclusiveMode,
-                            value: info.exclusiveMode ? 'Vol Locked' : null,
-                            cs: cs, tt: tt,
-                          ),
-                          // AAudio status (Android)
-                          if (Platform.isAndroid)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-                              child: _AAudioStatusRow(cs: cs, tt: tt),
-                            ),
-                          _ToggleRow(
-                            icon: Icons.deblur,
-                            label: 'Android Mixer',
-                            enabled: info.androidMixerBypassed,
-                            value: info.androidMixerBypassed ? 'Bypassed' : null,
-                            cs: cs, tt: tt,
-                            valueActiveColor: const Color(0xFF4CAF50),
-                          ),
-                          const SizedBox(height: 4),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // ── Footer ──
-                      Center(
-                        child: Text(
-                          'Data collected from active audio chain',
-                          style: tt.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+                    children: const [
+                      _FileSectionCard(),
+                      SizedBox(height: 8),
+                      _AudioChainSectionCard(),
+                      SizedBox(height: 8),
+                      _DspSectionCard(),
+                      SizedBox(height: 8),
+                      _StatusSectionCard(),
+                      SizedBox(height: 12),
+                      // Footer
+                      _InfoFooter(),
+                      SizedBox(height: 8),
                     ],
                   ),
                 ),
@@ -596,21 +104,556 @@ class _AudioInfoDialogState extends ConsumerState<_AudioInfoDialog> {
       ),
     );
   }
+}
 
-  String _fmtDuration(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60);
-    final s = d.inSeconds.remainder(60);
-    if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m ${s.toString().padLeft(2, '0')}s';
-    return '${m}m ${s.toString().padLeft(2, '0')}s';
-  }
+// ═══════════════════════════════════════════════
+// File section — watches currentTrackProvider, durationProvider,
+// audioFormatInfoProvider. Rebuilds only when track or format info changes.
+// ═══════════════════════════════════════════════
+class _FileSectionCard extends ConsumerWidget {
+  const _FileSectionCard();
 
-  String _formatPresetName(String id) {
-    for (final p in EqualizerService.presets) {
-      if (p.id == id) return p.name;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final track = ref.watch(currentTrackProvider).valueOrNull;
+    final duration = ref.watch(durationProvider).valueOrNull;
+    final formatInfo = ref.watch(audioFormatInfoProvider).valueOrNull;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    String? fileName;
+    if (track?.url != null) {
+      final uri = track!.url;
+      fileName = uri.split('/').last.split('?').first.split('#').first;
     }
-    return id == 'custom' ? 'Custom' : id;
+
+    return _SectionCard(
+      icon: Icons.audiotrack,
+      title: 'File',
+      cs: cs,
+      tt: tt,
+      children: [
+        if (fileName != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
+            child: Text(
+              fileName,
+              style: tt.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontStyle: FontStyle.italic,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        // Format pills row
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 2),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              _FormatPill(
+                  label: formatInfo?.codec.toUpperCase() ?? '-',
+                  color: cs.primary.withValues(alpha: 0.7),
+                  textColor: cs.onPrimary),
+              if (formatInfo?.sampleRate != null)
+                _FormatPill(
+                    label: '${(formatInfo!.sampleRate! / 1000).toStringAsFixed(formatInfo.sampleRate! % 1000 == 0 ? 0 : 1)} kHz',
+                    color: cs.tertiary.withValues(alpha: 0.7),
+                    textColor: cs.onTertiary),
+              if (formatInfo?.bitDepth != null)
+                _FormatPill(
+                    label: '${formatInfo!.bitDepth} bit',
+                    color: cs.secondary.withValues(alpha: 0.7),
+                    textColor: cs.onSecondary),
+              if (formatInfo?.channels != null)
+                _FormatPill(
+                    label: '${formatInfo!.channels}ch',
+                    color: cs.surfaceContainerHighest.withValues(alpha: 0.8),
+                    textColor: cs.onSurfaceVariant),
+              if ((formatInfo?.sampleRate ?? 0) > 48000)
+                _FormatPill(
+                    label: 'HI-RES',
+                    color: cs.primaryContainer,
+                    textColor: cs.onPrimaryContainer,
+                    bold: true),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+          child: Text(
+            duration != null ? _fmtDuration(duration) : '—',
+            style: tt.bodySmall?.copyWith(
+              color: cs.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        // Bitrate row (if available)
+        if (formatInfo?.estimatedBitrateKbps != null) ...[
+          const SizedBox(height: 2),
+          _InfoRow(
+            label: 'Bitrate',
+            value: formatInfo!.estimatedBitrateKbps! >= 1000
+                ? '${(formatInfo.estimatedBitrateKbps! / 1000).toStringAsFixed(1)} Mbps'
+                : '${formatInfo.estimatedBitrateKbps} kbps',
+            cs: cs, tt: tt,
+          ),
+        ],
+      ],
+    );
   }
+}
+
+// ═══════════════════════════════════════════════
+// Audio Chain section — watches exclusive/hi-res/output providers.
+// ═══════════════════════════════════════════════
+class _AudioChainSectionCard extends ConsumerWidget {
+  const _AudioChainSectionCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final audioService = AudioPlayerService.instance;
+
+    // Exclusive mode + USB DAC
+    final exclusiveStateAsync = ref.watch(exclusiveAudioStateProvider);
+    final exclusiveState = exclusiveStateAsync.when(
+      data: (s) => s,
+      loading: () => const ExclusiveModeState(),
+      error: (_, __) => const ExclusiveModeState(),
+    );
+    final dacNameAsync = ref.watch(activeUsbDacNameProvider);
+    final usbDacNameValue = dacNameAsync.when(
+      data: (name) => name,
+      loading: () => '',
+      error: (_, __) => '',
+    );
+    final routingAsync = ref.watch(hiResUsbRoutingProvider);
+    final hiResRouting = routingAsync.when(
+      data: (r) => r,
+      loading: () => const UsbRoutingState(),
+      error: (_, __) => const UsbRoutingState(),
+    );
+    final hiResPlayingAsync = ref.watch(hiResPlaybackStateProvider);
+    final hiResIsPlaying = hiResPlayingAsync.when(
+      data: (p) => p,
+      loading: () => false,
+      error: (_, __) => false,
+    );
+    final activeDeviceAsync = ref.watch(activeOutputDeviceProvider);
+    final activeDeviceType = activeDeviceAsync.when(
+      data: (t) => t,
+      loading: () => '',
+      error: (_, __) => '',
+    );
+
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    // Compute decoder, output, device name
+    String decoder;
+    String output;
+    final bool isHiResActive = hiResIsPlaying;
+
+    final String aaudioFormatDesc;
+    if (Platform.isAndroid) {
+      aaudioFormatDesc = exclusiveState.aaudioExclusive
+          ? 'Exclusive'
+          : exclusiveState.aaudioActive
+              ? 'Shared'
+              : exclusiveState.aaudioAvailable
+                  ? 'Available'
+                  : 'N/A';
+    } else if (Platform.isWindows) {
+      aaudioFormatDesc = audioService.exclusiveModeEnabled
+          ? 'WASAPI Exclusive'
+          : 'WASAPI Shared';
+    } else if (Platform.isMacOS) {
+      aaudioFormatDesc = audioService.exclusiveModeEnabled
+          ? 'CoreAudio Exclusive'
+          : 'Core Audio';
+    } else if (Platform.isLinux) {
+      aaudioFormatDesc = 'ALSA / PulseAudio';
+    } else {
+      aaudioFormatDesc = 'N/A';
+    }
+
+    final isExclusiveOnWindows = Platform.isWindows && audioService.exclusiveModeEnabled;
+    final isExclusiveOnMacOS = Platform.isMacOS && audioService.exclusiveModeEnabled;
+
+    if (Platform.isAndroid) {
+      if (audioService.playerState.processingState != ProcessingState.idle) {
+        decoder = isHiResActive ? 'Hi-Res ExoPlayer' : 'ExoPlayer (just_audio)';
+        output = hiResRouting.routed
+            ? 'USB Native (AudioTrack)'
+            : 'Android AudioTrack';
+
+      } else {
+        decoder = 'Idle';
+        output = '—';
+      }
+    } else if (Platform.isIOS) {
+      decoder = 'AVPlayer (AudioQueue)';
+      output = 'Core Audio';
+    } else if (Platform.isMacOS) {
+      decoder = 'AVPlayer (AudioUnit)';
+      output = isExclusiveOnMacOS ? 'CoreAudio Exclusive' : 'Core Audio';
+
+    } else if (Platform.isWindows) {
+      decoder = 'just_audio (WASAPI)';
+      output = isExclusiveOnWindows
+          ? 'WASAPI Exclusive (bit-perfect)'
+          : 'WASAPI Shared';
+
+    } else if (Platform.isLinux) {
+      decoder = 'just_audio';
+      output = 'ALSA / PulseAudio';
+    } else {
+      decoder = 'Unknown';
+      output = 'Unknown';
+    }
+
+    String? deviceName;
+    if (Platform.isAndroid) {
+      deviceName = switch (activeDeviceType) {
+        'usb_dac' => 'USB DAC (routed)',
+        'usb_detected' => 'USB DAC (not routed)',
+        'wired_headphones' => 'Wired Headphones',
+        'bluetooth' => 'Bluetooth',
+        'builtin' => 'Built-in Speaker',
+        _ when hiResRouting.routed && hiResIsPlaying => 'USB DAC',
+        _ when activeDeviceType == '' => 'Built-in Speaker',
+        _ => activeDeviceType.isNotEmpty ? activeDeviceType : 'Built-in Speaker',
+      };
+    } else if (Platform.isIOS) {
+      deviceName = 'iPhone / iPad';
+    } else if (Platform.isWindows) {
+      if (isExclusiveOnWindows) {
+        deviceName = 'WASAPI Exclusive Device';
+      } else if (activeDeviceType.isNotEmpty) {
+        deviceName = activeDeviceType == 'wired_headphones'
+            ? 'Headphones'
+            : activeDeviceType == 'builtin'
+                ? 'Built-in Speaker'
+                : activeDeviceType;
+      } else {
+        deviceName = 'Default Output';
+      }
+    } else if (Platform.isLinux) {
+      deviceName = activeDeviceType.isNotEmpty
+          ? activeDeviceType
+          : 'Default ALSA Device';
+    } else if (Platform.isMacOS) {
+      deviceName = isExclusiveOnMacOS
+          ? 'CoreAudio Exclusive Device'
+          : activeDeviceType.isNotEmpty
+              ? activeDeviceType
+              : 'Built-in Output';
+    }
+
+    return _SectionCard(
+      icon: Icons.speaker,
+      title: 'Audio Chain',
+      cs: cs,
+      tt: tt,
+      children: [
+        _FlowRow(
+          icon: Icons.memory, label: 'Engine', value: decoder,
+          cs: cs, tt: tt,
+        ),
+        _FlowArrow(cs: cs),
+        _FlowRow(
+          icon: Icons.router, label: 'Path', value: output,
+          cs: cs, tt: tt,
+        ),
+        _FlowArrow(cs: cs),
+        _FlowRow(
+          icon: Icons.speaker_group, label: 'Device', value: deviceName ?? '—',
+          cs: cs, tt: tt,
+        ),
+        const SizedBox(height: 4),
+        if (usbDacNameValue.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            child: Row(
+              children: [
+                Icon(Icons.usb, size: 13, color: cs.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text('USB DAC', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                const SizedBox(width: 6),
+                hiResRouting.routed
+                    ? _MiniChip(usbDacNameValue, cs.primaryContainer, cs.onPrimaryContainer)
+                    : _MiniChip('$usbDacNameValue (not routed)', cs.surfaceContainerHighest, cs.onSurfaceVariant),
+              ],
+            ),
+          ),
+        const SizedBox(height: 2),
+        _InfoRow(
+          label: 'Audio Mode',
+          value: aaudioFormatDesc,
+          cs: cs, tt: tt,
+          valueColor: exclusiveState.aaudioExclusive
+              ? const Color(0xFF4CAF50)
+              : aaudioFormatDesc.contains('Exclusive')
+                  ? cs.primary
+                  : null,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
+          child: _BitPerfectIndicator(cs: cs, tt: tt),
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════
+// DSP section — watches audioPlayerControllerProvider.
+// ═══════════════════════════════════════════════
+class _DspSectionCard extends ConsumerWidget {
+  const _DspSectionCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final audioState = ref.watch(audioPlayerControllerProvider);
+    final eqService = EqualizerService.instance;
+    final audioService = AudioPlayerService.instance;
+    final currentGain = audioService.currentReplayGain;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return _SectionCard(
+      icon: Icons.tune,
+      title: 'DSP',
+      cs: cs,
+      tt: tt,
+      children: [
+        _ToggleRow(
+          icon: Icons.equalizer,
+          label: 'Equalizer',
+          enabled: eqService.state.enabled,
+          value: eqService.state.enabled
+              ? _formatPresetName(eqService.state.activePresetId)
+              : null,
+          cs: cs, tt: tt,
+        ),
+        _ToggleRow(
+          icon: Icons.swap_horiz,
+          label: 'Crossfade',
+          enabled: audioState.crossfadeDuration.inMilliseconds > 0,
+          value: audioState.crossfadeDuration.inMilliseconds > 0
+              ? '${audioState.crossfadeDuration.inMilliseconds} ms'
+              : null,
+          cs: cs, tt: tt,
+        ),
+        _ToggleRow(
+          icon: Icons.trending_up,
+          label: 'ReplayGain',
+          enabled: audioService.replayGainActive,
+          value: currentGain?.trackGain != null
+              ? '${currentGain!.trackGain!.toStringAsFixed(1)} dB'
+              : null,
+          cs: cs, tt: tt,
+        ),
+        _ToggleRow(
+          icon: Icons.volume_up,
+          label: 'Vol Norm',
+          enabled: audioService.volumeNormalizationActive,
+          cs: cs, tt: tt,
+        ),
+        const Divider(height: 12, indent: 12, endIndent: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+          child: Row(
+            children: [
+              Icon(Icons.speed, size: 15, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Text('Volume · Speed', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              const Spacer(),
+              // Sub-widget dengan timer sendiri — tidak rebuild dialog utama
+              _SystemVolumeWidget(
+                volume: audioState.volume,
+                speed: audioState.speed,
+                outputDevice: Platform.isAndroid ? _getOutputDeviceType(ref) : null,
+                exclusiveMode: audioService.exclusiveModeEnabled,
+                cs: cs, tt: tt,
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+          child: Row(
+            children: [
+              Icon(Icons.repeat, size: 15, color: cs.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Text('Repeat · Shuffle', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              const Spacer(),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _DotBadge(label: 'Repeat', active: audioState.repeatMode != LoopMode.off, cs: cs),
+                  const SizedBox(width: 10),
+                  _DotBadge(label: 'Shuffle', active: audioState.shuffleMode, cs: cs),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+
+  /// Helper to read output device type without subscribing the parent.
+  String? _getOutputDeviceType(WidgetRef ref) {
+    final deviceTypeAsync = ref.read(activeOutputDeviceProvider);
+    return deviceTypeAsync.valueOrNull;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Status section — watches exclusiveAudioStateProvider + playerStateProvider.
+// ═══════════════════════════════════════════════
+class _StatusSectionCard extends ConsumerWidget {
+  const _StatusSectionCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playerStateValue = ref.watch(playerStateProvider).valueOrNull;
+    final audioService = AudioPlayerService.instance;
+    final exclusiveStateAsync = ref.watch(exclusiveAudioStateProvider);
+    final exclusiveState = exclusiveStateAsync.when(
+      data: (s) => s,
+      loading: () => const ExclusiveModeState(),
+      error: (_, __) => const ExclusiveModeState(),
+    );
+    final hiResRoutingAsync = ref.watch(hiResUsbRoutingProvider);
+    final hiResRouting = hiResRoutingAsync.when(
+      data: (r) => r,
+      loading: () => const UsbRoutingState(),
+      error: (_, __) => const UsbRoutingState(),
+    );
+
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    // Player state string
+    String playerStateStr;
+    if (playerStateValue == null ||
+        audioService.playerState.processingState == ProcessingState.idle) {
+      playerStateStr = 'Stopped';
+    } else if (audioService.playerState.processingState ==
+            ProcessingState.loading ||
+        audioService.playerState.processingState == ProcessingState.buffering) {
+      playerStateStr = 'Loading';
+    } else if (playerStateValue.playing) {
+      playerStateStr = 'Playing';
+    } else {
+      playerStateStr = 'Paused';
+    }
+
+    // Exclusive mode
+    final isExclusiveOnAndroid = Platform.isAndroid && (exclusiveState.enabled || hiResRouting.routed);
+    final isExclusiveOnWindows = Platform.isWindows && audioService.exclusiveModeEnabled;
+    final isExclusiveOnMacOS = Platform.isMacOS && audioService.exclusiveModeEnabled;
+    final exclusiveMode = isExclusiveOnAndroid || isExclusiveOnWindows || isExclusiveOnMacOS;
+
+    return _SectionCard(
+      icon: Icons.check_circle_outline,
+      title: 'Status',
+      cs: cs,
+      tt: tt,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Row(
+            children: [
+              Container(
+                width: 8, height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: playerStateStr == 'Playing'
+                      ? const Color(0xFF4CAF50)
+                      : playerStateStr == 'Paused'
+                          ? cs.primary
+                          : cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text('Player State', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              const Spacer(),
+              _StateBadge(
+                label: playerStateStr,
+                color: playerStateStr == 'Playing'
+                    ? const Color(0xFF4CAF50)
+                    : playerStateStr == 'Paused'
+                        ? cs.primary
+                        : cs.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+        _ToggleRow(
+          icon: Icons.volume_off,
+          label: 'Exclusive Mode',
+          enabled: exclusiveMode,
+          value: exclusiveMode ? 'Vol Locked' : null,
+          cs: cs, tt: tt,
+        ),
+        if (Platform.isAndroid)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+            child: _AAudioStatusRow(cs: cs, tt: tt),
+          ),
+        _ToggleRow(
+          icon: Icons.deblur,
+          label: 'Android Mixer',
+          enabled: exclusiveState.aaudioExclusive,
+          value: exclusiveState.aaudioExclusive ? 'Bypassed' : null,
+          cs: cs, tt: tt,
+          valueActiveColor: const Color(0xFF4CAF50),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+}
+
+/// Footer text — no reactive providers.
+class _InfoFooter extends StatelessWidget {
+  const _InfoFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Center(
+      child: Text(
+        'Data collected from active audio chain',
+        style: tt.bodySmall?.copyWith(
+          color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+        ),
+      ),
+    );
+  }
+}
+
+String _fmtDuration(Duration d) {
+  final h = d.inHours;
+  final m = d.inMinutes.remainder(60);
+  final s = d.inSeconds.remainder(60);
+  if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m ${s.toString().padLeft(2, '0')}s';
+  return '${m}m ${s.toString().padLeft(2, '0')}s';
+}
+
+String _formatPresetName(String id) {
+  for (final p in EqualizerService.presets) {
+    if (p.id == id) return p.name;
+  }
+  return id == 'custom' ? 'Custom' : id;
 }
 
 // ═══════════════════════════════════════════════
@@ -618,12 +661,18 @@ class _AudioInfoDialogState extends ConsumerState<_AudioInfoDialog> {
 // Timer 2 detik hanya rebuild widget kecil ini, bukan seluruh dialog.
 // ═══════════════════════════════════════════════
 class _SystemVolumeWidget extends ConsumerStatefulWidget {
-  final AudioInfoData info;
+  final double volume;
+  final double speed;
+  final String? outputDevice;
+  final bool exclusiveMode;
   final ColorScheme cs;
   final TextTheme tt;
 
   const _SystemVolumeWidget({
-    required this.info,
+    required this.volume,
+    required this.speed,
+    this.outputDevice,
+    this.exclusiveMode = false,
     required this.cs,
     required this.tt,
   });
@@ -662,20 +711,25 @@ class _SystemVolumeWidgetState extends ConsumerState<_SystemVolumeWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final info = widget.info;
-    final isSystemVolume = Platform.isAndroid && !info.exclusiveMode;
+    // In exclusive mode on Android, system volume control is locked
+    // (bypassed by AAudio/WASAPI exclusive). Show app volume instead.
+    final isSystemVolume = Platform.isAndroid && !widget.exclusiveMode;
     if (isSystemVolume) {
-      final deviceLabel = _outputDeviceLabel(info.outputDevice);
+      final deviceLabel = _outputDeviceLabel(widget.outputDevice);
       final sv = _systemVolume;
-      if (sv != null && sv['maxVolume']! > 0) {
-        final percent = (sv['currentVolume']! / sv['maxVolume']! * 100).round();
-        return Text('$deviceLabel ($percent%) · ${info.speed.toStringAsFixed(2)}x',
-            style: widget.tt.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: widget.cs.onSurface));
+      if (sv != null) {
+        final maxVol = sv['maxVolume'];
+        final curVol = sv['currentVolume'];
+        if (maxVol != null && curVol != null && maxVol > 0) {
+          final percent = (curVol / maxVol * 100).round();
+          return Text('$deviceLabel ($percent%) · ${widget.speed.toStringAsFixed(2)}x',
+              style: widget.tt.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: widget.cs.onSurface));
+        }
       }
-      return Text('$deviceLabel · ${info.speed.toStringAsFixed(2)}x',
+      return Text('$deviceLabel · ${widget.speed.toStringAsFixed(2)}x',
           style: widget.tt.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: widget.cs.onSurface));
     }
-    return Text('${(info.volume * 100).round()}%  ·  ${info.speed.toStringAsFixed(2)}x',
+    return Text('${(widget.volume * 100).round()}%  ·  ${widget.speed.toStringAsFixed(2)}x',
         style: widget.tt.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: widget.cs.onSurface));
   }
 
@@ -774,7 +828,6 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
             child: Row(
@@ -789,7 +842,6 @@ class _SectionCard extends StatelessWidget {
               ],
             ),
           ),
-          // Content
           ...children,
         ],
       ),
