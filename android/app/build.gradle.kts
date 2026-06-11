@@ -67,6 +67,10 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
         debug {
             signingConfig = if (hasReleaseKeystore) {
@@ -74,6 +78,15 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+        }
+    }
+
+    // AGP 8.x release builds may load native .so directly from the APK (no extraction),
+    // which can cause "Bad JNI version" errors in some older native libraries
+    // (e.g. ffmpegkit_abidetect.so). Forcing legacy extraction fixes this.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }
