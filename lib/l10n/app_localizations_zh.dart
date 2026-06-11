@@ -7059,10 +7059,17 @@ class SZhHant extends SZh {
   String get convertWavAfterDownload => '下載後轉換為 FLAC/ALAC';
 
   @override
+  String get convertWavAfterDownloadDesc =>
+      '下載WAV檔案後自動轉換為無損FLAC（iOS為ALAC），節省約50%儲存空間';
+
+  @override
   String get convertWavAfterDownloadEnabled => '已啟用 - WAV 將轉換為 FLAC/ALAC';
 
   @override
   String get convertWavAfterDownloadDisabled => '未啟用 - 保持原始 WAV 格式';
+
+  @override
+  String get convertWavFfmpegNotFound => '系統未找到FFmpeg。請安裝FFmpeg或檢查您的PATH設定。';
 
   @override
   String get convertingAudio => '正在轉換音訊…';

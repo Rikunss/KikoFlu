@@ -84,6 +84,7 @@ class FullLyricDisplay extends ConsumerStatefulWidget {
   final bool isPortrait;
   final bool isLocked;
   final VoidCallback? onLongPress;
+  final ValueChanged<Duration>? onLyricSeek;
   final List<Color>? gradientColors;
 
   const FullLyricDisplay({
@@ -92,6 +93,7 @@ class FullLyricDisplay extends ConsumerStatefulWidget {
     this.isPortrait = false,
     this.isLocked = false,
     this.onLongPress,
+    this.onLyricSeek,
     this.gradientColors,
   });
 
@@ -115,6 +117,17 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
   final ValueNotifier<String?> _indicatorNotifier = ValueNotifier(null);
   Timer? _indicatorTimer;
 
+  // Seek grace period — after seeking ends, cache the seek target so
+  // the display doesn't revert to stale position while audio catches up.
+  Duration? _cachedSeekPosition;
+  bool _seekGraceActive = false;
+  Timer? _seekGraceTimer; // safety net: forces grace period to end after 1s
+
+  // Scroll generation counter — incremented on every new scroll attempt.
+  // Pending retries from _retryScrollToItem check this and bail if a newer
+  // scroll has superseded them (prevents stale retries during rapid seeks).
+  int _scrollGeneration = 0;
+
   // Auto-translate notification banner state
   _BannerPhase _bannerPhase = _BannerPhase.hidden;
   Timer? _bannerTimer;
@@ -137,7 +150,48 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
     // Register auto-translate listener ONCE — position changes are handled
     // reactively via ref.watch directly in build() instead, avoiding the
     // timing issues with StreamProvider + ref.listen re-registration.
-    ref.listen<LyricState>(lyricControllerProvider, _onAutoTranslateChanged);
+    ref.listenManual<LyricState>(lyricControllerProvider, _onAutoTranslateChanged);
+  }
+
+  @override
+  void didUpdateWidget(FullLyricDisplay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Detect seek START: when seekingPosition transitions from null → value.
+    // This happens in the same frame the parent's _handleSeekChanged runs.
+    // Crucially, even if seekingPosition is cleared back to null before
+    // build() runs (tap case: seek → immediate position emit → clear),
+    // didUpdateWidget still captures the transition. The grace period
+    // activated here ensures the Consumer builder sees _seekGraceActive
+    // when it runs in the next frame.
+    debugPrint('[SEEK] didUpdateWidget: old=${oldWidget.seekingPosition?.inMilliseconds}ms '
+        'new=${widget.seekingPosition?.inMilliseconds}ms '
+        'autoScroll=$_autoScroll lastAutoIdx=$_lastAutoScrollIndex');
+    if (widget.seekingPosition != null &&
+        oldWidget.seekingPosition == null) {
+      debugPrint('[SEEK] Seek START detected — resetting lastAutoScrollIndex');
+      _cachedSeekPosition = widget.seekingPosition;
+      _seekGraceActive = true;
+      // Reset auto-scroll tracking so the next Consumer rebuild always
+      // triggers a scroll (null != any computed index).
+      _lastAutoScrollIndex = null;
+      _seekGraceTimer?.cancel();
+      _seekGraceTimer = Timer(const Duration(seconds: 1), () {
+        if (mounted) {
+          _seekGraceActive = false;
+          _cachedSeekPosition = null;
+        }
+      });
+
+      // Force auto-scroll on seek — the current lyric must immediately
+      // scroll into view even if auto-scroll was previously disabled
+      // by manual lyric dragging or a previous tap-to-seek timer.
+      // Auto-scroll should only stay disabled during manual lyric
+      // dragging (browsing), not after a seek operation.
+      _autoScroll = true;
+      _autoScrollPausedByDrag = false;
+      _autoScrollTimer?.cancel();
+      _autoScrollTimer = null;
+    }
   }
 
   @override
@@ -145,6 +199,7 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
     _scrollController.dispose();
     _indicatorTimer?.cancel();
     _indicatorNotifier.dispose();
+    _seekGraceTimer?.cancel();
     _autoScrollTimer?.cancel();
     _bannerTimer?.cancel();
     _itemKeys.clear();
@@ -256,13 +311,70 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
     return -1;
   }
 
+  /// Retry scrolling to [key] in postFrameCallback up to [attempts] times.
+  ///
+  /// Each retry scrolls further DOWN by (multiplier × 30% viewport) from the
+  /// original [baseOffset], forcing the ListView to build it. All retries
+  /// go DOWN because:
+  ///   - Most seeks are forward (position increases) → proportional estimate
+  ///     tends to UNDERESTIMATE actual scroll offset (active items have larger
+  ///     padding + font), so the target is likely below the estimated position.
+  ///   - For backward seeks the proportional estimate is accurate enough that
+  ///     the initial jumpTo already renders the target.
+  void _retryScrollToItem({
+    required GlobalKey key,
+    required int attempts,
+    required bool animate,
+    double baseOffset = 0,
+    int scrollGen = 0,
+  }) {
+    if (!mounted || attempts <= 0) return;
+    // If a newer scroll superseded this one, bail to avoid stale retry.
+    if (scrollGen != _scrollGeneration) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || scrollGen != _scrollGeneration) return;
+      final ctx = key.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.48,
+          duration: animate ? _animDuration : Duration.zero,
+          curve: _animCurve,
+        );
+      } else {
+        // Target still not rendered — scroll further DOWN.
+        // attempts decrements (2→1), so (3 - attempts) gives increasing
+        // multipliers: attempts=2→1×30%, attempts=1→2×30%.
+        final viewH = _scrollController.position.viewportDimension;
+        final multiplier = 3 - attempts; // 2→1, 1→2
+        final newOff = (baseOffset + viewH * 0.3 * multiplier)
+            .clamp(0.0, _scrollController.position.maxScrollExtent);
+        _scrollController.jumpTo(newOff);
+        _retryScrollToItem(
+          key: key,
+          attempts: attempts - 1,
+          animate: animate,
+          baseOffset: baseOffset,
+          scrollGen: scrollGen,
+        );
+      }
+    });
+  }
+
   /// Scroll to center the lyric at [index] in the viewport.
   ///
   /// Uses [Scrollable.ensureVisible] when the item is already rendered.
   /// When the item is off-screen (ListView virtualization), estimates the
   /// scroll offset to jump there first, then fine-tunes after the item renders.
   void _scrollToLyric(int index, {bool animate = true}) {
-    if (!_autoScroll || !_scrollController.hasClients) return;
+    debugPrint('[SCROLL] _scrollToLyric(index=$index, animate=$animate) '
+        'autoScroll=$_autoScroll hasClients=${_scrollController.hasClients} '
+        'hasContext=${_getKeyForIndex(index).currentContext != null}');
+    if (!_autoScroll || !_scrollController.hasClients) {
+      debugPrint('[SCROLL] BLOCKED: _autoScroll=$_autoScroll hasClients=${_scrollController.hasClients}');
+      return;
+    }
+    _scrollGeneration++; // invalidate pending retries from previous seeks
 
     final key = _getKeyForIndex(index);
     final itemContext = key.currentContext;
@@ -283,28 +395,30 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
       // Note: can't use cached mediaQueryHeight here because this method
       // runs outside build() scope — called from postFrameCallback.
       final centrePadding = MediaQuery.of(context).size.height * 0.38;
-      // Typical lyric item height: fontSize~20 × lineHeight~1.5 + vertical padding 28
-      const approxItemHeight = 58.0;
-      final targetOffset = (index * approxItemHeight) - centrePadding;
-      final clamped = targetOffset.clamp(
-        0.0,
-        _scrollController.position.maxScrollExtent,
-      );
+      // Use proportional estimate (index/total × maxScrollExtent) instead of
+      // a hardcoded 58.0px item height constant. The hardcoded constant fails
+      // for large position jumps because the estimation error compounds as
+      // index grows, making the target item never render (hasContext=false
+      // → estimation miss → scroll silently fails).
+      final displayLyrics = ref.read(lyricControllerProvider).displayLyrics;
+      final totalItems = displayLyrics.length;
+      final maxExtent = _scrollController.position.maxScrollExtent;
+      final ratio = totalItems > 0 ? (index + 0.5) / totalItems : 0.0;
+      final estimatedOffset = (ratio * maxExtent) - centrePadding;
+      final clamped = estimatedOffset.clamp(0.0, maxExtent);
       _scrollController.jumpTo(clamped);
 
-      // After the item is rendered, animate to exact center.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final ctx = key.currentContext;
-        if (ctx != null) {
-          Scrollable.ensureVisible(
-            ctx,
-            alignment: 0.48,
-            duration: animate ? _animDuration : Duration.zero,
-            curve: _animCurve,
-          );
-        }
-      });
+      // Iterative retry: after jumpTo, wait for render then fine-tune.
+      // If item still not rendered (estimation off for variable-height items),
+      // scroll further DOWN in 30% viewport increments (up to 2 retries).
+      // Pass _scrollGeneration so stale retries from previous seeks bail.
+      _retryScrollToItem(
+        key: key,
+        attempts: 2,
+        animate: animate,
+        baseOffset: clamped,
+        scrollGen: _scrollGeneration,
+      );
     }
   }
 
@@ -318,18 +432,44 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
     HapticFeedback.lightImpact();
 
     final targetTime = displayLyrics[index].startTime;
+
+    // Invalidate seek grace period — see reasoning below.
+    _seekGraceActive = false;
+    _cachedSeekPosition = null;
+    _seekGraceTimer?.cancel();
+
+    // Notify parent that a lyric tap triggered a seek. The parent needs
+    // to update _seekingPosition + invalidate its old _seekCompletionSub
+    // (from a previous seekbar interaction), otherwise the parent would
+    // hold a stale _seekingPosition that overrides the lyric display.
+    widget.onLyricSeek?.call(targetTime);
+
     ref
         .read(audioPlayerControllerProvider.notifier)
         .seekAndPersist(targetTime);
 
-    _autoScrollTimer?.cancel();
+    // Force re-enable auto-scroll and seek grace for the Consumer builder.
+    // didUpdateWidget CAN detect seekbar seek now (deferred clear in
+    // _listenForSeekCompletion), but for tap-to-seek the explicit reset
+    // here runs BEFORE didUpdateWidget — guaranteeing the Consumer
+    // builder sees the correct state on the very first rebuild without
+    // relying on the deferred-clear mechanism.
+    //
+    // Without this explicit reset, _autoScroll stays false after a
+    // previous manual lyric drag. If the tap targets the same lyric
+    // index (backward/forward seek within the same line), the Consumer
+    // builder's _autoScrollPausedByDrag fallback also never fires
+    // because it requires an index change.
+    _autoScroll = true;
     _autoScrollPausedByDrag = false;
-    _autoScroll = false;
-    _showIndicator('Manual Scroll');
-    _autoScrollTimer = Timer(const Duration(seconds: 1), () {
+    _lastAutoScrollIndex = null; // force immediate scroll on next rebuild
+    _seekGraceActive = true;
+    _cachedSeekPosition = targetTime;
+    _seekGraceTimer?.cancel();
+    _seekGraceTimer = Timer(const Duration(seconds: 1), () {
       if (mounted) {
-        _autoScroll = true;
-        _showIndicator('Auto Scroll');
+        _seekGraceActive = false;
+        _cachedSeekPosition = null;
       }
     });
   }
@@ -351,14 +491,36 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
 
     // ---- Track change detection ----------------------------------------
     // When the raw lyrics list reference changes (track change), reset
-    // state. The lyric index will be handled reactively by the Consumer
-    // below, which watches positionProvider internally.
+    // all transient state that should not carry over to the new track.
+    //
+    // Critical: also reset seek grace period state. If the user had
+    // dragged the seekbar on the OLD track (caching that seek target),
+    // the grace period would make the NEW track's lyric display use the
+    // old track's position for up to 1s — showing wrong lyrics.
+    //
+    // Also clear the indicator notifier so any showing badge from the
+    // previous track disappears immediately, avoiding stale UI.
     if (lyricState.lyrics != _lastRawLyrics) {
       _lastRawLyrics = lyricState.lyrics;
       _autoScrollPausedByDrag = false;
       _autoScroll = true;
-      _itemKeys.clear(); // prevent unbounded growth across track changes
+      _itemKeys.clear();
       _lastAutoScrollIndex = null;
+
+      // Reset seek grace period — must not carry across tracks
+      _seekGraceActive = false;
+      _cachedSeekPosition = null;
+      _seekGraceTimer?.cancel();
+      _seekGraceTimer = null;
+
+      // Cancel old auto-scroll timer (from tapped lyric on previous track)
+      _autoScrollTimer?.cancel();
+      _autoScrollTimer = null;
+
+      // Clear indicator badge from previous track
+      _indicatorNotifier.value = null;
+      _indicatorTimer?.cancel();
+      _indicatorTimer = null;
     }
 
     // ---- Empty / loading / error ----------------------------------------
@@ -440,14 +602,73 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
         Consumer(builder: (context, ref, _) {
           final position = ref.watch(positionProvider).valueOrNull
               ?? Duration.zero;
-          final effectivePos = widget.seekingPosition ?? position;
+
+          // --- Seek grace period ----------------------------------------
+          // When the user drags the seekbar, seekingPosition gives the
+          // target position synchronously. But after release, the position
+          // stream takes ~100-500ms to catch up. During that window, the
+          // stale position from the provider would make the lyric display
+          // revert to the old position — which the user perceives as "gak
+          // pindah lirik" when seeking rapidly.
+          //
+          // Fix: cache the last seek target. While grace period is active,
+          // use the cached position instead of the stale provider position.
+          // Grace ends when:
+          //   1. Position stream catches up (position >= cached position)
+          //   2. User starts a new seek
+          //   3. Timeout (500ms safety net)
+          if (widget.seekingPosition != null) {
+            _cachedSeekPosition = widget.seekingPosition;
+            _seekGraceActive = true;
+            // Safety net: force-end grace after 1s in case position stream
+            // never catches up (e.g., rapid seeks glitch the stream).
+            _seekGraceTimer?.cancel();
+            _seekGraceTimer = Timer(
+              const Duration(seconds: 1),
+              () {
+                if (mounted) {
+                  _seekGraceActive = false;
+                  _cachedSeekPosition = null;
+                }
+              },
+            );
+          }
+
+          Duration effectivePos;
+          if (widget.seekingPosition != null) {
+            effectivePos = widget.seekingPosition!;
+          } else if (_seekGraceActive && _cachedSeekPosition != null) {
+            // Grace period: use cached seek target to prevent stale position
+            effectivePos = _cachedSeekPosition!;
+            // End grace if position stream has caught up
+            if (position >= _cachedSeekPosition!) {
+              _seekGraceActive = false;
+              _cachedSeekPosition = null;
+              _seekGraceTimer?.cancel();
+            }
+          } else {
+            effectivePos = position;
+          }
+
           final currentIndex =
               _getCurrentLyricIndex(effectivePos, displayLyrics);
+
+          // --- Debug: log lyric index + auto-scroll state ---
+          debugPrint('[LYRIC] oldIdx=$_lastAutoScrollIndex newIdx=$currentIndex '
+              'effectivePos=${effectivePos.inMilliseconds}ms '
+              'seekingPos=${widget.seekingPosition?.inMilliseconds}ms '
+              'graceActive=$_seekGraceActive cached=${_cachedSeekPosition?.inMilliseconds}ms');
+          debugPrint('[AUTOSCROLL] enabled=$_autoScroll '
+              'pausedByDrag=$_autoScrollPausedByDrag '
+              'scrollGuard=${currentIndex >= 0 && currentIndex != _lastAutoScrollIndex}');
 
           // --- Auto-scroll on index change ---
           if (currentIndex >= 0 &&
               currentIndex != _lastAutoScrollIndex) {
             _lastAutoScrollIndex = currentIndex;
+
+            debugPrint('[LYRIC RECALC] old=$_lastAutoScrollIndex new=$currentIndex '
+                'pos=${effectivePos.inMilliseconds}ms');
 
             // Resume auto-scroll if paused by drag
             if (_autoScrollPausedByDrag) {
@@ -463,11 +684,15 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
             // Only scroll if auto-scroll is active (not paused by drag)
             if (_autoScroll) {
               final animate = widget.seekingPosition == null;
+              debugPrint('[LYRIC AUTOSCROLL] index=$currentIndex animate=$animate '
+                  'pos=${effectivePos.inMilliseconds}ms');
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) {
                   _scrollToLyric(currentIndex, animate: animate);
                 }
               });
+            } else {
+              debugPrint('[SCROLL] BLOCKED because _autoScroll=$_autoScroll');
             }
           }
 
@@ -715,7 +940,18 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
 
     return Consumer(builder: (context, ref, _) {
       final position = ref.watch(positionProvider).valueOrNull ?? Duration.zero;
-      final effectivePos = widget.seekingPosition ?? position;
+
+      // Same grace period logic as the main Consumer — use cached seek
+      // target while audio catches up, so karaoke progress doesn't reset
+      // to stale position during the ~100-500ms after seekbar release.
+      final Duration effectivePos;
+      if (widget.seekingPosition != null) {
+        effectivePos = widget.seekingPosition!;
+      } else if (_seekGraceActive && _cachedSeekPosition != null) {
+        effectivePos = _cachedSeekPosition!;
+      } else {
+        effectivePos = position;
+      }
 
       final elapsed = effectivePos - lyric.startTime;
       final progress = lineDuration > Duration.zero

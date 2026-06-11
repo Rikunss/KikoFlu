@@ -799,6 +799,10 @@ class AudioPlayerService {
       _completionHandled = false;
     }
     await _player.seek(position);
+    // Immediately emit position so listeners (lyric display, position stream
+    // subscribers) react without waiting for the next just_audio position
+    // stream tick (~200ms interval). The hi-res path already does this.
+    _unifiedPositionController.add(position);
     _updatePlaybackState();
   }
 

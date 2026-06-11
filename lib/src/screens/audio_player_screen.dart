@@ -165,12 +165,14 @@ class _LyricHintBanner extends ConsumerWidget {
 /// ===================================================================
 class _PortraitLyricView extends ConsumerStatefulWidget {
   final Duration? seekingPosition;
+  final ValueChanged<Duration>? onLyricSeek;
   final VoidCallback onBackToCover;
   final List<Color>? gradientColors;
 
   const _PortraitLyricView({
     super.key,
     required this.seekingPosition,
+    this.onLyricSeek,
     required this.onBackToCover,
     this.gradientColors,
   });
@@ -227,6 +229,7 @@ class _PortraitLyricViewState extends ConsumerState<_PortraitLyricView> {
         child: Stack(children: [
           FullLyricDisplay(
             seekingPosition: widget.seekingPosition,
+            onLyricSeek: widget.onLyricSeek,
             isPortrait: true, isLocked: true,
             gradientColors: widget.gradientColors,
           ),
@@ -277,6 +280,7 @@ class _PortraitLyricViewState extends ConsumerState<_PortraitLyricView> {
     return Stack(children: [
       FullLyricDisplay(
         seekingPosition: widget.seekingPosition,
+        onLyricSeek: widget.onLyricSeek,
         isPortrait: true,
         gradientColors: widget.gradientColors,
         onLongPress: _enterLyricFullscreen,
@@ -386,6 +390,10 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   /// so the status bar style never needs to change after initial setup.
   /// Guarding this avoids a platform-channel method call on every build().
   bool _systemUiStyleSet = false;
+
+  /// In landscape mode, only drags started on the cover/controls side (left ~40%)
+  /// should trigger dismiss — the right side (lyrics) must remain scrollable.
+  bool _isValidDismissDrag = false;
 
   /// Force-dark status bar + nav bar for the fullscreen player.
   /// The player background is always dark regardless of theme.
@@ -618,9 +626,23 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   // ── Drag-to-dismiss handlers ──
   void _handleDragStart(DragStartDetails details) {
     _isDragging = true;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    if (isLandscape) {
+      final screenWidth = MediaQuery.sizeOf(context).width;
+      // Top zone (drag handle + top bar ~80px) — always allow dismiss
+      // so the drag handle pill at center-top works regardless of x position.
+      final isInTopZone = details.localPosition.dy < 80;
+      // Left side (cover + controls) uses flex: 2 out of total flex: 5 = 40%.
+      // Use 42% to allow a small buffer around the divider.
+      final isOnCoverSide = details.localPosition.dx < screenWidth * 0.42;
+      _isValidDismissDrag = isInTopZone || isOnCoverSide;
+    } else {
+      _isValidDismissDrag = true;
+    }
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
+    if (!_isValidDismissDrag) return;
     setState(() {
       _dragOffset = max(0.0, _dragOffset + details.delta.dy);
     });
@@ -628,6 +650,11 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
   void _handleDragEnd(DragEndDetails details) {
     _isDragging = false;
+    if (!_isValidDismissDrag) {
+      _isValidDismissDrag = false;
+      return;
+    }
+    _isValidDismissDrag = false;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final threshold = screenHeight * 0.25;
 
@@ -664,21 +691,67 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   void _handleSeekEnd(double value) {
     final dur = ref.read(durationProvider).value ?? Duration.zero;
     final newPosition = Duration(milliseconds: (value * dur.inMilliseconds).round());
+    debugPrint('[SEEKBAR SEEK] target=${newPosition.inMilliseconds}ms');
     setState(() => _seekingPosition = newPosition);
     ref.read(audioPlayerControllerProvider.notifier).seekAndPersist(newPosition);
 
-    // Keep _seekingPosition valid until the position stream confirms the seek,
-    // so the lyric display doesn't jump back to the old position mid-seek.
+    _listenForSeekCompletion(newPosition);
+  }
+
+  /// Called when the user taps a lyric line to seek to its timestamp.
+  /// The parent must be notified so it can:
+  ///   1. Override the stale [_seekingPosition] (from a previous seekbar
+  ///      interaction that hasn't completed yet) with the tapped position.
+  ///   2. Invalidate the old [_seekCompletionSub] so it doesn't clear
+  ///      [_seekingPosition] prematurely when an unrelated position tick fires.
+  ///   3. Optionally [_isSeekingManually] + [_seekValue] so the seekbar
+  ///      immediately reflects the tapped position instead of waiting for
+  ///      the async [positionProvider] stream to catch up.
+  void _onLyricSeek(Duration position) {
+    final dur = ref.read(durationProvider).value ?? Duration.zero;
+    setState(() {
+      _seekingPosition = position;
+      _isSeekingManually = true;
+      _seekValue = dur.inMilliseconds > 0
+          ? position.inMilliseconds / dur.inMilliseconds
+          : 0.0;
+    });
+    _listenForSeekCompletion(position);
+  }
+
+  /// Shared helper: subscribe to [positionStream] and wait until the
+  /// position reaches [target] (within 200ms), then clear seek state.
+  /// Includes a 2s safety fallback in case the stream never catches up.
+  /// [_seekGeneration] is incremented to invalidate any previous listener.
+  void _listenForSeekCompletion(Duration target) {
     final currentGen = ++_seekGeneration;
     _seekCompletionSub?.cancel();
     final service = ref.read(audioPlayerServiceProvider);
     _seekCompletionSub = service.positionStream.listen((pos) {
       if (currentGen != _seekGeneration) return;
-      if (pos >= newPosition - const Duration(milliseconds: 200)) {
+      // Use absolute proximity check (≤200ms) so backward seeks also
+      // trigger completion. The old forward-only check (pos >= target)
+      // caused backward tap-to-seek to immediately fire (current position
+      // > target), clearing _seekingPosition before the audio actually
+      // arrived — making the lyric display fall back to a stale position.
+      if ((pos - target).abs() <= const Duration(milliseconds: 200)) {
         _seekCompletionSub?.cancel();
         _seekCompletionSub = null;
         if (mounted) {
-          setState(() { _isSeekingManually = false; _seekingPosition = null; });
+          // Defer clearing _seekingPosition to the next frame so
+          // FullLyricDisplay.didUpdateWidget sees the transition from
+          // null → value and can force _autoScroll=true + reset
+          // _lastAutoScrollIndex. Without this deferral, the position
+          // stream fires synchronously (from seek()) and clears
+          // _seekingPosition before the first frame renders, making
+          // didUpdateWidget always see null on both old and new.
+          //
+          // This ensures seekbar seek gets the same treatment as
+          // tap-to-seek (_onLyricTap) for auto-scroll re-enablement.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || currentGen != _seekGeneration) return;
+            setState(() { _isSeekingManually = false; _seekingPosition = null; });
+          });
         }
       }
     });
@@ -1056,6 +1129,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   ? _PortraitLyricView(
                       key: const ValueKey('PortraitLyricView'),
                       seekingPosition: _seekingPosition,
+                      onLyricSeek: _onLyricSeek,
                       gradientColors: _gradientColors,
                       onBackToCover: () => setState(() => _showLyricView = false),
                     )
@@ -1434,6 +1508,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   return Stack(children: [
                     FullLyricDisplay(
                       seekingPosition: _seekingPosition,
+                      onLyricSeek: _onLyricSeek,
                       gradientColors: _gradientColors,
                     ),
                     const Positioned(
