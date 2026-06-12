@@ -27,6 +27,11 @@ import '../widgets/privacy_blur_cover.dart';
 import '../utils/scroll_optimization.dart';
 import 'local_file_browser_screen.dart';
 
+/// Provider that streams the set of workIds currently processing their cover.
+final processingCoversProvider = StreamProvider<Set<int>>((ref) {
+  return DownloadService.instance.processingCoversStream;
+});
+
 /// 本地下载屏幕 - 显示已完成的下载内容
 class LocalDownloadsScreen extends ConsumerStatefulWidget {
   const LocalDownloadsScreen({super.key});
@@ -1896,23 +1901,41 @@ class _WorkCardCover extends ConsumerStatefulWidget {
   ConsumerState<_WorkCardCover> createState() => _WorkCardCoverState();
 }
 
-class _WorkCardCoverState extends ConsumerState<_WorkCardCover> {
+class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
+    with SingleTickerProviderStateMixin {
   /// Cached local cover file path
   String? _coverPath;
 
   /// Whether we've finished trying to resolve the local cover
   bool _resolved = false;
 
+  /// Shimmer animation controller — pulses when cover is being processed.
+  late final AnimationController _shimmerCtrl;
+  late final Animation<double> _shimmerAnim;
+
   @override
   void initState() {
     super.initState();
+    _shimmerCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _shimmerAnim = Tween<double>(begin: 0.3, end: 0.8).animate(
+      CurvedAnimation(parent: _shimmerCtrl, curve: Curves.easeInOutSine),
+    );
     _resolveCover();
+  }
+
+  @override
+  void dispose() {
+    _shimmerCtrl.dispose();
+    super.dispose();
   }
 
   @override
   void didUpdateWidget(covariant _WorkCardCover oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Re-resolve cover when workMetadata changes (e.g. after disk sync)
+    // Re-resolve cover when workMetadata changes (e.g. after cover resize)
     if (widget.firstTask.workMetadata != oldWidget.firstTask.workMetadata) {
       _resolved = false;
       _coverPath = null;
@@ -1949,8 +1972,25 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover> {
     final cacheWidth = (210 * dpr).round();
     final cacheHeight = ((210 / 0.72 - 94.0) * dpr).round();
 
+    // Check if this work's cover is being processed
+    final processingIds = ref.watch(processingCoversProvider);
+    final isProcessing = processingIds.whenOrNull(
+      data: (ids) => ids.contains(widget.workId),
+    ) ?? false;
+
+    // Start/stop shimmer animation based on processing state
+    if (isProcessing && !_shimmerCtrl.isAnimating) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && isProcessing) _shimmerCtrl.repeat(reverse: true);
+      });
+    } else if (!isProcessing && _shimmerCtrl.isAnimating) {
+      _shimmerCtrl.stop();
+    }
+
+    Widget coverWidget;
+
     if (_coverPath != null) {
-      return Hero(
+      coverWidget = Hero(
         tag: 'offline_work_cover_${widget.workId}',
         child: PrivacyBlurCover(
           borderRadius: BorderRadius.circular(8),
@@ -1966,31 +2006,86 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover> {
           ),
         ),
       );
-    }
-
-    if (!_resolved) return _buildPlaceholder(context);
-
-    final host = ref.watch(authProvider.select((s) => s.host));
-    if (widget.work != null && host != null && host.isNotEmpty) {
-      return Hero(
-        tag: 'offline_work_cover_${widget.workId}',
-        child: PrivacyBlurCover(
-          borderRadius: BorderRadius.circular(8),
-          child: RepaintBoundary(
-            child: CachedNetworkImage(
-              imageUrl: widget.work!.getCoverImageUrl(host),
-              cacheKey: 'work_cover_${widget.work!.id}',
-              httpHeaders: StorageService.serverCookieHeaders,
-              fit: BoxFit.cover,
-              memCacheWidth: cacheWidth,
-              errorWidget: (_, __, ___) => _buildPlaceholder(context),
+    } else if (isProcessing) {
+      // Show shimmer placeholder while cover is being processed
+      coverWidget = _buildProcessingPlaceholder(context);
+    } else if (!_resolved) {
+      coverWidget = _buildPlaceholder(context);
+    } else {
+      final host = ref.watch(authProvider.select((s) => s.host));
+      if (widget.work != null && host != null && host.isNotEmpty) {
+        coverWidget = Hero(
+          tag: 'offline_work_cover_${widget.workId}',
+          child: PrivacyBlurCover(
+            borderRadius: BorderRadius.circular(8),
+            child: RepaintBoundary(
+              child: CachedNetworkImage(
+                imageUrl: widget.work!.getCoverImageUrl(host),
+                cacheKey: 'work_cover_${widget.work!.id}',
+                httpHeaders: StorageService.serverCookieHeaders,
+                fit: BoxFit.cover,
+                memCacheWidth: cacheWidth,
+                errorWidget: (_, __, ___) => _buildPlaceholder(context),
+              ),
             ),
           ),
-        ),
+        );
+      } else {
+        coverWidget = _buildPlaceholder(context);
+      }
+    }
+
+    // Wrap in a Stack to overlay the processing indicator
+    if (isProcessing) {
+      return Stack(
+        children: [
+          coverWidget,
+          // Processing indicator overlay (bottom-right)
+          Positioned(
+            bottom: 8,
+            right: 8,
+            child: AnimatedBuilder(
+              animation: _shimmerAnim,
+              builder: (context, child) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white.withValues(alpha: _shimmerAnim.value),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Cover',
+                        style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: _shimmerAnim.value),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       );
     }
 
-    return _buildPlaceholder(context);
+    return coverWidget;
   }
 
   Widget _buildPlaceholder(BuildContext context) {
@@ -2000,6 +2095,42 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover> {
       color: cs.surfaceContainerHighest,
       child: Icon(Icons.image_not_supported, size: 48,
         color: cs.outline),
+    );
+  }
+
+  /// Shimmer-style placeholder shown while the cover image is being resized.
+  Widget _buildProcessingPlaceholder(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return AnimatedBuilder(
+      animation: _shimmerAnim,
+      builder: (context, child) {
+        return Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Color.lerp(
+              cs.surfaceContainerHighest,
+              cs.primaryContainer.withValues(alpha: 0.4),
+              _shimmerAnim.value,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.sync_rounded, size: 28,
+                color: cs.primary.withValues(alpha: 0.5)),
+              const SizedBox(height: 4),
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: cs.primary.withValues(alpha: 0.4),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

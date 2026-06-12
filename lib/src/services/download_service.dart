@@ -30,6 +30,31 @@ class DownloadService {
   final StreamController<String> _conversionController =
       StreamController<String>.broadcast();
   final List<DownloadTask> _tasks = [];
+
+  /// Work IDs whose cover images are currently being resized/processed.
+  /// UI watches this to show a processing indicator on cards.
+  final Set<int> _processingCovers = {};
+  final StreamController<Set<int>> _processingCoversController =
+      StreamController<Set<int>>.broadcast();
+
+  /// Mark a work's cover as being processed (resized).
+  void addProcessingCover(int workId) {
+    _processingCovers.add(workId);
+    _processingCoversController.add(Set.of(_processingCovers));
+  }
+
+  /// Mark a work's cover processing as complete.
+  void removeProcessingCover(int workId) {
+    _processingCovers.remove(workId);
+    _processingCoversController.add(Set.of(_processingCovers));
+  }
+
+  /// Stream of workIds whose covers are currently being processed.
+  Stream<Set<int>> get processingCoversStream =>
+      _processingCoversController.stream;
+
+  /// Current set of workIds with covers being processed.
+  Set<int> get processingCovers => Set.unmodifiable(_processingCovers);
   final Dio _dio = Dio();
 
   // 并发下载控制
@@ -1395,52 +1420,24 @@ class DownloadService {
       throw Exception('No supported audio/image/text files found in the selected folder.');
     }
 
-    // Look for a cover image in the imported folder, resize to a reasonable
-    // max dimension (720px), and save as JPEG quality 85.
-    // This prevents large/resolution covers (>1MB) from failing to display in
-    // the fullscreen player and avoids unnecessary memory pressure during
-    // image decoding (Image.file with cacheWidth).
-    String? coverPath;
-    try {
-      await for (final entity in importDir.list(followLinks: false)) {
-        if (entity is File) {
-          final fName = entity.path.split(Platform.pathSeparator).last.toLowerCase();
-          if (fName.endsWith('.jpg') || fName.endsWith('.jpeg') ||
-              fName.endsWith('.png') || fName.endsWith('.webp') ||
-              fName.endsWith('.bmp')) {
-            await _resizeAndSaveCover(
-              sourcePath: entity.path,
-              destPath: '${workDir.path}/cover.jpg',
-              maxDimension: 720,
-            );
-            coverPath = 'cover.jpg';
-            _log.info('Cover image resized and saved as JPEG: $fName (max ${720}px)', tag: 'Download');
-            break; // use the first image found
-          }
-        }
-      }
-    } catch (e) {
-      _log.warning('Failed to process cover image: $e', tag: 'Download');
-    }
-
-    // Create work metadata
+    // Create work metadata FIRST (without cover path) and write it to disk
+    // so the metadata is available immediately.
     final metadata = <String, dynamic>{
       'id': workId,
       'title': title,
       'children': children,
       'local_import_path': folderPath,
     };
-    if (coverPath != null) {
-      metadata['localCoverPath'] = coverPath;
-    }
-
     final metadataFile = File('${workDir.path}/work_metadata.json');
     await metadataFile.writeAsString(jsonEncode(metadata));
 
     _log.info('Imported local work: $title (ID: $workId, $totalFiles files)',
         tag: 'Download');
 
-    // Create DownloadTask entries for each file
+    // Create DownloadTask entries for each file BEFORE processing the cover.
+    // This makes the card appear immediately in the grid, so the user gets
+    // instant feedback. The cover will be processed next and the card will
+    // update when complete.
     int fileIndex = 0;
     void addTaskForFile(dynamic item, String parentPath) {
       final itemType = item['type'] ?? '';
@@ -1481,7 +1478,64 @@ class DownloadService {
     await _saveTasks();
     _tasksController.add(List.from(_tasks));
 
+    // Now process the cover image in the background — resize and save as JPEG.
+    // The card is already visible at this point (tasks created above), so the
+    // user sees the card appear immediately. The cover will pop in once done.
+    addProcessingCover(workId);
+    _processCoverForImport(workId, workDir.path, importDir);
+
     return workId;
+  }
+
+  /// Fire-and-forget: scan the import folder for the first image, resize it
+  /// to max 720px, save as JPEG quality 85, then update the metadata and
+  /// notify listeners so the card updates with the processed cover.
+  Future<void> _processCoverForImport(
+      int workId, String workDirPath, Directory importDir) async {
+    try {
+      await for (final entity in importDir.list(followLinks: false)) {
+        if (entity is File) {
+          final fName = entity.path.split(Platform.pathSeparator).last.toLowerCase();
+          if (fName.endsWith('.jpg') || fName.endsWith('.jpeg') ||
+              fName.endsWith('.png') || fName.endsWith('.webp') ||
+              fName.endsWith('.bmp')) {
+            await _resizeAndSaveCover(
+              sourcePath: entity.path,
+              destPath: '$workDirPath/cover.jpg',
+              maxDimension: 720,
+            );
+
+            // Update the metadata file to include localCoverPath
+            final metadataFile = File('$workDirPath/work_metadata.json');
+            if (await metadataFile.exists()) {
+              try {
+                final content = await metadataFile.readAsString();
+                final meta = jsonDecode(content) as Map<String, dynamic>;
+                meta['localCoverPath'] = 'cover.jpg';
+                await metadataFile.writeAsString(jsonEncode(meta));
+
+                // Update tasks in memory so the card re-resolves the cover
+                for (var i = 0; i < _tasks.length; i++) {
+                  if (_tasks[i].workId == workId) {
+                    _tasks[i] = _tasks[i].copyWith(workMetadata: meta);
+                  }
+                }
+                _tasksController.add(List.from(_tasks));
+              } catch (e) {
+                _log.warning('Failed to update metadata after cover resize: $e', tag: 'Download');
+              }
+            }
+
+            _log.info('Cover image resized and saved as JPEG: $fName (max 720px)', tag: 'Download');
+            break; // use the first image found
+          }
+        }
+      }
+    } catch (e) {
+      _log.warning('Failed to process cover image: $e', tag: 'Download');
+    } finally {
+      removeProcessingCover(workId);
+    }
   }
 
   /// Resize a cover image to [maxDimension] pixels on the longest edge and
