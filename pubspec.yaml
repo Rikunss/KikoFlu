@@ -61,7 +61,7 @@ dependencies:
   
   # Image & File Operations
   saver_gallery: ^4.0.1
-  file_picker: ^8.0.0+1
+  file_picker: ^11.0.2
   archive: ^3.6.1
   gbk_codec: ^0.4.0
   charset: ^2.0.1

@@ -104,6 +104,9 @@ dependencies {
     // Jellyfin community build of AndroidX Media3 FFmpeg decoder (includes Java + native libs)
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1")
 
+    // SAF DocumentFile API — needed by SafFileUtils for content:// URI file access
+    implementation("androidx.documentfile:documentfile:1.0.1")
+
     // Core library desugaring (required by flutter_local_notifications)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

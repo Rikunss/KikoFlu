@@ -1306,6 +1306,193 @@ class DownloadService {
     }
   }
 
+  /// Import a local folder as a new work (reference only — no file copy).
+  /// Creates a synthetic work entry with a negative ID so it appears
+  /// alongside downloaded works in the local downloads screen.
+  ///
+  /// Returns the synthetic workId on success, or throws on error.
+  Future<int> importLocalWork({
+    required String folderPath,
+    required String title,
+  }) async {
+    final importDir = Directory(folderPath);
+    if (!await importDir.exists()) {
+      throw Exception('Folder not found: $folderPath');
+    }
+
+    // Generate a unique negative workId
+    final workId = -DateTime.now().millisecondsSinceEpoch;
+
+    // Create work directory in download folder
+    final downloadDir = await _getDownloadDirectory();
+    final workDir = Directory('${downloadDir.path}/$workId');
+    await workDir.create(recursive: true);
+
+    // Scan the original folder for files and build a file tree
+    final List<dynamic> children = [];
+    int totalFiles = 0;
+
+    Future<void> scanDir(Directory dir, List<dynamic> parentList,
+        String relativePath) async {
+      await for (final entity in dir.list(followLinks: false)) {
+        final name = entity.path.split(Platform.pathSeparator).last;
+        // Skip hidden files
+        if (name.startsWith('.')) continue;
+
+        if (entity is Directory) {
+          final subDirChildren = <dynamic>[];
+          final subPath = relativePath.isEmpty ? name : '$relativePath/$name';
+          await scanDir(entity, subDirChildren, subPath);
+          if (subDirChildren.isNotEmpty) {
+            parentList.add({
+              'type': 'folder',
+              'title': name,
+              'children': subDirChildren,
+            });
+          }
+        } else if (entity is File) {
+          final fileType = FileIconUtils.inferFileType(name);
+          if (fileType == 'audio' || fileType == 'image' ||
+              fileType == 'text' || fileType == 'pdf') {
+            int? fileSize;
+            try {
+              fileSize = await entity.length();
+            } catch (_) {}
+            parentList.add({
+              'type': fileType,
+              'title': name,
+              'hash': 'local_${workId}_$name',
+              'size': fileSize,
+            });
+            totalFiles++;
+          }
+        }
+      }
+    }
+
+    await scanDir(importDir, children, '');
+
+    if (children.isEmpty) {
+      // Clean up empty directory
+      await workDir.delete(recursive: true);
+      throw Exception('No supported audio/image/text files found in the selected folder.');
+    }
+
+    // Create work metadata
+    final metadata = <String, dynamic>{
+      'id': workId,
+      'title': title,
+      'children': children,
+      'local_import_path': folderPath,
+    };
+
+    final metadataFile = File('${workDir.path}/work_metadata.json');
+    await metadataFile.writeAsString(jsonEncode(metadata));
+
+    _log.info('Imported local work: $title (ID: $workId, $totalFiles files)',
+        tag: 'Download');
+
+    // Create DownloadTask entries for each file
+    int fileIndex = 0;
+    void addTaskForFile(dynamic item, String parentPath) {
+      final itemType = item['type'] ?? '';
+      final fileTitle = item['title'] ?? 'unknown';
+      final hash = item['hash'];
+
+      if (itemType == 'folder') {
+        final subChildren = item['children'] as List<dynamic>?;
+        if (subChildren != null) {
+          for (final child in subChildren) {
+            final childPath = parentPath.isEmpty ? fileTitle : '$parentPath/$fileTitle';
+            addTaskForFile(child, childPath);
+          }
+        }
+      } else {
+        final fileName = parentPath.isEmpty ? fileTitle : '$parentPath/$fileTitle';
+        _tasks.add(DownloadTask(
+          id: hash ?? 'import_${workId}_${fileIndex++}',
+          workId: workId,
+          workTitle: title, // use the work title (outer param), not file name
+          fileName: fileName,
+          downloadUrl: '',
+          hash: hash,
+          totalBytes: item['size'] as int?,
+          downloadedBytes: item['size'] as int? ?? 0,
+          status: DownloadStatus.completed,
+          createdAt: DateTime.now(),
+          completedAt: DateTime.now(),
+          workMetadata: metadata,
+        ));
+      }
+    }
+
+    for (final child in children) {
+      addTaskForFile(child, '');
+    }
+
+    await _saveTasks();
+    _tasksController.add(List.from(_tasks));
+
+    return workId;
+  }
+
+  /// Import multiple folders (each subfolder becomes one work).
+  /// [parentFolderPath] is the parent directory; each direct subfolder will
+  /// become an imported work using the folder name as its title.
+  /// [onProgress] is called with (currentIndex, totalCount, folderName) after
+  /// each subfolder is processed (whether it succeeds or fails).
+  /// Returns the list of synthetic workIds created.
+  Future<List<int>> importMultipleLocalWorks({
+    required String parentFolderPath,
+    void Function(int current, int total, String folderName)? onProgress,
+  }) async {
+    final parentDir = Directory(parentFolderPath);
+    if (!await parentDir.exists()) {
+      throw Exception('Folder not found: $parentFolderPath');
+    }
+
+    final subDirs = <Directory>[];
+    await for (final entity in parentDir.list(followLinks: false)) {
+      if (entity is Directory) {
+        final name = entity.path.split(Platform.pathSeparator).last;
+        if (name.startsWith('.')) continue;
+        subDirs.add(entity);
+      }
+    }
+
+    if (subDirs.isEmpty) {
+      throw Exception('No subfolders found in the selected folder.');
+    }
+
+    final total = subDirs.length;
+    final createdIds = <int>[];
+    final errors = <String>[];
+
+    for (int i = 0; i < total; i++) {
+      final subDir = subDirs[i];
+      final folderName = subDir.path.split(Platform.pathSeparator).last;
+      try {
+        final workId = await importLocalWork(
+          folderPath: subDir.path,
+          title: folderName,
+        );
+        createdIds.add(workId);
+      } catch (e) {
+        errors.add('$folderName: $e');
+      }
+      onProgress?.call(i + 1, total, folderName);
+    }
+
+    if (errors.isNotEmpty) {
+      _log.warning(
+        'Import multiple works completed with errors: ${errors.join("; ")}',
+        tag: 'Download',
+      );
+    }
+
+    return createdIds;
+  }
+
   void dispose() {
     _saveTimer?.cancel();
     _saveTimer = null;

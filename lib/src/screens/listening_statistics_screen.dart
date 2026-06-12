@@ -1,4 +1,3 @@
-import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -517,10 +516,6 @@ class _OverviewGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final completionRate = stats.totalWorksPlayed > 0
-        ? (stats.completedWorks / stats.totalWorksPlayed)
-        : 0.0;
-
     final S l10n = S.of(context);
     final totalMinutes = stats.approximateListeningTime.inMinutes;
     final hours = totalMinutes ~/ 60;
@@ -547,11 +542,17 @@ class _OverviewGrid extends StatelessWidget {
           iconColor: cs.primary,
           valueColor: cs.primary,
         ),
-        _CompletionRingCard(
-          rate: completionRate,
+        _StatCard(
+          icon: Icons.check_circle_rounded,
+          value: '${stats.completedWorks}',
           label: S.of(context).statsCompleted,
-          completed: stats.completedWorks,
-          total: stats.totalWorksPlayed,
+          suffix: '/ ${stats.totalWorksPlayed}',
+          gradientColors: [
+            Colors.green.withValues(alpha: 0.15),
+            Colors.green.withValues(alpha: 0.05),
+          ],
+          iconColor: Colors.green,
+          valueColor: Colors.green,
         ),
         _StatCard(
           icon: Icons.timer_rounded,
@@ -678,85 +679,6 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// Circular completion ring card.
-class _CompletionRingCard extends StatelessWidget {
-  final double rate;
-  final String label;
-  final int completed;
-  final int total;
-
-  const _CompletionRingCard({
-    required this.rate,
-    required this.label,
-    required this.completed,
-    required this.total,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    return Card(
-      elevation: 0,
-      color: cs.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            colors: [
-              Colors.green.withValues(alpha: 0.12),
-              Colors.green.withValues(alpha: 0.03),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            const Spacer(),
-            // Circular progress
-            SizedBox(
-              width: 56,
-              height: 56,
-              child: CustomPaint(
-                painter: _RingPainter(
-                  progress: rate,
-                  color: Colors.green,
-                  backgroundColor: cs.surfaceContainerHighest,
-                ),
-                child: Center(
-                  child: Text(
-                    '${(rate * 100).round()}%',
-                    style: tt.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green.shade700,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: tt.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const Spacer(),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════
 // Chart Tab Bar
@@ -1233,91 +1155,50 @@ class _MilestoneCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           // Progress bar or check
-          SizedBox(
-            width: 56,
-            child: achieved
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle_rounded, size: 18, color: Colors.green.shade600),
-                      const SizedBox(width: 4),
-                      Text(S.of(context).statsCompleted, style: tt.labelSmall?.copyWith(fontSize: 10, color: Colors.green.shade600, fontWeight: FontWeight.w600)),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 4,
-                          backgroundColor: cs.surfaceContainerHighest,
-                          valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${(progress * 100).round()}%',
-                        style: tt.labelSmall?.copyWith(fontSize: 9, color: cs.onSurfaceVariant),
-                      ),
-                    ],
+          if (achieved)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle_rounded, size: 18, color: Colors.green.shade600),
+                const SizedBox(width: 4),
+                Text(S.of(context).statsCompleted,
+                  style: tt.labelSmall?.copyWith(
+                    fontSize: 10,
+                    color: Colors.green.shade600,
+                    fontWeight: FontWeight.w600,
                   ),
-          ),
+                ),
+              ],
+            )
+          else
+            SizedBox(
+              width: 56,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 4,
+                      backgroundColor: cs.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${(progress * 100).round()}%',
+                    style: tt.labelSmall?.copyWith(fontSize: 9, color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-/// Custom painter for the completion ring.
-class _RingPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-  final Color backgroundColor;
-
-  _RingPainter({
-    required this.progress,
-    required this.color,
-    required this.backgroundColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - 8) / 2;
-    const strokeWidth = 5.0;
-
-    // Background ring
-    final bgPaint = Paint()
-      ..color = backgroundColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-    canvas.drawCircle(center, radius, bgPaint);
-
-    // Progress arc
-    final progressPaint = Paint()
-      ..shader = LinearGradient(
-        colors: [color, color.withValues(alpha: 0.6)],
-      ).createShader(Rect.fromCircle(center: center, radius: radius))
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -pi / 2, // Start from top
-      progress * 2 * pi,
-      false,
-      progressPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _RingPainter oldDelegate) =>
-      oldDelegate.progress != progress;
-}
 
 // ═══════════════════════════════════════════════════════════════
 // Section Header

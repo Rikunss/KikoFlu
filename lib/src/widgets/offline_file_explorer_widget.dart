@@ -29,10 +29,16 @@ class OfflineFileExplorerWidget extends ConsumerStatefulWidget {
   final Work work;
   final List<dynamic>? fileTree; // 从 work_metadata.json 中读取的文件树
 
+  /// For imported local works — absolute path to the original source folder.
+  /// When set, file existence checks and path resolution use this instead of
+  /// the download directory work folder.
+  final String? localImportPath;
+
   const OfflineFileExplorerWidget({
     super.key,
     required this.work,
     this.fileTree,
+    this.localImportPath,
   });
 
   @override
@@ -71,6 +77,18 @@ class _OfflineFileExplorerWidgetState
     super.dispose();
   }
 
+  /// Returns the base directory path for file operations.
+  /// For imported works, this is the original source folder.
+  /// For downloaded works, this is the work folder in the download directory.
+  Future<String> _getWorkBasePath() async {
+    if (widget.localImportPath != null &&
+        await Directory(widget.localImportPath!).exists()) {
+      return widget.localImportPath!;
+    }
+    final downloadDir = await DownloadPathService.getDownloadDirectory();
+    return p.join(downloadDir.path, widget.work.id.toString());
+  }
+
   // 加载本地存在的文件
   Future<void> _loadLocalFiles() async {
     if (widget.fileTree == null) {
@@ -87,9 +105,8 @@ class _OfflineFileExplorerWidgetState
     });
 
     try {
-      final downloadDir = await DownloadPathService.getDownloadDirectory();
-      final workDir =
-          Directory(p.join(downloadDir.path, widget.work.id.toString()));
+      final basePath = await _getWorkBasePath();
+      final workDir = Directory(basePath);
 
       if (!await workDir.exists()) {
         setState(() {
@@ -562,11 +579,10 @@ class _OfflineFileExplorerWidgetState
     final title = _getProperty(item, 'title', defaultValue: '');
 
     try {
-      final downloadDir = await DownloadPathService.getDownloadDirectory();
-      final workDir = p.join(downloadDir.path, widget.work.id.toString());
+      final basePath = await _getWorkBasePath();
       final filePath = parentPath.isEmpty
-          ? p.join(workDir, title)
-          : p.join(workDir, parentPath, title);
+          ? p.join(basePath, title)
+          : p.join(basePath, parentPath, title);
       final file = File(filePath);
 
       if (await file.exists()) {
@@ -591,11 +607,10 @@ class _OfflineFileExplorerWidgetState
     }
 
     // 获取本地文件路径
-    final downloadDir = await DownloadPathService.getDownloadDirectory();
-    final workDir = p.join(downloadDir.path, widget.work.id.toString());
+    final basePath = await _getWorkBasePath();
     final localPath = parentPath.isEmpty
-        ? p.join(workDir, title)
-        : p.join(workDir, parentPath, title);
+        ? p.join(basePath, title)
+        : p.join(basePath, parentPath, title);
     final localFile = File(localPath);
 
     if (!await localFile.exists()) {
@@ -607,7 +622,7 @@ class _OfflineFileExplorerWidgetState
     // 获取作品封面URL（用于播放器显示）
     String? coverUrl;
     try {
-      final coverFile = File(p.join(workDir, 'cover.jpg'));
+      final coverFile = File(p.join(basePath, 'cover.jpg'));
       if (await coverFile.exists()) {
         coverUrl = 'file://${coverFile.path}';
       }
@@ -637,8 +652,8 @@ class _OfflineFileExplorerWidgetState
 
       // 获取本地文件路径（使用 path 包确保路径分隔符正确）
       final filePath = parentPath.isEmpty
-          ? p.join(workDir, fileTitle)
-          : p.join(workDir, parentPath, fileTitle);
+          ? p.join(basePath, fileTitle)
+          : p.join(basePath, parentPath, fileTitle);
       final file2 = File(filePath);
 
       if (await file2.exists()) {
@@ -900,8 +915,7 @@ class _OfflineFileExplorerWidgetState
   // 预览图片文件（从本地）
   Future<void> _previewImageFile(dynamic file) async {
     final unknownLabel = S.of(context).unknown;
-    final downloadDir = await DownloadPathService.getDownloadDirectory();
-    final workPath = p.join(downloadDir.path, widget.work.id.toString());
+    final basePath = await _getWorkBasePath();
 
     final imageFiles = _getImageFilesFromCurrentDirectory();
     final currentIndex = imageFiles.indexWhere(
@@ -920,7 +934,7 @@ class _OfflineFileExplorerWidgetState
 
       final filePath = await _findFileFullPath(f, _localFiles, '');
       if (filePath != null) {
-        final localPath = p.join(workPath, filePath);
+        final localPath = p.join(basePath, filePath);
         final localFile = File(localPath);
         if (await localFile.exists()) {
           imageItems
@@ -1013,9 +1027,8 @@ class _OfflineFileExplorerWidgetState
       return;
     }
 
-    final downloadDir = await DownloadPathService.getDownloadDirectory();
-    final localPath =
-        p.join(downloadDir.path, widget.work.id.toString(), filePath);
+    final basePath = await _getWorkBasePath();
+    final localPath = p.join(basePath, filePath);
     final localFile = File(localPath);
 
     if (!await localFile.exists()) {
@@ -1054,9 +1067,8 @@ class _OfflineFileExplorerWidgetState
       return;
     }
 
-    final downloadDir = await DownloadPathService.getDownloadDirectory();
-    final localPath =
-        p.join(downloadDir.path, widget.work.id.toString(), filePath);
+    final basePath = await _getWorkBasePath();
+    final localPath = p.join(basePath, filePath);
     final localFile = File(localPath);
 
     if (!await localFile.exists()) {
@@ -1093,9 +1105,8 @@ class _OfflineFileExplorerWidgetState
       return;
     }
 
-    final downloadDir = await DownloadPathService.getDownloadDirectory();
-    final localPath =
-        p.join(downloadDir.path, widget.work.id.toString(), filePath);
+    final basePath = await _getWorkBasePath();
+    final localPath = p.join(basePath, filePath);
     final localFile = File(localPath);
 
     if (!await localFile.exists()) {
@@ -1524,6 +1535,17 @@ class _OfflineFileExplorerWidgetState
 
   // 删除单个文件
   Future<void> _deleteFile(dynamic file, String parentPath) async {
+    // For imported works, deletion is not supported — files are referenced
+    // from their original location and cannot be safely removed by the app.
+    if (widget.localImportPath != null) {
+      if (!mounted) return;
+      SnackBarUtil.showInfo(
+        context,
+        S.of(context).importedWorkDeleteNotSupported,
+      );
+      return;
+    }
+
     final title = _getProperty(file, 'title', defaultValue: S.of(context).unknown);
     final relativePath = parentPath.isEmpty ? title : '$parentPath/$title';
 

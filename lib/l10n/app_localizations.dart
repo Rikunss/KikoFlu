@@ -7529,6 +7529,126 @@ abstract class S {
   /// In en, this message translates to:
   /// **'minutes'**
   String get appLockAutoLockMinutes;
+
+  /// No description provided for @importWork.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get importWork;
+
+  /// No description provided for @selectImportFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Folder to Import'**
+  String get selectImportFolder;
+
+  /// No description provided for @importDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Local Work'**
+  String get importDialogTitle;
+
+  /// No description provided for @importDialogMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Import files from:\n{path}'**
+  String importDialogMessage(Object path);
+
+  /// No description provided for @workNameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Work Name'**
+  String get workNameTitle;
+
+  /// No description provided for @enterWorkName.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter work name...'**
+  String get enterWorkName;
+
+  /// No description provided for @importAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get importAction;
+
+  /// No description provided for @importingWork.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing work...'**
+  String get importingWork;
+
+  /// No description provided for @importComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Import complete'**
+  String get importComplete;
+
+  /// No description provided for @importFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {error}'**
+  String importFailed(Object error);
+
+  /// No description provided for @importedWorkDeleteNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot delete files from imported works. Delete the source files directly.'**
+  String get importedWorkDeleteNotSupported;
+
+  /// No description provided for @importSingleFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Single Folder'**
+  String get importSingleFolder;
+
+  /// No description provided for @importSingleFolderDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick one folder and set a custom title'**
+  String get importSingleFolderDesc;
+
+  /// No description provided for @importMultipleFolders.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple Folders'**
+  String get importMultipleFolders;
+
+  /// No description provided for @importMultipleFoldersDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Each subfolder becomes one work (folder name = title)'**
+  String get importMultipleFoldersDesc;
+
+  /// No description provided for @selectImportFolderSingle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a folder to import'**
+  String get selectImportFolderSingle;
+
+  /// No description provided for @selectImportFolderMultiple.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a folder containing sub-works'**
+  String get selectImportFolderMultiple;
+
+  /// No description provided for @importingMultipleWorks.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing works...'**
+  String get importingMultipleWorks;
+
+  /// No description provided for @importMultipleComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} works successfully'**
+  String importMultipleComplete(Object count);
+
+  /// No description provided for @importPartialComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count}/{total} works'**
+  String importPartialComplete(Object count, Object total);
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {

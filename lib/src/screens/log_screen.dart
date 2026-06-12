@@ -87,7 +87,7 @@ class _LogScreenState extends State<LogScreen> {
       final fileName = logService.exportFileName;
 
       if (Platform.isIOS) {
-        final result = await FilePicker.platform.saveFile(
+        final result = await FilePicker.saveFile(
           dialogTitle: 'Export Logs',
           fileName: fileName,
           bytes: Uint8List.fromList(content.codeUnits),
@@ -96,7 +96,7 @@ class _LogScreenState extends State<LogScreen> {
           SnackBarUtil.showSuccess(context, 'Logs exported to $result');
         }
       } else {
-        final result = await FilePicker.platform.saveFile(
+        final result = await FilePicker.saveFile(
           dialogTitle: 'Export Logs',
           fileName: fileName,
         );

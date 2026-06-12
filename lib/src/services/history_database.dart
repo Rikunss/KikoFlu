@@ -32,7 +32,7 @@ class HistoryDatabase {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -47,29 +47,29 @@ class HistoryDatabase {
         last_track_json TEXT,
         last_position_ms INTEGER DEFAULT 0,
         playlist_index INTEGER DEFAULT 0,
-        playlist_total INTEGER DEFAULT 0
+        playlist_total INTEGER DEFAULT 0,
+        total_listened_ms INTEGER DEFAULT 0
       )
     ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      // Version 2: Add playlist_index and playlist_total
-      // Since we are in dev, we can just drop and recreate or alter table
-      // But to be safe and simple for now, let's try adding columns if they don't exist
-      // Or just drop table if it's easier for dev environment
-      // Given the previous code dropped table for version < 2, let's stick with that pattern for now
-      // or implement proper migration.
-
-      // Let's try to add columns instead of dropping to preserve history if possible
       try {
         await db.execute(
             'ALTER TABLE history ADD COLUMN playlist_index INTEGER DEFAULT 0');
         await db.execute(
             'ALTER TABLE history ADD COLUMN playlist_total INTEGER DEFAULT 0');
       } catch (e) {
-        // If columns already exist or error, ignore (or handle appropriately)
-        _log.warning('Migration error (ignored): $e');
+        _log.warning('Migration v2 error (ignored): $e');
+      }
+    }
+    if (oldVersion < 3) {
+      try {
+        await db.execute(
+            'ALTER TABLE history ADD COLUMN total_listened_ms INTEGER DEFAULT 0');
+      } catch (e) {
+        _log.warning('Migration v3 error (ignored): $e');
       }
     }
   }

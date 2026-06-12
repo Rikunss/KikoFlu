@@ -299,17 +299,19 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     }
 
     // On Android, when the app is swiped away from recent apps (detached),
-    // stop the audio service foreground notification if audio is NOT
-    // actively playing. This prevents a stale, non-functional media
-    // notification from lingering after the user has left the app.
+    // fully stop audio playback and dismiss the notification.
+    //
+    // The sequence: stop() halts the player + transitions processing state
+    // to idle → AudioService._observePlaybackState() detects the transition
+    // and calls stopSelf() on the native service → notification is dismissed.
+    // clearQueue() resets the queue + current track so state is fully clean.
     if (state == AppLifecycleState.detached && Platform.isAndroid) {
       try {
         final service = AudioPlayerService.instance;
-        if (!service.playing) {
-          service.audioHandler
-              ?.stop()
-              .catchError((_) {/* service may already be disposed */});
-        }
+        service.audioHandler
+            ?.stop()
+            .then((_) => service.clearQueue())
+            .catchError((_) {});
       } catch (e) {
         // Service may already be disposed — safe to ignore.
       }
@@ -414,6 +416,8 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
                 if (child != null) child,
                 // Global FPS overlay (top-right, togglable via Developer Tools)
                 const _FpsOverlayGlobal(),
+                // Session-expired dialog listener (must be inside Navigator scope)
+                const _SessionExpiredListener(),
               ],
             );
           },
@@ -437,6 +441,54 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     }
 
     return const MainScreen();
+  }
+}
+
+/// Invisible widget inside [MaterialApp.builder] that listens for session
+/// expired events (via [AuthState.sessionExpired]) and shows a dialog.
+/// Must be rendered INSIDE the [MaterialApp] so [Navigator.of] works.
+class _SessionExpiredListener extends ConsumerStatefulWidget {
+  const _SessionExpiredListener();
+
+  @override
+  ConsumerState<_SessionExpiredListener> createState() =>
+      _SessionExpiredListenerState();
+}
+
+class _SessionExpiredListenerState
+    extends ConsumerState<_SessionExpiredListener> {
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (next.sessionExpired && previous?.sessionExpired != true) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showDialog();
+        });
+      }
+    });
+    return const SizedBox.shrink();
+  }
+
+  void _showDialog() {
+    if (!mounted) return;
+    final s = S.of(context);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Session Expired'),
+        content: const Text(
+          'Your login session has expired or you have been logged out. '
+          'Please log in again to continue.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(s.ok),
+          ),
+        ],
+      ),
+    );
   }
 }
 

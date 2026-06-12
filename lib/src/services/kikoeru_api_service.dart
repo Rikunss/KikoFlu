@@ -14,6 +14,10 @@ class KikoeruApiService {
   static const String remoteHost = ServerUtils.defaultRemoteHost;
   static const String localHost = ServerUtils.defaultLocalHost;
 
+  /// Called when a 401 or 403 response is received from any API request.
+  /// The AuthNotifier sets this to trigger auto-logout + session-expired UI.
+  void Function()? onUnauthorized;
+
   late Dio _dio;
   String? _token;
   String? _host;
@@ -67,10 +71,23 @@ class KikoeruApiService {
           // Handle errors globally
           _log.error('API Error: ${error.message}');
 
+          // Detect session expiration (401/403) and notify the auth layer.
+          // We only trigger for non-auth endpoints to avoid reacting to
+          // failed login/register calls.
+          final statusCode = error.response?.statusCode;
+          if ((statusCode == 401 || statusCode == 403) &&
+              onUnauthorized != null &&
+              !error.requestOptions.path.contains('/api/auth/')) {
+            _log.warning(
+                'Unauthorized (HTTP $statusCode) on ${error.requestOptions.path}, triggering session expired handler',
+                tag: 'API');
+            onUnauthorized!();
+          }
+
           // 自动重试连接超时错误（仅重试一次）
           if (error.type == DioExceptionType.connectionTimeout &&
               error.requestOptions.extra['retried'] != true) {
-            _log.warning('Connection timeout detected, retrying once...');
+            _log.warning('Connection timeout detected, retrying once...', tag: 'API');
 
             // 标记已重试，避免无限循环
             error.requestOptions.extra['retried'] = true;

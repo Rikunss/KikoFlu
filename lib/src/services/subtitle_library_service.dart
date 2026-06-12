@@ -586,7 +586,7 @@ class SubtitleLibraryService {
   /// 导入单个字幕文件
   static Future<ImportResult> importSubtitleFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: [
           'vtt',
@@ -695,7 +695,7 @@ class SubtitleLibraryService {
   static Future<ImportResult> importFolder(
       {Function(String)? onProgress}) async {
     try {
-      final directoryPath = await FilePicker.platform.getDirectoryPath();
+      final directoryPath = await FilePicker.getDirectoryPath();
 
       if (directoryPath == null) {
         return ImportResult(
@@ -833,7 +833,7 @@ class SubtitleLibraryService {
   static Future<ImportResult> importArchive(
       {Function(String)? onProgress}) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['zip', 'rar', '7z'],
       );

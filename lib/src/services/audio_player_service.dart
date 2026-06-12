@@ -87,6 +87,8 @@ class AudioPlayerService {
   final HiResAudioService _hiResService = HiResAudioService.instance;
   bool _hiResEnabled = false;
   bool _hiResActive = false;
+  final StreamController<bool> _hiResActiveController =
+      StreamController<bool>.broadcast()..add(false);
   Duration _lastHiResPosition = Duration.zero;
   Duration? _lastHiResDuration;
   Duration _lastHiResBufferedPosition = Duration.zero;
@@ -778,7 +780,18 @@ class AudioPlayerService {
   Future<void> stop() async {
     _cancelCrossfade();
     if (_hiResActive) {
-      await _hiResService.stop();
+      // Use _stopHiResPlayback() which properly cancels subscriptions,
+      // stops the native ExoPlayer, and sets _hiResActive = false.
+      // Without resetting _hiResActive, _updatePlaybackState() would
+      // report ProcessingState.ready instead of idle, which prevents
+      // AudioService.java from calling stopSelf() and dismissing the
+      // notification — leaving a stale notification behind.
+      await _stopHiResPlayback();
+      // Also stop just_audio so its processingState becomes idle.
+      // AudioService._observePlaybackState() only calls stopSelf()
+      // when the playback state transitions TO idle — without this
+      // the foreground service & notification never get dismissed.
+      await _player.stop();
       _updatePlaybackState();
       return;
     }
@@ -938,6 +951,7 @@ class AudioPlayerService {
       _nativeBufferedPositionSub = null;
       await _hiResService.stop();
       _hiResActive = false;
+      _hiResActiveController.add(false);
     }
     _queue.clear();
     _currentIndex = 0;
@@ -1177,8 +1191,16 @@ class AudioPlayerService {
   List<AudioTrack> get queue => List.unmodifiable(_queue);
   int get currentIndex => _currentIndex;
 
+  /// Whether the hi-res ExoPlayer path is currently active.
+  bool get hiResActive => _hiResActive;
+
+  /// Stream that emits when the hi-res active state changes.
+  /// Emits [hiResActive]'s current value on each change.
+  Stream<bool> get hiResActiveStream => _hiResActiveController.stream;
+
   bool get hasNext => _currentIndex < _queue.length - 1;
   bool get hasPrevious => _currentIndex > 0;
+
 
   /// Detect audio format info from the current track's cached or local file.
   Future<void> _detectAudioFormat(AudioTrack track) async {
@@ -1224,6 +1246,7 @@ class AudioPlayerService {
     await _stopHiResPlayback();
 
     _hiResActive = true;
+    _hiResActiveController.add(true);
 
     // Update media item for system notification
     await _updateMediaItem(
@@ -1254,6 +1277,7 @@ class AudioPlayerService {
     if (!success) {
       _log.warning('Hi-Res playback failed, falling back to just_audio', tag: 'Audio');
       _hiResActive = false;
+      _hiResActiveController.add(false);
       // Temporarily disable hi-res to prevent infinite recursion
       final savedEnabled = _hiResEnabled;
       _hiResEnabled = false;
@@ -1336,6 +1360,7 @@ class AudioPlayerService {
     if (_hiResActive) {
       await _hiResService.stop();
       _hiResActive = false;
+      _hiResActiveController.add(false);
       _lastHiResPosition = Duration.zero;
       _lastHiResDuration = null;
       _lastHiResBufferedPosition = Duration.zero;
@@ -1517,6 +1542,7 @@ class AudioPlayerService {
     _justAudioDurationSub?.cancel();
     await _stopHiResPlayback();
     await _cleanupTempPlaybackFile();
+    await _hiResActiveController.close();
     await _unifiedPositionController.close();
     await _unifiedDurationController.close();
     await _unifiedPlayerStateController.close();
@@ -1634,6 +1660,17 @@ class _AudioPlayerHandler extends BaseAudioHandler with SeekHandler {
     await _service.stop();
     // 系统通知栏停止时立即落盘历史
     PlaybackHistoryService.instance.onStopped();
+  }
+
+  @override
+  Future<void> onTaskRemoved() async {
+    // Android: when the user swipes the app away from recent apps,
+    // the native AudioService fires onTaskRemoved. Stop playback
+    // and dismiss the notification immediately.
+    await stop();
+    // Clear the media item so even if the notification lingers
+    // briefly, it shows no stale track info.
+    mediaItem.add(null);
   }
 
   @override

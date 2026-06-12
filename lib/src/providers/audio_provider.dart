@@ -15,6 +15,15 @@ import 'settings_provider.dart';
 import 'history_provider.dart';
 import 'auth_provider.dart' show kikoeruApiServiceProvider;
 
+/// Provider that tracks whether the hi-res ExoPlayer path is currently active.
+/// Unlike [hiResPlaybackStateProvider] (which only reports `isPlaying`),
+/// this provider emits `true` even when the hi-res track is paused,
+/// because the ExoPlayer is still configured and ready.
+final hiResActiveProvider = StreamProvider<bool>((ref) {
+  final service = ref.watch(audioPlayerServiceProvider);
+  return service.hiResActiveStream;
+});
+
 // Audio Player Service Provider
 final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
   final service = AudioPlayerService.instance;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +26,10 @@ class AuthState extends Equatable {
   final String? error;
   final bool isLoggedIn;
 
+  /// Set to true when a 401/403 response is received during an API call.
+  /// The UI shows a "Session Expired" dialog and navigates to LoginScreen.
+  final bool sessionExpired;
+
   const AuthState({
     this.currentUser,
     this.token,
@@ -32,6 +37,7 @@ class AuthState extends Equatable {
     this.isLoading = false,
     this.error,
     this.isLoggedIn = false,
+    this.sessionExpired = false,
   });
 
   AuthState copyWith({
@@ -41,6 +47,7 @@ class AuthState extends Equatable {
     bool? isLoading,
     String? error,
     bool? isLoggedIn,
+    bool? sessionExpired,
   }) {
     return AuthState(
       currentUser: currentUser ?? this.currentUser,
@@ -49,23 +56,39 @@ class AuthState extends Equatable {
       isLoading: isLoading ?? this.isLoading,
       error: error,
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
+      sessionExpired: sessionExpired ?? this.sessionExpired,
     );
   }
 
   @override
   List<Object?> get props =>
-      [currentUser, token, host, isLoading, error, isLoggedIn];
+      [currentUser, token, host, isLoading, error, isLoggedIn, sessionExpired];
 }
 
 // Auth notifier
 class AuthNotifier extends StateNotifier<AuthState> {
   final KikoeruApiService _apiService;
 
+  /// Guard flag: prevents multiple concurrent unauthorized handlers from
+  /// triggering cascading logouts when 401/403 fires on parallel API calls.
+  bool _isHandlingUnauthorized = false;
+
+  /// Periodic timer that retries connection when in offline mode.
+  Timer? _offlineRetryTimer;
+
   AuthNotifier(this._apiService) : super(const AuthState()) {
+    // Wire up global 401/403 handler from the API service interceptor.
+    _apiService.onUnauthorized = _handleUnauthorized;
     _loadCurrentUser();
   }
 
   Future<void> _loadCurrentUser() async {
+    // Yield to event loop so the initial AuthState(currentUser: null)
+    // gets rendered by the widget tree BEFORE any synchronous state
+    // changes (e.g. restoring cached guest credentials).
+    // This ensures the LoginScreen is always visible on the first frame.
+    await Future<void>.delayed(Duration.zero);
+
     try {
       LogService.instance.debug('[Auth] Loading current user...', tag: 'Network');
 
@@ -127,6 +150,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
         if (success) {
           LogService.instance.debug('[Auth] Re-login successful', tag: 'Network');
+          _stopOfflineRetryTimer();
           return;
         } else {
           LogService.instance.warning('[Auth] Re-login failed due to network or server issue', tag: 'Network');
@@ -154,6 +178,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           );
 
           LogService.instance.debug('[Auth] Offline mode activated', tag: 'Network');
+          // Start periodic retry to check when connection is back
+          _startOfflineRetryTimer();
           return;
         }
       } else {
@@ -187,10 +213,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
             ),
             host: activeAccount.host,
             token: '',
-            isLoggedIn: false,
-            error: '网络连接失败，以离线模式启动',
+            isLoggedIn: false,              error: '网络连接失败，以离线模式启动',
           );
 
+          _startOfflineRetryTimer();
           return;
         }
       } catch (dbError) {
@@ -208,6 +234,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? serverCookie, {
     bool silent = false,
   }) async {
+    // Clear session expired flag on a fresh login attempt
+    if (state.sessionExpired) {
+      state = state.copyWith(sessionExpired: false);
+    }
+
     if (!silent) {
       state = state.copyWith(isLoading: true, error: null);
     }
@@ -541,7 +572,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Called by the global Dio interceptor when a 401/403 is received.
+  /// Uses [Future.microtask] to decouple from the interceptor call chain.
+  void _handleUnauthorized() {
+    if (_isHandlingUnauthorized) return;
+    _isHandlingUnauthorized = true;
+
+    Future.microtask(() async {
+      try {
+        LogService.instance.warning('[Auth] Session expired (401/403), logging out', tag: 'Network');
+
+        // Mark session as expired in state first so the UI can react.
+        state = state.copyWith(sessionExpired: true);
+
+        await logout();
+      } finally {
+        _isHandlingUnauthorized = false;
+      }
+    });
+  }
+
   Future<void> logout() async {
+    _stopOfflineRetryTimer();
+
     try {
       await StorageService.remove('auth_token');
       await StorageService.remove('server_host');
@@ -627,11 +680,47 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// 重新尝试连接（用于从离线模式恢复）
   Future<void> retryConnection() async {
     LogService.instance.debug('[Auth] Retrying connection...', tag: 'Network');
+    _stopOfflineRetryTimer();
     await _loadCurrentUser();
   }
 
+  /// Start a periodic timer that retries connection when the app is in
+  /// offline mode. Checks every 30 seconds.
+  void _startOfflineRetryTimer() {
+    _stopOfflineRetryTimer();
+    _offlineRetryTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) async {
+        try {
+          // Only retry if still in offline-like state (not logged in but has cached data)
+          if (state.currentUser != null && !state.isLoggedIn && !state.isLoading) {
+            LogService.instance.debug('[Auth] Offline retry: checking connection...', tag: 'Network');
+            await retryConnection();
+          } else {
+            _stopOfflineRetryTimer();
+          }
+        } catch (e) {
+          LogService.instance.error('[Auth] Offline retry failed: $e', tag: 'Network');
+        }
+      },
+    );
+  }
+
+  void _stopOfflineRetryTimer() {
+    _offlineRetryTimer?.cancel();
+    _offlineRetryTimer = null;
+  }
+
+  @override
+  void dispose() {
+    _stopOfflineRetryTimer();
+    // Unregister the callback so the API service doesn't call into a disposed notifier.
+    _apiService.onUnauthorized = null;
+    super.dispose();
+  }
+
   void clearError() {
-    state = state.copyWith(error: null);
+    state = state.copyWith(error: null, sessionExpired: false);
   }
 }
 

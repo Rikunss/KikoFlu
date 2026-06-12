@@ -44,6 +44,15 @@ class PlaybackHistoryService {
   Work? _currentWork;
   bool _dirty = false;
 
+  // --- Cumulative listening time tracking ---
+  /// Timestamp of the last checkpoint tick while playing. Used to compute
+  /// wall-clock delta for cumulative listening time.
+  DateTime? _lastCheckpointTime;
+
+  /// Accumulated listening time (ms) for the current session's current work.
+  /// Reset on track change. Added to the DB's [totalListenedMs] on each persist.
+  int _sessionListenedMs = 0;
+
   // --- Subscriptions ---
   StreamSubscription? _positionSubscription;
   StreamSubscription? _trackSubscription;
@@ -78,14 +87,32 @@ class PlaybackHistoryService {
     });
   }
 
-  /// 周期性 checkpoint: 只在 playing 且 position 真正推进时触发
+
+
+  /// 周期性 checkpoint: measure wall-clock delta for cumulative listening
+  /// time, then persist if position moved enough.
   void _onCheckpointTick(AudioPlayerService playerService) {
-    if (!playerService.playing) return;
     if (_currentWorkId == null || _currentWork == null) return;
 
-    final positionMs = playerService.position.inMilliseconds;
+    final now = DateTime.now();
 
-    // 与上次持久化位置差值不足 3 秒则不写
+    // --- Cumulative listening time: wall-clock delta between ticks ---
+    // Only accumulate when actively playing.
+    if (playerService.playing) {
+      if (_lastCheckpointTime != null) {
+        final deltaMs = now.difference(_lastCheckpointTime!).inMilliseconds;
+        // Cap at 15s to guard against edge cases (e.g., device sleep, timer coalescing)
+        _sessionListenedMs += deltaMs.clamp(0, 15000);
+      }
+    }
+    // Always update checkpoint time, even when paused/sleeping, so the
+    // next delta does NOT include pause/sleep time.
+    _lastCheckpointTime = now;
+
+    // --- Position-based persist check (only when playing) ---
+    if (!playerService.playing) return;
+
+    final positionMs = playerService.position.inMilliseconds;
     if ((positionMs - _lastPersistedPositionMs).abs() < 3000) return;
 
     _lastKnownPositionMs = positionMs;
@@ -101,6 +128,10 @@ class PlaybackHistoryService {
       await _persistNow(FlushReason.trackChanged);
     }
 
+    // Reset session listening accumulator for the new track
+    _sessionListenedMs = 0;
+    _lastCheckpointTime = null;
+
     // 更新会话 snapshot
     _currentTrack = track;
     _currentWorkId = track.workId;
@@ -108,6 +139,7 @@ class PlaybackHistoryService {
     _playlistTotal = playerService.queue.length;
     _lastKnownPositionMs = playerService.position.inMilliseconds;
     _lastPersistedPositionMs = 0;
+    _lastCheckpointTime = DateTime.now();
     _dirty = true;
 
     // 获取 Work 数据
@@ -188,6 +220,19 @@ class PlaybackHistoryService {
 
     final now = DateTime.now();
 
+    // Read existing record from DB to preserve cumulative listening time
+    int accumulatedMs = _sessionListenedMs;
+    try {
+      final existing =
+          await HistoryDatabase.instance.getHistoryByWorkId(_currentWork!.id);
+      if (existing != null) {
+        accumulatedMs += existing.totalListenedMs;
+      }
+    } catch (e) {
+      _log.warning('Failed to read existing history for cumulative time: $e',
+          tag: 'PlaybackHistoryService');
+    }
+
     final record = HistoryRecord(
       work: _currentWork!,
       lastPlayedTime: now,
@@ -195,11 +240,13 @@ class PlaybackHistoryService {
       lastPositionMs: _lastKnownPositionMs,
       playlistIndex: _playlistIndex,
       playlistTotal: _playlistTotal,
+      totalListenedMs: accumulatedMs,
     );
 
     try {
       await HistoryDatabase.instance.addOrUpdate(record);
       _lastPersistedPositionMs = _lastKnownPositionMs;
+      _sessionListenedMs = 0; // reset session accumulator after persist
       _dirty = false;
 
       // 通知外部历史已更新

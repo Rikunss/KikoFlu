@@ -4086,4 +4086,75 @@ class SJa extends S {
 
   @override
   String get appLockAutoLockMinutes => '分';
+
+  @override
+  String get importWork => 'Import';
+
+  @override
+  String get selectImportFolder => 'Select Folder to Import';
+
+  @override
+  String get importDialogTitle => 'Import Local Work';
+
+  @override
+  String importDialogMessage(Object path) {
+    return 'Import files from:\n$path';
+  }
+
+  @override
+  String get workNameTitle => 'Work Name';
+
+  @override
+  String get enterWorkName => 'Enter work name...';
+
+  @override
+  String get importAction => 'Import';
+
+  @override
+  String get importingWork => 'Importing work...';
+
+  @override
+  String get importComplete => 'Import complete';
+
+  @override
+  String importFailed(Object error) {
+    return 'Import failed: $error';
+  }
+
+  @override
+  String get importedWorkDeleteNotSupported =>
+      'Cannot delete files from imported works. Delete the source files directly.';
+
+  @override
+  String get importSingleFolder => 'Single Folder';
+
+  @override
+  String get importSingleFolderDesc => 'Pick one folder and set a custom title';
+
+  @override
+  String get importMultipleFolders => 'Multiple Folders';
+
+  @override
+  String get importMultipleFoldersDesc =>
+      'Each subfolder becomes one work (folder name = title)';
+
+  @override
+  String get selectImportFolderSingle => 'Select a folder to import';
+
+  @override
+  String get selectImportFolderMultiple =>
+      'Select a folder containing sub-works';
+
+  @override
+  String get importingMultipleWorks => 'Importing works...';
+
+  @override
+  String importMultipleComplete(Object count) {
+    return 'Imported $count works successfully';
+  }
+
+  @override
+  String importPartialComplete(Object count, Object total) {
+    return 'Imported $count/$total works';
+  }
 }

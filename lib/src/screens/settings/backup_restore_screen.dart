@@ -67,7 +67,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     final s = S.of(context);
 
     // Pick backup file
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       dialogTitle: s.backupSelectImportFile,
       type: FileType.custom,
       allowedExtensions: ['zip'],
@@ -129,7 +129,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   }
 
   Future<String?> _pickDirectory({required String dialogTitle}) async {
-    final result = await FilePicker.platform.getDirectoryPath(
+    final result = await FilePicker.getDirectoryPath(
       dialogTitle: dialogTitle,
     );
     return result;

@@ -236,8 +236,14 @@ class _AudioChainSectionCard extends ConsumerWidget {
       loading: () => const UsbRoutingState(),
       error: (_, __) => const UsbRoutingState(),
     );
-    final hiResPlayingAsync = ref.watch(hiResPlaybackStateProvider);
-    final hiResIsPlaying = hiResPlayingAsync.when(
+    // Use hiResActiveProvider instead of hiResPlaybackStateProvider for the
+    // decoder label. hiResPlaybackStateProvider only tracks isPlaying (native
+    // play state), so it would incorrectly show "ExoPlayer (just_audio)"
+    // when a hi-res track is paused. hiResActiveProvider tracks the Dart-side
+    // _hiResActive flag, which is true whenever the hi-res ExoPlayer is
+    // configured, regardless of play/pause state.
+    final hiResActiveAsync = ref.watch(hiResActiveProvider);
+    final hiResIsPlaying = ref.watch(hiResPlaybackStateProvider).when(
       data: (p) => p,
       loading: () => false,
       error: (_, __) => false,
@@ -255,7 +261,12 @@ class _AudioChainSectionCard extends ConsumerWidget {
     // Compute decoder, output, device name
     String decoder;
     String output;
-    final bool isHiResActive = hiResIsPlaying;
+    // Use hiResActiveProvider for decoder label (true even when paused)
+    final bool isHiResActive = hiResActiveAsync.when(
+      data: (active) => active,
+      loading: () => hiResIsPlaying,
+      error: (_, __) => hiResIsPlaying,
+    );
 
     final String aaudioFormatDesc;
     if (Platform.isAndroid) {

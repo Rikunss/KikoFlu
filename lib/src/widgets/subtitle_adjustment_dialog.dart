@@ -70,7 +70,7 @@ class _SubtitleAdjustmentDialogState
       }
 
       // 选择保存目录
-      final selectedDirectory = await FilePicker.platform.getDirectoryPath(
+      final selectedDirectory = await FilePicker.getDirectoryPath(
         dialogTitle: S.of(context).selectSaveDirectory,
       );
 

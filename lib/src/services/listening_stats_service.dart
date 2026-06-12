@@ -34,7 +34,8 @@ class ListeningStats {
   /// Works partially played.
   final int inProgressWorks;
 
-  /// Approximate total listening time (sum of lastPositionMs across records).
+  /// Approximate total listening time (sum of totalListenedMs across records,
+  /// falling back to lastPositionMs for pre-migration records).
   final Duration approximateListeningTime;
 
   /// Current listening streak in days.
@@ -162,13 +163,22 @@ class ListeningStatsService {
 
   /// Start listening to [PlaybackHistoryService.historyUpdatedStream] so the
   /// cache is automatically invalidated whenever a new history record is written.
+  /// Throttled: cache is only cleared if the last computation was at least 15
+  /// seconds ago, preventing recomputation on every 5-second checkpoint tick
+  /// during active playback.
   /// Safe to call multiple times.
   void subscribeToHistoryUpdates() {
     if (_initialized) return;
     _initialized = true;
     _historySub = PlaybackHistoryService.instance.historyUpdatedStream.listen((_) {
-      _cached = null;
-      _lastFetch = null;
+      // Throttle: only clear cache if last fetch was 15+ seconds ago.
+      // During playback, checkpoints fire every ~5s but stats don't change
+      // meaningfully — the 30s internal cache in compute() handles freshness.
+      if (_lastFetch == null ||
+          DateTime.now().difference(_lastFetch!).inSeconds >= 15) {
+        _cached = null;
+        _lastFetch = null;
+      }
     });
   }
 
@@ -205,7 +215,10 @@ class ListeningStatsService {
     int totalPositionMs = 0;
 
     for (final record in allRecords) {
-      totalPositionMs += record.lastPositionMs;
+      // Use totalListenedMs for accurate cumulative listening time.
+      // Falls back to lastPositionMs for records predating DB v3 migration.
+      totalPositionMs +=
+          record.totalListenedMs > 0 ? record.totalListenedMs : record.lastPositionMs;
 
       final dur = record.work.duration ?? 0;
       if (dur > 0 && record.lastPositionMs >= dur * 0.7) {
@@ -324,7 +337,9 @@ class ListeningStatsService {
         if (record.lastPlayedTime.isAfter(weekStart.subtract(const Duration(hours: 1))) &&
             record.lastPlayedTime.isBefore(weekEnd)) {
           weekPlayCount++;
-          weekHours += record.lastPositionMs / 3600000.0;
+          final weekTimeMs =
+              record.totalListenedMs > 0 ? record.totalListenedMs : record.lastPositionMs;
+          weekHours += weekTimeMs / 3600000.0;
         }
       }
       weeklyStats.add(WeeklyStats(
@@ -344,7 +359,9 @@ class ListeningStatsService {
         if (record.lastPlayedTime.year == monthDate.year &&
             record.lastPlayedTime.month == monthDate.month) {
           monthPlayCount++;
-          monthHours += record.lastPositionMs / 3600000.0;
+          final monthTimeMs =
+              record.totalListenedMs > 0 ? record.totalListenedMs : record.lastPositionMs;
+          monthHours += monthTimeMs / 3600000.0;
         }
       }
       monthlyStats.add(MonthlyStats(

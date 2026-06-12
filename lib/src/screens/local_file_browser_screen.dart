@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/download_service.dart';
 import '../services/log_service.dart';
 import '../models/work.dart';
+import '../utils/metadata_utils.dart';
 import '../utils/snackbar_util.dart';
 
 import 'offline_work_detail_screen.dart';
@@ -100,22 +101,39 @@ class _LocalFileBrowserScreenState
           }
         }
 
-        // Count files (excluding metadata and cover)
+        // Count files (excluding metadata and cover) — use concurrent counting
         int fileCount = 0;
         int totalBytes = 0;
-        await for (final f in entity.list(recursive: true)) {
-          if (f is File) {
+        try {
+          final files = await entity.list(recursive: true).toList();
+          final fileFutures = files.whereType<File>().map((f) async {
             final name = f.path.split(Platform.pathSeparator).last;
             if (name == 'work_metadata.json' ||
                 name == 'cover.jpg' ||
                 name.endsWith('.downloading')) {
-              continue;
+              return null;
             }
-            fileCount++;
             try {
-              totalBytes += await f.length();
-            } catch (_) {}
+              final len = await f.length();
+              return {'name': name, 'len': len};
+            } catch (_) {
+              return null;
+            }
+          });
+          final results = await Future.wait(fileFutures);
+          for (final r in results) {
+            if (r != null) {
+              fileCount++;
+              totalBytes += r['len'] as int;
+            }
           }
+        } catch (_) {
+          // If listing fails, skip file counting for this work
+        }
+
+        if (metadata == null) {
+          _log.debug('Skipping work $folderName — no metadata', tag: 'LocalBrowser');
+          continue;
         }
 
         String? coverPath;
@@ -142,6 +160,7 @@ class _LocalFileBrowserScreenState
         _isLoading = false;
       });
     } catch (e) {
+      _log.warning('Failed to scan download directory: $e', tag: 'LocalBrowser');
       setState(() {
         _isLoading = false;
         _errorMessage = e.toString();
@@ -150,16 +169,12 @@ class _LocalFileBrowserScreenState
   }
 
   void _openWork(_LocalWorkEntry entry) async {
-    if (entry.metadata == null) {
-      if (!mounted) return;
-      SnackBarUtil.showError(context, S.of(context).noWorkMetadataForOffline);
-      return;
-    }
-
     try {
-      // Sanitize metadata (Work.fromJson expects clean maps)
-      final sanitized = _sanitizeMetadata(entry.metadata!);
+      final sanitized = sanitizeMetadata(entry.metadata!);
       final work = Work.fromJson(sanitized);
+
+      // Extract localImportPath from raw metadata for imported works
+      final localImportPath = entry.metadata!['local_import_path'] as String?;
 
       if (!mounted) return;
       Navigator.of(context).push(MaterialPageRoute(
@@ -167,51 +182,18 @@ class _LocalFileBrowserScreenState
           work: work,
           isOffline: true,
           localCoverPath: entry.localCoverPath,
+          localImportPath: localImportPath,
         ),
       ));
     } catch (e) {
       if (!mounted) return;
+      _log.warning('Failed to open work ${entry.workId}: $e', tag: 'LocalBrowser');
       SnackBarUtil.showError(
           context, S.of(context).openWorkDetailFailed(e.toString()));
     }
   }
 
-  Map<String, dynamic> _sanitizeMetadata(Map<String, dynamic> metadata) {
-    try {
-      return _deepSanitize(metadata) as Map<String, dynamic>;
-    } catch (e) {
-      _log.error('Error sanitizing metadata: $e', tag: 'LocalBrowser');
-      rethrow;
-    }
-  }
 
-  dynamic _deepSanitize(dynamic value) {
-    if (value == null) return null;
-    if (value is Map) {
-      return value
-          .map((key, val) => MapEntry(key.toString(), _deepSanitize(val)));
-
-    }
-    if (value is List) {
-      return value.map(_deepSanitize).toList();
-    }
-    if (const [
-      'Va',
-      'Tag',
-      'AudioFile',
-      'RatingDetail',
-      'OtherLanguageEdition'
-    ].contains(value.runtimeType.toString())) {
-      try {
-        return _deepSanitize((value as dynamic).toJson());
-      } catch (e) {
-        _log.warning(
-            'Serialization failed ${value.runtimeType}: $e', tag: 'LocalBrowser');
-        return null;
-      }
-    }
-    return value;
-  }
 
   String _formatBytes(int bytes) {
     if (bytes <= 0) return '';

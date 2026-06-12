@@ -59,6 +59,10 @@ class Work extends Equatable {
   @JsonKey(name: 'other_language_editions_in_db')
   final List<OtherLanguageEdition>? otherLanguageEditions; // 其他语言版本
 
+  /// For imported local works — path to the original folder on disk.
+  /// Null for works downloaded from the server.
+  final String? localImportPath;
+
   const Work({
     required this.id,
     required this.title,
@@ -84,6 +88,7 @@ class Work extends Equatable {
     this.blurHash,
     this.sourceUrl,
     this.otherLanguageEditions,
+    this.localImportPath,
   });
 
   factory Work.fromJson(Map<String, dynamic> json) {
@@ -120,10 +125,19 @@ class Work extends Equatable {
       }
     }
 
-    return _$WorkFromJson(processingJson);
+    final localImportPath = json['local_import_path'] as String?;
+    return _$WorkFromJson(processingJson).copyWith(
+      localImportPath: localImportPath,
+    );
   }
 
-  Map<String, dynamic> toJson() => _$WorkToJson(this);
+  Map<String, dynamic> toJson() {
+    final map = _$WorkToJson(this);
+    if (localImportPath != null) {
+      map['local_import_path'] = localImportPath;
+    }
+    return map;
+  }
 
   String getCoverImageUrl(String baseUrl, {String? token}) {
     String normalizedUrl = baseUrl;
@@ -166,6 +180,7 @@ class Work extends Equatable {
     List<AudioFile>? children,
     String? sourceUrl,
     List<OtherLanguageEdition>? otherLanguageEditions,
+    String? localImportPath,
   }) {
     return Work(
       id: id ?? this.id,
@@ -192,6 +207,7 @@ class Work extends Equatable {
       sourceUrl: sourceUrl ?? this.sourceUrl,
       otherLanguageEditions:
           otherLanguageEditions ?? this.otherLanguageEditions,
+      localImportPath: localImportPath ?? this.localImportPath,
     );
   }
 
@@ -221,6 +237,7 @@ class Work extends Equatable {
         blurHash,
         sourceUrl,
         otherLanguageEditions,
+        localImportPath,
       ];
 }
 

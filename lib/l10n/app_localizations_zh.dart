@@ -4061,6 +4061,74 @@ class SZh extends S {
 
   @override
   String get appLockAutoLockMinutes => '分钟';
+
+  @override
+  String get importWork => '导入';
+
+  @override
+  String get selectImportFolder => '选择要导入的文件夹';
+
+  @override
+  String get importDialogTitle => '导入本地作品';
+
+  @override
+  String importDialogMessage(Object path) {
+    return '从以下位置导入文件：\n$path';
+  }
+
+  @override
+  String get workNameTitle => '作品名称';
+
+  @override
+  String get enterWorkName => '输入作品名称...';
+
+  @override
+  String get importAction => '导入';
+
+  @override
+  String get importingWork => '正在导入作品...';
+
+  @override
+  String get importComplete => '导入完成';
+
+  @override
+  String importFailed(Object error) {
+    return '导入失败：$error';
+  }
+
+  @override
+  String get importedWorkDeleteNotSupported => '无法删除导入作品的文件，请直接在源文件夹中删除。';
+
+  @override
+  String get importSingleFolder => '单个文件夹';
+
+  @override
+  String get importSingleFolderDesc => '选择一个文件夹并设置自定义标题';
+
+  @override
+  String get importMultipleFolders => '多个文件夹';
+
+  @override
+  String get importMultipleFoldersDesc => '每个子文件夹成为一个作品（文件夹名称=标题）';
+
+  @override
+  String get selectImportFolderSingle => '选择要导入的文件夹';
+
+  @override
+  String get selectImportFolderMultiple => '选择包含子作品的文件夹';
+
+  @override
+  String get importingMultipleWorks => '正在导入作品...';
+
+  @override
+  String importMultipleComplete(Object count) {
+    return '成功导入 $count 个作品';
+  }
+
+  @override
+  String importPartialComplete(Object count, Object total) {
+    return '已导入 $count/$total 个作品';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).

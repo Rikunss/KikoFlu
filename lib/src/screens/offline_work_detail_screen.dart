@@ -33,11 +33,15 @@ class OfflineWorkDetailScreen extends ConsumerStatefulWidget {
   final bool isOffline; // 标记是否为离线模式
   final String? localCoverPath; // 本地封面图片路径
 
+  /// For imported local works — absolute path to the original source folder.
+  final String? localImportPath;
+
   const OfflineWorkDetailScreen({
     super.key,
     required this.work,
     this.isOffline = true,
     this.localCoverPath,
+    this.localImportPath,
   });
 
   @override
@@ -197,7 +201,7 @@ class _OfflineWorkDetailScreenState
         }
       } else {
         // 其他平台: 选择目录后写入
-        final directoryPath = await FilePicker.platform.getDirectoryPath();
+        final directoryPath = await FilePicker.getDirectoryPath();
         if (directoryPath == null) return;
 
         if (!mounted) return;
@@ -601,6 +605,7 @@ class _OfflineWorkDetailScreenState
                     // 如果是 AudioFile 对象，转换为 Map
                     return e.toJson();
                   }).toList(),
+            localImportPath: widget.localImportPath,
           ),
         ],
       ),

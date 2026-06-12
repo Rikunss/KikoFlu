@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -16,6 +18,7 @@ import '../services/storage_service.dart';
 import '../utils/string_utils.dart';
 
 import '../providers/auth_provider.dart';
+import '../utils/metadata_utils.dart';
 import '../widgets/pagination_bar.dart';
 import '../widgets/sort_dialog.dart';
 import 'offline_work_detail_screen.dart';
@@ -24,35 +27,18 @@ import '../widgets/privacy_blur_cover.dart';
 import '../utils/scroll_optimization.dart';
 import 'local_file_browser_screen.dart';
 
-Map<String, dynamic> _sanitizeMetadata(Map<String, dynamic> metadata) {
-  try {
-    return _deepSanitize(metadata) as Map<String, dynamic>;
-  } catch (e) {
-    LogService.instance.error('[LocalDownloads] Error sanitizing metadata: $e', tag: 'Download');
-    rethrow;
-  }
-}
-
-dynamic _deepSanitize(dynamic value) {
-  if (value == null) return null;
-  if (value is Map) {
-    return value.map((key, val) => MapEntry(key.toString(), _deepSanitize(val)));
-  }
-  if (value is List) {
-    return value.map(_deepSanitize).toList();
-  }
-  // Serialize objects with toJson
-  if (const [
-    'Va', 'Tag', 'AudioFile', 'RatingDetail', 'OtherLanguageEdition'
-  ].contains(value.runtimeType.toString())) {
+/// Extract a user-friendly folder name from either a file path or SAF content URI.
+String _extractFolderName(String path) {
+  if (path.startsWith('content://')) {
     try {
-      return _deepSanitize((value as dynamic).toJson());
-    } catch (e) {
-      LogService.instance.warning('[LocalDownloads] Serialization failed ${value.runtimeType}: $e', tag: 'Download');
-      return null;
+      final uri = Uri.parse(path);
+      final lastSeg = Uri.decodeComponent(uri.pathSegments.lastOrNull ?? 'folder');
+      return lastSeg.startsWith('primary:') ? lastSeg.substring(8) : lastSeg;
+    } catch (_) {
+      return 'folder';
     }
   }
-  return value;
+  return path.split(Platform.pathSeparator).last;
 }
 
 /// 本地下载屏幕 - 显示已完成的下载内容
@@ -382,15 +368,17 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       return;
     }
     try {
-      final metadata = _sanitizeMetadata(task.workMetadata!);
+      final metadata = sanitizeMetadata(task.workMetadata!);
       final work = Work.fromJson(metadata);
       final downloadDir = await DownloadService.instance.getDownloadDirectory();
       final relPath = metadata['localCoverPath'] as String?;
       final localCover = relPath != null ? '${downloadDir.path}/$workId/$relPath' : null;
+      final localImportPath = metadata['local_import_path'] as String?;
       if (!mounted) return;
       Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => OfflineWorkDetailScreen(
-          work: work, isOffline: true, localCoverPath: localCover),
+          work: work, isOffline: true, localCoverPath: localCover,
+          localImportPath: localImportPath),
       ));
     } catch (e) {
       if (mounted) {
@@ -399,6 +387,306 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
           duration: const Duration(seconds: 2),
         ));
       }
+    }
+  }
+
+  /// SAF file copy channel — used to copy files from content:// URIs on Android 11+.
+  static const _safChannel = MethodChannel('com.kikoeru.flutter/saf_file_utils');
+
+  /// Resolve the picked import path. If it's a SAF content URI (Android 11+),
+  /// copy the files to a temp directory via native platform channel.
+  /// Returns the local file path ready for import.
+  Future<String> _resolveImportPath(String pickedPath, String workTitle) async {
+    // Normal path on desktop or Android with full file access
+    if (!pickedPath.startsWith('content://')) return pickedPath;
+
+    // SAF content URI — copy via native Android DocumentFile API
+    final tempDir = await getTemporaryDirectory();
+    final safeName = workTitle.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+    final destDir = '${tempDir.path}/kikoflu_import_$safeName';
+
+    // Clean up any leftover from previous attempt
+    final dest = Directory(destDir);
+    if (await dest.exists()) {
+      await dest.delete(recursive: true);
+    }
+
+    await _safChannel.invokeMethod('copyFromSafUri', {
+      'safUri': pickedPath,
+      'destDir': destDir,
+    });
+
+    return destDir;
+  }
+
+  /// Clean up the temp directory created for a SAF import.
+  /// Only deletes if the path is inside the system temp directory
+  /// AND is a subdirectory we created (contains 'kikoflu_import_').
+  void _cleanupImportTemp(String path) {
+    try {
+      final tempDir = Directory.systemTemp.path;
+      if (path.startsWith(tempDir) &&
+          path.length > tempDir.length + 1 &&
+          path.contains('kikoflu_import_')) {
+        unawaited(Directory(path).delete(recursive: true));
+      }
+    } catch (_) {}
+  }
+
+
+
+  /// Import a single folder as one work.
+  Future<void> _importSingleFolder() async {
+    final s = S.of(context);
+
+    // Note: FilePicker uses SAF (Storage Access Framework) on Android 11+,
+    // which does NOT require MANAGE_EXTERNAL_STORAGE permission. The system
+    // file picker handles its own permissions.
+
+    final folderPath = await FilePicker.getDirectoryPath(
+      dialogTitle: s.selectImportFolderSingle,
+    );
+    if (folderPath == null || !mounted) return;
+
+    // Resolve SAF content URI on Android 11+ via native DocumentFile copy
+    final safeTitle = _extractFolderName(folderPath);
+    final resolvedPath = await _resolveImportPath(folderPath, safeTitle);
+    if (!mounted) return;
+    // Show the user-friendly path in the dialog
+    final displayPath = folderPath.startsWith('content://') ? safeTitle : folderPath;
+    final titleCtrl = TextEditingController(text: safeTitle);
+    final title = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.importDialogTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(s.importDialogMessage(displayPath)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: titleCtrl,
+              decoration: InputDecoration(
+                labelText: s.workNameTitle,
+                border: const OutlineInputBorder(),
+                hintText: s.enterWorkName,
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(s.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final name = titleCtrl.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.pop(ctx, name);
+              }
+            },
+            child: Text(s.importAction),
+          ),
+        ],
+      ),
+    );
+
+    if (title == null || !mounted) return;
+
+    _showSnackBarSafe(SnackBar(
+      content: Row(children: [
+        const SizedBox(width: 16, height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+        ),
+        const SizedBox(width: 12),
+        Text(s.importingWork),
+      ]),
+      duration: const Duration(seconds: 30),
+    ));
+
+    try {
+      await DownloadService.instance.importLocalWork(
+        folderPath: resolvedPath,
+        title: title,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+      // Reset to page 1 so the newly imported work is visible
+      setState(() => _currentPage = 1);
+      _scrollToTop();
+      _showSnackBarSafe(SnackBar(
+        content: Row(children: [
+          const Icon(Icons.check_circle, color: Colors.white),
+          const SizedBox(width: 12),
+          Expanded(child: Text(s.importComplete)),
+        ]),
+        duration: const Duration(seconds: 3),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+      _showSnackBarSafe(SnackBar(
+        content: Text(s.importFailed(e.toString())),
+        duration: const Duration(seconds: 4),
+      ));
+    } finally {
+      // Clean up SAF temp copy
+      _cleanupImportTemp(resolvedPath);
+    }
+  }
+
+  /// Import multiple subfolders — each becomes one work.
+  /// Shows a progress dialog with folder name + linear progress bar.
+  Future<void> _importMultipleFolders() async {
+    // Capture context BEFORE any async gaps to avoid the
+    // use_build_context_synchronously warning.
+    final dialogContext = context;
+    final s = S.of(dialogContext);
+
+    // Note: FilePicker uses SAF (Storage Access Framework) on Android 11+,
+    // which does NOT require MANAGE_EXTERNAL_STORAGE permission.
+
+    // Pick parent folder containing subfolders
+    final parentPath = await FilePicker.getDirectoryPath(
+      dialogTitle: s.selectImportFolderMultiple,
+    );
+    if (parentPath == null || !mounted) return;
+
+    // Resolve SAF content URI on Android 11+ by copying the whole tree locally
+    final safeName = _extractFolderName(parentPath);
+    final resolvedParentPath = await _resolveImportPath(parentPath, safeName);
+
+    // Count subfolders first for total
+    final parentDir = Directory(resolvedParentPath);
+    int totalSubfolders = 0;
+    if (await parentDir.exists()) {
+      await for (final e in parentDir.list(followLinks: false)) {
+        if (e is Directory && !e.path.split(Platform.pathSeparator).last.startsWith('.')) {
+          totalSubfolders++;
+        }
+      }
+    }
+
+    if (totalSubfolders == 0) {
+      _showSnackBarSafe(SnackBar(
+        content: Text(s.importFailed('No subfolders found')),
+        duration: const Duration(seconds: 3),
+      ));
+      return;
+    }
+
+    if (!dialogContext.mounted) return;
+
+    // Show progress dialog
+    final progressNotifier = ValueNotifier<_ImportProgress>(
+      _ImportProgress(completed: 0, total: totalSubfolders, currentFolder: ''),
+    );
+
+    final dialogFuture = showDialog<void>(
+      context: dialogContext,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Row(children: [
+          const SizedBox(width: 16, height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 12),
+          Text(s.importingMultipleWorks),
+        ]),
+        content: ValueListenableBuilder<_ImportProgress>(
+          valueListenable: progressNotifier,
+          builder: (ctx, progress, _) {
+            final foldername = progress.currentFolder;
+            final ratio = progress.total > 0 ? progress.completed / progress.total : 0.0;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: ratio,
+                    minHeight: 8,
+                    backgroundColor: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '${progress.completed} / ${progress.total}',
+                  style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (foldername.isNotEmpty) ...[const SizedBox(height: 4),
+                  Text(
+                    foldername,
+                    style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+
+    try {
+      final createdIds = await DownloadService.instance.importMultipleLocalWorks(
+        parentFolderPath: resolvedParentPath,
+        onProgress: (current, total, folderName) {
+          progressNotifier.value = _ImportProgress(
+            completed: current, total: total, currentFolder: folderName,
+          );
+        },
+      );
+
+      if (!mounted) return;
+      // Dismiss progress dialog
+      if (dialogContext.mounted) {
+        // ignore: use_build_context_synchronously
+        Navigator.of(dialogContext, rootNavigator: true).pop();
+      }
+      await dialogFuture; // wait for dismiss animation
+
+      // Reset to page 1 so the newly imported works are visible
+      setState(() => _currentPage = 1);
+      _scrollToTop();
+
+      _showSnackBarSafe(SnackBar(
+        content: Row(children: [
+          const Icon(Icons.check_circle, color: Colors.white),
+          const SizedBox(width: 12),
+          Expanded(child: Text(
+            createdIds.length < totalSubfolders
+                ? s.importPartialComplete(createdIds.length, totalSubfolders)
+                : s.importMultipleComplete(createdIds.length),
+          )),
+        ]),
+        duration: const Duration(seconds: 3),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      // Dismiss progress dialog
+      if (dialogContext.mounted) {
+        // ignore: use_build_context_synchronously
+        Navigator.of(dialogContext, rootNavigator: true).pop();
+      }
+      await dialogFuture;
+      _showSnackBarSafe(SnackBar(
+        content: Text(s.importFailed(e.toString())),
+        duration: const Duration(seconds: 4),
+      ));
+    } finally {
+      // Clean up SAF temp copy
+      _cleanupImportTemp(resolvedParentPath);
     }
   }
 
@@ -441,6 +729,8 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         onOpenFolder: _openDownloadFolder,
         onToggleSearch: _toggleSearch,
         onShowSort: _showSortDialog,
+        onImportSingleFolder: _importSingleFolder,
+        onImportMultipleFolders: _importMultipleFolders,
       ),
       if (_isSearchVisible) _buildSearchBar(),
       Expanded(
@@ -598,6 +888,20 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
 /// ===================================================================
 /// Top toolbar — receives all callbacks, no state
 /// ===================================================================
+/// Progress state for the import multiple dialog.
+class _ImportProgress {
+  final int completed;
+  final int total;
+  final String currentFolder;
+  const _ImportProgress({
+    required this.completed,
+    required this.total,
+    this.currentFolder = '',
+  });
+}
+
+enum _ImportAction { singleFolder, multipleFolders }
+
 class _DownloadTopBar extends StatelessWidget {
   final bool isSelectionMode;
   final int selectedCount;
@@ -611,6 +915,8 @@ class _DownloadTopBar extends StatelessWidget {
   final VoidCallback onOpenFolder;
   final VoidCallback onToggleSearch;
   final VoidCallback onShowSort;
+  final VoidCallback? onImportSingleFolder;
+  final VoidCallback? onImportMultipleFolders;
 
   const _DownloadTopBar({
     required this.isSelectionMode,
@@ -625,6 +931,8 @@ class _DownloadTopBar extends StatelessWidget {
     required this.onOpenFolder,
     required this.onToggleSearch,
     required this.onShowSort,
+    this.onImportSingleFolder,
+    this.onImportMultipleFolders,
   });
 
   @override
@@ -709,10 +1017,51 @@ class _DownloadTopBar extends StatelessWidget {
                 },
               ),
             ),
+          if (onImportSingleFolder != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: PopupMenuButton<_ImportAction>(
+                tooltip: S.of(context).importWork,
+                icon: const Icon(Icons.add_circle_outline, size: 22),
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                onSelected: (action) {
+                  HapticFeedback.lightImpact();
+                  switch (action) {
+                    case _ImportAction.singleFolder:
+                      onImportSingleFolder!();
+                    case _ImportAction.multipleFolders:
+                      onImportMultipleFolders!();
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  PopupMenuItem(
+                    value: _ImportAction.singleFolder,
+                    child: ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.create_new_folder_rounded, size: 20),
+                      title: Text(S.of(ctx).importSingleFolder),
+                      subtitle: Text(S.of(ctx).importSingleFolderDesc, style: const TextStyle(fontSize: 11)),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ImportAction.multipleFolders,
+                    child: ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.folder_copy_rounded, size: 20),
+                      title: Text(S.of(ctx).importMultipleFolders),
+                      subtitle: Text(S.of(ctx).importMultipleFoldersDesc, style: const TextStyle(fontSize: 11)),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: FilledButton.tonalIcon(
-              icon: const Icon(Icons.folder_open, size: 18),
+              icon: const Icon(Icons.folder_rounded, size: 18),
               label: Text(S.of(context).browseFiles),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -811,7 +1160,7 @@ class _DownloadWorkCard extends StatelessWidget {
     Work? work;
     if (firstTask.workMetadata != null) {
       try {
-        final sanitized = _sanitizeMetadata(firstTask.workMetadata!);
+        final sanitized = sanitizeMetadata(firstTask.workMetadata!);
         work = Work.fromJson(sanitized);
       } catch (e) {
         LogService.instance.warning('[LocalDownloads] Failed to parse work metadata for offline card: $e', tag: 'Download');

@@ -1254,6 +1254,28 @@
   "appLockAutoLock5Min": "5 minutes",
   "appLockAutoLock15Min": "15 minutes",
   "appLockAutoLock30Min": "30 minutes",
-  "appLockAutoLockMinutes": "minutes"
+  "appLockAutoLockMinutes": "minutes",
+
+  "importWork": "Import",
+  "selectImportFolder": "Select Folder to Import",
+  "importDialogTitle": "Import Local Work",
+  "importDialogMessage": "Import files from:\n{path}",
+  "workNameTitle": "Work Name",
+  "enterWorkName": "Enter work name...",
+  "importAction": "Import",
+  "importingWork": "Importing work...",
+  "importComplete": "Import complete",
+  "importFailed": "Import failed: {error}",
+  "importedWorkDeleteNotSupported": "Cannot delete files from imported works. Delete the source files directly.",
+
+  "importSingleFolder": "Single Folder",
+  "importSingleFolderDesc": "Pick one folder and set a custom title",
+  "importMultipleFolders": "Multiple Folders",
+  "importMultipleFoldersDesc": "Each subfolder becomes one work (folder name = title)",
+  "selectImportFolderSingle": "Select a folder to import",
+  "selectImportFolderMultiple": "Select a folder containing sub-works",
+  "importingMultipleWorks": "Importing works...",
+  "importMultipleComplete": "Imported {count} works successfully",
+  "importPartialComplete": "Imported {count}/{total} works"
 }
 

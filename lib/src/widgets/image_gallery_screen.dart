@@ -216,7 +216,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
       try {
         final tempDir = await getTemporaryDirectory();
         final tempFile = File('${tempDir.path}/$fileName');
-        await tempFile.writeAsBytes(imageBytes);            final outputFile = await FilePicker.platform.saveFile(
+        await tempFile.writeAsBytes(imageBytes);            final outputFile = await FilePicker.saveFile(
               dialogTitle: s2.saveImage,
           fileName: fileName,
           type: FileType.image,
@@ -237,7 +237,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
         }
       }
     } else {
-      final outputFile = await FilePicker.platform.saveFile(
+      final outputFile = await FilePicker.saveFile(
         dialogTitle: S.of(context).saveImage,
         fileName: fileName,
         type: FileType.image,

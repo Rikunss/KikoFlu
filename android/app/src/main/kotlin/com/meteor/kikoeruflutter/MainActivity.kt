@@ -81,6 +81,9 @@ class MainActivity : AudioServiceActivity() {
         // 注册 Audio Conversion 插件 (WAV → FLAC)
         AudioConversionPlugin.register(flutterEngine)
 
+        // 注册 SAF 文件工具（用于导入 content:// URI 的文件夹）
+        SafFileUtils.register(flutterEngine, this)
+
         // Set up channel for App Lock Quick Settings tile
         appLockTileChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,

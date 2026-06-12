@@ -189,7 +189,7 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
         }
       } else {
         // 其他平台: 选择目录后写入
-        final directoryPath = await FilePicker.platform.getDirectoryPath();
+        final directoryPath = await FilePicker.getDirectoryPath();
         if (directoryPath == null) return;
         if (!mounted) return;
 

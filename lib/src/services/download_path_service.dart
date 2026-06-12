@@ -69,58 +69,66 @@ class DownloadPathService {
   }
 
   /// Android 平台选择目录
+  ///
+  /// Di Android 11+ (API 30+), [FilePicker] menggunakan Storage Access Framework
+  /// (SAF) secara internal, sehingga tidak memerlukan MANAGE_EXTERNAL_STORAGE
+  /// atau READ_EXTERNAL_STORAGE. System file picker akan memberikan akses ke
+  /// direktori yang dipilih melalui SAF URI.
   static Future<String?> _pickDirectoryAndroid() async {
-    // Android 11+ 需要 MANAGE_EXTERNAL_STORAGE 权限
+    // Request storage permission dulu sebelum buka file picker
     if (await _requestStoragePermission()) {
-      final result = await FilePicker.platform.getDirectoryPath();
-      return result;
+      try {
+        final result = await FilePicker.getDirectoryPath();
+        return result;
+      } catch (e) {
+        _log.error('Android directory picker failed: $e', tag: 'DownloadPath');
+        return null;
+      }
     }
     return null;
   }
 
-  /// iOS 平台选择目录
-  static Future<String?> _pickDirectoryIOS() async {
-    // iOS 使用文档选择器
-    final result = await FilePicker.platform.getDirectoryPath();
-    return result;
-  }
-
-  /// 桌面平台（Windows/macOS/Linux）选择目录
-  static Future<String?> _pickDirectoryDesktop() async {
-    final result = await FilePicker.platform.getDirectoryPath();
-    return result;
-  }
-
-  /// 请求存储权限（Android）
+  /// Request storage permission (Android).
   static Future<bool> _requestStoragePermission() async {
     if (!Platform.isAndroid) return true;
 
-    // Android 13+ (API 33+) 使用新的权限模型
+    // Android 13+ (API 33+) menggunakan scoped storage — tidak perlu MANAGE_EXTERNAL_STORAGE
     if (Platform.version.contains('13') ||
         Platform.version.contains('14') ||
         Platform.version.contains('15')) {
-      // Android 13+ 不再需要 MANAGE_EXTERNAL_STORAGE
-      // 使用 scoped storage
       return true;
     }
 
-    // Android 11-12 需要 MANAGE_EXTERNAL_STORAGE
+    // Android 11-12: perlu MANAGE_EXTERNAL_STORAGE
     var status = await Permission.manageExternalStorage.status;
     if (!status.isGranted) {
       status = await Permission.manageExternalStorage.request();
     }
-
     if (!status.isGranted) {
-      // 如果没有获得权限，尝试基本的存储权限
+      // Fallback: coba basic storage permission
       var storageStatus = await Permission.storage.status;
       if (!storageStatus.isGranted) {
         storageStatus = await Permission.storage.request();
       }
       return storageStatus.isGranted;
     }
-
     return status.isGranted;
   }
+
+  /// iOS 平台选择目录
+  static Future<String?> _pickDirectoryIOS() async {
+    // iOS 使用文档选择器
+    final result = await FilePicker.getDirectoryPath();
+    return result;
+  }
+
+  /// 桌面平台（Windows/macOS/Linux）选择目录
+  static Future<String?> _pickDirectoryDesktop() async {
+    final result = await FilePicker.getDirectoryPath();
+    return result;
+  }
+
+
 
   /// 设置自定义下载路径并迁移文件
   /// 返回迁移结果消息

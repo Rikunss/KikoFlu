@@ -174,7 +174,7 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
 
   Future<void> _saveToFile(Uint8List bytes, String fileName) async {
     // 桌面端：让用户选择保存位置
-    final result = await FilePicker.platform.saveFile(
+    final result = await FilePicker.saveFile(
       dialogTitle: S.of(context).saveCoverImage,
       fileName: fileName,
       type: FileType.image,

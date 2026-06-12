@@ -1237,5 +1237,27 @@
   "backupSelectExportDir": "选择备份目标位置",
   "backupSelectImportFile": "选择备份文件",
   "backupSubtitle": "导出或恢复应用数据",
-  "backupTitle": "备份与恢复"
+  "backupTitle": "备份与恢复",
+
+  "importWork": "导入",
+  "selectImportFolder": "选择要导入的文件夹",
+  "importDialogTitle": "导入本地作品",
+  "importDialogMessage": "从以下位置导入文件：\n{path}",
+  "workNameTitle": "作品名称",
+  "enterWorkName": "输入作品名称...",
+  "importAction": "导入",
+  "importingWork": "正在导入作品...",
+  "importComplete": "导入完成",
+  "importFailed": "导入失败：{error}",
+  "importedWorkDeleteNotSupported": "无法删除导入作品的文件，请直接在源文件夹中删除。",
+
+  "importSingleFolder": "单个文件夹",
+  "importSingleFolderDesc": "选择一个文件夹并设置自定义标题",
+  "importMultipleFolders": "多个文件夹",
+  "importMultipleFoldersDesc": "每个子文件夹成为一个作品（文件夹名称=标题）",
+  "selectImportFolderSingle": "选择要导入的文件夹",
+  "selectImportFolderMultiple": "选择包含子作品的文件夹",
+  "importingMultipleWorks": "正在导入作品...",
+  "importMultipleComplete": "成功导入 {count} 个作品",
+  "importPartialComplete": "已导入 {count}/{total} 个作品"
 }
