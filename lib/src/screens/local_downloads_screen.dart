@@ -1129,6 +1129,15 @@ class _DownloadWorkCard extends StatelessWidget {
             Expanded(
               child: Stack(fit: StackFit.expand, children: [
                 _WorkCardCover(workId: workId, work: work, firstTask: firstTask),
+                // Colored avatar with work title initial
+                Positioned(
+                  top: 8, left: 8,
+                  child: _WorkAvatar(
+                    workId: workId,
+                    title: work?.title ?? firstTask.workTitle,
+                    size: 34,
+                  ),
+                ),
                 Positioned(
                   left: 0, right: 0, bottom: 0,
                   child: Container(
@@ -1217,6 +1226,64 @@ class _DownloadWorkCard extends StatelessWidget {
 /// ===================================================================
 /// Work card cover — fetches auth only when needed (not per-card)
 /// ===================================================================
+/// Generate a consistent color from a workId using the golden angle.
+/// Each work gets a distinct hue that stays the same across sessions.
+Color _workColor(int id) {
+  final hue = (id * 137.508) % 360;
+  return HSLColor.fromAHSL(0.85, hue, 0.55, 0.5).toColor();
+}
+
+/// Small circle avatar with the first character of the work title.
+/// Placed as an overlay on the cover image to help distinguish works.
+class _WorkAvatar extends StatelessWidget {
+  final int workId;
+  final String? title;
+  final double size;
+
+  const _WorkAvatar({
+    required this.workId,
+    this.title,
+    this.size = 32,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _workColor(workId);
+    final initial = (title ?? '').isNotEmpty ? title![0].toUpperCase() : '?';
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: size * 0.48,
+            letterSpacing: 0,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _WorkCardCover extends ConsumerStatefulWidget {
   final int workId;
   final Work? work;
