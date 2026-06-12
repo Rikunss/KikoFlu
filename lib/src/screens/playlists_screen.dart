@@ -3,12 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../providers/playlists_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/smart_playlists_provider.dart';
 import '../utils/l10n_extensions.dart';
 import '../utils/scroll_optimization.dart';
 import '../widgets/playlist_card.dart';
 import '../widgets/pagination_bar.dart';
 import '../models/playlist.dart' show PlaylistPrivacy;
+import '../models/smart_playlist.dart';
 import 'playlist_detail_screen.dart';
+import 'smart_playlist_detail_screen.dart';
+import 'smart_playlist_editor_screen.dart';
 
 class PlaylistsScreen extends ConsumerStatefulWidget {
   const PlaylistsScreen({super.key});
@@ -20,21 +24,11 @@ class PlaylistsScreen extends ConsumerStatefulWidget {
 class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
     with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
+  bool _hasVisited = false;
 
   @override
   bool get wantKeepAlive => true; // 保持状态不被销毁
 
-  @override
-  void initState() {
-    super.initState();
-    // 首次加载数据
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final playlistsState = ref.read(playlistsProvider);
-      if (playlistsState.playlists.isEmpty && !playlistsState.isLoading) {
-        ref.read(playlistsProvider.notifier).load(refresh: true);
-      }
-    });
-  }
 
   @override
   void dispose() {
@@ -49,6 +43,50 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
       );
+    }
+  }
+
+  /// Show FAB menu: create playlist, create smart playlist
+  void _showFabMenu() {
+    final s = S.of(context);
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.playlist_add),
+              title: Text(s.createPlaylist),
+              subtitle: Text(s.regularPlaylist),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showCreatePlaylistDialog();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_awesome, color: Colors.amber),
+              title: Text(s.smartPlaylist),
+              subtitle: Text(s.smartPlaylistSubtitle),
+              onTap: () {
+                Navigator.pop(ctx);
+                _navigateToSmartPlaylistEditor();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _navigateToSmartPlaylistEditor() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => const SmartPlaylistEditorScreen(),
+      ),
+    );
+    if (result == true && mounted) {
+      setState(() {}); // Refresh widget
     }
   }
 
@@ -145,7 +183,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
 
                                 // 隐私设置
                                 DropdownButtonFormField<PlaylistPrivacy>(
-                                  value: selectedPrivacy,
+                                  initialValue: selectedPrivacy,
                                   decoration: InputDecoration(
                                     labelText: S.of(context).privacySetting,
                                     border: const OutlineInputBorder(),
@@ -464,6 +502,19 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
     super.build(context); // 必须调用以保持状态
 
     final state = ref.watch(playlistsProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
+    // Defer data loading to first visit
+    if (!_hasVisited) {
+      _hasVisited = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && state.playlists.isEmpty && !state.isLoading) {
+          ref.read(playlistsProvider.notifier).load(refresh: true);
+        }
+      });
+    }
 
     // 错误状态
     if (state.error != null && state.playlists.isEmpty) {
@@ -474,18 +525,18 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
             Icon(
               Icons.error_outline,
               size: 64,
-              color: Theme.of(context).colorScheme.error,
+              color: colorScheme.error,
             ),
             const SizedBox(height: 16),
             Text(
               S.of(context).loadFailed,
-              style: Theme.of(context).textTheme.titleLarge,
+              style: textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
               state.error!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
               textAlign: TextAlign.center,
             ),
@@ -511,7 +562,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
     if (state.playlists.isEmpty) {
       return Scaffold(
         floatingActionButton: FloatingActionButton(
-          onPressed: _showCreatePlaylistDialog,
+          onPressed: _showFabMenu,
           tooltip: S.of(context).createPlaylist,
           child: const Icon(Icons.add),
         ),
@@ -522,18 +573,18 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
               Icon(
                 Icons.playlist_play,
                 size: 64,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: colorScheme.onSurfaceVariant,
               ),
               const SizedBox(height: 16),
               Text(
                 S.of(context).noPlaylists,
-                style: Theme.of(context).textTheme.titleLarge,
+                style: textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               Text(
                 S.of(context).noPlaylistsDescription,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -545,24 +596,204 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
-        onPressed: _showCreatePlaylistDialog,
+        onPressed: _showFabMenu,
         tooltip: S.of(context).createPlaylist,
         child: const Icon(Icons.add),
       ),
       body: RefreshIndicator(
-        onRefresh: () async => ref.read(playlistsProvider.notifier).refresh(),
-        child: _buildListView(state),
+        onRefresh: () async {
+          ref.read(playlistsProvider.notifier).refresh();
+          if (mounted) setState(() {});
+        },
+        child: _buildListView(state, colorScheme, textTheme),
       ),
     );
   }
 
-  Widget _buildListView(PlaylistsState state) {
+  Widget _buildSmartPlaylistCard(SmartPlaylist sp) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final s = S.of(context);
+    final hasCount = sp.cachedWorksCount > 0;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: Colors.amber.withValues(alpha: 0.3),
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => SmartPlaylistDetailScreen(playlist: sp),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Amber icon container
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.amber.shade400,
+                      Colors.amber.shade700,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.amber.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+
+              // Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      sp.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      sp.rulesSummary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // Works count + auto badge
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (hasCount)
+                    Text(
+                      s.totalNWorks(sp.cachedWorksCount),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.amber.shade700,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  const SizedBox(height: 2),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.refresh, size: 10, color: Colors.amber.shade700),
+                        const SizedBox(width: 2),
+                        Text(
+                          'Auto',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.amber.shade700,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListView(PlaylistsState state, ColorScheme colorScheme, TextTheme textTheme) {
+    final smartPlaylists = ref.watch(smartPlaylistsProvider);
+
     return CustomScrollView(
-      controller: _scrollController,
-      cacheExtent: ScrollOptimization.cacheExtent,
+      // ignore: deprecated_member_use
+      cacheExtent: ScrollOptimization.cacheExtent, controller: _scrollController,
       physics: ScrollOptimization.physics,
       slivers: [
-        // 顶部标题栏
+        // Smart Playlists section
+        if (smartPlaylists.isNotEmpty) ...[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            sliver: SliverToBoxAdapter(
+              child: Row(
+                children: [
+                  Icon(Icons.auto_awesome,
+                      size: 20, color: Colors.amber.shade600),
+                  const SizedBox(width: 8),
+                  Text(
+                    S.of(context).smartPlaylists,
+                    style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.amber.shade700,
+                        ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${smartPlaylists.length}',
+                    style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final sp = smartPlaylists[index];
+                return _buildSmartPlaylistCard(sp);
+              },
+              childCount: smartPlaylists.length,
+            ),
+          ),
+        ],
+
+        // Regular playlists header
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           sliver: SliverToBoxAdapter(
@@ -570,22 +801,21 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
               children: [
                 Icon(
                   Icons.playlist_play,
-                  size: 28,
-                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
+                  color: colorScheme.primary,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Text(
                   S.of(context).myPlaylists,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                  style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
                 ),
                 const Spacer(),
                 Text(
                   S.of(context).totalNItems(state.totalCount),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                       ),
                 ),
               ],
@@ -600,6 +830,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
               final playlist = state.playlists[index];
               return RepaintBoundary(
                 child: PlaylistCard(
+                  key: ValueKey(playlist.id),
                   playlist: playlist,
                   onTap: () async {
                     // 导航到播放列表详情页

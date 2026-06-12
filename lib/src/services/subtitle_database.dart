@@ -360,6 +360,13 @@ class SubtitleDatabase {
     await db.delete('subtitle_files');
   }
 
+  /// Close the database connection. After closing, the database will
+  /// be re-opened lazily on the next access.
+  Future<void> close() async {
+    await _database?.close();
+    _database = null;
+  }
+
   // ==================== 工具方法 ====================
 
   static final _workIdRegex = RegExp(r'[RrBbVv][Jj]0*(\d+)');

@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 
 import '../models/work.dart';
 import '../services/kikoeru_api_service.dart' hide kikoeruApiServiceProvider;
+import '../services/log_service.dart';
 import 'auth_provider.dart';
 import 'settings_provider.dart';
 import '../models/sort_options.dart';
@@ -26,8 +27,7 @@ enum LayoutType {
   bigGrid // 大网格布局 (2列)
 }
 
-class WorksModeSnapshot extends Equatable {
-  static const _noValue = Object();
+class WorksModeSnapshot extends Equatable {      static const _noValue = Object();
 
   final List<Work> works;
   final List<Work> rawWorks;
@@ -206,7 +206,7 @@ class WorksNotifier extends StateNotifier<WorksState> {
     final modeState = _getModeState(mode);
 
     if (modeState.isLoading) {
-      print('[WorksProvider] Already loading, skipping');
+      LogService.instance.debug('[WorksProvider] Already loading, skipping', tag: 'UI');
       return;
     }
 
@@ -216,8 +216,8 @@ class WorksNotifier extends StateNotifier<WorksState> {
     final page = targetPage ??
         (isAllMode ? previousPage : (refresh ? 1 : (previousPage + 1)));
 
-    print(
-        '[WorksProvider] Loading works - mode: $mode, page: $page, refresh: $refresh, currentPage: $previousPage, targetPage: $targetPage');
+    LogService.instance.debug(
+        '[WorksProvider] Loading works - mode: $mode, page: $page, refresh: $refresh, currentPage: $previousPage, targetPage: $targetPage', tag: 'UI');
 
     _updateModeState(
       mode,
@@ -233,7 +233,7 @@ class WorksNotifier extends StateNotifier<WorksState> {
 
       // 当字幕筛选开启时，不发送 subtitle 参数给服务器，而是在前端过滤
       // 这样可以同时显示服务器有字幕 和 本地字幕库有字幕的作品
-      final serverSubtitleParam = 0; // 始终请求所有作品，前端过滤
+      const serverSubtitleParam = 0; // 始终请求所有作品，前端过滤
 
       if (mode == DisplayMode.popular) {
         response = await _apiService.getPopularWorks(
@@ -297,8 +297,8 @@ class WorksNotifier extends StateNotifier<WorksState> {
         isLastPage = !hasMore && filteredWorks.isNotEmpty;
       }
 
-      print(
-          '[WorksProvider] Loaded ${filteredWorks.length} works (filtered from ${newRawWorks.length}), total: ${filteredWorks.length}, hasMore: $hasMore, currentPage: $currentPage');
+      LogService.instance.debug(
+          '[WorksProvider] Loaded ${filteredWorks.length} works (filtered from ${newRawWorks.length}), total: ${filteredWorks.length}, hasMore: $hasMore, currentPage: $currentPage', tag: 'UI');
 
       _updateModeState(
         mode,
@@ -314,7 +314,7 @@ class WorksNotifier extends StateNotifier<WorksState> {
         ),
       );
     } catch (e) {
-      print('Failed to load works: $e');
+      LogService.instance.error('Failed to load works: $e', tag: 'UI');
 
       _updateModeState(
         mode,
@@ -525,7 +525,7 @@ final worksProvider = StateNotifierProvider<WorksNotifier, WorksState>((ref) {
     final prevUser = previous;
     final nextUser = next;
     if (prevUser?.name != nextUser?.name || prevUser?.host != nextUser?.host) {
-      print('[WorksProvider] User changed, refreshing works list');
+      LogService.instance.debug('[WorksProvider] User changed, refreshing works list', tag: 'UI');
       notifier.refresh();
     }
   });

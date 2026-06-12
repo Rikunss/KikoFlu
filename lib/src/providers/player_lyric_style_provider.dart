@@ -16,13 +16,13 @@ class PlayerLyricSettings {
   final double fullLineHeight;
 
   const PlayerLyricSettings({
-    this.miniFontSize = 11.0,
+    this.miniFontSize = 13.0,
     this.miniLineHeight = 1.0,
-    this.smallFontSize = 14.0,
+    this.smallFontSize = 15.0,
     this.smallLineHeight = 1.2,
-    this.fullActiveFontSize = 18.0,
-    this.fullInactiveFontSize = 16.0,
-    this.fullLineHeight = 1.5,
+    this.fullActiveFontSize = 22.0,
+    this.fullInactiveFontSize = 18.0,
+    this.fullLineHeight = 1.6,
   });
 
   PlayerLyricSettings copyWith({
@@ -57,15 +57,15 @@ class PlayerLyricSettingsNotifier extends StateNotifier<PlayerLyricSettings> {
     final prefs = await SharedPreferences.getInstance();
 
     state = PlayerLyricSettings(
-      miniFontSize: prefs.getDouble('${_keyPrefix}miniFontSize') ?? 11.0,
+      miniFontSize: prefs.getDouble('${_keyPrefix}miniFontSize') ?? 13.0,
       miniLineHeight: prefs.getDouble('${_keyPrefix}miniLineHeight') ?? 1.0,
-      smallFontSize: prefs.getDouble('${_keyPrefix}smallFontSize') ?? 14.0,
+      smallFontSize: prefs.getDouble('${_keyPrefix}smallFontSize') ?? 15.0,
       smallLineHeight: prefs.getDouble('${_keyPrefix}smallLineHeight') ?? 1.2,
       fullActiveFontSize:
-          prefs.getDouble('${_keyPrefix}fullActiveFontSize') ?? 18.0,
+          prefs.getDouble('${_keyPrefix}fullActiveFontSize') ?? 22.0,
       fullInactiveFontSize:
-          prefs.getDouble('${_keyPrefix}fullInactiveFontSize') ?? 16.0,
-      fullLineHeight: prefs.getDouble('${_keyPrefix}fullLineHeight') ?? 1.5,
+          prefs.getDouble('${_keyPrefix}fullInactiveFontSize') ?? 18.0,
+      fullLineHeight: prefs.getDouble('${_keyPrefix}fullLineHeight') ?? 1.6,
     );
   }
 

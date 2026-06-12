@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/log_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../screens/search_result_screen.dart';
 
@@ -30,12 +31,13 @@ class CircleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     // 如果提供了自定义样式参数，使用自定义样式
     if (fontSize != null || padding != null || borderRadius != null) {
       return GestureDetector(
         onTap: onTap ??
             () {
-              print('[CircleChip] Clicked circle: $circleName, id: $circleId');
+              LogService.instance.debug('[CircleChip] Clicked circle: $circleName, id: $circleId', tag: 'UI');
               // 默认跳转到社团搜索结果页面
               Navigator.push(
                 context,
@@ -56,14 +58,14 @@ class CircleChip extends StatelessWidget {
           padding:
               padding ?? const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.secondaryContainer,
+            color: cs.secondaryContainer,
             borderRadius: BorderRadius.circular(borderRadius ?? 12),
           ),
           child: Text(
             circleName,
             style: TextStyle(
               fontSize: fontSize ?? 11,
-              color: Theme.of(context).colorScheme.onSecondaryContainer,
+              color: cs.onSecondaryContainer,
               fontWeight: fontWeight ?? FontWeight.w500,
             ),
           ),
@@ -78,7 +80,7 @@ class CircleChip extends StatelessWidget {
         label: Text(circleName),
         onPressed: onTap ??
             () {
-              print('[CircleChip] Clicked circle: $circleName, id: $circleId');
+              LogService.instance.debug('[CircleChip] Clicked circle: $circleName, id: $circleId', tag: 'UI');
               // 默认跳转到社团搜索结果页面
               Navigator.push(
                 context,
@@ -99,7 +101,7 @@ class CircleChip extends StatelessWidget {
         visualDensity: compact ? VisualDensity.compact : null,
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         side: BorderSide(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
         ),
         backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
         labelStyle: TextStyle(
@@ -114,7 +116,7 @@ class CircleChip extends StatelessWidget {
       label: Text(circleName),
       onPressed: onTap ??
           () {
-            print('[CircleChip] Clicked circle: $circleName, id: $circleId');
+            LogService.instance.debug('[CircleChip] Clicked circle: $circleName, id: $circleId', tag: 'UI');
             // 默认跳转到社团搜索结果页面
             Navigator.push(
               context,
@@ -133,7 +135,7 @@ class CircleChip extends StatelessWidget {
       visualDensity: compact ? VisualDensity.compact : null,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       side: BorderSide(
-        color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
       ),
       backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
       labelStyle: TextStyle(

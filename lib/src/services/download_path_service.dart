@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
+import '../widgets/custom_file_picker.dart';
 import 'storage_service.dart';
 import 'log_service.dart';
 
@@ -56,10 +57,12 @@ class DownloadPathService {
   /// 选择自定义下载目录
   /// 返回 null 表示用户取消选择
   /// 返回路径字符串表示成功
-  static Future<String?> pickCustomDirectory() async {
+  ///
+  /// [context] is required on Android to show the custom file picker dialog.
+  static Future<String?> pickCustomDirectory({BuildContext? context}) async {
     // 根据平台不同处理
     if (Platform.isAndroid) {
-      return await _pickDirectoryAndroid();
+      return await _pickDirectoryAndroid(context: context);
     } else if (Platform.isIOS) {
       return await _pickDirectoryIOS();
     } else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
@@ -69,58 +72,37 @@ class DownloadPathService {
   }
 
   /// Android 平台选择目录
-  static Future<String?> _pickDirectoryAndroid() async {
-    // Android 11+ 需要 MANAGE_EXTERNAL_STORAGE 权限
-    if (await _requestStoragePermission()) {
-      final result = await FilePicker.platform.getDirectoryPath();
-      return result;
+  ///
+  /// Uses the in-app custom file browser ([CustomFilePicker]) instead of SAF
+  /// (Storage Access Framework), because SAF's `ACTION_OPEN_DOCUMENT_TREE`
+  /// is broken on MIUI/HyperOS (shows empty folder).
+  ///
+  /// On Android 11+, requests [Permission.manageExternalStorage] first.
+  /// If granted, [CustomFilePicker] uses [dart:io] to browse the filesystem.
+  static Future<String?> _pickDirectoryAndroid({BuildContext? context}) async {
+    if (context == null) {
+      _log.error('Context required for Android custom file picker',
+          tag: 'DownloadPath');
+      return null;
     }
-    return null;
+    // Request storage permission first, then show custom file picker
+    return CustomFilePicker.pickDirectory(context: context);
   }
 
   /// iOS 平台选择目录
   static Future<String?> _pickDirectoryIOS() async {
     // iOS 使用文档选择器
-    final result = await FilePicker.platform.getDirectoryPath();
+    final result = await FilePicker.getDirectoryPath();
     return result;
   }
 
   /// 桌面平台（Windows/macOS/Linux）选择目录
   static Future<String?> _pickDirectoryDesktop() async {
-    final result = await FilePicker.platform.getDirectoryPath();
+    final result = await FilePicker.getDirectoryPath();
     return result;
   }
 
-  /// 请求存储权限（Android）
-  static Future<bool> _requestStoragePermission() async {
-    if (!Platform.isAndroid) return true;
 
-    // Android 13+ (API 33+) 使用新的权限模型
-    if (Platform.version.contains('13') ||
-        Platform.version.contains('14') ||
-        Platform.version.contains('15')) {
-      // Android 13+ 不再需要 MANAGE_EXTERNAL_STORAGE
-      // 使用 scoped storage
-      return true;
-    }
-
-    // Android 11-12 需要 MANAGE_EXTERNAL_STORAGE
-    var status = await Permission.manageExternalStorage.status;
-    if (!status.isGranted) {
-      status = await Permission.manageExternalStorage.request();
-    }
-
-    if (!status.isGranted) {
-      // 如果没有获得权限，尝试基本的存储权限
-      var storageStatus = await Permission.storage.status;
-      if (!storageStatus.isGranted) {
-        storageStatus = await Permission.storage.request();
-      }
-      return storageStatus.isGranted;
-    }
-
-    return status.isGranted;
-  }
 
   /// 设置自定义下载路径并迁移文件
   /// 返回迁移结果消息

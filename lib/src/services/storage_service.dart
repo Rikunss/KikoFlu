@@ -1,6 +1,9 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'log_service.dart';
+
+final _log = LogService.instance;
 
 class StorageService {
   static late Box _settingsBox;
@@ -114,11 +117,18 @@ class StorageService {
       try {
         return jsonDecode(jsonString) as Map<String, dynamic>;
       } catch (e) {
-        print('Error decoding JSON for key $key: $e');
+        _log.error('Error decoding JSON for key $key: $e');
         return null;
       }
     }
     return null;
+  }
+
+  /// Close all open Hive boxes so their files can be safely copied.
+  static Future<void> closeBoxes() async {
+    await _settingsBox.close();
+    await _userBox.close();
+    await _cacheBox.close();
   }
 
   /// Returns HTTP headers with server cookie if configured.

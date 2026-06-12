@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/log_service.dart';
 import '../models/work.dart';
 import '../screens/search_result_screen.dart';
 import '../../l10n/app_localizations.dart';
@@ -39,7 +40,7 @@ class TagChip extends StatelessWidget {
       Widget chip = GestureDetector(
         onTap: onTap ??
             () {
-              print('[TagChip] Clicked tag: ${tag.name}, id: ${tag.id}');
+              LogService.instance.debug('[TagChip] Clicked tag: ${tag.name}, id: ${tag.id}', tag: 'UI');
               // 默认跳转到标签搜索结果页面
               Navigator.push(
                 context,
@@ -80,7 +81,7 @@ class TagChip extends StatelessWidget {
         label: Text(localizedName),
         onPressed: onTap ??
             () {
-              print('[TagChip] Clicked tag: ${tag.name}, id: ${tag.id}');
+              LogService.instance.debug('[TagChip] Clicked tag: ${tag.name}, id: ${tag.id}', tag: 'UI');
               // 默认跳转到标签搜索结果页面
               Navigator.push(
                 context,
@@ -111,7 +112,7 @@ class TagChip extends StatelessWidget {
         label: Text(localizedName),
         onPressed: onTap ??
             () {
-              print('[TagChip] Clicked tag: ${tag.name}, id: ${tag.id}');
+              LogService.instance.debug('[TagChip] Clicked tag: ${tag.name}, id: ${tag.id}', tag: 'UI');
               // 默认跳转到标签搜索结果页面
               Navigator.push(
                 context,

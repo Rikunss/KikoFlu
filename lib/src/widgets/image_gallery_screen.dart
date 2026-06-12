@@ -69,7 +69,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
       setState(() => _isScaled = false);
     } else {
       const newScale = 2.0;
-      controller.value = Matrix4.identity()..scale(newScale);
+      controller.value = Matrix4.diagonal3Values(newScale, newScale, 1.0);
       setState(() => _isScaled = true);
     }
   }
@@ -144,28 +144,29 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
   }
 
   Future<void> _saveToGallery(List<int> imageBytes, String imageName) async {
+    final s = S.of(context);
     PermissionStatus status = await Permission.photos.request();
 
     if (status.isPermanentlyDenied || status == PermissionStatus.restricted) {
-      status = await Permission.storage.request();
-    }
+      status = await Permission.storage.request();        }
 
     if (!status.isGranted) {
       if (mounted) {
         if (status.isPermanentlyDenied) {
+          if (!mounted) return;
           final shouldOpenSettings = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              title: Text(S.of(context).storagePermissionRequired),
-              content: Text(S.of(context).storagePermissionForGalleryDesc),
+              title: Text(s.storagePermissionRequired),
+              content: Text(s.storagePermissionForGalleryDesc),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: Text(S.of(context).cancel),
+                  child: Text(s.cancel),
                 ),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: Text(S.of(context).goToSettings),
+                  child: Text(s.goToSettings),
                 ),
               ],
             ),
@@ -175,8 +176,8 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
             await openAppSettings();
           }
         } else {
-          SnackBarUtil.showWarning(
-              context, S.of(context).storagePermissionRequiredForImage);
+        SnackBarUtil.showWarning(
+              context, s.storagePermissionRequiredForImage);
         }
       }
       return;
@@ -202,6 +203,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
   }
 
   Future<void> _saveToFile(List<int> imageBytes, String imageName) async {
+    final s2 = S.of(context);
     String fileName = imageName;
     if (!fileName.toLowerCase().endsWith('.jpg') &&
         !fileName.toLowerCase().endsWith('.jpeg') &&
@@ -214,10 +216,8 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
       try {
         final tempDir = await getTemporaryDirectory();
         final tempFile = File('${tempDir.path}/$fileName');
-        await tempFile.writeAsBytes(imageBytes);
-
-        final outputFile = await FilePicker.platform.saveFile(
-          dialogTitle: S.of(context).saveImage,
+        await tempFile.writeAsBytes(imageBytes);            final outputFile = await FilePicker.saveFile(
+              dialogTitle: s2.saveImage,
           fileName: fileName,
           type: FileType.image,
           bytes: Uint8List.fromList(imageBytes),
@@ -237,7 +237,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
         }
       }
     } else {
-      final outputFile = await FilePicker.platform.saveFile(
+      final outputFile = await FilePicker.saveFile(
         dialogTitle: S.of(context).saveImage,
         fileName: fileName,
         type: FileType.image,
@@ -258,7 +258,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
   @override
   Widget build(BuildContext context) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     final currentImage = widget.images[_currentIndex];
     final title = currentImage['title'] ?? '';
     final pageLabel = '${_currentIndex + 1}/${widget.images.length}';
@@ -272,7 +272,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
         extendBodyBehindAppBar: true,
         appBar: AppBar(
           scrolledUnderElevation: 0,
-          backgroundColor: Colors.black.withOpacity(0.4),
+          backgroundColor: Colors.black.withValues(alpha: 0.4),
           elevation: 0,
           foregroundColor: Colors.white,
           title: isSingleImage
@@ -466,18 +466,27 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
 
           return GestureDetector(
             onTap: () => _jumpToImage(index),
-            child: AnimatedContainer(
+            child: TweenAnimationBuilder<Color>(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOut,
-              width: 90,
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: isSelected ? Colors.white : Colors.transparent,
-                  width: 3,
-                ),
-                borderRadius: BorderRadius.circular(10),
+              tween: Tween<Color>(
+                begin: Colors.transparent,
+                end: isSelected ? Colors.white : Colors.transparent,
               ),
+              builder: (context, borderColor, child) {
+                return Container(
+                  width: 90,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: borderColor,
+                      width: 3,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: child,
+                );
+              },
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(7),
                 child: CachedImageWidget(
@@ -498,7 +507,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.55),
+        color: Colors.black.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(

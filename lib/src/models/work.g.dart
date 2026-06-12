@@ -37,6 +37,7 @@ Work _$WorkFromJson(Map<String, dynamic> json) => Work(
       children: (json['children'] as List<dynamic>?)
           ?.map((e) => AudioFile.fromJson(e as Map<String, dynamic>))
           .toList(),
+      blurHash: json['blur_hash'] as String?,
       sourceUrl: json['source_url'] as String?,
       otherLanguageEditions: (json['other_language_editions_in_db']
               as List<dynamic>?)
@@ -66,6 +67,7 @@ Map<String, dynamic> _$WorkToJson(Work instance) => <String, dynamic>{
       'images': instance.images,
       'description': instance.description,
       'children': instance.children,
+      'blur_hash': instance.blurHash,
       'source_url': instance.sourceUrl,
       'other_language_editions_in_db': instance.otherLanguageEditions,
     };

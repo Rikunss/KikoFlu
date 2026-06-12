@@ -1,12 +1,6 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:sqflite/sqflite.dart';
 
 import 'package:kikoeru_flutter/src/services/playback_history_service.dart';
-import 'package:kikoeru_flutter/src/models/history_record.dart';
 import 'package:kikoeru_flutter/src/models/work.dart';
 import 'package:kikoeru_flutter/src/models/audio_track.dart';
 
@@ -16,18 +10,18 @@ Work _makeWork(int id, {String title = 'Test Work'}) {
   return Work.fromJson({
     'id': id,
     'title': '$title $id',
-    'circle': {'id': 1, 'name': 'Test Circle'},
+    'circle': const {'id': 1, 'name': 'Test Circle'},
     'create_date': '2024-01-01',
     'dl_count': 0,
     'price': 0,
     'review_count': 0,
     'rate_count': 0,
     'rate_average_2dp': 0.0,
-    'rate_count_detail': [],
+    'rate_count_detail': const [],
     'rank': null,
     'has_subtitle': false,
-    'tags': [],
-    'vas': [],
+    'tags': const [],
+    'vas': const [],
   });
 }
 

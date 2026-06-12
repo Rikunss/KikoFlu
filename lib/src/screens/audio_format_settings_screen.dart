@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -15,7 +16,7 @@ class AudioFormatSettingsScreen extends ConsumerStatefulWidget {
 
 class _AudioFormatSettingsScreenState
     extends ConsumerState<AudioFormatSettingsScreen> {
-  late List<AudioFormat> _formatOrder;
+  List<AudioFormat> _formatOrder = [];
 
   @override
   void initState() {
@@ -23,9 +24,11 @@ class _AudioFormatSettingsScreenState
     // 延迟初始化以确保provider已经加载
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final preference = ref.read(audioFormatPreferenceProvider);
-      setState(() {
-        _formatOrder = List.from(preference.priority);
-      });
+      if (mounted) {
+        setState(() {
+          _formatOrder = List.from(preference.priority);
+        });
+      }
     });
   }
 
@@ -40,6 +43,126 @@ class _AudioFormatSettingsScreenState
       );
       Navigator.of(context).pop();
     }
+  }
+
+  Widget _buildLoadingSkeleton(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Info card skeleton
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.3, end: 0.7),
+          duration: const Duration(milliseconds: 1000),
+          builder: (context, value, child) {
+            return Card(
+              elevation: 0,
+              color: cs.surfaceContainerLow,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              margin: const EdgeInsets.only(bottom: 16),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest
+                            .withValues(alpha: value * 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      height: 14,
+                      width: 120,
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest
+                            .withValues(alpha: value * 0.6),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        // Format card skeletons
+        ...List.generate(4, (i) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.3, end: 0.7),
+            duration: const Duration(milliseconds: 1000),
+            builder: (context, value, child) {
+              return Card(
+                elevation: 0,
+                color: cs.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest
+                              .withValues(alpha: value * 0.5),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              height: 14,
+                              width: 80 + (i * 20),
+                              decoration: BoxDecoration(
+                                color: cs.surfaceContainerHighest
+                                    .withValues(alpha: value * 0.6),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              height: 12,
+                              width: 40,
+                              decoration: BoxDecoration(
+                                color: cs.surfaceContainerHighest
+                                    .withValues(alpha: value * 0.4),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest
+                              .withValues(alpha: value * 0.3),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        )),
+      ],
+    );
   }
 
   Future<void> _resetToDefault() async {
@@ -78,12 +201,17 @@ class _AudioFormatSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return Scaffold(
       appBar: ScrollableAppBar(
         title: Text(S.of(context).audioFormatPriority, style: const TextStyle(fontSize: 18)),
         actions: [
           TextButton.icon(
-            onPressed: _resetToDefault,
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _resetToDefault();
+            },
             icon: const Icon(Icons.restart_alt),
             label: Text(S.of(context).restoreDefault),
           ),
@@ -91,31 +219,41 @@ class _AudioFormatSettingsScreenState
         ],
       ),
       body: _formatOrder.isEmpty
-          ? const Center(child: CircularProgressIndicator())
+          ? _buildLoadingSkeleton(context)
           : Column(
               children: [
                 // 说明卡片
                 Card(
+                  elevation: 0,
+                  color: cs.surfaceContainerLow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                   margin: const EdgeInsets.all(16),
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(
-                              Icons.info_outline,
-                              size: 20,
-                              color: Theme.of(context).colorScheme.primary,
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: cs.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.info_outline,
+                                size: 18,
+                                color: cs.primary,
+                              ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 10),
                             Text(
                               S.of(context).priorityDescription,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(
+                              style: tt.titleSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
                             ),
@@ -124,7 +262,10 @@ class _AudioFormatSettingsScreenState
                         const SizedBox(height: 12),
                         Text(
                           S.of(context).audioFormatPriorityDesc,
-                          style: const TextStyle(fontSize: 12, height: 1.5),
+                          style: tt.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                                height: 1.5,
+                              ),
                         ),
                       ],
                     ),
@@ -136,7 +277,7 @@ class _AudioFormatSettingsScreenState
                   child: ReorderableListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: _formatOrder.length,
-                    onReorder: (oldIndex, newIndex) {
+                    onReorderItem: (oldIndex, newIndex) {
                       setState(() {
                         if (newIndex > oldIndex) {
                           newIndex -= 1;
@@ -147,56 +288,83 @@ class _AudioFormatSettingsScreenState
                     },
                     itemBuilder: (context, index) {
                       final format = _formatOrder[index];
+                      final cs = Theme.of(context).colorScheme;
                       return Card(
                         key: ValueKey(format),
+                        elevation: 0,
+                        color: cs.surfaceContainerLow,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                         margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primaryContainer,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onPrimaryContainer,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          child: Row(
+                            children: [
+                              // Rank container
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: cs.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: cs.primary,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                          title: Text(
-                            format.displayName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
-                          subtitle: Text(
-                            '.${format.extension}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                          ),
-                          trailing: ReorderableDragStartListener(
-                            index: index,
-                            child: Icon(
-                              Icons.drag_handle,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
+                              const SizedBox(width: 14),
+                              // Format info
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      format.displayName,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15,
+                                        color: cs.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '.${format.extension}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Drag handle
+                              ReorderableDragStartListener(
+                                index: index,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: cs.onSurfaceVariant
+                                        .withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.drag_handle,
+                                    color: cs.onSurfaceVariant,
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       );
@@ -211,7 +379,10 @@ class _AudioFormatSettingsScreenState
                     child: SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: _saveSettings,
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          _saveSettings();
+                        },
                         icon: const Icon(Icons.check),
                         label: Text(S.of(context).saveSettings),
                       ),

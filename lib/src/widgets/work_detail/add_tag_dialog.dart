@@ -99,7 +99,7 @@ class _AddTagDialogState extends ConsumerState<AddTagDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(S.of(context).selectAtLeastOneTag),
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         ),
       );
       return;
@@ -124,7 +124,7 @@ class _AddTagDialogState extends ConsumerState<AddTagDialog> {
           SnackBar(
             content: Text(S.of(context).tagSubmitSuccess),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -199,7 +199,7 @@ class _AddTagDialogState extends ConsumerState<AddTagDialog> {
                 spacing: 4,
                 runSpacing: 4,
                 children: _selectedTagIds.map((tagId) {
-                  final tag = _allTags.firstWhere((t) => t['id'] == tagId);
+                  final tag = _allTags.firstWhere((t) => t['id'] == tagId, orElse: () => <String, dynamic>{'id': tagId, 'name': tagId.toString()});
                   return Chip(
                     label: Text(
                       TagLocalizer.localize(tagId, tag['name'], Localizations.localeOf(context)),

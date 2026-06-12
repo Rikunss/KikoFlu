@@ -6,40 +6,49 @@ import '../widgets/pagination_bar.dart';
 import '../utils/scroll_optimization.dart';
 import '../../l10n/app_localizations.dart';
 
-class HistoryScreen extends ConsumerWidget {
+class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final historyState = ref.watch(historyProvider);
-    final history = historyState.records;
+  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends ConsumerState<HistoryScreen>
+    with AutomaticKeepAliveClientMixin {
+  bool _hasVisited = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // must call for AutomaticKeepAliveClientMixin
+
+    final history = ref.watch(historyProvider.select((s) => s.records));
+    final isLoading = ref.watch(historyProvider.select((s) => s.isLoading));
+    final (currentPage, totalCount, pageSize, hasMore) = ref.watch(
+      historyProvider.select(
+        (s) => (s.currentPage, s.totalCount, s.pageSize, s.hasMore),
+      ),
+    );
+
+    // Defer data loading to first visit — not in initState
+    if (!_hasVisited) {
+      _hasVisited = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && history.isEmpty && !isLoading) {
+          ref.read(historyProvider.notifier).load(refresh: true);
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: history.isEmpty && !historyState.isLoading
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.history,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    S.of(context).noPlayHistory,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            )
+      body: history.isEmpty && !isLoading
+          ? _buildEmptyState(context)
           : CustomScrollView(
-              cacheExtent: ScrollOptimization.cacheExtent,
-              physics: ScrollOptimization.physics,
+              // ignore: deprecated_member_use
+              cacheExtent: ScrollOptimization.cacheExtent, physics: ScrollOptimization.physics,
               slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.all(16),
@@ -54,7 +63,12 @@ class HistoryScreen extends ConsumerWidget {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final record = history[index];
-                        return HistoryWorkCard(record: record);
+                        return RepaintBoundary(
+                          child: HistoryWorkCard(
+                            key: ValueKey(record.work.id),
+                            record: record,
+                          ),
+                        );
                       },
                       childCount: history.length,
                     ),
@@ -65,11 +79,11 @@ class HistoryScreen extends ConsumerWidget {
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 80, top: 16),
                       child: PaginationBar(
-                        currentPage: historyState.currentPage,
-                        totalCount: historyState.totalCount,
-                        pageSize: historyState.pageSize,
-                        hasMore: historyState.hasMore,
-                        isLoading: historyState.isLoading,
+                        currentPage: currentPage,
+                        totalCount: totalCount,
+                        pageSize: pageSize,
+                        hasMore: hasMore,
+                        isLoading: isLoading,
                         onGoToPage: (page) {
                           ref.read(historyProvider.notifier).goToPage(page);
                         },
@@ -91,6 +105,52 @@ class HistoryScreen extends ConsumerWidget {
               child: const Icon(Icons.delete_outline),
             )
           : null,
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final s = S.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer.withValues(alpha: 0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.history,
+                size: 56,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              s.noPlayHistory,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              S.of(context).noData,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 

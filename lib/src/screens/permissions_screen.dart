@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../src/services/log_service.dart';
 import '../utils/snackbar_util.dart';
 
 /// 权限管理页面（仅安卓平台）
@@ -38,7 +39,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
       final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
       _ignoreBatteryOptimizationsGranted = batteryStatus.isGranted;
     } catch (e) {
-      debugPrint('检查权限失败: $e');
+      LogService.instance.error('检查权限失败: $e');
     }
 
     if (mounted) {
@@ -119,6 +120,8 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     // 非安卓平台显示提示信息
     if (!Platform.isAndroid) {
       return Scaffold(
@@ -132,18 +135,18 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               Icon(
                 Icons.info_outline,
                 size: 64,
-                color: Theme.of(context).colorScheme.primary,
+                color: cs.primary,
               ),
               const SizedBox(height: 16),
               Text(
                 S.of(context).permissionsAndroidOnly,
-                style: Theme.of(context).textTheme.titleMedium,
+                style: tt.titleMedium,
               ),
               const SizedBox(height: 8),
               Text(
                 S.of(context).permissionsNotNeeded,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                style: tt.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
                     ),
               ),
             ],
@@ -170,7 +173,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               children: [
                 // 权限说明
                 Card(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  color: cs.surfaceContainerHighest,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -180,18 +183,13 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                           children: [
                             Icon(
                               Icons.lightbulb_outline,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              color: cs.onSurfaceVariant,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
                             Text(
                               S.of(context).permissionExplanation,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(
+                              style: tt.titleSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
                             ),
@@ -222,7 +220,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                       Icons.notifications_outlined,
                       color: _notificationGranted
                           ? Colors.green
-                          : Theme.of(context).colorScheme.primary,
+                          : cs.primary,
                       size: 32,
                     ),
                     title: Text(S.of(context).notificationPermission),
@@ -248,7 +246,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                       Icons.battery_charging_full,
                       color: _ignoreBatteryOptimizationsGranted
                           ? Colors.green
-                          : Theme.of(context).colorScheme.primary,
+                          : cs.primary,
                       size: 32,
                     ),
                     title: Text(S.of(context).backgroundRunningPermission),
@@ -275,13 +273,15 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
     String title,
     String description,
   ) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(
           Icons.check_circle_outline,
           size: 16,
-          color: Theme.of(context).colorScheme.primary,
+          color: cs.primary,
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -290,14 +290,14 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             children: [
               Text(
                 title,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                style: tt.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
               ),
               Text(
                 description,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                style: tt.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
                     ),
               ),
             ],

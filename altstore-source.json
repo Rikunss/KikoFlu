@@ -9,19 +9,19 @@
   "sourceURL": "https://raw.githubusercontent.com/pa-jesusf/KikoFlu/main/altstore-source.json",
   "apps": [
     {
-      "name": "KikoFlu",
+      "name": "KikoFlu Edge",
       "bundleIdentifier": "com.meteor.kikoeruflutter",
-      "developerName": "pa-jesusf",
+      "developerName": "Meteor-Sage, Rikunss",
       "subtitle": "Kikoeru Client",
       "localizedDescription": "A cross-platform client for browsing and playing Kikoeru server content. Features include background playback, subtitle system, offline download, multi-language support, and more.",
       "iconURL": "https://raw.githubusercontent.com/pa-jesusf/KikoFlu/main/assets/icons/app_icon_opaque.png",
       "tintColor": "6750A4",
       "versions": [
         {
-          "version": "3.1.1",
+          "version": "3.2.0",
           "date": "2026-04-07",
           "size": 13143146,
-          "downloadURL": "https://github.com/pa-jesusf/KikoFlu/releases/download/v3.1.1/KikoFlu-ios-unsigned_311.ipa",
+          "downloadURL": "https://github.com/pa-jesusf/KikoFlu/releases/download/v3.2.0/KikoFlu-ios-unsigned_320.ipa",
           "localizedDescription": "新增：Linux支持、多语言支持、快捷翻译按钮、推荐系统、悬浮字幕触摸开关、已下载搜索排序、日志界面、字幕库索引优化、本地文件扫描、低认同度标签区分显示\n修复：最大并行下载数保护、悬浮字幕多行显示、UI动画修复、字幕解码稳定性、iOS无法保存文件\nNew: Linux support, multi-language support, quick translation button, recommendation system, floating subtitle touch toggle, downloaded items search sorting, log interface, subtitle library indexing optimization, local file scanning, and differentiated display for low-confidence tags.\nFixed: maximum concurrent download limit protection, multi-line display for floating subtitles, UI animation fixes, improved subtitle decoding stability, and an issue where files could not be saved on iOS."
         }
       ]

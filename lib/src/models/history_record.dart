@@ -11,6 +11,11 @@ class HistoryRecord extends Equatable {
   final int playlistIndex;
   final int playlistTotal;
 
+  /// Approximate total time (ms) spent listening to this work across ALL
+  /// sessions. Accumulated by [PlaybackHistoryService] on each checkpoint
+  /// tick by measuring wall-clock time between ticks when playing.
+  final int totalListenedMs;
+
   const HistoryRecord({
     required this.work,
     required this.lastPlayedTime,
@@ -18,6 +23,7 @@ class HistoryRecord extends Equatable {
     this.lastPositionMs = 0,
     this.playlistIndex = 0,
     this.playlistTotal = 0,
+    this.totalListenedMs = 0,
   });
 
   HistoryRecord copyWith({
@@ -27,6 +33,7 @@ class HistoryRecord extends Equatable {
     int? lastPositionMs,
     int? playlistIndex,
     int? playlistTotal,
+    int? totalListenedMs,
   }) {
     return HistoryRecord(
       work: work ?? this.work,
@@ -35,6 +42,7 @@ class HistoryRecord extends Equatable {
       lastPositionMs: lastPositionMs ?? this.lastPositionMs,
       playlistIndex: playlistIndex ?? this.playlistIndex,
       playlistTotal: playlistTotal ?? this.playlistTotal,
+      totalListenedMs: totalListenedMs ?? this.totalListenedMs,
     );
   }
 
@@ -48,6 +56,7 @@ class HistoryRecord extends Equatable {
       'last_position_ms': lastPositionMs,
       'playlist_index': playlistIndex,
       'playlist_total': playlistTotal,
+      'total_listened_ms': totalListenedMs,
     };
   }
 
@@ -62,6 +71,7 @@ class HistoryRecord extends Equatable {
       lastPositionMs: map['last_position_ms'] ?? 0,
       playlistIndex: map['playlist_index'] ?? 0,
       playlistTotal: map['playlist_total'] ?? 0,
+      totalListenedMs: map['total_listened_ms'] ?? 0,
     );
   }
 
@@ -73,5 +83,6 @@ class HistoryRecord extends Equatable {
         lastPositionMs,
         playlistIndex,
         playlistTotal,
+        totalListenedMs,
       ];
 }

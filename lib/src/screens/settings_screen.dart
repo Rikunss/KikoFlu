@@ -1,28 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
-import 'dart:io';
 
-import 'account_management_screen.dart';
-import 'download_path_settings_screen.dart';
-import 'theme_settings_screen.dart';
-import 'ui_settings_screen.dart';
-import 'preferences_screen.dart';
+import 'settings/account_screen.dart';
+import 'settings/playback_screen.dart';
+import 'settings/usb_dac_settings_screen.dart';
+import 'settings/appearance_screen.dart';
+import 'settings/downloads_storage_screen.dart';
+import 'settings/privacy_content_screen.dart';
+import 'settings/translation_screen.dart';
+import 'settings/advanced_screen.dart';
+import 'listening_statistics_screen.dart';
 import 'about_screen.dart';
-import 'permissions_screen.dart';
-import 'privacy_mode_settings_screen.dart';
-import 'floating_lyric_style_screen.dart';
-import 'log_screen.dart';
-import '../providers/locale_provider.dart';
-import '../providers/settings_provider.dart';
-import '../providers/update_provider.dart';
-import '../providers/floating_lyric_provider.dart';
-import '../services/cache_service.dart';
-import '../services/translation_service.dart';
-import '../utils/snackbar_util.dart';
-import '../widgets/scrollable_appbar.dart';
-import '../widgets/download_fab.dart';
+import 'settings/widgets/settings_dashboard_card.dart';
 
+/// MD3 Dashboard-style Settings screen.
+///
+/// Features:
+/// - Large Top App Bar (SliverAppBar.large)
+/// - Live search bar for settings lookup
+/// - 8 section cards with tonal icons
+/// - Max 2-level navigation depth
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -31,1186 +29,259 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  String _cacheSize = '';
-  bool _isUpdatingCacheSize = false;
-  ScaffoldMessengerState? _scaffoldMessenger;
-
-  @override
-  void initState() {
-    super.initState();
-    // 延迟执行，确保 ref 可用
-    Future.microtask(() {
-      if (mounted) {
-        _updateCacheSize();
-      }
-    });
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_cacheSize.isEmpty) {
-      _cacheSize = S.of(context).calculating;
-    }
-    _scaffoldMessenger = ScaffoldMessenger.of(context);
-  }
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+  String _searchQuery = '';
 
   @override
   void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
-  // 安全显示 SnackBar 的辅助方法
-  void _showSnackBar(SnackBar snackBar) {
-    if (!mounted) return;
-
-    // 提取 SnackBar 内容
-    final content = snackBar.content;
-    String message = '';
-
-    if (content is Text) {
-      message = content.data ?? '';
-    } else if (content is Row) {
-      final children = content.children;
-      for (final child in children) {
-        if (child is Text) {
-          message = child.data ?? '';
-          break;
-        } else if (child is Expanded) {
-          final expandedChild = child.child;
-          if (expandedChild is Text) {
-            message = expandedChild.data ?? '';
-            break;
-          }
-        }
-      }
-    }
-
-    if (message.isEmpty) {
-      final messenger = _scaffoldMessenger ?? ScaffoldMessenger.of(context);
-      messenger.showSnackBar(snackBar);
-      return;
-    }
-
-    // 根据背景色判断类型
-    final backgroundColor = snackBar.backgroundColor;
-    final duration = snackBar.duration;
-
-    if (backgroundColor == Colors.red ||
-        backgroundColor == Theme.of(context).colorScheme.error) {
-      SnackBarUtil.showError(context, message, duration: duration);
-    } else if (backgroundColor == Colors.green) {
-      SnackBarUtil.showSuccess(context, message, duration: duration);
-    } else if (backgroundColor == Colors.orange) {
-      SnackBarUtil.showWarning(context, message, duration: duration);
-    } else {
-      SnackBarUtil.showInfo(context, message, duration: duration);
-    }
-  }
-
-  Future<void> _updateCacheSize() async {
-    if (_isUpdatingCacheSize) return;
-    _isUpdatingCacheSize = true;
-
-    if (mounted) {
-      setState(() {
-        _cacheSize = S.of(context).calculating;
-      });
-    }
-
-    try {
-      final size = await CacheService.getFormattedCacheSize();
-      if (mounted) {
-        setState(() {
-          _cacheSize = size;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _cacheSize = S.of(context).fetchFailed;
-        });
-      }
-    } finally {
-      _isUpdatingCacheSize = false;
-    }
+  void _navigate(Widget screen) {
+    // Unfocus search bar before navigating so it doesn't auto-focus on pop
+    _searchFocusNode.unfocus();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => screen),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // 监听缓存刷新触发器（只在 build 中设置一次监听）
-    ref.listen<int>(
-      settingsCacheRefreshTriggerProvider,
-      (_, __) {
-        _updateCacheSize();
-      },
-    );
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final s = S.of(context);
+    final isSearching = _searchQuery.isNotEmpty;
 
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
-    final cards = [
-      _buildAccountCard(context),
-      _buildDownloadAndCacheCard(context),
-      _buildAppearanceAndAboutCard(context),
+    // ── Card data with search keywords ──
+    final allCards = <_SettingsCardData>[
+      _SettingsCardData(
+        icon: Icons.music_note_rounded,
+        iconColor: colorScheme.primary,
+        title: s.settingsPlayback,
+        subtitle: s.settingsPlaybackSubtitle,
+        screen: const PlaybackScreen(),
+        keywords: ['equalizer', 'crossfade', 'gapless', 'audio format', 'eq'],
+      ),
+      _SettingsCardData(
+        icon: Icons.palette_rounded,
+        iconColor: const Color(0xFF9C27B0),
+        title: s.settingsAppearance,
+        subtitle: s.settingsAppearanceSubtitle,
+        screen: const AppearanceScreen(),
+        keywords: ['theme', 'language', 'color', 'dark', 'light', 'display', 'card size', 'page'],
+      ),
+      _SettingsCardData(
+        icon: Icons.download_rounded,
+        iconColor: const Color(0xFF00796B),
+        title: s.settingsDownloadsStorage,
+        subtitle: s.settingsDownloadsStorageSubtitle,
+        screen: const DownloadsStorageScreen(),
+        keywords: ['download path', 'cache', 'storage', 'clear', 'space'],
+      ),
+      _SettingsCardData(
+        icon: Icons.shield_rounded,
+        iconColor: const Color(0xFFC62828),
+        title: s.settingsPrivacyContent,
+        subtitle: s.settingsPrivacyContentSubtitle,
+        screen: const PrivacyContentScreen(),
+        keywords: ['privacy mode', 'block', 'tag', 'voice actor', 'circle', 'blur'],
+      ),
+      _SettingsCardData(
+        icon: Icons.translate_rounded,
+        iconColor: const Color(0xFF283593),
+        title: s.settingsTranslation,
+        subtitle: s.settingsTranslationSubtitle,
+        screen: const TranslationScreen(),
+        keywords: ['translate', 'llm', 'api', 'openai', 'google', 'prompt'],
+      ),
+      _SettingsCardData(
+        icon: Icons.person_rounded,
+        iconColor: const Color(0xFF37474F),
+        title: s.settingsAccount,
+        subtitle: s.settingsAccountSubtitle,
+        screen: const AccountScreen(),
+        keywords: ['floating lyric', 'login', 'logout', 'server', 'permission', 'notification'],
+      ),
+      const _SettingsCardData(
+        icon: Icons.usb,
+        iconColor: Color(0xFF00695C),
+        title: 'USB DAC (Beta)',
+        subtitle: 'USB DAC routing & AAudio exclusive mode',
+        screen: UsbDacSettingsScreen(),
+        keywords: ['usb', 'dac', 'aaudio', 'exclusive mode', 'bit-perfect', 'mixer bypass', 'volume lock'],
+      ),
+      _SettingsCardData(
+        icon: Icons.bar_chart_rounded,
+        iconColor: const Color(0xFFE65100),
+        title: s.listeningStatsTitle,
+        subtitle: s.listeningStatsSubtitle,
+        screen: const ListeningStatisticsScreen(),
+        keywords: ['statistics', 'stats', 'listening', 'history', 'top', 'va', 'voice actor', 'streak', 'chart'],
+      ),
+      _SettingsCardData(
+        icon: Icons.tune_rounded,
+        iconColor: const Color(0xFF546E7A),
+        title: s.settingsAdvanced,
+        subtitle: s.settingsAdvancedSubtitle,
+        screen: const AdvancedScreen(),
+        keywords: ['sort', 'default', 'subtitle library', 'priority', 'log', 'debug', 'device info', 'legacy'],
+      ),
+      _SettingsCardData(
+        icon: Icons.info_outline_rounded,
+        iconColor: const Color(0xFF616161),
+        title: s.aboutTitle,
+        subtitle: s.settingsAboutSubtitle,
+        screen: const AboutScreen(),
+        keywords: ['version', 'update', 'license', 'author', 'repo', 'github'],
+      ),
     ];
+
+    // ── Filter ──
+    final filteredCards = isSearching
+        ? allCards.where((c) => c.matches(_searchQuery)).toList()
+        : allCards;
 
     return Scaffold(
-      floatingActionButton: const DownloadFab(),
-      appBar: ScrollableAppBar(
-        title: Text(S.of(context).settingsTitle, style: const TextStyle(fontSize: 18)),
-      ),
-      body: isLandscape
-          ? _buildLandscapeLayout(cards)
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemBuilder: (context, index) => cards[index],
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemCount: cards.length,
-            ),
-    );
-  }
-
-  Widget _buildLandscapeLayout(List<Widget> cards) {
-    final column1 = <Widget>[];
-    final column2 = <Widget>[];
-
-    void addToColumn(List<Widget> column, Widget card) {
-      if (column.isNotEmpty) {
-        column.add(const SizedBox(height: 16));
-      }
-      column.add(card);
-    }
-
-    for (var i = 0; i < cards.length; i++) {
-      if (i.isEven) {
-        addToColumn(column1, cards[i]);
-      } else {
-        addToColumn(column2, cards[i]);
-      }
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: column1,
+      body: CustomScrollView(
+        slivers: [
+          // ── Large Top App Bar (MD3) ──
+          SliverAppBar.large(
+            title: Text(
+              s.settingsTitle,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: column2.isEmpty ? [const SizedBox.shrink()] : column2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildAccountCard(BuildContext context) {
-    final privacySettings = ref.watch(privacyModeSettingsProvider);
-
-    return Card(
-      child: Column(
-        children: [
-          ListTile(
-            leading: Icon(Icons.manage_accounts,
-                color: Theme.of(context).colorScheme.primary),
-            title: Text(S.of(context).accountManagement),
-            subtitle: Text(S.of(context).accountManagementSubtitle),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const AccountManagementScreen(),
+          // ── Search Bar ──
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: SearchBar(
+                hintText: s.searchSettings,
+                leading: const Icon(Icons.search),
+                trailing: [
+                  if (_searchQuery.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    ),
+                ],
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 16),
                 ),
-              );
-            },
-          ),
-          Divider(color: Theme.of(context).colorScheme.outlineVariant),
-          ListTile(
-            leading: Icon(Icons.privacy_tip_outlined,
-                color: Theme.of(context).colorScheme.primary),
-            title: Text(S.of(context).privacyMode),
-            subtitle: Text(
-              privacySettings.enabled ? S.of(context).privacyModeEnabled : S.of(context).privacyModeDisabled,
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const PrivacyModeSettingsScreen(),
+                elevation: const WidgetStatePropertyAll(0),
+                backgroundColor: WidgetStatePropertyAll(
+                  colorScheme.surfaceContainerHighest,
                 ),
-              );
-            },
-          ),
-          // 显示悬浮字幕 (Android & Windows & macOS & iOS)
-          if (Platform.isAndroid ||
-              Platform.isWindows ||
-              Platform.isMacOS ||
-              Platform.isIOS) ...[
-            Divider(color: Theme.of(context).colorScheme.outlineVariant),
-            _buildFloatingLyricTile(context),
-          ],
-
-          // 仅在安卓平台显示权限管理
-          if (Platform.isAndroid) ...[
-            Divider(color: Theme.of(context).colorScheme.outlineVariant),
-            ListTile(
-              leading: Icon(Icons.security,
-                  color: Theme.of(context).colorScheme.primary),
-              title: Text(S.of(context).permissionManagement),
-              subtitle: Text(S.of(context).permissionManagementSubtitle),
-              trailing: const Icon(Icons.arrow_forward_ios),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const PermissionsScreen(),
+                shape: WidgetStatePropertyAll(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
                   ),
-                );
-              },
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// 悬浮字幕开关组件
-  Widget _buildFloatingLyricTile(BuildContext context) {
-    final isEnabled = ref.watch(floatingLyricEnabledProvider);
-
-    return Column(
-      children: [
-        SwitchListTile(
-          secondary: Icon(
-            Icons.subtitles_outlined,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          title: Text(S.of(context).desktopFloatingLyric),
-          subtitle: Text(
-            isEnabled ? S.of(context).floatingLyricEnabled : S.of(context).privacyModeDisabled,
-            style: TextStyle(
-              color: isEnabled
-                  ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
-                  : null,
+                ),
+                focusNode: _searchFocusNode,
+                controller: _searchController,
+                onChanged: (value) {
+                  setState(() => _searchQuery = value.trim());
+                },
+              ),
             ),
           ),
-          value: isEnabled,
-          onChanged: (value) async {
-            try {
-              await ref.read(floatingLyricEnabledProvider.notifier).toggle();
-            } catch (e) {
-              if (mounted) {
-                SnackBarUtil.showError(
-                  context,
-                  S.of(context).operationFailedWithError(e.toString()),
-                );
-              }
-            }
-          },
-        ),
-        if (isEnabled) ...[
-          Divider(
-            height: 1,
-            color: Theme.of(context).colorScheme.outlineVariant,
-            indent: 72,
-          ),
-          ListTile(
-            leading: const SizedBox(width: 24), // 占位对齐
-            title: Text(S.of(context).styleSettings),
-            subtitle: Text(S.of(context).styleSettingsSubtitle),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const FloatingLyricStyleScreen(),
-                ),
-              );
-            },
-          ),
-          if (Platform.isAndroid) ...[
-            Divider(
-              height: 1,
-              color: Theme.of(context).colorScheme.outlineVariant,
-              indent: 72,
-            ),
-            _buildFloatingLyricTouchTile(context),
-          ],
-          if (Platform.isIOS) ...[
-            Divider(
-              height: 1,
-              color: Theme.of(context).colorScheme.outlineVariant,
-              indent: 72,
-            ),
-            _buildFloatingFPSTile(context),
-            Divider(
-              height: 1,
-              color: Theme.of(context).colorScheme.outlineVariant,
-              indent: 72,
-            ),
-            _buildFloatingNetworkSpeedTile(context),
-          ],
-        ],
-      ],
-    );
-  }
 
-  /// 悬浮字幕触摸开关（仅 Android）
-  Widget _buildFloatingLyricTouchTile(BuildContext context) {
-    final touchEnabled = ref.watch(floatingLyricTouchEnabledProvider);
-    return SwitchListTile(
-      secondary: const SizedBox(width: 24),
-      title: Text(S.of(context).floatingLyricTouch),
-      subtitle: Text(
-        touchEnabled
-            ? S.of(context).floatingLyricTouchEnabled
-            : S.of(context).floatingLyricTouchDisabled,
-      ),
-      value: !touchEnabled,
-      onChanged: (value) async {
-        await ref.read(floatingLyricTouchEnabledProvider.notifier).toggle();
-      },
-    );
-  }
-
-  /// 悬浮窗 FPS 显示开关（仅 iOS）
-  Widget _buildFloatingFPSTile(BuildContext context) {
-    final fpsEnabled = ref.watch(floatingLyricFPSEnabledProvider);
-    return SwitchListTile(
-      secondary: const SizedBox(width: 24),
-      title: Text(S.of(context).floatingFPS),
-      subtitle: Text(
-        fpsEnabled
-            ? S.of(context).floatingFPSEnabled
-            : S.of(context).floatingFPSDisabled,
-      ),
-      value: fpsEnabled,
-      onChanged: (value) async {
-        await ref.read(floatingLyricFPSEnabledProvider.notifier).toggle();
-      },
-    );
-  }
-
-  /// 悬浮窗网速显示开关（仅 iOS）
-  Widget _buildFloatingNetworkSpeedTile(BuildContext context) {
-    final networkSpeedEnabled = ref.watch(floatingLyricNetworkSpeedEnabledProvider);
-    return SwitchListTile(
-      secondary: const SizedBox(width: 24),
-      title: Text(S.of(context).floatingNetworkSpeed),
-      subtitle: Text(
-        networkSpeedEnabled
-            ? S.of(context).floatingNetworkSpeedEnabled
-            : S.of(context).floatingNetworkSpeedDisabled,
-      ),
-      value: networkSpeedEnabled,
-      onChanged: (value) async {
-        await ref.read(floatingLyricNetworkSpeedEnabledProvider.notifier).toggle();
-      },
-    );
-  }
-
-  Widget _buildDownloadAndCacheCard(BuildContext context) {
-    return Card(
-      child: Column(
-        children: [
-          ListTile(
-            leading: Icon(Icons.folder_outlined,
-                color: Theme.of(context).colorScheme.primary),
-            title: Text(S.of(context).downloadPath),
-            subtitle: Text(S.of(context).downloadPathSubtitle),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const DownloadPathSettingsScreen(),
-                ),
-              );
-            },
-          ),
-          Divider(color: Theme.of(context).colorScheme.outlineVariant),
-          ListTile(
-            leading: Icon(Icons.storage,
-                color: Theme.of(context).colorScheme.primary),
-            title: Text(S.of(context).cacheManagement),
-            subtitle: Text(S.of(context).currentCache(_cacheSize)),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              _showCacheManagementDialog();
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLanguagePicker(BuildContext context, WidgetRef ref) {
-    final currentLocale = ref.read(localeProvider);
-    final options = <(String, Locale?)>[
-      (S.of(context).languageSystem, null),
-      (S.of(context).languageZh, const Locale('zh')),
-      (S.of(context).languageZhTw,
-          const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant')),
-      (S.of(context).languageEn, const Locale('en')),
-      (S.of(context).languageJa, const Locale('ja')),
-      (S.of(context).languageRu, const Locale('ru')),
-    ];
-
-    showDialog(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: Text(S.of(context).settingsLanguage),
-        children: options.map((option) {
-          final (label, locale) = option;
-          return RadioListTile<int>(
-            title: Text(label),
-            value: options.indexOf(option),
-            groupValue: options.indexWhere((o) =>
-                o.$2?.languageCode == currentLocale?.languageCode &&
-                o.$2?.scriptCode == currentLocale?.scriptCode),
-            onChanged: (_) {
-              ref.read(localeProvider.notifier).setLocale(locale);
-              Navigator.of(context).pop();
-            },
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildAppearanceAndAboutCard(BuildContext context) {
-    return Card(
-      child: Column(
-        children: [
-          ListTile(
-            leading: Icon(Icons.palette,
-                color: Theme.of(context).colorScheme.primary),
-            title: Text(S.of(context).themeSettings),
-            subtitle: Text(S.of(context).themeSettingsSubtitle),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const ThemeSettingsScreen(),
-                ),
-              );
-            },
-          ),
-          Divider(color: Theme.of(context).colorScheme.outlineVariant),
-          Consumer(
-            builder: (context, ref, _) {
-              final currentLocale = ref.watch(localeProvider);
-              String localeLabel;
-              if (currentLocale == null) {
-                localeLabel = S.of(context).languageSystem;
-              } else if (currentLocale.scriptCode == 'Hant') {
-                localeLabel = S.of(context).languageZhTw;
-              } else {
-                localeLabel = switch (currentLocale.languageCode) {
-                  'zh' => S.of(context).languageZh,
-                  'en' => S.of(context).languageEn,
-                  'ja' => S.of(context).languageJa,
-                  'ru' => S.of(context).languageRu,
-                  _ => currentLocale.languageCode,
-                };
-              }
-              return ListTile(
-                leading: Icon(Icons.language,
-                    color: Theme.of(context).colorScheme.primary),
-                title: Text(S.of(context).settingsLanguage),
-                subtitle: Text(localeLabel),
-                trailing: const Icon(Icons.arrow_forward_ios),
-                onTap: () => _showLanguagePicker(context, ref),
-              );
-            },
-          ),
-          Divider(color: Theme.of(context).colorScheme.outlineVariant),
-          ListTile(
-            leading: Icon(Icons.dashboard_customize,
-                color: Theme.of(context).colorScheme.primary),
-            title: Text(S.of(context).uiSettings),
-            subtitle: Text(S.of(context).uiSettingsSubtitle),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const UiSettingsScreen(),
-                ),
-              );
-            },
-          ),
-          Divider(color: Theme.of(context).colorScheme.outlineVariant),
-          ListTile(
-            leading:
-                Icon(Icons.tune, color: Theme.of(context).colorScheme.primary),
-            title: Text(S.of(context).preferenceSettings),
-            subtitle: Text(S.of(context).preferenceSettingsSubtitle),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const PreferencesScreen(),
-                ),
-              );
-            },
-          ),
-          Divider(color: Theme.of(context).colorScheme.outlineVariant),
-          ListTile(
-            leading: Icon(Icons.article_outlined,
-                color: Theme.of(context).colorScheme.primary),
-            title: Text(S.of(context).logTitle),
-            subtitle: Text(S.of(context).logSubtitle),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const LogScreen(),
-                ),
-              );
-            },
-          ),
-          Divider(color: Theme.of(context).colorScheme.outlineVariant),
-          Consumer(
-            builder: (context, ref, _) {
-              final showRedDot = ref.watch(showUpdateRedDotProvider);
-              final hasNewVersion = ref.watch(hasNewVersionProvider);
-
-              return ListTile(
-                leading: Stack(
-                  children: [
-                    Icon(Icons.info_outline,
-                        color: Theme.of(context).colorScheme.primary),
-                    // Red dot indicator for updates (only when not notified)
-                    if (showRedDot)
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Theme.of(context).colorScheme.surface,
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                title: Text(S.of(context).aboutTitle),
-                subtitle: Text(S.of(context).aboutSubtitle),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (hasNewVersion)
+          // ── Dashboard Cards or No Results ──
+          if (isSearching && filteredCards.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
+                        width: 80,
+                        height: 80,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Theme.of(context).colorScheme.primaryContainer,
-                              Theme.of(context).colorScheme.secondaryContainer,
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withOpacity(0.3),
-                            width: 1,
-                          ),
+                          color: colorScheme.primaryContainer
+                              .withValues(alpha: 0.3),
+                          shape: BoxShape.circle,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.new_releases,
-                              size: 14,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              S.of(context).hasNewVersion,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
-                          ],
+                        child: Icon(
+                          Icons.search_off_rounded,
+                          size: 40,
+                          color: colorScheme.primary,
                         ),
                       ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward_ios),
-                  ],
+                      const SizedBox(height: 20),
+                      Text(
+                        s.noResults,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const AboutScreen(),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
+              ),
+            )
+          else
+            SliverList(
+              delegate: SliverChildListDelegate([
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      ...filteredCards.map((card) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: SettingsDashboardCard(
+                          icon: card.icon,
+                          iconColor: card.iconColor,
+                          title: card.title,
+                          subtitle: card.subtitle,
+                          onTap: () => _navigate(card.screen),
+                        ),
+                      )),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ]),
+            ),
         ],
       ),
     );
   }
+}
 
-  // 显示缓存管理对话框
-  Future<void> _showCacheManagementDialog() async {
-    // 直接使用已经获取的 _cacheSize，避免重复调用
-    final currentSize = await CacheService.getCacheSize();
-    final formattedSize = _cacheSize; // 使用已缓存的格式化字符串
-    int currentLimit = await CacheService.getCacheSizeLimit();
+/// Internal data holder for a settings dashboard card.
+class _SettingsCardData {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final Widget screen;
+  final List<String> keywords;
 
-    if (!mounted) return;
+  const _SettingsCardData({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.screen,
+    this.keywords = const [],
+  });
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        // 使用独立的状态变量控制滑动条
-        int tempLimit = currentLimit;
-
-        // 非线性刻度映射函数
-        // 滑动条值 0-100 映射到实际缓存大小
-        // 0-50: 100MB-1000MB (每档约18MB)
-        // 50-75: 1000MB-3000MB (每档约80MB)
-        // 75-90: 3000MB-5000MB (每档约133MB)
-        // 90-100: 5000MB-10240MB (每档约524MB)
-        int sliderValueToMB(double sliderValue) {
-          if (sliderValue <= 50) {
-            // 100MB to 1000MB
-            return 100 + ((sliderValue / 50) * 900).toInt();
-          } else if (sliderValue <= 75) {
-            // 1000MB to 3000MB
-            return 1000 + (((sliderValue - 50) / 25) * 2000).toInt();
-          } else if (sliderValue <= 90) {
-            // 3000MB to 5000MB
-            return 3000 + (((sliderValue - 75) / 15) * 2000).toInt();
-          } else {
-            // 5000MB to 10240MB
-            return 5000 + (((sliderValue - 90) / 10) * 5240).toInt();
-          }
-        }
-
-        // MB值反向映射到滑动条值
-        double mbToSliderValue(int mb) {
-          if (mb <= 1000) {
-            return ((mb - 100) / 900.0) * 50;
-          } else if (mb <= 3000) {
-            return 50 + (((mb - 1000) / 2000.0) * 25);
-          } else if (mb <= 5000) {
-            return 75 + (((mb - 3000) / 2000.0) * 15);
-          } else {
-            return 90 + (((mb - 5000) / 5240.0) * 10);
-          }
-        }
-
-        double currentSliderValue = mbToSliderValue(tempLimit);
-
-        final isLandscape =
-            MediaQuery.of(context).orientation == Orientation.landscape;
-
-        return StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(S.of(context).cacheManagement, style: const TextStyle(fontSize: 18)),
-                ),
-                if (isLandscape)
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                    tooltip: S.of(context).close,
-                  ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: isLandscape
-                  ? SizedBox(
-                      width: MediaQuery.of(context).size.width * 0.65,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 左列：缓存信息
-                          Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // 当前缓存大小
-                                Card(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .surfaceContainerHighest,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          S.of(context).currentCacheSize,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          formattedSize,
-                                          style: TextStyle(
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.bold,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .primary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        LinearProgressIndicator(
-                                          value: currentLimit > 0
-                                              ? (currentSize /
-                                                      (currentLimit *
-                                                          1024 *
-                                                          1024))
-                                                  .clamp(0.0, 1.0)
-                                              : 0.0,
-                                          backgroundColor: Colors.grey[300],
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                            currentSize >
-                                                    currentLimit * 1024 * 1024
-                                                ? Colors.red
-                                                : Theme.of(context)
-                                                    .colorScheme
-                                                    .primary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          S.of(context).cacheLimitLabelMB(currentLimit),
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                // 使用量详情
-                                Card(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .surfaceContainerHighest,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          S.of(context).cacheUsagePercent,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              '${currentLimit > 0 ? ((currentSize / (currentLimit * 1024 * 1024)) * 100).clamp(0.0, 100.0).toStringAsFixed(1) : "0.0"}%',
-                                              style: TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.bold,
-                                                color: currentSize >
-                                                        currentLimit *
-                                                            1024 *
-                                                            1024
-                                                    ? Colors.red
-                                                    : Theme.of(context)
-                                                        .colorScheme
-                                                        .primary,
-                                              ),
-                                            ),
-                                            Icon(
-                                              currentSize >
-                                                      currentLimit * 1024 * 1024
-                                                  ? Icons.warning_amber_rounded
-                                                  : Icons.check_circle_outline,
-                                              color: currentSize >
-                                                      currentLimit * 1024 * 1024
-                                                  ? Colors.red
-                                                  : Colors.green,
-                                              size: 28,
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          const VerticalDivider(width: 1),
-                          const SizedBox(width: 16),
-                          // 右列：设置和说明
-                          Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // 缓存大小上限设置
-                                Text(
-                                  S.of(context).cacheSizeLimit,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Column(
-                                  children: [
-                                    Slider(
-                                      value: currentSliderValue,
-                                      min: 0,
-                                      max: 100,
-                                      divisions: 20,
-                                      label: tempLimit < 1024
-                                          ? '${tempLimit}MB'
-                                          : '${(tempLimit / 1024).toStringAsFixed(1)}GB',
-                                      onChanged: (value) {
-                                        setDialogState(() {
-                                          currentSliderValue = value;
-                                          tempLimit = sliderValueToMB(value);
-                                        });
-                                      },
-                                      onChangeEnd: (value) async {
-                                        final finalLimit =
-                                            sliderValueToMB(value);
-                                        await CacheService.setCacheSizeLimit(
-                                            finalLimit);
-                                        if (mounted) {
-                                          setState(() {}); // 刷新主界面
-                                        }
-                                      },
-                                    ),
-                                    Text(
-                                      tempLimit < 1024
-                                          ? '${tempLimit}MB'
-                                          : '${(tempLimit / 1024).toStringAsFixed(1)}GB',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-
-                                // 说明文本
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.info_outline,
-                                              size: 16, color: Colors.blue),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            S.of(context).autoCleanTitle,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.blue,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        S.of(context).autoCleanDescription,
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 当前缓存大小
-                        Card(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  S.of(context).currentCacheSize,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  formattedSize,
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                LinearProgressIndicator(
-                                  value: currentLimit > 0
-                                      ? (currentSize /
-                                              (currentLimit * 1024 * 1024))
-                                          .clamp(0.0, 1.0)
-                                      : 0.0,
-                                  backgroundColor: Colors.grey[300],
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    currentSize > currentLimit * 1024 * 1024
-                                        ? Colors.red
-                                        : Theme.of(context).colorScheme.primary,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  S.of(context).cacheLimitLabelMB(currentLimit),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        Text(
-                          S.of(context).cacheSizeLimit,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Column(
-                          children: [
-                            Slider(
-                              value: currentSliderValue,
-                              min: 0,
-                              max: 100,
-                              divisions: 20,
-                              label: tempLimit < 1024
-                                  ? '${tempLimit}MB'
-                                  : '${(tempLimit / 1024).toStringAsFixed(1)}GB',
-                              onChanged: (value) {
-                                setDialogState(() {
-                                  currentSliderValue = value;
-                                  tempLimit = sliderValueToMB(value);
-                                });
-                              },
-                              onChangeEnd: (value) async {
-                                final finalLimit = sliderValueToMB(value);
-                                await CacheService.setCacheSizeLimit(
-                                    finalLimit);
-                                if (mounted) {
-                                  setState(() {}); // 刷新主界面
-                                }
-                              },
-                            ),
-                            Text(
-                              tempLimit < 1024
-                                  ? '${tempLimit}MB'
-                                  : '${(tempLimit / 1024).toStringAsFixed(1)}GB',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 说明文本
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.info_outline,
-                                      size: 16, color: Colors.blue),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    S.of(context).autoCleanTitle,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.blue,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                S.of(context).autoCleanDescriptionShort,
-                                style: TextStyle(fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-            actions: [
-              if (!isLandscape)
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: Text(S.of(context).close),
-                ),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text(S.of(context).confirmClear),
-                      content: Text(S.of(context).confirmClearCacheMessage),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: Text(S.of(context).cancel),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: Text(S.of(context).confirmClear),
-                        ),
-                      ],
-                    ),
-                  );
-
-                  if (confirmed == true && mounted) {
-                    // 显示加载指示器
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => const Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                    );
-
-                    try {
-                      await CacheService.clearAllCache();
-
-                      if (mounted) {
-                        Navigator.of(context).pop(); // 关闭加载指示器
-                        Navigator.of(context).pop(); // 关闭缓存管理对话框
-                        await _updateCacheSize(); // 更新缓存大小
-
-                        _showSnackBar(
-                          SnackBar(
-                            content: Text(S.of(context).cacheCleared),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        Navigator.of(context).pop(); // 关闭加载指示器
-                        _showSnackBar(
-                          SnackBar(
-                            content: Text(S.of(context).clearCacheFailedWithError(e.toString())),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  }
-                },
-                icon: const Icon(Icons.delete_outline),
-                label: Text(S.of(context).clearCache),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-              TextButton.icon(
-                onPressed: () async {
-                  await TranslationService().clearCache();
-                  if (mounted) {
-                    Navigator.of(context).pop();
-                    _showSnackBar(
-                      SnackBar(
-                        content: Text(S.of(context).translationCacheCleared),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.translate),
-                label: Text(S.of(context).clearTranslationCache),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+  bool matches(String query) {
+    final q = query.toLowerCase();
+    if (title.toLowerCase().contains(q)) return true;
+    if (subtitle.toLowerCase().contains(q)) return true;
+    return keywords.any((k) => k.toLowerCase().contains(q));
   }
 }

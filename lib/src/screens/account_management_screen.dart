@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../l10n/app_localizations.dart';
 import '../models/account.dart';
@@ -152,6 +153,283 @@ class _AccountManagementScreenState
     }
   }
 
+  Widget _buildLoadingSkeleton(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      children: List.generate(
+        3,
+        (index) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.3, end: 0.7),
+            duration: const Duration(milliseconds: 1000),
+            builder: (context, value, child) {
+              return Card(
+                elevation: 0,
+                color: cs.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest
+                              .withValues(alpha: value * 0.5),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              height: 14,
+                              width: 120,
+                              decoration: BoxDecoration(
+                                color: cs.surfaceContainerHighest
+                                    .withValues(alpha: value * 0.6),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              height: 12,
+                              width: 180,
+                              decoration: BoxDecoration(
+                                color: cs.surfaceContainerHighest
+                                    .withValues(alpha: value * 0.4),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest
+                              .withValues(alpha: value * 0.3),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final s = S.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: cs.primaryContainer.withValues(alpha: 0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.account_circle_outlined,
+                size: 40,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              s.noAccounts,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              s.tapToAddAccount,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccountCard(BuildContext context, Account account) {
+    final cs = Theme.of(context).colorScheme;
+    final s = S.of(context);
+    final isActive = account.isActive;
+
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: isActive
+            ? null
+            : () {
+                HapticFeedback.lightImpact();
+                _switchAccount(account);
+              },
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              // Active/Inactive icon container
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? cs.primary.withValues(alpha: 0.15)
+                      : cs.surfaceContainerHighest.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  isActive ? Icons.check_circle : Icons.account_circle,
+                  color:
+                      isActive ? cs.primary : cs.onSurfaceVariant,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              // Username + host info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            account.username,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                  fontWeight: isActive
+                                      ? FontWeight.bold
+                                      : FontWeight.w600,
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isActive) ...[const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: cs.primary,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              s.currentAccount,
+                              style: TextStyle(
+                                color: cs.onPrimary,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      account.host,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Popup menu
+              PopupMenuButton<String>(
+                icon: Icon(
+                  Icons.more_vert,
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                  size: 20,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                itemBuilder: (context) => [
+                  if (!isActive)
+                    PopupMenuItem(
+                      value: 'switch',
+                      child: Row(
+                        children: [
+                          Icon(Icons.swap_horiz,
+                              size: 18,
+                              color: cs.onSurfaceVariant),
+                          const SizedBox(width: 8),
+                          Text(s.switchAction,
+                              style: TextStyle(
+                                  color: cs.onSurfaceVariant)),
+                        ],
+                      ),
+                    ),
+                  if (!isActive)
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete,
+                              size: 18, color: cs.error),
+                          const SizedBox(width: 8),
+                          Text(s.delete,
+                              style:
+                                  TextStyle(color: cs.error)),
+                        ],
+                      ),
+                    ),
+                ],
+                onSelected: (value) {
+                  switch (value) {
+                    case 'switch':
+                      _switchAccount(account);
+                      break;
+                    case 'delete':
+                      _deleteAccount(account);
+                      break;
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -159,122 +437,17 @@ class _AccountManagementScreenState
         title: Text(S.of(context).accountManagement, style: const TextStyle(fontSize: 18)),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? _buildLoadingSkeleton(context)
           : _accounts.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.account_circle_outlined,
-                        size: 64,
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        S.of(context).noAccounts,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        S.of(context).tapToAddAccount,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.outline,
-                            ),
-                      ),
-                    ],
-                  ),
-                )
+              ? _buildEmptyState(context)
               : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   itemCount: _accounts.length,
                   itemBuilder: (context, index) {
                     final account = _accounts[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: account.isActive
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.surfaceContainerHighest,
-                          child: Icon(
-                            account.isActive
-                                ? Icons.check_circle
-                                : Icons.account_circle,
-                            color: account.isActive
-                                ? Theme.of(context).colorScheme.onPrimary
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                          ),
-                        ),
-                        title: Text(
-                          account.username,
-                          style: TextStyle(
-                            fontWeight: account.isActive
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(account.host),
-                            if (account.isActive)
-                              Text(
-                                S.of(context).currentAccount,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                          ],
-                        ),
-                        trailing: PopupMenuButton(
-                          itemBuilder: (context) => [
-                            if (!account.isActive)
-                              PopupMenuItem(
-                                value: 'switch',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.swap_horiz),
-                                    const SizedBox(width: 8),
-                                    Text(S.of(context).switchAction),
-                                  ],
-                                ),
-                              ),
-                            if (!account.isActive)
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.delete, color: Colors.red),
-                                    const SizedBox(width: 8),
-                                    Text(S.of(context).delete,
-                                        style: const TextStyle(color: Colors.red)),
-                                  ],
-                                ),
-                              ),
-                          ],
-                          onSelected: (value) {
-                            switch (value) {
-                              case 'switch':
-                                _switchAccount(account);
-                                break;
-                              case 'delete':
-                                _deleteAccount(account);
-                                break;
-                            }
-                          },
-                        ),
-                        onTap: () {
-                          if (!account.isActive) {
-                            _switchAccount(account);
-                          }
-                        },
-                      ),
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildAccountCard(context, account),
                     );
                   },
                 ),

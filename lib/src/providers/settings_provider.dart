@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/sort_options.dart';
+import '../services/audio_conversion_service.dart';
+import '../services/progress_sync_service.dart';
 
 /// Triggers when Settings screen should refresh cache-related information.
 final settingsCacheRefreshTriggerProvider = StateProvider<int>((ref) => 0);
@@ -86,8 +88,6 @@ enum AudioFormat {
 /// 翻译源
 enum TranslationSource {
   google('Google 翻译', 'google'),
-  youdao('Youdao 翻译', 'youdao'),
-  microsoft('Microsoft 翻译', 'microsoft'),
   llm('LLM 翻译', 'llm');
 
   final String displayName;
@@ -644,3 +644,448 @@ final blockedItemsProvider =
     StateNotifierProvider<BlockedItemsNotifier, BlockedItemsState>((ref) {
   return BlockedItemsNotifier();
 });
+
+/// Preferred sample rate for hi-res audio
+enum PreferredSampleRate {
+  auto('Auto', 0, 'auto'),
+  sr44100('44100 Hz', 44100, '44100'),
+  sr48000('48000 Hz', 48000, '48000'),
+  sr96000('96000 Hz', 96000, '96000'),
+  sr192000('192000 Hz', 192000, '192000');
+
+  final String displayName;
+  final int sampleRate;
+  final String value;
+  const PreferredSampleRate(this.displayName, this.sampleRate, this.value);
+}
+
+/// Preferred sample rate setting
+class PreferredSampleRateNotifier extends StateNotifier<PreferredSampleRate> {
+  static const String _preferenceKey = 'preferred_sample_rate';
+
+  PreferredSampleRateNotifier() : super(PreferredSampleRate.auto) {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedValue = prefs.getString(_preferenceKey);
+      if (savedValue != null) {
+        final rate = PreferredSampleRate.values.firstWhere(
+          (r) => r.value == savedValue,
+          orElse: () => PreferredSampleRate.auto,
+        );
+        state = rate;
+      }
+    } catch (e) {
+      state = PreferredSampleRate.auto;
+    }
+  }
+
+  Future<void> updateRate(PreferredSampleRate rate) async {
+    state = rate;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_preferenceKey, rate.value);
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
+/// Preferred sample rate provider
+final preferredSampleRateProvider =
+    StateNotifierProvider<PreferredSampleRateNotifier, PreferredSampleRate>((ref) {
+  return PreferredSampleRateNotifier();
+});
+
+/// Crossfade duration setting (in milliseconds, 0 = off/gapless)
+class CrossfadeDurationNotifier extends StateNotifier<int> {
+  static const String _preferenceKey = 'crossfade_duration_ms';
+
+  CrossfadeDurationNotifier() : super(0) {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedValue = prefs.getInt(_preferenceKey);
+      if (savedValue != null && savedValue >= 0 && savedValue <= 10000) {
+        state = savedValue;
+      }
+    } catch (e) {
+      state = 0;
+    }
+  }
+
+  Future<void> updateDuration(int ms) async {
+    state = ms.clamp(0, 10000);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_preferenceKey, state);
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
+/// Crossfade duration provider
+final crossfadeDurationProvider =
+    StateNotifierProvider<CrossfadeDurationNotifier, int>((ref) {
+  return CrossfadeDurationNotifier();
+});/// ReplayGain setting.
+class ReplayGainSettings {
+  final bool enabled;
+  final double preampDb;
+
+  const ReplayGainSettings({
+    this.enabled = false,
+    this.preampDb = 0.0,
+  });
+
+  ReplayGainSettings copyWith({bool? enabled, double? preampDb}) {
+    return ReplayGainSettings(
+      enabled: enabled ?? this.enabled,
+      preampDb: preampDb ?? this.preampDb,
+    );
+  }
+}
+
+class ReplayGainNotifier extends StateNotifier<ReplayGainSettings> {
+  static const String _enabledKey = 'replay_gain_enabled';
+  static const String _preampKey = 'replay_gain_preamp_db';
+
+  ReplayGainNotifier() : super(const ReplayGainSettings()) {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      state = ReplayGainSettings(
+        enabled: prefs.getBool(_enabledKey) ?? false,
+        preampDb: prefs.getDouble(_preampKey) ?? 0.0,
+      );
+    } catch (e) {
+      state = const ReplayGainSettings();
+    }
+  }
+
+  Future<void> toggle(bool enabled) async {
+    state = state.copyWith(enabled: enabled);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_enabledKey, enabled);
+    } catch (e) {/* ignore */}
+  }
+
+  Future<void> setPreampDb(double db) async {
+    state = state.copyWith(preampDb: db.clamp(-12.0, 12.0));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_preampKey, state.preampDb);
+    } catch (e) {/* ignore */}
+  }
+}
+
+final replayGainSettingsProvider =
+    StateNotifierProvider<ReplayGainNotifier, ReplayGainSettings>((ref) {
+  return ReplayGainNotifier();
+});
+
+/// Volume Normalization setting.
+class VolumeNormalizationSettings {
+  final bool enabled;
+  final double targetLevelDb;
+
+  const VolumeNormalizationSettings({
+    this.enabled = false,
+    this.targetLevelDb = -14.0,
+  });
+
+  VolumeNormalizationSettings copyWith({bool? enabled, double? targetLevelDb}) {
+    return VolumeNormalizationSettings(
+      enabled: enabled ?? this.enabled,
+      targetLevelDb: targetLevelDb ?? this.targetLevelDb,
+    );
+  }
+}
+
+class VolumeNormalizationNotifier extends StateNotifier<VolumeNormalizationSettings> {
+  static const String _enabledKey = 'volume_normalization_enabled';
+  static const String _targetKey = 'volume_normalization_target_db';
+
+  VolumeNormalizationNotifier() : super(const VolumeNormalizationSettings()) {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      state = VolumeNormalizationSettings(
+        enabled: prefs.getBool(_enabledKey) ?? false,
+        targetLevelDb: prefs.getDouble(_targetKey) ?? -14.0,
+      );
+    } catch (e) {
+      state = const VolumeNormalizationSettings();
+    }
+  }
+
+  Future<void> toggle(bool enabled) async {
+    state = state.copyWith(enabled: enabled);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_enabledKey, enabled);
+    } catch (e) {/* ignore */}
+  }
+
+  Future<void> setTargetLevel(double db) async {
+    state = state.copyWith(targetLevelDb: db.clamp(-24.0, -6.0));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_targetKey, state.targetLevelDb);
+    } catch (e) {/* ignore */}
+  }
+}
+
+final volumeNormalizationProvider =
+    StateNotifierProvider<VolumeNormalizationNotifier, VolumeNormalizationSettings>(
+        (ref) {
+  return VolumeNormalizationNotifier();
+});
+
+/// Bit-Perfect Playback mode setting (Android only).
+///
+/// Merges the old Hi-Res Exclusive Mode and USB DAC Bypass into one toggle.
+/// When enabled, USB DAC detection is active, device picker appears, and
+/// audio can be streamed directly to the external DAC via libusb,
+/// bypassing Android's audio mixer for pristine bit-perfect output.
+class BitPerfectPlaybackSettings {
+  final bool enabled;
+  final int? preferredDeviceId;
+
+  const BitPerfectPlaybackSettings({
+    this.enabled = false,
+    this.preferredDeviceId,
+  });
+
+  BitPerfectPlaybackSettings copyWith({bool? enabled, int? preferredDeviceId}) {
+    return BitPerfectPlaybackSettings(
+      enabled: enabled ?? this.enabled,
+      preferredDeviceId: preferredDeviceId ?? this.preferredDeviceId,
+    );
+  }
+}
+
+class BitPerfectPlaybackNotifier extends StateNotifier<BitPerfectPlaybackSettings> {
+  static const String _enabledKey = 'bit_perfect_playback_enabled';
+  static const String _deviceIdKey = 'bit_perfect_playback_device_id';
+
+  BitPerfectPlaybackNotifier() : super(const BitPerfectPlaybackSettings()) {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      state = BitPerfectPlaybackSettings(
+        enabled: prefs.getBool(_enabledKey) ?? false,
+        preferredDeviceId: prefs.getInt(_deviceIdKey),
+      );
+    } catch (e) {
+      state = const BitPerfectPlaybackSettings();
+    }
+  }
+
+  Future<void> toggle(bool enabled) async {
+    state = state.copyWith(enabled: enabled);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_enabledKey, enabled);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<void> setPreferredDevice(int? deviceId) async {
+    state = state.copyWith(preferredDeviceId: deviceId);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (deviceId != null) {
+        await prefs.setInt(_deviceIdKey, deviceId);
+      } else {
+        await prefs.remove(_deviceIdKey);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
+/// Bit-Perfect Playback provider
+final bitPerfectPlaybackProvider =
+    StateNotifierProvider<BitPerfectPlaybackNotifier, BitPerfectPlaybackSettings>((ref) {
+  return BitPerfectPlaybackNotifier();
+});
+
+/// Progress Sync (cross-device) setting.
+class ProgressSyncNotifier extends StateNotifier<bool> {
+  static const String _preferenceKey = 'progress_sync_enabled';
+
+  ProgressSyncNotifier() : super(true) {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      state = prefs.getBool(_preferenceKey) ?? true;
+    } catch (e) {
+      state = true;
+    }
+  }
+
+  Future<void> toggle(bool enabled) async {
+    state = enabled;
+    ProgressSyncService.instance.setEnabled(enabled);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_preferenceKey, enabled);
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
+/// Progress Sync provider
+final progressSyncProvider =
+    StateNotifierProvider<ProgressSyncNotifier, bool>((ref) {
+  return ProgressSyncNotifier();
+});
+
+/// Auto-translate lyrics setting.
+class AutoTranslateLyricsNotifier extends StateNotifier<bool> {
+  static const String _preferenceKey = 'auto_translate_lyrics';
+
+  AutoTranslateLyricsNotifier() : super(false) {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      state = prefs.getBool(_preferenceKey) ?? false;
+    } catch (e) {
+      state = false;
+    }
+  }
+
+  Future<void> toggle(bool enabled) async {
+    state = enabled;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_preferenceKey, enabled);
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
+/// Auto-translate lyrics provider
+final autoTranslateLyricsProvider =
+    StateNotifierProvider<AutoTranslateLyricsNotifier, bool>((ref) {
+  return AutoTranslateLyricsNotifier();
+});
+
+/// Convert WAV files to another format after download.
+class WavConversionFormatNotifier extends StateNotifier<WavConversionFormat> {
+  static const String _preferenceKeyNew = 'wav_conversion_format';
+  static const String _preferenceKeyOld = 'convert_wav_after_download';
+
+  WavConversionFormatNotifier() : super(WavConversionFormat.none) {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Try new key (string-based)
+      final savedValue = prefs.getString(_preferenceKeyNew);
+      if (savedValue != null) {
+        final format = WavConversionFormat.values.firstWhere(
+          (f) => f.value == savedValue,
+          orElse: () => WavConversionFormat.none,
+        );
+        state = format;
+        return;
+      }
+
+      // Migrate from old bool key
+      final oldEnabled = prefs.getBool(_preferenceKeyOld);
+      if (oldEnabled == true) {
+        state = WavConversionFormat.flac; // old default
+        // Save to new key and remove old
+        await prefs.setString(_preferenceKeyNew, WavConversionFormat.flac.value);
+        await prefs.remove(_preferenceKeyOld);
+      }
+    } catch (e) {
+      state = WavConversionFormat.none;
+    }
+  }
+
+  Future<void> setFormat(WavConversionFormat format) async {
+    state = format;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_preferenceKeyNew, format.value);
+      // Clean up old key if present
+      if (prefs.containsKey(_preferenceKeyOld)) {
+        await prefs.remove(_preferenceKeyOld);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
+final wavConversionFormatProvider =
+    StateNotifierProvider<WavConversionFormatNotifier, WavConversionFormat>((ref) {
+  return WavConversionFormatNotifier();
+});
+
+/// Show FPS overlay (debug only — persisted in SharedPreferences).
+class FpsOverlayNotifier extends StateNotifier<bool> {
+  static const String _preferenceKey = 'show_fps_overlay';
+
+  FpsOverlayNotifier() : super(false) {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      state = prefs.getBool(_preferenceKey) ?? false;
+    } catch (e) {
+      state = false;
+    }
+  }
+
+  Future<void> toggle(bool enabled) async {
+    state = enabled;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_preferenceKey, enabled);
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
+final showFpsOverlayProvider =
+    StateNotifierProvider<FpsOverlayNotifier, bool>((ref) {
+  return FpsOverlayNotifier();
+});
+

@@ -80,6 +80,9 @@ class _PrivacyModeSettingsScreenState
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(privacyModeSettingsProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
     return Scaffold(
       appBar: ScrollableAppBar(
@@ -90,14 +93,14 @@ class _PrivacyModeSettingsScreenState
         children: [
           // 说明卡片
           Card(
-            color: Theme.of(context).colorScheme.primaryContainer,
+            color: colorScheme.primaryContainer,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
                   Icon(
                     Icons.privacy_tip_outlined,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: colorScheme.primary,
                     size: 32,
                   ),
                   const SizedBox(width: 16),
@@ -107,22 +110,16 @@ class _PrivacyModeSettingsScreenState
                       children: [
                         Text(
                           S.of(context).whatIsPrivacyMode,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
+                          style: textTheme.titleMedium?.copyWith(
+                                color: colorScheme.primary,
                                 fontWeight: FontWeight.bold,
                               ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           S.of(context).privacyModeDescription,
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onPrimaryContainer,
+                          style: textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onPrimaryContainer,
                                   ),
                         ),
                       ],
@@ -141,7 +138,7 @@ class _PrivacyModeSettingsScreenState
                 settings.enabled ? Icons.shield : Icons.shield_outlined,
                 color: settings.enabled
                     ? Colors.green
-                    : Theme.of(context).colorScheme.primary,
+                    : colorScheme.primary,
               ),
               title: Text(S.of(context).enablePrivacyMode),
               subtitle: Text(
@@ -166,8 +163,7 @@ class _PrivacyModeSettingsScreenState
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: colorScheme.surfaceContainerHighest,
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(12),
                       topRight: Radius.circular(12),
@@ -178,12 +174,12 @@ class _PrivacyModeSettingsScreenState
                       Icon(
                         Icons.settings,
                         size: 20,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         S.of(context).blurOptions,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        style: textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                       ),
@@ -195,7 +191,7 @@ class _PrivacyModeSettingsScreenState
                 SwitchListTile(
                   secondary: Icon(
                     Icons.notifications_outlined,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: colorScheme.primary,
                   ),
                   title: Text(S.of(context).blurNotificationCover),
                   subtitle: Text(S.of(context).blurNotificationCoverSubtitle),
@@ -208,13 +204,13 @@ class _PrivacyModeSettingsScreenState
                         }
                       : null,
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: colorScheme.outlineVariant),
 
                 // 应用内封面模糊
                 SwitchListTile(
                   secondary: Icon(
                     Icons.blur_on,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: colorScheme.primary,
                   ),
                   title: Text(S.of(context).blurInAppCover),
                   subtitle: Text(S.of(context).blurInAppCoverSubtitle),
@@ -227,13 +223,13 @@ class _PrivacyModeSettingsScreenState
                         }
                       : null,
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: colorScheme.outlineVariant),
 
                 // 标题替换
                 SwitchListTile(
                   secondary: Icon(
                     Icons.text_fields,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: colorScheme.primary,
                   ),
                   title: Text(S.of(context).replaceTitle),
                   subtitle: Text(S.of(context).replaceTitleSubtitle),
@@ -246,7 +242,7 @@ class _PrivacyModeSettingsScreenState
                         }
                       : null,
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: colorScheme.outlineVariant),
 
                 // 自定义标题
                 ListTile(
@@ -254,8 +250,8 @@ class _PrivacyModeSettingsScreenState
                   leading: Icon(
                     Icons.edit,
                     color: settings.enabled && settings.maskTitle
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
                   ),
                   title: Text(S.of(context).replaceTitleContent),
                   subtitle: Text(settings.customTitle),
@@ -271,7 +267,7 @@ class _PrivacyModeSettingsScreenState
 
           // 效果举例
           Card(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            color: colorScheme.surfaceContainerHighest,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -281,13 +277,13 @@ class _PrivacyModeSettingsScreenState
                     children: [
                       Icon(
                         Icons.preview,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: colorScheme.onSurfaceVariant,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         S.of(context).effectExample,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        style: textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                       ),

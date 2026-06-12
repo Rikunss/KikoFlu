@@ -1,7 +1,10 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
+
+import 'waveform_seeker.dart';
 
 import '../../providers/audio_provider.dart';
 import '../../providers/floating_lyric_provider.dart';
@@ -10,17 +13,17 @@ import '../../providers/player_buttons_provider.dart';
 import '../responsive_dialog.dart';
 import '../subtitle_adjustment_dialog.dart';
 import '../volume_control.dart';
+import '../../screens/equalizer_screen.dart';
+import '../../services/bookmark_service.dart';
 import 'sleep_timer_button.dart';
 import 'sleep_timer_dialog.dart';
+import 'bookmarks_sheet.dart';
 import '../../../l10n/app_localizations.dart';
 
 /// 播放器控制组件
 class PlayerControlsWidget extends ConsumerStatefulWidget {
   final bool isLandscape;
   final AudioPlayerState audioState;
-  final bool isPlaying;
-  final AsyncValue<Duration> position;
-  final AsyncValue<Duration?> duration;
   final bool isSeekingManually;
   final double seekValue;
   final ValueChanged<double> onSeekChanged;
@@ -31,13 +34,16 @@ class PlayerControlsWidget extends ConsumerStatefulWidget {
   final VoidCallback? onMarkPressed;
   final VoidCallback? onDetailPressed;
 
+  /// Optional gradient colours extracted from album artwork.
+  final List<Color>? gradientColors;
+
+  /// Called on long-press of the seekbar — used to refresh gradient colours.
+  final VoidCallback? onGradientRefresh;
+
   const PlayerControlsWidget({
     super.key,
     required this.isLandscape,
     required this.audioState,
-    required this.isPlaying,
-    required this.position,
-    required this.duration,
     required this.isSeekingManually,
     required this.seekValue,
     required this.onSeekChanged,
@@ -47,6 +53,8 @@ class PlayerControlsWidget extends ConsumerStatefulWidget {
     this.currentProgress,
     this.onMarkPressed,
     this.onDetailPressed,
+    this.gradientColors,
+    this.onGradientRefresh,
   });
 
   @override
@@ -54,18 +62,72 @@ class PlayerControlsWidget extends ConsumerStatefulWidget {
       _PlayerControlsWidgetState();
 }
 
-class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
+/// Format [Duration] to display string (e.g. "1:23:45" or "3:45").
+/// Top-level so leaf ConsumerWidgets can reuse it.
+String formatDuration(Duration duration) {
+  String twoDigits(int n) => n.toString().padLeft(2, '0');
+  final hours = duration.inHours;
+  final minutes = duration.inMinutes.remainder(60);
+  final seconds = duration.inSeconds.remainder(60);
 
-    if (hours > 0) {
-      return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
-    } else {
-      return '${twoDigits(minutes)}:${twoDigits(seconds)}';
-    }
+  if (hours > 0) {
+    return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
+  } else {
+    return '${twoDigits(minutes)}:${twoDigits(seconds)}';
+  }
+}
+
+class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
+
+  /// Builds seekbar + time labels section.
+  /// The time labels use leaf ConsumerWidgets so only the position text
+  /// rebuilds on every 200ms tick — the Row wrapper stays stable.
+  Widget _buildSeekSection(BuildContext context) {
+    final isPlaying = ref.watch(isPlayingProvider);
+
+    return Column(children: [
+      // Progress slider
+      Consumer(
+        builder: (context, ref, child) {
+          final pos = ref.watch(positionProvider).value ?? Duration.zero;
+          final dur = ref.watch(durationProvider).value ?? Duration.zero;
+
+          final seekValue = (widget.isSeekingManually
+                  ? widget.seekValue
+                  : dur.inMilliseconds > 0
+                      ? pos.inMilliseconds / dur.inMilliseconds
+                      : 0.0)
+              .clamp(0.0, 1.0);
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: WaveformSeeker(
+              value: seekValue,
+              duration: dur,
+              isPlaying: isPlaying,
+              gradientColors: widget.gradientColors,
+              onChanged: widget.onSeekChanged,
+              onChangeEnd: widget.onSeekEnd,
+              onLongPress: widget.onGradientRefresh,
+            ),
+          );
+        },
+      ),
+      // Time labels — leaf ConsumerWidgets avoid rebuilding both Texts on every 200ms tick
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _PositionText(
+              isSeekingManually: widget.isSeekingManually,
+              seekValue: widget.seekValue,
+            ),
+            const _DurationText(),
+          ],
+        ),
+      ),
+    ]);
   }
 
   void _showSpeedDialog(
@@ -140,6 +202,8 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
   Widget _buildMenuItemForButton(
       BuildContext context, WidgetRef ref, PlayerButtonType buttonType,
       [StateSetter? setState]) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     switch (buttonType) {
       case PlayerButtonType.seekBackward:
         return ListTile(
@@ -169,15 +233,15 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           leading: Icon(
             timerState.isActive ? Icons.timer : Icons.timer_outlined,
             color: timerState.isActive
-                ? Theme.of(context).colorScheme.primary
+                ? cs.primary
                 : null,
           ),
           title: Text(S.of(context).sleepTimer),
           trailing: timerState.isActive && timerState.remainingTime != null
               ? Text(
                   timerState.formattedTime,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                  style: tt.bodyMedium?.copyWith(
+                        color: cs.primary,
                       ),
                 )
               : null,
@@ -192,8 +256,8 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           title: Text(S.of(context).playbackSpeed),
           trailing: Text(
             '${widget.audioState.speed.toStringAsFixed(1)}x',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
+            style: tt.bodyMedium?.copyWith(
+                  color: cs.primary,
                 ),
           ),
           onTap: () {
@@ -210,7 +274,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               LoopMode.all => Icons.repeat_on,
             },
             color: widget.audioState.repeatMode != LoopMode.off
-                ? Theme.of(context).colorScheme.primary
+                ? cs.primary
                 : null,
           ),
           title: Text(S.of(context).repeatMode),
@@ -220,9 +284,9 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               LoopMode.one => S.of(context).repeatOne,
               LoopMode.all => S.of(context).repeatAll,
             },
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            style: tt.bodyMedium?.copyWith(
                   color: widget.audioState.repeatMode != LoopMode.off
-                      ? Theme.of(context).colorScheme.primary
+                      ? cs.primary
                       : null,
                 ),
           ),
@@ -245,14 +309,14 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                 ? Icons.bookmark
                 : Icons.bookmark_border,
             color: widget.currentProgress != null
-                ? Theme.of(context).colorScheme.primary
+                ? cs.primary
                 : null,
           ),
           title: Text(S.of(context).addMark),
           trailing: widget.currentProgress != null
               ? Icon(
                   Icons.check_circle,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: cs.primary,
                   size: 20,
                 )
               : null,
@@ -285,8 +349,8 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               title: Text(S.of(context).volume),
               trailing: Text(
                 '${(currentVolume * 100).round()}%',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
+                style: tt.bodyMedium?.copyWith(
+                      color: cs.primary,
                     ),
               ),
             ),
@@ -297,7 +361,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                   Icon(
                     Icons.volume_down,
                     size: 20,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: cs.onSurfaceVariant,
                   ),
                   Expanded(
                     child: Slider(
@@ -316,7 +380,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                   Icon(
                     Icons.volume_up,
                     size: 20,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: cs.onSurfaceVariant,
                   ),
                 ],
               ),
@@ -324,19 +388,21 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           ],
         );
       case PlayerButtonType.subtitleAdjustment:
-        final lyricState = ref.watch(lyricControllerProvider);
-        final hasOffset = lyricState.timelineOffset != Duration.zero;
+        final timelineOffset = ref.watch(
+          lyricControllerProvider.select((s) => s.timelineOffset),
+        );
+        final hasOffset = timelineOffset != Duration.zero;
         return ListTile(
           leading: Icon(
             Icons.tune,
-            color: hasOffset ? Theme.of(context).colorScheme.primary : null,
+            color: hasOffset ? cs.primary : null,
           ),
           title: Text(S.of(context).subtitleTimingAdjustment),
           trailing: hasOffset
               ? Text(
-                  '${lyricState.timelineOffset.inMilliseconds}ms',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                  '${timelineOffset.inMilliseconds}ms',
+                  style: tt.bodyMedium?.copyWith(
+                        color: cs.primary,
                       ),
                 )
               : null,
@@ -356,7 +422,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
             return ListTile(
               leading: Icon(
                 Icons.picture_in_picture_alt,
-                color: isEnabled ? Theme.of(context).colorScheme.primary : null,
+                color: isEnabled ? cs.primary : null,
               ),
               title: Text(S.of(context).floatingSubtitle),
               trailing: Transform.scale(
@@ -375,10 +441,36 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
             );
           },
         );
+      case PlayerButtonType.equalizer:
+        return ListTile(
+          leading: Icon(
+            Icons.equalizer,
+            color: cs.primary,
+          ),
+          title: Text(S.of(context).equalizerTitle),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const EqualizerScreen(),
+              ),
+            );
+          },
+        );
+      case PlayerButtonType.bookmark:
+        return ListTile(
+          leading: const Icon(Icons.bookmark_rounded),
+          title: Text(S.of(context).audioBookmarksTitle),
+          onTap: () {
+            Navigator.pop(context);
+            BookmarksSheet.show(context);
+          },
+        );
     }
   }
 
   Widget _buildButton(BuildContext context, WidgetRef ref,
+      ColorScheme colorScheme,
       PlayerButtonType buttonType, bool isLandscape) {
     final iconSize = isLandscape ? 24.0 : null;
 
@@ -448,7 +540,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                   icon: Icon(
                     Icons.speed,
                     color: widget.audioState.speed != 1.0
-                        ? Theme.of(context).colorScheme.primary
+                        ? colorScheme.primary
                         : null,
                   ),
                   iconSize: iconSize,
@@ -466,7 +558,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                     style: TextStyle(
                       fontSize: 9,
                       height: 1.0,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: colorScheme.primary,
                       fontWeight: FontWeight.w500,
                       fontFeatures: const [
                         FontFeature.tabularFigures(),
@@ -501,7 +593,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                   LoopMode.all => Icons.repeat_on,
                 },
                 color: widget.audioState.repeatMode != LoopMode.off
-                    ? Theme.of(context).colorScheme.primary
+                    ? colorScheme.primary
                     : null,
               ),
               iconSize: iconSize,
@@ -520,7 +612,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                     ? Icons.bookmark
                     : Icons.bookmark_border,
                 color: widget.currentProgress != null
-                    ? Theme.of(context).colorScheme.primary
+                    ? colorScheme.primary
                     : null,
               ),
               iconSize: iconSize,
@@ -541,8 +633,9 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           ],
         );
       case PlayerButtonType.subtitleAdjustment:
-        final lyricState = ref.watch(lyricControllerProvider);
-        final hasOffset = lyricState.timelineOffset != Duration.zero;
+        final hasOffset = ref.watch(
+          lyricControllerProvider.select((s) => s.timelineOffset != Duration.zero),
+        );
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -555,8 +648,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                 );
               },
               icon: Badge(
-                isLabelVisible: hasOffset,
-                backgroundColor: Theme.of(context).colorScheme.primary,
+                isLabelVisible: hasOffset,                                backgroundColor: colorScheme.primary,
                 child: const Icon(Icons.tune),
               ),
             ),
@@ -576,8 +668,66 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                 isEnabled
                     ? Icons.picture_in_picture_alt
                     : Icons.picture_in_picture_alt_outlined,
-                color: isEnabled ? Theme.of(context).colorScheme.primary : null,
+                color: isEnabled ? colorScheme.primary : null,
               ),
+              iconSize: iconSize,
+            ),
+            if (!isLandscape) const SizedBox(height: 14),
+          ],
+        );
+      case PlayerButtonType.equalizer:
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const EqualizerScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.equalizer),
+              iconSize: iconSize,
+            ),
+            if (!isLandscape) const SizedBox(height: 14),
+          ],
+        );
+      case PlayerButtonType.bookmark:
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: () {
+                final service = ref.read(bookmarkServiceProvider);
+                final currentTrack = ref.read(currentTrackProvider).valueOrNull;
+                if (currentTrack != null) {
+                  final position = ref.read(positionProvider).valueOrNull ??
+                      Duration.zero;
+                  service.add(
+                    trackId: currentTrack.id,
+                    workId: currentTrack.workId,
+                    position: position,
+                    trackTitle: currentTrack.title,
+                  );
+                  HapticFeedback.lightImpact();
+                  ScaffoldMessenger.of(context).clearSnackBars();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(S.of(context).audioBookmarkAdded(position.inMilliseconds > 0
+                          ? formatDuration(position)
+                          : '0:00')),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 2),
+                      action: SnackBarAction(
+                        label: S.of(context).audioBookmarksView,
+                        onPressed: () => BookmarksSheet.show(context),
+                      ),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.bookmark_add_outlined),
               iconSize: iconSize,
             ),
             if (!isLandscape) const SizedBox(height: 14),
@@ -588,74 +738,16 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final iconSize = widget.isLandscape ? 24.0 : 48.0;
     final playButtonSize = widget.isLandscape ? 64.0 : 72.0;
     final playIconSize = widget.isLandscape ? 32.0 : 36.0;
+    final isPlaying = ref.watch(isPlayingProvider);
 
     return Column(
       children: [
-        // Progress slider
-        Column(
-          children: [
-            Consumer(
-              builder: (context, ref, child) {
-                final pos = widget.position.value ?? Duration.zero;
-                final dur = widget.duration.value ?? Duration.zero;
-
-                return SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    // 增强未播放部分的可见度，使其与背景区分
-                    inactiveTrackColor: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant
-                        .withOpacity(0.15),
-                    trackShape: const RoundedRectSliderTrackShape(),
-                  ),
-                  child: Slider(
-                    value: (widget.isSeekingManually
-                            ? widget.seekValue
-                            : dur.inMilliseconds > 0
-                                ? pos.inMilliseconds / dur.inMilliseconds
-                                : 0.0)
-                        .clamp(0.0, 1.0),
-                    onChanged: widget.onSeekChanged,
-                    onChangeEnd: widget.onSeekEnd,
-                  ),
-                );
-              },
-            ),
-            // Time labels
-            Consumer(
-              builder: (context, ref, child) {
-                final pos = widget.position.value ?? Duration.zero;
-                final dur = widget.duration.value ?? Duration.zero;
-
-                final displayPos = widget.isSeekingManually
-                    ? Duration(
-                        milliseconds:
-                            (widget.seekValue * dur.inMilliseconds).round())
-                    : pos;
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _formatDuration(displayPos),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      Text(
-                        _formatDuration(dur),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
+        _buildSeekSection(context),
         SizedBox(height: widget.isLandscape ? 20 : 16),
         // Main controls
         Row(
@@ -670,27 +762,48 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               icon: const Icon(Icons.skip_previous),
               iconSize: iconSize,
             ),
+            // -10s seek button (always visible)
+            IconButton(
+              onPressed: () {
+                ref
+                    .read(audioPlayerControllerProvider.notifier)
+                    .seekBackward(const Duration(seconds: 10));
+                HapticFeedback.lightImpact();
+              },
+              icon: const Icon(Icons.replay_10),
+              iconSize: widget.isLandscape ? 22 : iconSize * 0.7,
+            ),
             Container(
               width: playButtonSize,
               height: playButtonSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              child: IconButton(
+                color: colorScheme.primary,
+              ),                child: IconButton(
                 onPressed: () {
-                  if (widget.isPlaying) {
+                  if (isPlaying) {
                     ref.read(audioPlayerControllerProvider.notifier).pause();
                   } else {
                     ref.read(audioPlayerControllerProvider.notifier).play();
                   }
                 },
                 icon: Icon(
-                  widget.isPlaying ? Icons.pause : Icons.play_arrow,
-                  color: Theme.of(context).colorScheme.onPrimary,
+                  isPlaying ? Icons.pause : Icons.play_arrow,
+                  color: colorScheme.onPrimary,
                 ),
                 iconSize: playIconSize,
               ),
+            ),
+            // +10s seek button (always visible)
+            IconButton(
+              onPressed: () {
+                ref
+                    .read(audioPlayerControllerProvider.notifier)
+                    .seekForward(const Duration(seconds: 10));
+                HapticFeedback.lightImpact();
+              },
+              icon: const Icon(Icons.forward_10),
+              iconSize: widget.isLandscape ? 22 : iconSize * 0.7,
             ),
             IconButton(
               onPressed: () {
@@ -699,7 +812,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               icon: Consumer(
                 builder: (context, ref, child) {
                   final canSkipNext = ref.watch(canSkipNextProvider);
-                  final baseColor = Theme.of(context).colorScheme.onSurface;
+                  final baseColor = colorScheme.onSurface;
                   return Icon(
                     Icons.skip_next,
                     color:
@@ -721,13 +834,21 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                 : ref.watch(playerButtonsConfigMobileProvider);
             final visibleButtons = config.getVisibleButtons(isDesktop);
 
+            // Filter out seekBackward/seekForward from config visible buttons
+            // since they are ALREADY always visible in the main controls row above.
+            // Showing them in both places creates 4 seek buttons (duplication).
+            final dedupedButtons = visibleButtons.where(
+              (b) => b != PlayerButtonType.seekBackward &&
+                     b != PlayerButtonType.seekForward,
+            ).toList();
+
             return Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                ...visibleButtons
+                ...dedupedButtons
                     .map((type) =>
-                        _buildButton(context, ref, type, widget.isLandscape))
-                    .toList(),
+                        _buildButton(context, ref, colorScheme, type, widget.isLandscape))
+                    ,
                 // More menu button (always visible)
                 Column(
                   mainAxisSize: MainAxisSize.min,
@@ -750,7 +871,11 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                           final hasFloatingLyricInMore = moreButtons
                               .contains(PlayerButtonType.floatingLyric);
                           final timerState = ref.watch(sleepTimerProvider);
-                          final lyricState = ref.watch(lyricControllerProvider);
+                          final hasSubtitleOffset = ref.watch(
+                            lyricControllerProvider.select(
+                              (s) => s.timelineOffset != Duration.zero,
+                            ),
+                          );
                           final isFloatingLyricEnabled =
                               ref.watch(floatingLyricEnabledProvider);
 
@@ -761,14 +886,12 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                                       LoopMode.off) ||
                               (hasSleepTimerInMore && timerState.isActive) ||
                               (hasSubtitleAdjustmentInMore &&
-                                  lyricState.timelineOffset != Duration.zero) ||
+                                  hasSubtitleOffset) ||
                               (hasFloatingLyricInMore &&
                                   isFloatingLyricEnabled);
 
                           return Badge(
-                            isLabelVisible: shouldShowBadge,
-                            backgroundColor:
-                                Theme.of(context).colorScheme.primary,
+                            isLabelVisible: shouldShowBadge,                                backgroundColor: colorScheme.primary,
                             child: const Icon(Icons.more_horiz),
                           );
                         },
@@ -783,6 +906,57 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           },
         ),
       ],
+    );
+  }
+}
+
+/// Position time label — watches [positionProvider] independently so
+/// the time labels Row does not rebuild on every 200ms position tick.
+/// Only this single Text widget rebuilds when the position updates.
+class _PositionText extends ConsumerWidget {
+  final bool isSeekingManually;
+  final double seekValue;
+
+  const _PositionText({
+    required this.isSeekingManually,
+    required this.seekValue,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pos = ref.watch(positionProvider).value ?? Duration.zero;
+    final dur = ref.watch(durationProvider).value ?? Duration.zero;
+    final displayPos = isSeekingManually
+        ? Duration(milliseconds: (seekValue * dur.inMilliseconds).round())
+        : pos;
+    final theme = Theme.of(context);
+    return Text(
+      formatDuration(displayPos),
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
+  }
+}
+
+/// Duration time label — watches [durationProvider] independently so
+/// the time labels Row does not rebuild on every 200ms position tick.
+/// Duration rarely changes (only on track change), so this widget
+/// almost never rebuilds, keeping the UI thread free for position updates.
+class _DurationText extends ConsumerWidget {
+  const _DurationText();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dur = ref.watch(durationProvider).value ?? Duration.zero;
+    final theme = Theme.of(context);
+    return Text(
+      formatDuration(dur),
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
     );
   }
 }

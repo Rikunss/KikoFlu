@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 enum DownloadStatus {
   pending,
   downloading,
+  converting,
   completed,
   failed,
   paused,
@@ -22,6 +23,7 @@ class DownloadTask extends Equatable {
   final DateTime createdAt;
   final DateTime? completedAt;
   final Map<String, dynamic>? workMetadata; // 作品详情元数据，用于离线预览
+  final String? eta; // Estimated time remaining (ephemeral, for conversion progress UI)
 
   const DownloadTask({
     required this.id,
@@ -37,6 +39,7 @@ class DownloadTask extends Equatable {
     required this.createdAt,
     this.completedAt,
     this.workMetadata,
+    this.eta,
   });
 
   double get progress {
@@ -58,6 +61,7 @@ class DownloadTask extends Equatable {
     DateTime? createdAt,
     DateTime? completedAt,
     Map<String, dynamic>? workMetadata,
+    String? eta,
   }) {
     return DownloadTask(
       id: id ?? this.id,
@@ -73,6 +77,7 @@ class DownloadTask extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       completedAt: completedAt ?? this.completedAt,
       workMetadata: workMetadata ?? this.workMetadata,
+      eta: eta ?? this.eta,
     );
   }
 
@@ -133,5 +138,6 @@ class DownloadTask extends Equatable {
         createdAt,
         completedAt,
         workMetadata,
+        eta,
       ];
 }

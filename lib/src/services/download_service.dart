@@ -1,11 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/download_task.dart';
+import 'package:image/image.dart' as img;
 import '../utils/file_icon_utils.dart';
+import 'audio_conversion_service.dart';
 import 'cache_service.dart';
+import 'conversion_notification_service.dart';
 import 'storage_service.dart';
 import 'kikoeru_api_service.dart';
 import 'download_path_service.dart';
@@ -22,7 +28,34 @@ class DownloadService {
   final Map<String, CancelToken> _cancelTokens = {};
   final StreamController<List<DownloadTask>> _tasksController =
       StreamController<List<DownloadTask>>.broadcast();
+  final StreamController<String> _conversionController =
+      StreamController<String>.broadcast();
   final List<DownloadTask> _tasks = [];
+
+  /// Work IDs whose cover images are currently being resized/processed.
+  /// UI watches this to show a processing indicator on cards.
+  final Set<int> _processingCovers = {};
+  final StreamController<Set<int>> _processingCoversController =
+      StreamController<Set<int>>.broadcast();
+
+  /// Mark a work's cover as being processed (resized).
+  void addProcessingCover(int workId) {
+    _processingCovers.add(workId);
+    _processingCoversController.add(Set.of(_processingCovers));
+  }
+
+  /// Mark a work's cover processing as complete.
+  void removeProcessingCover(int workId) {
+    _processingCovers.remove(workId);
+    _processingCoversController.add(Set.of(_processingCovers));
+  }
+
+  /// Stream of workIds whose covers are currently being processed.
+  Stream<Set<int>> get processingCoversStream =>
+      _processingCoversController.stream;
+
+  /// Current set of workIds with covers being processed.
+  Set<int> get processingCovers => Set.unmodifiable(_processingCovers);
   final Dio _dio = Dio();
 
   // 并发下载控制
@@ -35,6 +68,7 @@ class DownloadService {
   bool _needsSave = false;
 
   Stream<List<DownloadTask>> get tasksStream => _tasksController.stream;
+  Stream<String> get conversionStream => _conversionController.stream;
   List<DownloadTask> get tasks => List.unmodifiable(_tasks);
 
   // 获取正在下载或等待下载的任务数量
@@ -49,6 +83,8 @@ class DownloadService {
 
   static const String _tasksKey = 'download_tasks';
 
+  /// Lightweight init: only load tasks from SharedPreferences (no disk scan).
+  /// Call [syncWithDiskAfterInit] later from a post-frame callback.
   Future<void> initialize() async {
     await _loadTasks();
     // 恢复未完成的下载任务
@@ -56,14 +92,21 @@ class DownloadService {
       if (task.status == DownloadStatus.downloading) {
         _updateTask(task.copyWith(status: DownloadStatus.paused));
       }
+      // Reset tasks stuck in 'converting' (app was killed mid-conversion)
+      if (task.status == DownloadStatus.converting) {
+        _updateTask(task.copyWith(status: DownloadStatus.completed));
+      }
     }
-    // 启动时从硬盘完全同步任务（静默执行）
+  }
+
+  /// Heavy disk scan: sync tasks with filesystem. Run this fire-and-forget
+  /// after the app is fully initialized to avoid blocking startup.
+  Future<void> syncWithDiskAfterInit() async {
     try {
       await reloadMetadataFromDisk();
-      _log.info('启动时同步完成', tag: 'Download');
+      _log.info('启动后磁盘同步完成', tag: 'Download');
     } catch (e) {
-      _log.error('启动时同步失败: $e', tag: 'Download');
-      // 同步失败则保持当前状态，等待用户手动刷新
+      _log.error('启动后磁盘同步失败: $e', tag: 'Download');
     }
   }
 
@@ -445,14 +488,109 @@ class DownloadService {
 
       _log.info('下载完成: ${task.fileName}', tag: 'Download');
 
+      // ── WAV → FLAC/ALAC conversion hook ──
+      final isWav = filePath.toLowerCase().endsWith('.wav');
+      String? convertedPath;
+      if (isWav) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final formatStr = prefs.getString('wav_conversion_format') ?? 'none';
+          final format = WavConversionFormat.values.firstWhere(
+            (f) => f.value == formatStr,
+            orElse: () => WavConversionFormat.none,
+          );
+          if (format != WavConversionFormat.none) {
+            // Update task status to show "Converting..." in the UI
+            final currentTask =
+                _tasks.firstWhere((t) => t.id == task.id, orElse: () => task);
+            _updateTask(currentTask.copyWith(status: DownloadStatus.converting), immediate: true);
+
+            _log.info('开始转换: $filePath → ${format.displayName}', tag: 'Download');
+            _conversionController.add('start:${task.fileName}');
+            unawaited(ConversionNotificationService.instance.showProgress(
+              fileName: task.fileName, progress: 0.0,
+            ));
+            var lastProgressMs = 0;
+            const progressThrottleMs = 200;
+            String? currentEta;
+            convertedPath = await AudioConversionService.instance.convert(
+              filePath, format,
+              onProgress: (progress, {eta}) {
+                final now = DateTime.now().millisecondsSinceEpoch;
+                if (eta != null) currentEta = eta;
+                if (now - lastProgressMs > progressThrottleMs || progress >= 1.0) {
+                  lastProgressMs = now;
+                  final t = _tasks.firstWhere((t) => t.id == task.id, orElse: () => task);
+                  _updateTask(t.copyWith(
+                    status: DownloadStatus.converting,
+                    downloadedBytes: (progress * 100).round(),
+                    totalBytes: 100,
+                    eta: currentEta,
+                  ));
+                  unawaited(ConversionNotificationService.instance.showProgress(
+                    fileName: task.fileName, progress: progress, eta: currentEta,
+                  ));
+                }
+              },
+            );
+            if (convertedPath != null) {
+              _log.info('转换成功: $convertedPath', tag: 'Download');
+              _conversionController.add('success:${format.displayName}:${task.fileName}');
+              unawaited(ConversionNotificationService.instance.showCompleted(
+                fileName: task.fileName,
+                formatName: format.displayName,
+              ));
+            } else {
+              _log.warning('转换失败，保留原始WAV: $filePath', tag: 'Download');
+              _conversionController.add('fail:${format.displayName}:${task.fileName}');
+              unawaited(ConversionNotificationService.instance.showFailed(
+                fileName: task.fileName,
+                formatName: format.displayName,
+              ));
+            }
+          }
+        } catch (e) {
+          _log.error('转换异常: $e', tag: 'Download');
+          _conversionController.add('fail:${task.fileName}');
+          unawaited(ConversionNotificationService.instance.showFailed(
+            fileName: task.fileName,
+          ));
+          // Reset task status so it doesn't stay stuck in "converting"
+          try {
+            final stuckTask = _tasks.firstWhere((t) => t.id == task.id, orElse: () => task);
+            _updateTask(stuckTask.copyWith(status: DownloadStatus.completed), immediate: true);
+          } catch (_) {}
+        }
+      }
+
       // 从 _tasks 获取当前版本以保留进度数据
       final currentTask =
           _tasks.firstWhere((t) => t.id == task.id, orElse: () => task);
-      final completedTask = currentTask.copyWith(
+
+      // Update task info if conversion changed the file
+      var updatedTask = currentTask.copyWith(
         status: DownloadStatus.completed,
         completedAt: DateTime.now(),
       );
-      _updateTask(completedTask, immediate: true); // 完成时立即保存
+      if (convertedPath != null) {
+        final convertedFile = File(convertedPath);
+        final physicalName = convertedPath.split('/').last;
+        _log.info('[Download] Conversion success: $physicalName', tag: 'Download');
+
+        // Preserve relative path from original fileName, just replace extension
+        final originalStem = task.fileName.replaceAll(
+          RegExp(r'\.wav$', caseSensitive: false), '');
+        final newExt = convertedPath.split('.').last;
+        final newFileName = '$originalStem.$newExt';
+        _log.info('[Download] newFileName=$newFileName', tag: 'Download');
+        // Update fileName and totalBytes to reflect converted file
+        updatedTask = updatedTask.copyWith(
+          fileName: newFileName,
+          totalBytes: await convertedFile.length(),
+          downloadedBytes: await convertedFile.length(),
+        );
+      }
+      _updateTask(updatedTask, immediate: true); // 完成时立即保存
       _cancelTokens.remove(task.id);
     } catch (e) {
       if (e is DioException && e.type == DioExceptionType.cancel) {
@@ -508,7 +646,12 @@ class DownloadService {
   }
 
   Future<void> resumeTask(String taskId) async {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
+    final index = _tasks.indexWhere((t) => t.id == taskId);
+    if (index == -1) {
+      _log.warning('resumeTask: task not found: $taskId', tag: 'Download');
+      return;
+    }
+    final task = _tasks[index];
     if (task.status == DownloadStatus.paused ||
         task.status == DownloadStatus.failed) {
       _updateTask(task.copyWith(status: DownloadStatus.pending),
@@ -518,7 +661,12 @@ class DownloadService {
   }
 
   Future<void> deleteTask(String taskId) async {
-    final task = _tasks.firstWhere((t) => t.id == taskId);
+    final taskIdx = _tasks.indexWhere((t) => t.id == taskId);
+    if (taskIdx == -1) {
+      _log.warning('deleteTask: task not found: $taskId', tag: 'Download');
+      return;
+    }
+    final task = _tasks[taskIdx];
     final workId = task.workId;
 
     // 取消下载
@@ -785,7 +933,14 @@ class DownloadService {
       buildPathMap(tracks, '');
 
       // 扫描工作目录中的所有文件
-      await for (final entity in workDir.list()) {
+      final workEntities = await workDir.list(followLinks: false).toList();
+      workEntities.sort((a, b) {
+        final aName = a.path.split(Platform.pathSeparator).last;
+        final bName = b.path.split(Platform.pathSeparator).last;
+        return _naturalCompare(aName, bName);
+      });
+
+      for (final entity in workEntities) {
         if (entity is File) {
           final fileName = entity.path.split(Platform.pathSeparator).last;
 
@@ -835,12 +990,22 @@ class DownloadService {
 
   /// 同步磁盘文件到 work_metadata.json 的 children 文件树
   /// 确保手动添加的文件也能在离线浏览器中正确显示
+  ///
+  /// Always sorts the children tree recursively after sync so tracks
+  /// appear in natural filename order (1.mp3, 2.mp3, ..., 10.mp3).
   Future<void> _syncFileTreeWithDisk(int workId, Directory workDir) async {
     // 1. 收集磁盘上所有实际文件的相对路径
     final diskFiles = <String, File>{};
 
     Future<void> collectFiles(Directory dir, String relativePath) async {
-      await for (final entity in dir.list()) {
+      final entities = await dir.list(followLinks: false).toList();
+      entities.sort((a, b) {
+        final aName = a.path.split(Platform.pathSeparator).last;
+        final bName = b.path.split(Platform.pathSeparator).last;
+        return _naturalCompare(aName, bName);
+      });
+
+      for (final entity in entities) {
         if (entity is File) {
           final fileName = entity.path.split(Platform.pathSeparator).last;
           // 跳过元数据、封面和临时下载文件
@@ -862,9 +1027,8 @@ class DownloadService {
     }
 
     await collectFiles(workDir, '');
-    if (diskFiles.isEmpty) return;
 
-    // 2. 加载现有元数据
+    // 2. 加载现有元数据 (always, even when diskFiles is empty for imported works)
     final metadataFile = File('${workDir.path}/work_metadata.json');
     Map<String, dynamic>? metadata;
 
@@ -877,7 +1041,6 @@ class DownloadService {
       }
     }
 
-    bool metadataCreated = false;
     if (metadata == null) {
       // 没有任何元数据，创建基础元数据
       metadata = {
@@ -885,108 +1048,117 @@ class DownloadService {
         'title': 'RJ$workId',
         'children': <dynamic>[],
       };
-      metadataCreated = true;
     }
 
-    // 3. 收集已有文件树中所有文件的相对路径
-    final existingChildren = (metadata['children'] as List<dynamic>?) ?? [];
-    final knownPaths = <String>{};
+    // 3. Sync new files from disk into the children tree (if any)
+    if (diskFiles.isNotEmpty) {
+      // 收集已有文件树中所有文件的相对路径
+      final existingChildren = (metadata['children'] as List<dynamic>?) ?? [];
+      final knownPaths = <String>{};
 
-    void collectKnownPaths(List<dynamic> items, String parentPath) {
-      for (final item in items) {
-        if (item is! Map<String, dynamic>) continue;
-        final type = item['type'] as String? ?? '';
-        final title = item['title'] as String? ?? '';
-        if (type == 'folder') {
-          final folderPath = parentPath.isEmpty ? title : '$parentPath/$title';
-          final children = item['children'] as List<dynamic>?;
-          if (children != null) {
-            collectKnownPaths(children, folderPath);
-          }
-        } else {
-          final filePath = parentPath.isEmpty ? title : '$parentPath/$title';
-          knownPaths.add(filePath);
-        }
-      }
-    }
-
-    collectKnownPaths(existingChildren, '');
-
-    // 4. 找出磁盘上有但文件树中没有的文件
-    final newFiles = <String, File>{};
-    for (final entry in diskFiles.entries) {
-      if (!knownPaths.contains(entry.key)) {
-        newFiles[entry.key] = entry.value;
-      }
-    }
-
-    if (newFiles.isEmpty && !metadataCreated) return;
-
-    // 5. 将新文件添加到 children 树中的正确位置
-    final mutableChildren = List<dynamic>.from(existingChildren);
-
-    for (final entry in newFiles.entries) {
-      final relativePath = entry.key;
-      final file = entry.value;
-      final parts = relativePath.split('/');
-
-      final fileType = FileIconUtils.inferFileType(parts.last);
-      final syntheticHash = 'local_${workId}_$relativePath';
-
-      int? fileSize;
-      try {
-        fileSize = await file.length();
-      } catch (_) {}
-
-      final fileEntry = <String, dynamic>{
-        'type': fileType,
-        'title': parts.last,
-        'hash': syntheticHash,
-        if (fileSize != null) 'size': fileSize,
-      };
-
-      if (parts.length == 1) {
-        // 根级别文件
-        mutableChildren.add(fileEntry);
-      } else {
-        // 嵌套文件，确保父文件夹存在
-        var currentLevel = mutableChildren;
-        for (var i = 0; i < parts.length - 1; i++) {
-          final folderName = parts[i];
-          // 查找或创建文件夹
-          Map<String, dynamic>? folder;
-          for (final item in currentLevel) {
-            if (item is Map<String, dynamic> &&
-                item['type'] == 'folder' &&
-                item['title'] == folderName) {
-              folder = item;
-              break;
+      void collectKnownPaths(List<dynamic> items, String parentPath) {
+        for (final item in items) {
+          if (item is! Map<String, dynamic>) continue;
+          final type = item['type'] as String? ?? '';
+          final title = item['title'] as String? ?? '';
+          if (type == 'folder') {
+            final folderPath = parentPath.isEmpty ? title : '$parentPath/$title';
+            final children = item['children'] as List<dynamic>?;
+            if (children != null) {
+              collectKnownPaths(children, folderPath);
             }
+          } else {
+            final filePath = parentPath.isEmpty ? title : '$parentPath/$title';
+            knownPaths.add(filePath);
           }
-
-          if (folder == null) {
-            folder = <String, dynamic>{
-              'type': 'folder',
-              'title': folderName,
-              'children': <dynamic>[],
-            };
-            currentLevel.add(folder);
-          } else if (folder['children'] == null) {
-            folder['children'] = <dynamic>[];
-          }
-          currentLevel = folder['children'] as List<dynamic>;
         }
-        currentLevel.add(fileEntry);
       }
 
-      _log.info('添加手动文件到文件树: $relativePath (RJ$workId)', tag: 'Download');
-    }
+      collectKnownPaths(existingChildren, '');
 
-    if (newFiles.isNotEmpty || metadataCreated) {
+      // 找出磁盘上有但文件树中没有的文件
+      final newFiles = <String, File>{};
+      for (final entry in diskFiles.entries) {
+        if (!knownPaths.contains(entry.key)) {
+          newFiles[entry.key] = entry.value;
+        }
+      }
+
+      // 将新文件添加到 children 树中的正确位置
+      final mutableChildren = List<dynamic>.from(existingChildren);
+
+      for (final entry in newFiles.entries) {
+        final relativePath = entry.key;
+        final file = entry.value;
+        final parts = relativePath.split('/');
+
+        final fileType = FileIconUtils.inferFileType(parts.last);
+        final syntheticHash = 'local_${workId}_$relativePath';
+
+        int? fileSize;
+        try {
+          fileSize = await file.length();
+        } catch (_) {}
+
+        final fileEntry = <String, dynamic>{
+          'type': fileType,
+          'title': parts.last,
+          'hash': syntheticHash,
+          if (fileSize != null) 'size': fileSize,
+        };
+
+        if (parts.length == 1) {
+          // 根级别文件
+          mutableChildren.add(fileEntry);
+        } else {
+          // 嵌套文件，确保父文件夹存在
+          var currentLevel = mutableChildren;
+          for (var i = 0; i < parts.length - 1; i++) {
+            final folderName = parts[i];
+            // 查找或创建文件夹
+            Map<String, dynamic>? folder;
+            for (final item in currentLevel) {
+              if (item is Map<String, dynamic> &&
+                  item['type'] == 'folder' &&
+                  item['title'] == folderName) {
+                folder = item;
+                break;
+              }
+            }
+
+            if (folder == null) {
+              folder = <String, dynamic>{
+                'type': 'folder',
+                'title': folderName,
+                'children': <dynamic>[],
+              };
+              currentLevel.add(folder);
+            } else if (folder['children'] == null) {
+              folder['children'] = <dynamic>[];
+            }
+            currentLevel = folder['children'] as List<dynamic>;
+          }
+          currentLevel.add(fileEntry);
+        }
+
+        _log.info('添加手动文件到文件树: $relativePath (RJ$workId)', tag: 'Download');
+      }
+
+      // Sort + write
+      _sortChildrenTree(mutableChildren);
       metadata['children'] = mutableChildren;
       await metadataFile.writeAsString(jsonEncode(metadata));
       _log.info('已更新作品文件树: RJ$workId, 新增 ${newFiles.length} 个文件',
           tag: 'Download');
+    } else {
+      // No disk files found (e.g. imported works with only metadata.json).
+      // Still sort existing children and write back so tracks appear in
+      // natural filename order, not arbitrary filesystem order.
+      final existingChildren = (metadata['children'] as List<dynamic>?) ?? [];
+      _sortChildrenTree(existingChildren);
+      metadata['children'] = existingChildren;
+      await metadataFile.writeAsString(jsonEncode(metadata));
+      _log.info('已排序作品文件树: RJ$workId (no new files)', tag: 'Download');
     }
   }
 
@@ -1048,9 +1220,24 @@ class DownloadService {
             tasksToRemove.add(task.id);
             _log.warning('作品文件夹不存在，删除任务: ${task.workTitle}', tag: 'Download');
           } else {
-            // 检查文件是否存在
+            // Check file existence in the work directory first.
             final file = File('${workDir.path}/${task.fileName}');
-            if (!await file.exists()) {
+            bool fileExists = await file.exists();
+
+            // If not found, try loading metadata from disk — imported works
+            // (local_import_path) keep their files in the original source
+            // folder, not the work directory. task.workMetadata is null on
+            // startup because it's not serialized to SharedPreferences.
+            if (!fileExists) {
+              final meta = await _loadWorkMetadata(task.workId);
+              final importPath = meta?['local_import_path'] as String?;
+              if (importPath != null && importPath.isNotEmpty) {
+                final sourceFile = File('$importPath/${task.fileName}');
+                fileExists = await sourceFile.exists();
+              }
+            }
+
+            if (!fileExists) {
               tasksToRemove.add(task.id);
               _log.warning('文件不存在，删除任务: ${task.fileName}', tag: 'Download');
             }
@@ -1088,7 +1275,14 @@ class DownloadService {
 
         // 递归扫描文件夹中的所有文件
         Future<void> scanDirectory(Directory dir, String relativePath) async {
-          await for (final entity in dir.list()) {
+          final entities = await dir.list(followLinks: false).toList();
+          entities.sort((a, b) {
+            final aName = a.path.split(Platform.pathSeparator).last;
+            final bName = b.path.split(Platform.pathSeparator).last;
+            return _naturalCompare(aName, bName);
+          });
+
+          for (final entity in entities) {
             if (entity is File) {
               final fileName = entity.path.split(Platform.pathSeparator).last;
 
@@ -1186,10 +1380,436 @@ class DownloadService {
     }
   }
 
+  /// Human-friendly natural sort comparator — sorts "2.mp3" before "10.mp3".
+  /// Handles mixed text+numeric filenames by comparing numeric segments
+  /// as integers and text segments as strings.
+  static int _naturalCompare(String a, String b) {
+    final pattern = RegExp(r'(\d+|[^\d]+)');
+    final aParts = pattern
+        .allMatches(a.toLowerCase())
+        .map((m) => m.group(1)!)
+        .toList();
+    final bParts = pattern
+        .allMatches(b.toLowerCase())
+        .map((m) => m.group(1)!)
+        .toList();
+
+    final len = aParts.length < bParts.length ? aParts.length : bParts.length;
+    for (int i = 0; i < len; i++) {
+      final aNum = int.tryParse(aParts[i]);
+      final bNum = int.tryParse(bParts[i]);
+      if (aNum != null && bNum != null) {
+        if (aNum != bNum) return aNum.compareTo(bNum);
+      } else {
+        final cmp = aParts[i].compareTo(bParts[i]);
+        if (cmp != 0) return cmp;
+      }
+    }
+    return aParts.length.compareTo(bParts.length);
+  }
+
+  /// Recursively sort a children tree in natural filename order.
+  /// Sorts files first, then folders (each group sorted by name).
+  /// Also recursively sorts nested folder children.
+  static void _sortChildrenTree(List<dynamic> children) {
+    children.sort((a, b) {
+      final aIsFolder = a is Map && a['type'] == 'folder';
+      final bIsFolder = b is Map && b['type'] == 'folder';
+      // Folders before files
+      if (aIsFolder && !bIsFolder) return -1;
+      if (!aIsFolder && bIsFolder) return 1;
+      // Same type — natural sort by title
+      final aName = (a is Map ? (a['title'] as String? ?? '') : '').toLowerCase();
+      final bName = (b is Map ? (b['title'] as String? ?? '') : '').toLowerCase();
+      return _naturalCompare(aName, bName);
+    });
+
+    // Recursively sort subfolders
+    for (final item in children) {
+      if (item is Map && item['type'] == 'folder') {
+        final subChildren = item['children'] as List<dynamic>?;
+        if (subChildren != null && subChildren.isNotEmpty) {
+          _sortChildrenTree(subChildren);
+        }
+      }
+    }
+  }
+
+  /// Import a local folder as a new work (reference only — no file copy).
+  /// Creates a synthetic work entry with a negative ID so it appears
+  /// alongside downloaded works in the local downloads screen.
+  ///
+  /// Returns the synthetic workId on success, or throws on error.
+  Future<int> importLocalWork({
+    required String folderPath,
+    required String title,
+  }) async {
+    final importDir = Directory(folderPath);
+    if (!await importDir.exists()) {
+      throw Exception('Folder not found: $folderPath');
+    }
+
+    // Generate a unique negative workId
+    final workId = -DateTime.now().millisecondsSinceEpoch;
+
+    // Create work directory in download folder
+    final downloadDir = await _getDownloadDirectory();
+    final workDir = Directory('${downloadDir.path}/$workId');
+    await workDir.create(recursive: true);
+
+    // Scan the original folder for files and build a file tree
+    final List<dynamic> children = [];
+    int totalFiles = 0;
+
+    Future<void> scanDir(Directory dir, List<dynamic> parentList,
+        String relativePath) async {
+      // Collect entities first, sort by name, then process.
+      // dir.list() returns files in filesystem order (arbitrary), not
+      // alphabetical — without sorting, tracks end up in random order.
+      final entities = await dir.list(followLinks: false).toList();
+      entities.sort((a, b) {
+        final aName = a.path.split(Platform.pathSeparator).last;
+        final bName = b.path.split(Platform.pathSeparator).last;
+        return _naturalCompare(aName, bName);
+      });
+
+      for (final entity in entities) {
+        final name = entity.path.split(Platform.pathSeparator).last;
+        // Skip hidden files
+        if (name.startsWith('.')) continue;
+
+        if (entity is Directory) {
+          final subDirChildren = <dynamic>[];
+          final subPath = relativePath.isEmpty ? name : '$relativePath/$name';
+          await scanDir(entity, subDirChildren, subPath);
+          if (subDirChildren.isNotEmpty) {
+            parentList.add({
+              'type': 'folder',
+              'title': name,
+              'children': subDirChildren,
+            });
+          }
+        } else if (entity is File) {
+          final fileType = FileIconUtils.inferFileType(name);
+          if (fileType == 'audio' || fileType == 'image' ||
+              fileType == 'text' || fileType == 'pdf') {
+            int? fileSize;
+            try {
+              fileSize = await entity.length();
+            } catch (_) {}
+            parentList.add({
+              'type': fileType,
+              'title': name,
+              'hash': 'local_${workId}_$name',
+              'size': fileSize,
+            });
+            totalFiles++;
+          }
+        }
+      }
+    }
+
+    await scanDir(importDir, children, '');
+
+    if (children.isEmpty) {
+      // Clean up empty directory
+      await workDir.delete(recursive: true);
+      throw Exception('No supported audio/image/text files found in the selected folder.');
+    }
+
+    // Create work metadata FIRST (without cover path) and write it to disk
+    // so the metadata is available immediately.
+    final metadata = <String, dynamic>{
+      'id': workId,
+      'title': title,
+      'children': children,
+      'local_import_path': folderPath,
+    };
+    final metadataFile = File('${workDir.path}/work_metadata.json');
+    await metadataFile.writeAsString(jsonEncode(metadata));
+
+    _log.info('Imported local work: $title (ID: $workId, $totalFiles files)',
+        tag: 'Download');
+
+    // Create DownloadTask entries for each file BEFORE processing the cover.
+    // This makes the card appear immediately in the grid, so the user gets
+    // instant feedback. The cover will be processed next and the card will
+    // update when complete.
+    int fileIndex = 0;
+    void addTaskForFile(dynamic item, String parentPath) {
+      final itemType = item['type'] ?? '';
+      final fileTitle = item['title'] ?? 'unknown';
+      final hash = item['hash'];
+
+      if (itemType == 'folder') {
+        final subChildren = item['children'] as List<dynamic>?;
+        if (subChildren != null) {
+          for (final child in subChildren) {
+            final childPath = parentPath.isEmpty ? fileTitle : '$parentPath/$fileTitle';
+            addTaskForFile(child, childPath);
+          }
+        }
+      } else {
+        final fileName = parentPath.isEmpty ? fileTitle : '$parentPath/$fileTitle';
+        _tasks.add(DownloadTask(
+          id: hash ?? 'import_${workId}_${fileIndex++}',
+          workId: workId,
+          workTitle: title, // use the work title (outer param), not file name
+          fileName: fileName,
+          downloadUrl: '',
+          hash: hash,
+          totalBytes: item['size'] as int?,
+          downloadedBytes: item['size'] as int? ?? 0,
+          status: DownloadStatus.completed,
+          createdAt: DateTime.now(),
+          completedAt: DateTime.now(),
+          workMetadata: metadata,
+        ));
+      }
+    }
+
+    for (final child in children) {
+      addTaskForFile(child, '');
+    }
+
+    await _saveTasks();
+    _tasksController.add(List.from(_tasks));
+
+    // Now process the cover image in the background — resize and save as JPEG.
+    // The card is already visible at this point (tasks created above), so the
+    // user sees the card appear immediately. The cover will pop in once done.
+    addProcessingCover(workId);
+    _processCoverForImport(workId, workDir.path, importDir);
+
+    return workId;
+  }
+
+  /// Fire-and-forget: scan the import folder for the first image, resize it
+  /// to max 720px, save as JPEG quality 85, then update the metadata and
+  /// notify listeners so the card updates with the processed cover.
+  Future<void> _processCoverForImport(
+      int workId, String workDirPath, Directory importDir) async {
+    try {
+      // Collect and sort entities so the first valid image is deterministic
+      // (based on filename order), not arbitrary filesystem order.
+      final entities = await importDir.list(followLinks: false).toList();
+      entities.sort((a, b) {
+        final aName = a.path.split(Platform.pathSeparator).last;
+        final bName = b.path.split(Platform.pathSeparator).last;
+        return _naturalCompare(aName, bName);
+      });
+
+      for (final entity in entities) {
+        if (entity is File) {
+          final fName = entity.path.split(Platform.pathSeparator).last.toLowerCase();
+          if (fName.endsWith('.jpg') || fName.endsWith('.jpeg') ||
+              fName.endsWith('.png') || fName.endsWith('.webp') ||
+              fName.endsWith('.bmp')) {
+            await _resizeAndSaveCover(
+              sourcePath: entity.path,
+              destPath: '$workDirPath/cover.jpg',
+              maxDimension: 720,
+            );
+
+            // Update the metadata file to include localCoverPath
+            final metadataFile = File('$workDirPath/work_metadata.json');
+            if (await metadataFile.exists()) {
+              try {
+                final content = await metadataFile.readAsString();
+                final meta = jsonDecode(content) as Map<String, dynamic>;
+                meta['localCoverPath'] = 'cover.jpg';
+                await metadataFile.writeAsString(jsonEncode(meta));
+
+                // Update tasks in memory so the card re-resolves the cover
+                for (var i = 0; i < _tasks.length; i++) {
+                  if (_tasks[i].workId == workId) {
+                    _tasks[i] = _tasks[i].copyWith(workMetadata: meta);
+                  }
+                }
+                _tasksController.add(List.from(_tasks));
+              } catch (e) {
+                _log.warning('Failed to update metadata after cover resize: $e', tag: 'Download');
+              }
+            }
+
+            _log.info('Cover image resized and saved as JPEG: $fName (max 720px)', tag: 'Download');
+            break; // use the first image found
+          }
+        }
+      }
+    } catch (e) {
+      _log.warning('Failed to process cover image: $e', tag: 'Download');
+    } finally {
+      removeProcessingCover(workId);
+    }
+  }
+
+  /// Resize a cover image to [maxDimension] pixels on the longest edge and
+  /// save as JPEG quality 85. This prevents large images (>1MB) from causing
+  /// silent decode failures in Image.file() on Android with Impeller/Vulkan.
+  ///
+  /// If the pure-Dart [img.decodeImage] fails (e.g. CMYK JPEG, unusual PNG
+  /// color types), falls back to Flutter's platform decoder (dart:ui) which
+  /// supports more formats. If both decoders fail, the cover is skipped
+  /// entirely — no fallback copy of the original large file.
+  Future<void> _resizeAndSaveCover({
+    required String sourcePath,
+    required String destPath,
+    int maxDimension = 720,
+  }) async {
+    final sourceFile = File(sourcePath);
+    if (!await sourceFile.exists()) return;
+
+    // Read the source file bytes
+    final Uint8List bytes = await sourceFile.readAsBytes();
+
+    // Decode the image using the pure-Dart image package first
+    img.Image? result = img.decodeImage(bytes);
+
+    if (result == null) {
+      // Pure-Dart decoder failed — try the platform decoder (dart:ui) which
+      // handles more formats (CMYK JPEG, certain PNG types, animated WebP
+      // static frame, etc.).
+      _log.warning('Pure-Dart decoder failed, trying platform decoder: $sourcePath',
+          tag: 'Download');
+      try {
+        final codec = await ui.instantiateImageCodec(
+          bytes,
+          targetWidth: maxDimension * 2, // decode at ~2x for quality headroom
+        );
+        final frame = await codec.getNextFrame();
+        final rgbaData = await frame.image.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        );
+        if (rgbaData != null) {
+          result = img.Image.fromBytes(
+            width: frame.image.width,
+            height: frame.image.height,
+            bytes: rgbaData.buffer,
+            numChannels: 4,
+          );
+          _log.info(
+            'Platform decoder succeeded: ${frame.image.width}x${frame.image.height}',
+            tag: 'Download',
+          );
+        }
+      } catch (e) {
+        _log.warning('Platform decoder also failed: $e', tag: 'Download');
+      }
+    }
+
+    if (result == null) {
+      // Both decoders failed — skip cover creation entirely rather than
+      // copying the original >1MB file which would fail to load on
+      // Android/Impeller.
+      _log.warning('Skipping cover (could not decode): $sourcePath',
+          tag: 'Download');
+      return;
+    }
+
+    // Resize if needed (maintaining aspect ratio)
+    if (result.width > maxDimension || result.height > maxDimension) {
+      result = img.copyResize(result,
+        width: result.width > result.height ? maxDimension : null,
+        height: result.height >= result.width ? maxDimension : null,
+      );
+    }
+
+    // Encode as JPEG — start at quality 85, then step down if still too large
+    const maxBytes = 500 * 1024; // 500KB safety limit for Impeller
+    int quality = 85;
+    Uint8List jpegBytes;
+
+    do {
+      jpegBytes = img.encodeJpg(result, quality: quality);
+      if (jpegBytes.length <= maxBytes) break;
+      quality -= 10;
+    } while (quality >= 25);
+
+    await File(destPath).writeAsBytes(jpegBytes);
+
+    _log.info(
+      'Cover resized: ${result.width}x${result.height} '
+      '(${(bytes.length / 1024).toStringAsFixed(1)}KB -> '
+      '${(jpegBytes.length / 1024).toStringAsFixed(1)}KB, '
+      'quality=$quality)',
+      tag: 'Download',
+    );
+  }
+
+  /// Import multiple folders (each subfolder becomes one work).
+  /// [parentFolderPath] is the parent directory; each direct subfolder will
+  /// become an imported work using the folder name as its title.
+  /// [onProgress] is called with (currentIndex, totalCount, folderName) after
+  /// each subfolder is processed (whether it succeeds or fails).
+  /// Returns the list of synthetic workIds created.
+  Future<List<int>> importMultipleLocalWorks({
+    required String parentFolderPath,
+    void Function(int current, int total, String folderName)? onProgress,
+  }) async {
+    final parentDir = Directory(parentFolderPath);
+    if (!await parentDir.exists()) {
+      throw Exception('Folder not found: $parentFolderPath');
+    }
+
+    final subDirs = <Directory>[];
+    await for (final entity in parentDir.list(followLinks: false)) {
+      if (entity is Directory) {
+        final name = entity.path.split(Platform.pathSeparator).last;
+        if (name.startsWith('.')) continue;
+        subDirs.add(entity);
+      }
+    }
+
+    if (subDirs.isEmpty) {
+      throw Exception('No subfolders found in the selected folder.');
+    }
+
+    // Sort subfolders by name so multi-import processes in a predictable order
+    subDirs.sort((a, b) {
+      final aName = a.path.split(Platform.pathSeparator).last;
+      final bName = b.path.split(Platform.pathSeparator).last;
+      return _naturalCompare(aName, bName);
+    });
+
+    final total = subDirs.length;
+    final createdIds = <int>[];
+    final errors = <String>[];
+
+    for (int i = 0; i < total; i++) {
+      final subDir = subDirs[i];
+      final folderName = subDir.path.split(Platform.pathSeparator).last;
+      try {
+        final workId = await importLocalWork(
+          folderPath: subDir.path,
+          title: folderName,
+        );
+        createdIds.add(workId);
+      } catch (e) {
+        errors.add('$folderName: $e');
+      }
+      onProgress?.call(i + 1, total, folderName);
+    }
+
+    if (errors.isNotEmpty) {
+      _log.warning(
+        'Import multiple works completed with errors: ${errors.join("; ")}',
+        tag: 'Download',
+      );
+    }
+
+    // Full disk sync after all imports complete — ensures file trees match
+    // what's on disk (picks up any files the syncFileTreeWithDisk step adds)
+    await reloadMetadataFromDisk();
+
+    return createdIds;
+  }
+
   void dispose() {
     _saveTimer?.cancel();
     _saveTimer = null;
     _tasksController.close();
+    _conversionController.close();
     for (final token in _cancelTokens.values) {
       token.cancel();
     }

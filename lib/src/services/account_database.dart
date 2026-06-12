@@ -172,8 +172,10 @@ class AccountDatabase {
     return result;
   }
 
+  /// Close the database connection. After closing, the database will
+  /// be re-opened lazily on the next access.
   Future<void> close() async {
-    final db = await database;
-    await db.close();
+    await _database?.close();
+    _database = null;
   }
 }

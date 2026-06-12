@@ -1,0 +1,6 @@
+{
+  "zh_Hant": [
+    "convertWavAfterDownloadDesc",
+    "convertWavFfmpegNotFound"
+  ]
+}

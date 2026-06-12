@@ -36,7 +36,7 @@ void main() {
     });
 
     test('UTF-8 BOM (EF BB BF)', () {
-      final text = '带BOM的UTF-8文本';
+      const text = '带BOM的UTF-8文本';
       final bytes = [0xEF, 0xBB, 0xBF, ...utf8.encode(text)];
       final (content, encoding) = EncodingUtils.decodeBytes(bytes);
       expect(encoding, 'UTF-8');

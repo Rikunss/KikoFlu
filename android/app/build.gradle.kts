@@ -21,12 +21,13 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -38,6 +39,14 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    // AAudio exclusive mode — NDK (C++) build configuration
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.18.1+"
+        }
     }
 
     signingConfigs {
@@ -58,6 +67,10 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
         debug {
             signingConfig = if (hasReleaseKeystore) {
@@ -67,8 +80,33 @@ android {
             }
         }
     }
+
+    // AGP 8.x release builds may load native .so directly from the APK (no extraction),
+    // which can cause "Bad JNI version" errors in some older native libraries
+    // (e.g. ffmpegkit_abidetect.so). Forcing legacy extraction fixes this.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // AndroidX Media3 (ExoPlayer) for hi-res audio playback
+    // FLAC decoding is natively supported by media3-exoplayer
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
+
+    // ExoPlayer FFmpeg extension — provides libffmpegJNI.so for software ALAC/FLAC/etc decoding
+    // Jellyfin community build of AndroidX Media3 FFmpeg decoder (includes Java + native libs)
+    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1")
+
+    // SAF DocumentFile API — needed by SafFileUtils for content:// URI file access
+    implementation("androidx.documentfile:documentfile:1.0.1")
+
+    // Core library desugaring (required by flutter_local_notifications)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

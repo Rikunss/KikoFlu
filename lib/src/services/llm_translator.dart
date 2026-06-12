@@ -2,6 +2,9 @@ import 'dart:ui';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'translation_service.dart';
+import 'log_service.dart';
+
+final _log = LogService.instance;
 
 class LLMTranslator {
   final Dio _dio = Dio();
@@ -58,10 +61,10 @@ class LLMTranslator {
       }
       return text;
     } catch (e) {
-      print('LLM translation error: $e');
+      _log.error('LLM translation error: $e');
       if (e is DioException) {
         if (e.response != null) {
-          print('Response data: ${e.response?.data}');
+          _log.info('Response data: ${e.response?.data}');
           return 'Error: ${e.response?.statusCode} - ${e.response?.statusMessage}';
         }
       }

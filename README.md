@@ -1,11 +1,10 @@
 <div align="center">
-  <img src="assets/icons/app_icon_opaque.png" alt="KikoFlu" width="120" height="120">
+  <img src="assets/icons/app_icon_opaque.png" alt="KikoFlu Edge" width="120" height="120">
 
-  # KikoFlu
+  # KikoFlu Edge
 
-  [English](README_EN.md) | [日本語](README_JA.md) | 简体中文
-  
-  一个跨平台同人音声客户端，支持连接 Kikoeru 自建服务器或在线服务
+  A cross-platform doujin voice client. Supports self-hosted Kikoeru servers and online services.
+  I just tested it for Android, I don't know if Windows/Linux/MacOS can run smoothly without bugs or not
 
   [![Flutter](https://img.shields.io/badge/Flutter-3.0+-02569B?logo=flutter)](https://flutter.dev)
   [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#)
@@ -15,89 +14,142 @@
 </div>
 
 <div align="center">
-  <img src="screenshots/8.png" width="900" alt="KikoFlu 截图">
+  <img src="screenshots/1.jpg" width="950" alt="KikoFlu Screenshot">
 </div>
 
-## 特性
+## Features
 
-### 🎵 媒体播放
-- 后台播放与自动缓存机制
-- 倍速播放
-- 单曲循环、列表循环、随机播放
-- 多媒体支持：音频、视频、文本、图片、PDF 等
-- 支持整个作品或选择性下载，并发下载管理
-- 离线下载搜索与排序
+### 🎵 Media Playback
+- Background playback with automatic caching
+- Playback speed control
+- Loop (single / list) and shuffle modes
+- **Queue management** — reorder, skip, and manage your play queue
+- **Fullscreen player** — immersive playback UI with enhanced controls
+- Multi-format support: audio, video, text, images, PDF, etc.
+- Full or selective download with concurrent download management
+- Offline download search and sorting
+- **Playback history** — track and revisit recently played works
+- **Hi-res audio output** — high-resolution audio support
+- **Exclusive audio mode** — bit-perfect audio output
+- **Equalizer** — built-in equalizer with presets
+- **Replay gain** — consistent volume across tracks
+- **Volume normalization** — automatic volume leveling
+- **Streaming speed tracker** — real-time buffering and streaming stats
+- **MPV player integration** — configurable MPV backend
 
-### 📝 字幕系统
-- 自动字幕加载
-- 字幕导入、编辑、调轴
-- 字幕翻译（播放时实时翻译歌词/台词）
-- 字幕库（SQLite 索引，快速检索）
-- 支持保存目录修改，跨硬盘拷贝
+### 📝 Subtitle System
+- Automatic subtitle loading
+- Subtitle import, editing, and timing adjustment
+- Real-time subtitle / lyric translation during playback
+- **LLM-powered translation** — AI-assisted subtitle and lyric translation
+- Subtitle library (SQLite indexed, fast search)
+- **Custom file picker** — import subtitle folders with the built-in CustomFilePicker (breadcrumb nav, quick access, search, hidden files toggle)
+- Custom save directory with cross-drive copy support
 
-### 🎨 界面
-- 全平台支持（Android / iOS / Windows / macOS / Linux）
-- Material Design 3 设计规范
-- 横屏模式支持
-- 明暗主题自适应
-- 标题、文件目录、文本文件翻译
-- 标签自动翻译（中/英/日）
-- 防社死模式
-- 评分系统
-- 推荐作品功能
+### 📥 Downloads
+- **Redesigned Downloads screen** — source tab layout (server / offline)
+- **Count badges** on source tabs showing item totals
+- **Filter bar** — filter downloads by circle, VA, and tag
+- **Colored circle avatars** — visual distinction per download source
+- **Separate import button row** — cleaner top bar layout
+- **Sort by title, added time, and file tree** — multiple sorting options
+- **Cover image auto-resize** during import to prevent player failures
 
-### 🔍 搜索
-- 高级搜索，支持多标签 / 排除标签
-- 多维度筛选（标签、评分、发售日期等）
-- 完整作品信息展示
+### 📋 Playlists & Smart Playlists
+- **Queue management** — full queue UI with reorder and skip controls
+- **Smart playlists** — auto-generated playlists based on custom rules:
+  - By tag, VA (voice actor), circle
+  - By age (release date range)
+  - By rating threshold
+  - By subtitle presence
+- **Smart playlist evaluator** — dynamically updates content as your library grows
+- **Playlist UI/UX enhancements** — improved playlist browsing and management
 
-### 🌐 国际化
+### 📊 Listening Statistics
+- **Comprehensive statistics dashboard** — track your listening habits
+- Total listening time, works completed, trends over time
+- Listening history breakdown
+- **Redesigned stats UI** — beautiful visual presentation with charts
+
+### 🎨 Interface
+- Full platform support (Android / iOS / Windows / macOS / Linux)
+- Material Design 3
+- Landscape mode support
+- Light and dark theme
+- Title, file directory, and text file translation
+- Automatic tag translation (Chinese / English / Japanese)
+- **Privacy mode** — blur sensitive content
+- Rating system
+- Recommendations
+- **Home screen widget (Android)** — current track info and playback controls on your home screen
+
+### 🔍 Search
+- Advanced search with multi-tag / exclude-tag support
+- Multi-dimensional filtering (tags, rating, release date, etc.)
+- Detailed work information display
+
+### 📁 Custom File Manager
+- **Built-in CustomFilePicker** — replaces system file picker (SAF) for better compatibility
+- **Breadcrumb navigation** — easy folder traversal
+- **Quick access sidebar** — shortcuts to common locations
+- **Search functionality** — find files and folders quickly
+- **Show/hide hidden files** toggle
+- **MIUI compatibility** — works reliably on Xiaomi devices
+
+### 🌐 Internationalization
 - 简体中文 / 繁體中文 / English / 日本語 / Русский
 
-### ⚙️ 设置
-- 多账户支持
-- 自定义服务器地址（[使用指南](https://github.com/pa-jesusf/KikoFlu/wiki/%E4%BD%BF%E7%94%A8%E8%87%AA%E5%BB%BA%E5%90%8E%E7%AB%AF%E6%9C%8D%E5%8A%A1%E5%99%A8)），可测试连接延迟
-- 自定义缓存大小限制与清理策略
-- 主题模式、配色方案自由选择
-- 丰富的界面自定义选项
-- 应用内日志系统（支持导出）
-- 更新检查
+### ⚙️ Settings
+- Multi-account support
+- Custom server address ([Guide](https://github.com/pa-jesusf/KikoFlu/wiki/%E4%BD%BF%E7%94%A8%E8%87%AA%E5%BB%BA%E5%90%8E%E7%AB%AF%E6%9C%8D%E5%8A%A1%E5%99%A8)) with connection latency testing
+- **Custom cookie support** — for server authentication
+- Cache size limit and cleanup strategy
+- Theme and color scheme customization
+- Extensive UI customization options
+- Audio output configuration (hi-res, exclusive mode, equalizer, replay gain, normalization)
+- MPV player configuration
+- **Progress sync** — sync playback progress across devices
+- **Screen state management** — keep screen on during playback
+- In-app log system (with export)
+- Update checker
 
-### 📱 Android 特性
-- 悬浮歌词（锁定 / 解锁 / 触控穿透）
+### 📱 Android Features
+- Floating lyrics (lock / unlock / touch passthrough)
+- **Home screen widget** — quick playback controls and now-playing info
+- **Exclusive audio mode** — bit-perfect USB DAC support *AAudio Exclusive Mode Not Supported for All Android Devices. failed on my poco x6 5g.. but you can try by yourself :)
 
 ---
 
-## 下载
+## Download
 
-前往 [Releases](https://github.com/pa-jesusf/KikoFlu/releases/latest) 下载最新版本。
+Go to [Releases](https://github.com/Rikunss/KikoFlu/releases/latest) for the latest version.
 
-支持平台：Android（universal / arm64 / armeabi-v7a / x86_64）、iOS（未签名 IPA）、Windows（安装包 / 便携版）、macOS（DMG）、Linux（x64 / arm64）
+Platforms: Android (universal / arm64 / armeabi-v7a / x86_64), iOS (unsigned IPA), Windows (installer / portable), macOS (DMG), Linux (x64 / arm64)
 
 ### AltStore / SideStore
 
-iOS 用户可通过 AltStore 或 SideStore 添加软件源来安装和更新 KikoFlu：
+iOS users can add the KikoFlu Edge source to AltStore or SideStore for easy installation and updates:
 
-**源地址：** `https://raw.githubusercontent.com/pa-jesusf/KikoFlu/main/altstore-source.json`
+**Source URL:** `https://raw.githubusercontent.com/pa-jesusf/KikoFlu/main/altstore-source.json`
 
 ---
 
-## 源码构建
+## Build from Source
 
-### 环境要求
+### Requirements
 - Flutter SDK 3.0+
 - Dart SDK 3.0+
 
 ```bash
-git clone https://github.com/pa-jesusf/KikoFlu.git
+git clone https://github.com/Rikunss/KikoFlu.git
 cd KikoFlu
 flutter pub get
 ```
 
-### 构建命令
+### Build Commands
 
-| 平台 | 命令 |
-|------|------|
+| Platform | Command |
+|----------|---------|
 | Android | `flutter build apk --release --split-per-abi` |
 | Windows | `flutter build windows --release` |
 | macOS | `flutter build macos --release` |
@@ -106,24 +158,29 @@ flutter pub get
 
 ---
 
-## 相关项目
+## Related Projects
 
-- [Kikoeru](https://github.com/Number178/kikoeru-express) — 自建后端服务器
-- [asmr.one](https://www.asmr.one) — 在线服务
+- [Kikoeru](https://github.com/Number178/kikoeru-express) — Self-hosted backend server
+- [asmr.one](https://www.asmr.one) — Online service
 
-## 开源协议
+## Contributors
+
+- **Meteor-Sage** — Original author & lead developer
+- **Rikunss** - sigma male
+
+## License
 
 [GPL-3.0 License](LICENSE)
 
-## 联系方式
+## Contact
 
-- **问题反馈**：[Issues](https://github.com/pa-jesusf/KikoFlu/issues)
-- **交流群组**：[Telegram](https://t.me/+PrkiN-pZrXs4ZTU1)
+- **Bug Reports**: [Issues](https://github.com/Rikunss/KikoFlu/issues)
+- **Community**: [Telegram](https://t.me/+PrkiN-pZrXs4ZTU1)
 
 ---
 
 <div align="center">
 
-  **如果这个项目对你有帮助，请给个 ⭐ Star 支持一下！**
+  **If this project helps you, please give it a ⭐ Star!**
 
 </div>

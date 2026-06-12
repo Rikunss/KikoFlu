@@ -14,6 +14,7 @@ class UiSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
     final pageSize = ref.watch(pageSizeProvider);
 
     return Scaffold(
@@ -31,7 +32,7 @@ class UiSettingsScreen extends ConsumerWidget {
               children: [
                 ListTile(
                   leading: Icon(Icons.tune,
-                      color: Theme.of(context).colorScheme.primary),
+                      color: cs.primary),
                   title: Text(S.of(context).playerButtonSettings),
                   subtitle: Text(S.of(context).playerButtonSettingsSubtitle),
                   trailing: const Icon(Icons.arrow_forward_ios),
@@ -44,10 +45,10 @@ class UiSettingsScreen extends ConsumerWidget {
                     );
                   },
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: cs.outlineVariant),
                 ListTile(
                   leading: Icon(Icons.lyrics,
-                      color: Theme.of(context).colorScheme.primary),
+                      color: cs.primary),
                   title: Text(S.of(context).playerLyricStyle),
                   subtitle: Text(S.of(context).playerLyricStyleSubtitle),
                   trailing: const Icon(Icons.arrow_forward_ios),
@@ -59,10 +60,10 @@ class UiSettingsScreen extends ConsumerWidget {
                     );
                   },
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: cs.outlineVariant),
                 ListTile(
                   leading: Icon(Icons.visibility,
-                      color: Theme.of(context).colorScheme.primary),
+                      color: cs.primary),
                   title: Text(S.of(context).workDetailDisplaySettings),
                   subtitle: Text(S.of(context).workDetailDisplaySubtitle),
                   trailing: const Icon(Icons.arrow_forward_ios),
@@ -75,10 +76,10 @@ class UiSettingsScreen extends ConsumerWidget {
                     );
                   },
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: cs.outlineVariant),
                 ListTile(
                   leading: Icon(Icons.grid_view,
-                      color: Theme.of(context).colorScheme.primary),
+                      color: cs.primary),
                   title: Text(S.of(context).workCardDisplaySettings),
                   subtitle: Text(S.of(context).workCardDisplaySubtitle),
                   trailing: const Icon(Icons.arrow_forward_ios),
@@ -91,10 +92,10 @@ class UiSettingsScreen extends ConsumerWidget {
                     );
                   },
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: cs.outlineVariant),
                 ListTile(
                   leading: Icon(Icons.tab,
-                      color: Theme.of(context).colorScheme.primary),
+                      color: cs.primary),
                   title: Text(S.of(context).myTabsDisplaySettings),
                   subtitle: Text(S.of(context).myTabsDisplaySubtitle),
                   trailing: const Icon(Icons.arrow_forward_ios),
@@ -107,10 +108,10 @@ class UiSettingsScreen extends ConsumerWidget {
                     );
                   },
                 ),
-                Divider(color: Theme.of(context).colorScheme.outlineVariant),
+                Divider(color: cs.outlineVariant),
                 ListTile(
                   leading: Icon(Icons.format_list_numbered,
-                      color: Theme.of(context).colorScheme.primary),
+                      color: cs.primary),
                   title: Text(S.of(context).pageSizeSettings),
                   subtitle: Text(S.of(context).pageSizeCurrent(pageSize)),
                   trailing: DropdownButton<int>(

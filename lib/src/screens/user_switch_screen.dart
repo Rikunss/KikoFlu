@@ -79,12 +79,15 @@ class _UserSwitchScreenState extends ConsumerState<UserSwitchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
     return Scaffold(
       body: CustomScrollView(
         slivers: [
           SliverAppBar.large(
             title: Text(S.of(context).selectAccount),
-            backgroundColor: Theme.of(context).colorScheme.surface,
+            backgroundColor: cs.surface,
             actions: [
               IconButton(
                 icon: const Icon(Icons.add),
@@ -113,19 +116,18 @@ class _UserSwitchScreenState extends ConsumerState<UserSwitchScreen> {
                     Icon(
                       Icons.person_add,
                       size: 80,
-                      color: Theme.of(context).colorScheme.outline,
+                      color: cs.outline,
                     ),
                     const SizedBox(height: 16),
                     Text(
                       S.of(context).noSavedAccounts,
-                      style: Theme.of(context).textTheme.headlineSmall,
+                      style: tt.headlineSmall,
                     ),
                     const SizedBox(height: 8),
                     Text(
                       S.of(context).addAccountToGetStarted,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                      style: tt.bodyLarge?.copyWith(
+                            color: cs.onSurfaceVariant,
                           ),
                     ),
                     const SizedBox(height: 24),
@@ -157,20 +159,20 @@ class _UserSwitchScreenState extends ConsumerState<UserSwitchScreen> {
                     child: ListTile(
                       contentPadding: const EdgeInsets.all(16),
                       leading: CircleAvatar(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        backgroundColor: cs.primary,
                         child: Text(
                           user.name.isNotEmpty
                               ? user.name[0].toUpperCase()
                               : '?',
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimary,
+                            color: cs.onPrimary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                       title: Text(
                         user.name,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: tt.titleMedium,
                       ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,23 +180,15 @@ class _UserSwitchScreenState extends ConsumerState<UserSwitchScreen> {
                           const SizedBox(height: 4),
                           Text(
                             user.host ?? S.of(context).unknownHost,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
+                            style: tt.bodyMedium?.copyWith(
+                                  color: cs.onSurfaceVariant,
                                 ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             S.of(context).lastUsedTime(user.lastUpdateTime != null ? _formatDateTime(context, user.lastUpdateTime!) : S.of(context).unknown),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.outline,
+                            style: tt.bodySmall?.copyWith(
+                                  color: cs.outline,
                                 ),
                           ),
                         ],

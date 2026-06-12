@@ -6,6 +6,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../services/log_service.dart';
 import '../services/cache_service.dart';
 import '../services/translation_service.dart';
 import '../services/subtitle_library_service.dart';
@@ -91,10 +92,10 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
       final (content, encoding) =
           await EncodingUtils.readFileWithEncoding(file);
       _detectedEncoding = encoding;
-      print('[TextPreview] 检测到文件编码: $encoding');
+      LogService.instance.debug('[TextPreview] 检测到文件编码: $encoding', tag: 'UI');
       return content;
     } catch (e) {
-      print('[TextPreview] 读取文件失败: $e');
+      LogService.instance.error('[TextPreview] 读取文件失败: $e', tag: 'UI');
       rethrow;
     }
   }
@@ -104,14 +105,14 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
   String _decodeBytes(List<int> bytes) {
     final (content, encoding) = EncodingUtils.decodeBytes(bytes);
     _detectedEncoding = encoding;
-    print('[TextPreview] 检测到编码: $encoding');
+    LogService.instance.debug('[TextPreview] 检测到编码: $encoding', tag: 'UI');
     return content;
   }
 
   /// 将字符串编码为字节数组
   /// 使用检测到的原始编码，保持文件编码一致性
   List<int> _encodeString(String content) {
-    print('[TextPreview] 使用 $_detectedEncoding 编码保存');
+    LogService.instance.debug('[TextPreview] 使用 $_detectedEncoding 编码保存', tag: 'UI');
     return EncodingUtils.encodeString(content, _detectedEncoding);
   }
 
@@ -150,9 +151,10 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
   Future<void> _saveToLocal() async {
     // 获取当前显示的内容（可能是编辑后的）
     final contentToSave = _getCurrentContent();
+    final s = S.of(context);
     if (contentToSave == null || contentToSave.isEmpty) {
       if (mounted) {
-        SnackBarUtil.showWarning(context, S.of(context).noContentToSave);
+        SnackBarUtil.showWarning(context, s.noContentToSave);
       }
       return;
     }
@@ -171,12 +173,14 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
         final bytes = _encodeString(contentToSave);
         await tempFile.writeAsBytes(bytes);
         try {
+          if (!mounted) return;
           final box = context.findRenderObject() as RenderBox?;
+          final mediaQuerySize = MediaQuery.of(context).size;
           await Share.shareXFiles(
             [XFile(tempFile.path)],
             sharePositionOrigin: box != null
                 ? box.localToGlobal(Offset.zero) & box.size
-                : Rect.fromLTWH(0, 0, MediaQuery.of(context).size.width, 80),
+                : Rect.fromLTWH(0, 0, mediaQuerySize.width, 80),
           );
         } finally {
           if (await tempFile.exists()) {
@@ -185,8 +189,9 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
         }
       } else {
         // 其他平台: 选择目录后写入
-        final directoryPath = await FilePicker.platform.getDirectoryPath();
+        final directoryPath = await FilePicker.getDirectoryPath();
         if (directoryPath == null) return;
+        if (!mounted) return;
 
         // 检查文件是否已存在，如果存在则添加序号
         String finalPath = path.join(directoryPath, fileName);
@@ -204,15 +209,14 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
         final bytes = _encodeString(contentToSave);
         await file.writeAsBytes(bytes);
 
-        if (mounted) {
-          SnackBarUtil.showSuccess(
-              context, S.of(context).fileSavedToPath(finalPath));
-        }
+        if (!mounted) return;
+        SnackBarUtil.showSuccess(
+            context, s.fileSavedToPath(finalPath));
       }
     } catch (e) {
       if (mounted) {
         SnackBarUtil.showError(
-            context, S.of(context).saveFailedWithError(e.toString()));
+            context, s.saveFailedWithError(e.toString()));
       }
     }
   }
@@ -220,9 +224,10 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
   Future<void> _saveToSubtitleLibrary() async {
     // 获取当前显示的内容（可能是编辑后的）
     final contentToSave = _getCurrentContent();
+    final s2 = S.of(context);
     if (contentToSave == null || contentToSave.isEmpty) {
       if (mounted) {
-        SnackBarUtil.showWarning(context, S.of(context).noContentToSave);
+        SnackBarUtil.showWarning(context, s2.noContentToSave);
       }
       return;
     }
@@ -272,14 +277,14 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             SnackBarUtil.showSuccess(
-                context, S.of(context).savedToSubtitleLibrary);
+                context, s2.savedToSubtitleLibrary);
           }
         });
       }
     } catch (e) {
       if (mounted) {
         SnackBarUtil.showError(
-            context, S.of(context).saveFailedWithError(e.toString()));
+            context, s2.saveFailedWithError(e.toString()));
       }
     }
   }

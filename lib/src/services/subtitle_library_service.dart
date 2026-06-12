@@ -3,10 +3,15 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:archive/archive.dart';
+import 'package:flutter/widgets.dart';
 import 'package:gbk_codec/gbk_codec.dart';
 import 'download_path_service.dart';
 import 'subtitle_database.dart';
 import '../utils/file_icon_utils.dart';
+import '../widgets/custom_file_picker.dart';
+import 'log_service.dart';
+
+final _log = LogService.instance;
 
 /// 字幕库管理服务
 class SubtitleLibraryService {
@@ -218,7 +223,7 @@ class SubtitleLibraryService {
       return await SubtitleDatabase.instance
           .getParsedFolderNames(parsedFolderName);
     } catch (e) {
-      print('[SubtitleLibrary] 获取已解析文件夹列表失败: $e');
+      _log.error('获取已解析文件夹列表失败: $e', tag: 'SubtitleLibrary');
       return [];
     }
   }
@@ -237,10 +242,10 @@ class SubtitleLibraryService {
       // 重建数据库
       await _rebuildDatabase(libraryDir);
     } catch (e) {
-      print('[SubtitleLibrary] 重建索引失败: $e');
+      _log.error('重建索引失败: $e', tag: 'SubtitleLibrary');
     }
 
-    print('[SubtitleLibrary] 索引已重建');
+    _log.info('索引已重建', tag: 'SubtitleLibrary');
     _cacheUpdateController.add(null);
   }
 
@@ -271,7 +276,7 @@ class SubtitleLibraryService {
       final cacheFile = File('${libraryDir.path}/$_cacheFileName');
       if (await cacheFile.exists()) {
         try {
-          print('[SubtitleLibrary] 从 JSON 缓存迁移到数据库...');
+          _log.info('从 JSON 缓存迁移到数据库...', tag: 'SubtitleLibrary');
           final content = await cacheFile.readAsString();
           final cacheData = jsonDecode(content) as Map<String, dynamic>;
           final tree = cacheData['fileTree'] as List<dynamic>?;
@@ -279,15 +284,14 @@ class SubtitleLibraryService {
             final records = <SubtitleFileRecord>[];
             _flattenTreeToRecords(tree, libraryDir.path, records);
             await SubtitleDatabase.instance.insertFiles(records);
-            print(
-                '[SubtitleLibrary] JSON 迁移完成: ${records.length} 条记录');
+            _log.info('JSON 迁移完成: ${records.length} 条记录', tag: 'SubtitleLibrary');
           } else {
             // JSON 为空，扫描文件系统
             await _rebuildDatabase(libraryDir);
           }
           await cacheFile.delete();
         } catch (e) {
-          print('[SubtitleLibrary] JSON 迁移失败，回退到文件系统扫描: $e');
+          _log.error('JSON 迁移失败，回退到文件系统扫描: $e', tag: 'SubtitleLibrary');
           await _rebuildDatabase(libraryDir);
         }
       } else {
@@ -313,7 +317,7 @@ class SubtitleLibraryService {
     if (records.isNotEmpty) {
       await SubtitleDatabase.instance.insertFiles(records);
     }
-    print('[SubtitleLibrary] 数据库重建完成: ${records.length} 条记录');
+    _log.info('数据库重建完成: ${records.length} 条记录', tag: 'SubtitleLibrary');
   }
 
   /// 扫描目录，收集字幕文件记录
@@ -361,10 +365,9 @@ class SubtitleLibraryService {
       if (e is FileSystemException ||
           e.toString().contains('PathNotFoundException') ||
           e.toString().contains('系统找不到指定的路径')) {
-        print(
-            '[SubtitleLibrary] 路径过长导致访问失败，跳过: ${dir.path.split(Platform.pathSeparator).last}');
+        _log.warning('路径过长导致访问失败，跳过: ${dir.path.split(Platform.pathSeparator).last}', tag: 'SubtitleLibrary');
       } else {
-        print('[SubtitleLibrary] 扫描目录失败: ${dir.path}, 错误: $e');
+        _log.error('扫描目录失败: ${dir.path}, 错误: $e', tag: 'SubtitleLibrary');
       }
     }
   }
@@ -570,7 +573,7 @@ class SubtitleLibraryService {
     // 如果不存在则自动创建
     if (!await libraryDir.exists()) {
       await libraryDir.create(recursive: true);
-      print('[SubtitleLibrary] 创建字幕库目录: ${libraryDir.path}');
+      _log.info('创建字幕库目录: ${libraryDir.path}', tag: 'SubtitleLibrary');
     }
 
     return libraryDir;
@@ -585,7 +588,7 @@ class SubtitleLibraryService {
   /// 导入单个字幕文件
   static Future<ImportResult> importSubtitleFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: [
           'vtt',
@@ -616,7 +619,7 @@ class SubtitleLibraryService {
       final savedDir = Directory('${libraryDir.path}/$savedFolderName');
       if (!await savedDir.exists()) {
         await savedDir.create(recursive: true);
-        print('[SubtitleLibrary] 创建"已保存"文件夹: ${savedDir.path}');
+        _log.info('创建"已保存"文件夹: ${savedDir.path}', tag: 'SubtitleLibrary');
       }
 
       int successCount = 0;
@@ -655,11 +658,11 @@ class SubtitleLibraryService {
 
           await sourceFile.copy(finalDestFile.path);
           successCount++;
-          print('[SubtitleLibrary] 导入字幕文件到"已保存": $finalFileName');
+          _log.info('导入字幕文件到"已保存": $finalFileName', tag: 'SubtitleLibrary');
         } catch (e) {
           errorCount++;
           errorFiles.add('$fileName ($e)');
-          print('[SubtitleLibrary] 导入文件失败: $fileName, 错误: $e');
+          _log.error('导入文件失败: $fileName, 错误: $e', tag: 'SubtitleLibrary');
         }
       }
 
@@ -690,11 +693,17 @@ class SubtitleLibraryService {
   }
 
   /// 导入文件夹（递归检查子目录，自动分配路径）
+  /// [context] - BuildContext for opening the file picker dialog
   /// [onProgress] - 进度回调，参数为当前进度消息
-  static Future<ImportResult> importFolder(
-      {Function(String)? onProgress}) async {
+  static Future<ImportResult> importFolder({
+    required BuildContext context,
+    Function(String)? onProgress,
+  }) async {
     try {
-      final directoryPath = await FilePicker.platform.getDirectoryPath();
+      final directoryPath = await CustomFilePicker.pickDirectory(
+        context: context,
+        title: 'Select subtitle folder',
+      );
 
       if (directoryPath == null) {
         return ImportResult(
@@ -731,7 +740,7 @@ class SubtitleLibraryService {
         onProgress?.call('正在处理: $rootFolderName');
 
         final folderName = _normalizeFolderName(rootFolderName);
-        final targetCategory = parsedFolderName;
+        const targetCategory = parsedFolderName;
         final targetDir =
             Directory('${libraryDir.path}/$targetCategory/$folderName');
 
@@ -745,13 +754,12 @@ class SubtitleLibraryService {
 
         // 检查目标文件夹是否已存在，如果存在则合并（复制并替换）
         if (await targetDir.exists()) {
-          print('[SubtitleLibrary] 检测到同名文件夹，合并并替换同名文件: $folderName');
+          _log.info('检测到同名文件夹，合并并替换同名文件: $folderName', tag: 'SubtitleLibrary');
           result = await _mergeAndCopyFolder(sourceDir, targetDir,
               onProgress: onProgress);
           parsedFolderCount = 1;
           modifiedPaths.add(targetDir.path);
-          print(
-              '[SubtitleLibrary] 已合并根目录文件夹: $folderName，导入 ${result['successCount']} 个字幕文件');
+          _log.info('已合并根目录文件夹: $folderName，导入 ${result['successCount']} 个字幕文件', tag: 'SubtitleLibrary');
         } else {
           result = await _copyDirectoryWithFilter(
             sourceDir,
@@ -760,8 +768,7 @@ class SubtitleLibraryService {
           );
           parsedFolderCount = 1;
           modifiedPaths.add(targetDir.path);
-          print(
-              '[SubtitleLibrary] 已解析根目录文件夹: $folderName, 字幕文件: ${result['successCount']}');
+          _log.info('已解析根目录文件夹: $folderName, 字幕文件: ${result['successCount']}', tag: 'SubtitleLibrary');
         }
       } else {
         // 根目录不匹配规则：递归处理子目录
@@ -834,7 +841,7 @@ class SubtitleLibraryService {
   static Future<ImportResult> importArchive(
       {Function(String)? onProgress}) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['zip', 'rar', '7z'],
       );
@@ -916,7 +923,7 @@ class SubtitleLibraryService {
               rootArchive = ZipDecoder().decodeBytes(bytes, verify: false);
             }
           } catch (e) {
-            print('[SubtitleLibrary] 检查压缩包结构失败: $e');
+            _log.error('检查压缩包结构失败: $e', tag: 'SubtitleLibrary');
           }
 
           if (rootArchive != null) {
@@ -924,14 +931,14 @@ class SubtitleLibraryService {
                 _shouldCreateNewFolder(rootArchive, zipNameWithoutExt);
             if (shouldCreate) {
               relativePath = zipNameWithoutExt;
-              print('[SubtitleLibrary] 根压缩包符合 RJ 格式且内容分散，将解压到: $relativePath');
+              _log.info('根压缩包符合 RJ 格式且内容分散，将解压到: $relativePath', tag: 'SubtitleLibrary');
             }
           }
         }
 
         // 先解压到临时目录
         onProgress?.call('正在解压压缩包...');
-        print('[SubtitleLibrary] 解压到临时目录: ${tempDir.path}');
+        _log.info('解压到临时目录: ${tempDir.path}', tag: 'SubtitleLibrary');
         await _processArchiveBytes(
           bytes,
           platformFile.extension ?? 'zip',
@@ -959,18 +966,17 @@ class SubtitleLibraryService {
         final parsedCount = result['parsedCount'] ?? 0;
         final unknownCount = result['unknownCount'] ?? 0;
 
-        print(
-            '[SubtitleLibrary] 已解析: $parsedCount 个文件夹, 未知作品: $unknownCount 个文件夹');
+        _log.info('已解析: $parsedCount 个文件夹, 未知作品: $unknownCount 个文件夹', tag: 'SubtitleLibrary');
       } finally {
         // 清理临时目录
         onProgress?.call('正在清理临时文件...');
         try {
           if (await tempDir.exists()) {
             await _deleteDirectoryWithProgress(tempDir, onProgress);
-            print('[SubtitleLibrary] 清理临时目录完成');
+            _log.info('清理临时目录完成', tag: 'SubtitleLibrary');
           }
         } catch (e) {
-          print('[SubtitleLibrary] 清理临时目录失败: $e');
+          _log.error('清理临时目录失败: $e', tag: 'SubtitleLibrary');
         }
       }
 
@@ -1047,7 +1053,7 @@ class SubtitleLibraryService {
     // 防止无限递归：最大深度限制
     const maxDepth = 10;
     if (depth > maxDepth) {
-      print('[SubtitleLibrary] 警告: 压缩包嵌套深度超过 $maxDepth 层，停止解压');
+      _log.warning('压缩包嵌套深度超过 $maxDepth 层，停止解压', tag: 'SubtitleLibrary');
       stats.errorCount++;
       stats.depthErrorCount++;
       return;
@@ -1057,7 +1063,7 @@ class SubtitleLibraryService {
     const maxFileSize = 1024 * 1024 * 1024; // 1GB
     if (bytes.length > maxFileSize) {
       final sizeInMB = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
-      print('[SubtitleLibrary] 警告: 嵌套压缩包过大 ($sizeInMB MB)，跳过');
+      _log.warning('嵌套压缩包过大 ($sizeInMB MB)，跳过', tag: 'SubtitleLibrary');
       stats.errorCount++;
       stats.sizeErrorCount++;
       return;
@@ -1069,12 +1075,12 @@ class SubtitleLibraryService {
       if (extension == 'zip') {
         archive = ZipDecoder().decodeBytes(bytes, verify: false);
       } else {
-        print('[SubtitleLibrary] 不支持的压缩格式: $extension');
+        _log.warning('不支持的压缩格式: $extension', tag: 'SubtitleLibrary');
         stats.skippedCount++;
         return;
       }
     } catch (e) {
-      print('[SubtitleLibrary] 解压失败 (depth=$depth): $e');
+      _log.error('解压失败 (depth=$depth): $e', tag: 'SubtitleLibrary');
       stats.errorCount++;
       stats.decodeErrorCount++;
       return;
@@ -1111,20 +1117,20 @@ class SubtitleLibraryService {
         const maxContentSize = 500 * 1024 * 1024;
         if (content.length > maxContentSize) {
           final sizeInMB = (content.length / (1024 * 1024)).toStringAsFixed(1);
-          print('[SubtitleLibrary] 文件过大，跳过: $decodedName ($sizeInMB MB)');
+          _log.warning('文件过大，跳过: $decodedName ($sizeInMB MB)', tag: 'SubtitleLibrary');
           stats.sizeErrorCount++;
           stats.skippedCount++;
           continue;
         }
       } catch (e) {
-        print('[SubtitleLibrary] 读取文件内容失败: $decodedName, 错误: $e');
+        _log.error('读取文件内容失败: $decodedName, 错误: $e', tag: 'SubtitleLibrary');
         stats.errorCount++;
         continue;
       }
 
       // 判断是否是嵌套的压缩包
       if (fileExtension == 'zip') {
-        print('[SubtitleLibrary] 发现嵌套压缩包 (depth=${depth + 1}): $decodedName');
+        _log.info('发现嵌套压缩包 (depth=${depth + 1}): $decodedName', tag: 'SubtitleLibrary');
         stats.nestedArchiveCount++;
 
         // 先解析嵌套压缩包以判断是否需要创建文件夹
@@ -1132,7 +1138,7 @@ class SubtitleLibraryService {
         try {
           nestedArchive = ZipDecoder().decodeBytes(content, verify: false);
         } catch (e) {
-          print('[SubtitleLibrary] 解析嵌套压缩包失败: $decodedName, 错误: $e');
+          _log.error('解析嵌套压缩包失败: $decodedName, 错误: $e', tag: 'SubtitleLibrary');
           stats.decodeErrorCount++;
           stats.errorCount++;
           continue;
@@ -1151,8 +1157,7 @@ class SubtitleLibraryService {
                 : '$relativePath/$zipNameWithoutExt')
             : relativePath; // 不创建文件夹时使用当前相对路径
 
-        print(
-            '[SubtitleLibrary] 嵌套压缩包${shouldCreateFolder ? "需要创建文件夹" : "直接解压"}: $zipNameWithoutExt');
+        _log.info('嵌套压缩包${shouldCreateFolder ? "需要创建文件夹" : "直接解压"}: $zipNameWithoutExt', tag: 'SubtitleLibrary');
 
         // 递归处理嵌套压缩包
         await _processArchiveBytes(
@@ -1178,7 +1183,7 @@ class SubtitleLibraryService {
           if (targetFilePath.length > _maxPathLength) {
             targetFilePath = _shortenPath(targetFilePath, fileName);
             if (targetFilePath.isEmpty) {
-              print('[SubtitleLibrary] 路径过长无法缩短，跳过: $decodedName');
+              _log.warning('路径过长无法缩短，跳过: $decodedName', tag: 'SubtitleLibrary');
               stats.skippedCount++;
               continue;
             }
@@ -1190,7 +1195,7 @@ class SubtitleLibraryService {
 
           // 如果目标文件已存在，直接覆盖
           if (await targetFile.exists()) {
-            print('[SubtitleLibrary] 替换同名文件: $fileName');
+            _log.info('替换同名文件: $fileName', tag: 'SubtitleLibrary');
           }
 
           await targetFile.writeAsBytes(content);
@@ -1201,11 +1206,10 @@ class SubtitleLibraryService {
             onProgress?.call('已解压 ${stats.successCount} 个字幕文件...');
           }
 
-          print(
-              '[SubtitleLibrary] 解压字幕 (depth=$depth): ${targetFile.path.substring(targetBasePath.length)}');
+          _log.info('解压字幕 (depth=$depth): ${targetFile.path.substring(targetBasePath.length)}', tag: 'SubtitleLibrary');
         } catch (e) {
           stats.errorCount++;
-          print('[SubtitleLibrary] 写入文件失败: $decodedName, 错误: $e');
+          _log.error('写入文件失败: $decodedName, 错误: $e', tag: 'SubtitleLibrary');
         }
       } else {
         stats.skippedCount++;
@@ -1250,8 +1254,7 @@ class SubtitleLibraryService {
     try {
       // 如果变更目录过多，整体重建
       if (directoryPaths.length > 50) {
-        print(
-            '[SubtitleLibrary] 变更文件夹数量过多 (${directoryPaths.length})，切换为全量重建');
+        _log.warning('变更文件夹数量过多 (${directoryPaths.length})，切换为全量重建', tag: 'SubtitleLibrary');
         onProgress?.call('正在重建索引...');
         final libraryDir = await getSubtitleLibraryDirectory();
         await _rebuildDatabase(libraryDir);
@@ -1267,7 +1270,7 @@ class SubtitleLibraryService {
         }
       }
     } catch (e) {
-      print('[SubtitleLibrary] 刷新索引失败: $e');
+      _log.error('刷新索引失败: $e', tag: 'SubtitleLibrary');
     }
 
     _cacheUpdateController.add(null);
@@ -1286,12 +1289,12 @@ class SubtitleLibraryService {
         return false;
       }
 
-      print('[SubtitleLibrary] 已删除: $path');
+      _log.info('已删除: $path', tag: 'SubtitleLibrary');
       final parentPath = FileSystemEntity.parentOf(path);
       await _refreshDirectoriesAfterChange({parentPath});
       return true;
     } catch (e) {
-      print('[SubtitleLibrary] 删除失败: $path, 错误: $e');
+      _log.error('删除失败: $path, 错误: $e', tag: 'SubtitleLibrary');
       return false;
     }
   }
@@ -1312,11 +1315,11 @@ class SubtitleLibraryService {
         return false;
       }
 
-      print('[SubtitleLibrary] 已重命名: $oldPath -> $newPath');
+      _log.info('已重命名: $oldPath -> $newPath', tag: 'SubtitleLibrary');
       await _refreshDirectoriesAfterChange({parentPath});
       return true;
     } catch (e) {
-      print('[SubtitleLibrary] 重命名失败: $oldPath, 错误: $e');
+      _log.error('重命名失败: $oldPath, 错误: $e', tag: 'SubtitleLibrary');
       return false;
     }
   }
@@ -1356,21 +1359,21 @@ class SubtitleLibraryService {
           } while (await File(finalPath).exists());
 
           await File(sourcePath).rename(finalPath);
-          print('[SubtitleLibrary] 文件已移动（重命名）: $sourcePath -> $finalPath');
+          _log.info('文件已移动（重命名）: $sourcePath -> $finalPath', tag: 'SubtitleLibrary');
         } else {
           await File(sourcePath).rename(newPath);
-          print('[SubtitleLibrary] 文件已移动: $sourcePath -> $newPath');
+          _log.info('文件已移动: $sourcePath -> $newPath', tag: 'SubtitleLibrary');
         }
       } else if (entity == FileSystemEntityType.directory) {
         if (targetExists && await FileSystemEntity.isDirectory(newPath)) {
           // 文件夹冲突：合并内容
-          print('[SubtitleLibrary] 检测到同名文件夹，开始合并: $sourcePath -> $newPath');
+          _log.info('检测到同名文件夹，开始合并: $sourcePath -> $newPath', tag: 'SubtitleLibrary');
           await _mergeFolders(sourcePath, newPath);
-          print('[SubtitleLibrary] 文件夹已合并: $sourcePath -> $newPath');
+          _log.info('文件夹已合并: $sourcePath -> $newPath', tag: 'SubtitleLibrary');
         } else {
           // 目标不存在或是文件，直接重命名
           await Directory(sourcePath).rename(newPath);
-          print('[SubtitleLibrary] 文件夹已移动: $sourcePath -> $newPath');
+          _log.info('文件夹已移动: $sourcePath -> $newPath', tag: 'SubtitleLibrary');
         }
       } else {
         return false;
@@ -1380,7 +1383,7 @@ class SubtitleLibraryService {
       await _refreshDirectoriesAfterChange({sourceParent, targetFolderPath});
       return true;
     } catch (e) {
-      print('[SubtitleLibrary] 移动失败: $sourcePath, 错误: $e');
+      _log.error('移动失败: $sourcePath, 错误: $e', tag: 'SubtitleLibrary');
       return false;
     }
   }
@@ -1406,7 +1409,7 @@ class SubtitleLibraryService {
         // 处理文件：直接替换
         if (await File(targetPath).exists()) {
           await File(targetPath).delete();
-          print('[SubtitleLibrary] 替换同名文件: $fileName');
+          _log.info('替换同名文件: $fileName', tag: 'SubtitleLibrary');
         }
         await entity.rename(targetPath);
       } else if (entity is Directory) {
@@ -1424,7 +1427,7 @@ class SubtitleLibraryService {
       try {
         await sourceDir.delete();
       } catch (e) {
-        print('[SubtitleLibrary] 删除空文件夹失败: $sourceFolder, 错误: $e');
+        _log.error('删除空文件夹失败: $sourceFolder, 错误: $e', tag: 'SubtitleLibrary');
       }
     }
   }
@@ -1460,7 +1463,7 @@ class SubtitleLibraryService {
             if (targetFilePath.length > _maxPathLength) {
               targetFilePath = _shortenPath(targetFilePath, fileName);
               if (targetFilePath.isEmpty) {
-                print('[SubtitleLibrary] 路径过长无法缩短，跳过: $relativePath');
+                _log.warning('路径过长无法缩短，跳过: $relativePath', tag: 'SubtitleLibrary');
                 skippedCount++;
                 continue;
               }
@@ -1471,7 +1474,7 @@ class SubtitleLibraryService {
 
             // 如果目标文件已存在，直接替换
             if (await targetFile.exists()) {
-              print('[SubtitleLibrary] 替换同名文件: $fileName');
+              _log.info('替换同名文件: $fileName', tag: 'SubtitleLibrary');
             }
 
             await entity.copy(targetFile.path);
@@ -1483,12 +1486,12 @@ class SubtitleLibraryService {
             }
           } catch (e) {
             errorCount++;
-            print('[SubtitleLibrary] 复制文件失败: $fileName, 错误: $e');
+            _log.error('复制文件失败: $fileName, 错误: $e', tag: 'SubtitleLibrary');
           }
         }
       }
     } catch (e) {
-      print('[SubtitleLibrary] 合并复制目录失败: ${sourceDir.path}, 错误: $e');
+      _log.error('合并复制目录失败: ${sourceDir.path}, 错误: $e', tag: 'SubtitleLibrary');
       errorCount++;
     }
 
@@ -1521,7 +1524,7 @@ class SubtitleLibraryService {
         }
       }
     } catch (e) {
-      print('[SubtitleLibrary] 读取子文件夹失败: $parentPath, 错误: $e');
+      _log.error('读取子文件夹失败: $parentPath, 错误: $e', tag: 'SubtitleLibrary');
     }
 
     // 按名称排序
@@ -1627,7 +1630,7 @@ class SubtitleLibraryService {
 
       return newPath;
     } catch (e) {
-      print('[SubtitleLibrary] 路径缩短失败: $e');
+      _log.error('路径缩短失败: $e', tag: 'SubtitleLibrary');
       return '';
     }
   }
@@ -1677,14 +1680,13 @@ class SubtitleLibraryService {
           final folderName = _normalizeFolderName(originalFolderName);
 
           // 匹配规则：整个子目录移动到"已解析"
-          final targetCategory = parsedFolderName;
+          const targetCategory = parsedFolderName;
           final targetDir =
               Directory('${libraryDir.path}/$targetCategory/$folderName');
 
           // 检查目标路径长度
           if (targetDir.path.length > _maxPathLength) {
-            print(
-                '[SubtitleLibrary] 目标路径过长，跳过文件夹: $folderName (${targetDir.path.length} 字符)');
+            _log.warning('目标路径过长，跳过文件夹: $folderName (${targetDir.path.length} 字符)', tag: 'SubtitleLibrary');
             errorCount++;
             continue;
           }
@@ -1693,7 +1695,7 @@ class SubtitleLibraryService {
 
           // 检查目标文件夹是否已存在，如果存在则合并（复制并替换）
           if (await targetDir.exists()) {
-            print('[SubtitleLibrary] 检测到同名文件夹，合并并替换同名文件: $folderName');
+            _log.info('检测到同名文件夹，合并并替换同名文件: $folderName', tag: 'SubtitleLibrary');
             final result = await _mergeAndCopyFolder(subDir, targetDir,
                 onProgress: onProgress);
             successCount += result['successCount'] ?? 0;
@@ -1701,8 +1703,7 @@ class SubtitleLibraryService {
             skippedCount += result['skippedCount'] ?? 0;
             parsedCount++;
             modifiedPaths?.add(targetDir.path);
-            print(
-                '[SubtitleLibrary] 已合并文件夹: $folderName，导入 ${result['successCount']} 个字幕文件');
+            _log.info('已合并文件夹: $folderName，导入 ${result['successCount']} 个字幕文件', tag: 'SubtitleLibrary');
           } else {
             final result = await _copyDirectoryWithFilter(
               subDir,
@@ -1715,8 +1716,7 @@ class SubtitleLibraryService {
             parsedCount++;
             modifiedPaths?.add(targetDir.path);
 
-            print(
-                '[SubtitleLibrary] 已解析文件夹: $folderName, 字幕文件: ${result['successCount']}');
+            _log.info('已解析文件夹: $folderName, 字幕文件: ${result['successCount']}', tag: 'SubtitleLibrary');
           }
         } else {
           // 不匹配规则：递归检查子目录内部
@@ -1738,14 +1738,13 @@ class SubtitleLibraryService {
             final hasSubtitles = await _hasSubtitleFiles(subDir);
             if (hasSubtitles) {
               final folderName = originalFolderName; // 未知作品不需要标准化
-              final targetCategory = unknownFolderName;
+              const targetCategory = unknownFolderName;
               final targetDir =
                   Directory('${libraryDir.path}/$targetCategory/$folderName');
 
               // 检查目标路径长度
               if (targetDir.path.length > _maxPathLength) {
-                print(
-                    '[SubtitleLibrary] 目标路径过长，跳过文件夹: $folderName (${targetDir.path.length} 字符)');
+                _log.warning('目标路径过长，跳过文件夹: $folderName (${targetDir.path.length} 字符)', tag: 'SubtitleLibrary');
                 errorCount++;
                 continue;
               }
@@ -1754,16 +1753,14 @@ class SubtitleLibraryService {
 
               // 检查目标文件夹是否已存在，如果存在则合并（复制并替换）
               if (await targetDir.exists()) {
-                print('[SubtitleLibrary] 检测到同名文件夹，合并并替换同名文件: $folderName');
+                _log.info('检测到同名文件夹，合并并替换同名文件: $folderName', tag: 'SubtitleLibrary');
                 final result = await _mergeAndCopyFolder(subDir, targetDir,
                     onProgress: onProgress);
                 successCount += result['successCount'] ?? 0;
                 errorCount += result['errorCount'] ?? 0;
                 skippedCount += result['skippedCount'] ?? 0;
                 unknownCount++;
-                modifiedPaths?.add(targetDir.path);
-                print(
-                    '[SubtitleLibrary] 已合并未知作品: $folderName，导入 ${result['successCount']} 个字幕文件');
+                modifiedPaths?.add(targetDir.path);                _log.info('已合并未知作品: $folderName，导入 ${result['successCount']} 个字幕文件', tag: 'SubtitleLibrary');
               } else {
                 final result = await _copyDirectoryWithFilter(
                   subDir,
@@ -1776,8 +1773,7 @@ class SubtitleLibraryService {
                 unknownCount++;
                 modifiedPaths?.add(targetDir.path);
 
-                print(
-                    '[SubtitleLibrary] 未知作品: $folderName, 字幕文件: ${result['successCount']}');
+                _log.info('未知作品: $folderName, 字幕文件: ${result['successCount']}', tag: 'SubtitleLibrary');
               }
             }
           }
@@ -1790,7 +1786,7 @@ class SubtitleLibraryService {
           final fileName = file.path.split(Platform.pathSeparator).last;
           if (FileIconUtils.isLyricFile(fileName)) {
             try {
-              final targetCategory = unknownFolderName;
+              const targetCategory = unknownFolderName;
               final targetDir = Directory('${libraryDir.path}/$targetCategory');
               await targetDir.create(recursive: true);
 
@@ -1800,7 +1796,7 @@ class SubtitleLibraryService {
               if (targetFilePath.length > _maxPathLength) {
                 targetFilePath = _shortenPath(targetFilePath, fileName);
                 if (targetFilePath.isEmpty) {
-                  print('[SubtitleLibrary] 根目录文件路径过长，跳过: $fileName');
+                  _log.warning('根目录文件路径过长，跳过: $fileName', tag: 'SubtitleLibrary');
                   skippedCount++;
                   continue;
                 }
@@ -1809,10 +1805,10 @@ class SubtitleLibraryService {
               final targetFile = File(targetFilePath);
               await file.copy(targetFile.path);
               successCount++;
-              print('[SubtitleLibrary] 根目录文件: $fileName');
+              _log.info('根目录文件: $fileName', tag: 'SubtitleLibrary');
             } catch (e) {
               errorCount++;
-              print('[SubtitleLibrary] 复制根目录文件失败: $fileName, 错误: $e');
+              _log.error('复制根目录文件失败: $fileName, 错误: $e', tag: 'SubtitleLibrary');
             }
           } else {
             skippedCount++;
@@ -1820,7 +1816,7 @@ class SubtitleLibraryService {
         }
       }
     } catch (e) {
-      print('[SubtitleLibrary] 处理目录失败: ${currentDir.path}, 错误: $e');
+      _log.error('处理目录失败: ${currentDir.path}, 错误: $e', tag: 'SubtitleLibrary');
       errorCount++;
     }
 
@@ -1846,7 +1842,7 @@ class SubtitleLibraryService {
         }
       }
     } catch (e) {
-      print('[SubtitleLibrary] 检查字幕文件失败: ${dir.path}, 错误: $e');
+      _log.error('检查字幕文件失败: ${dir.path}, 错误: $e', tag: 'SubtitleLibrary');
     }
     return false;
   }
@@ -1881,7 +1877,7 @@ class SubtitleLibraryService {
             if (targetFilePath.length > _maxPathLength) {
               targetFilePath = _shortenPath(targetFilePath, fileName);
               if (targetFilePath.isEmpty) {
-                print('[SubtitleLibrary] 路径过长无法缩短，跳过: $relativePath');
+                _log.warning('路径过长无法缩短，跳过: $relativePath', tag: 'SubtitleLibrary');
                 skippedCount++;
                 continue;
               }
@@ -1893,7 +1889,7 @@ class SubtitleLibraryService {
 
             // 如果目标文件已存在，直接覆盖
             if (await targetFile.exists()) {
-              print('[SubtitleLibrary] 替换同名文件: $fileName');
+              _log.info('替换同名文件: $fileName', tag: 'SubtitleLibrary');
             }
 
             await entity.copy(targetFile.path);
@@ -1905,12 +1901,12 @@ class SubtitleLibraryService {
             }
           } catch (e) {
             errorCount++;
-            print('[SubtitleLibrary] 复制文件失败: $fileName, 错误: $e');
+            _log.error('复制文件失败: $fileName, 错误: $e', tag: 'SubtitleLibrary');
           }
         }
       }
     } catch (e) {
-      print('[SubtitleLibrary] 复制目录失败: ${sourceDir.path}, 错误: $e');
+      _log.error('复制目录失败: ${sourceDir.path}, 错误: $e', tag: 'SubtitleLibrary');
       errorCount++;
     }
 
@@ -1965,8 +1961,7 @@ class SubtitleLibraryService {
             final normalizedName = _normalizeFolderName(folderName);
             final targetPath = '$parsedFolderPath/$normalizedName';
 
-            print(
-                '[SubtitleLibrary] 迁移旧格式文件夹: $folderName -> 已解析/$normalizedName');
+            _log.info('迁移旧格式文件夹: $folderName -> 已解析/$normalizedName', tag: 'SubtitleLibrary');
 
             try {
               if (await Directory(targetPath).exists()) {
@@ -1977,17 +1972,17 @@ class SubtitleLibraryService {
               }
               migratedCount++;
             } catch (e) {
-              print('[SubtitleLibrary] 迁移文件夹失败: $folderName, $e');
+              _log.error('迁移文件夹失败: $folderName, $e', tag: 'SubtitleLibrary');
             }
           }
         }
       }
 
       if (migratedCount > 0) {
-        print('[SubtitleLibrary] 成功迁移 $migratedCount 个旧格式文件夹到"已解析"');
+        _log.info('成功迁移 $migratedCount 个旧格式文件夹到"已解析"', tag: 'SubtitleLibrary');
       }
     } catch (e) {
-      print('[SubtitleLibrary] 迁移旧格式文件夹失败: $e');
+      _log.error('迁移旧格式文件夹失败: $e', tag: 'SubtitleLibrary');
     }
   }
 
@@ -2000,7 +1995,7 @@ class SubtitleLibraryService {
     // 检查是否是纯数字（6-8位）
     final pureNumberPattern = RegExp(r'^\d{6,8}$');
     if (pureNumberPattern.hasMatch(folderName)) {
-      print('[SubtitleLibrary] 标准化文件夹名: $folderName -> RJ$folderName');
+      _log.info('标准化文件夹名: $folderName -> RJ$folderName', tag: 'SubtitleLibrary');
       return 'RJ$folderName';
     }
 
@@ -2013,7 +2008,7 @@ class SubtitleLibraryService {
       final numbers = match.group(2)!;
       final normalized = '${prefix}J$numbers';
       if (normalized != folderName) {
-        print('[SubtitleLibrary] 标准化文件夹名: $folderName -> $normalized');
+        _log.info('标准化文件夹名: $folderName -> $normalized', tag: 'SubtitleLibrary');
       }
       return normalized;
     }
@@ -2058,13 +2053,12 @@ class SubtitleLibraryService {
 
     // 如果文件夹名与ZIP名不同，需要创建文件夹
     if (singleItem != zipName) {
-      print(
-          '[SubtitleLibrary] 压缩包内文件夹名 "$singleItem" 与 ZIP 名 "$zipName" 不同，创建文件夹');
+      _log.info('压缩包内文件夹名 "$singleItem" 与 ZIP 名 "$zipName" 不同，创建文件夹', tag: 'SubtitleLibrary');
       return true;
     }
 
     // 文件夹名与ZIP名相同，不需要创建
-    print('[SubtitleLibrary] 压缩包内文件夹名与 ZIP 名相同，直接解压');
+    _log.info('压缩包内文件夹名与 ZIP 名相同，直接解压', tag: 'SubtitleLibrary');
     return false;
   }
 
@@ -2088,7 +2082,7 @@ class SubtitleLibraryService {
 
       await dir.delete();
     } catch (e) {
-      print('[SubtitleLibrary] 删除失败: ${dir.path}, $e');
+      _log.error('删除失败: ${dir.path}, $e', tag: 'SubtitleLibrary');
     }
   }
 }

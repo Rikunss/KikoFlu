@@ -3,7 +3,7 @@ description: A cross-platform Flutter app for browsing and playing Kikoeru serve
 
 publish_to: 'none'
 
-version: 3.1.1
+version: 3.2.0
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -42,7 +42,7 @@ dependencies:
   shared_preferences: ^2.2.2
   path: ^1.8.3
   sqflite: ^2.3.0
-  sqflite_common_ffi: ^2.3.0
+  sqflite_common_ffi: 2.4.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   path_provider: ^2.1.2
@@ -61,13 +61,16 @@ dependencies:
   
   # Image & File Operations
   saver_gallery: ^4.0.1
-  file_picker: ^8.0.0+1
+  file_picker: ^11.0.2
   archive: ^3.6.1
   gbk_codec: ^0.4.0
   charset: ^2.0.1
   
   # Share
   share_plus: ^10.1.4
+
+  # Notifications
+  flutter_local_notifications: ^18.0.1
 
   # System Integration
   url_launcher: ^6.2.2
@@ -78,6 +81,23 @@ dependencies:
   desktop_multi_window: ^0.3.0
   audio_session: ^0.1.25
   ffi: ^2.1.4
+  http: ^1.6.0
+  sqlite3: ^3.3.2
+  flutter_cache_manager: ^3.4.1
+  image: ^4.3.0
+  blurhash_dart: ^1.2.1
+  home_widget: ^0.9.3
+
+  # FFmpeg (Android) — bundles static FFmpeg binaries for audio conversion
+  ffmpeg_kit_flutter_new_audio: ^2.0.0
+  local_auth: ^3.0.1
+dependency_overrides:
+  # Local fork of audio_service with null-safety fixes for Android destroy sequence.
+  # The upstream plugin crashes with NullPointerException when AudioService.instance
+  # is null during app teardown. Patched: all AudioService.instance calls are now
+  # guarded with null checks. See packages/audio_service/android/src/...Plugin.java
+  audio_service:
+    path: packages/audio_service
 
 dev_dependencies:
   flutter_test:
@@ -97,12 +117,10 @@ flutter:
     - assets/icons/
     - LICENSE
 
-  # fonts:
-  #   - family: NotoSans
-  #     fonts:
-  #       - asset: assets/fonts/NotoSans-Regular.ttf
-  #       - asset: assets/fonts/NotoSans-Bold.ttf
-  #         weight: 700
+  fonts:
+    - family: GoogleSans
+      fonts:
+        - asset: assets/fonts/GoogleSans.ttf
 
 flutter_launcher_icons:
   android: "launcher_icon"

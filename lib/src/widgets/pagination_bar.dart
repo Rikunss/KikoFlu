@@ -67,10 +67,12 @@ class _PaginationBarState extends State<PaginationBar> {
 
   /// 构建到底提示
   Widget _buildEndMessage() {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -79,13 +81,13 @@ class _PaginationBarState extends State<PaginationBar> {
           Icon(
             Icons.check_circle_outline,
             size: 16,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: cs.onSurfaceVariant,
           ),
           const SizedBox(width: 8),
           Text(
             widget.endMessage ?? S.of(context).reachedEnd,
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: cs.onSurfaceVariant,
               fontSize: 14,
             ),
           ),
@@ -102,39 +104,45 @@ class _PaginationBarState extends State<PaginationBar> {
     required VoidCallback? onPressed,
     bool iconOnRight = false,
   }) {
-    final iconWidget = Icon(
-      icon,
-      size: 18,
-      color: enabled
-          ? Theme.of(context).colorScheme.onPrimaryContainer
-          : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
-    );
-
-    final textWidget = Text(
-      label,
-      style: TextStyle(
-        fontSize: 13,
-        color: enabled
-            ? Theme.of(context).colorScheme.onPrimaryContainer
-            : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
-      ),
-    );
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     return Material(
       color: enabled
-          ? Theme.of(context).colorScheme.primaryContainer
-          : Theme.of(context).colorScheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(8),
+          ? cs.primaryContainer
+          : cs.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
-        onTap: enabled ? onPressed : null,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        onTap: enabled
+            ? () {
+                HapticFeedback.lightImpact();
+                onPressed?.call();
+              }
+            : null,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: iconOnRight
-                ? [textWidget, const SizedBox(width: 4), iconWidget]
-                : [iconWidget, const SizedBox(width: 4), textWidget],
+            children: [
+              if (!iconOnRight) ...[
+                Icon(icon, size: 18, color: enabled ? cs.onPrimaryContainer : cs.onSurfaceVariant.withValues(alpha: 0.5)),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: enabled ? cs.onPrimaryContainer : cs.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+              ),
+              if (iconOnRight) ...[
+                const SizedBox(width: 4),
+                Icon(icon, size: 18, color: enabled ? cs.onPrimaryContainer : cs.onSurfaceVariant.withValues(alpha: 0.5)),
+              ],
+            ],
           ),
         ),
       ),
@@ -143,28 +151,35 @@ class _PaginationBarState extends State<PaginationBar> {
 
   /// 构建页码跳转按钮
   Widget _buildPageJumpButton() {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Material(
-      color: Theme.of(context).colorScheme.secondaryContainer,
-      borderRadius: BorderRadius.circular(8),
+      color: cs.secondaryContainer,
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
-        onTap: () => _showPageJumpDialog(),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          _showPageJumpDialog();
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.edit_location_alt,
                 size: 18,
-                color: Theme.of(context).colorScheme.onSecondaryContainer,
+                color: cs.onSecondaryContainer,
               ),
               const SizedBox(width: 4),
               Text(
                 S.of(context).jumpTo,
                 style: TextStyle(
                   fontSize: 13,
-                  color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  fontWeight: FontWeight.w500,
+                  color: cs.onSecondaryContainer,
                 ),
               ),
             ],
@@ -234,50 +249,60 @@ class _PaginationBarState extends State<PaginationBar> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
     // 如果总数小于等于一页的大小，显示到底提示
     if (widget.totalCount <= widget.pageSize) {
       return _buildEndMessage();
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 页码和总数信息
+          // 页码和总数信息（animated）
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                S.of(context).pageNOfTotal(widget.currentPage, _maxPage),
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                transitionBuilder: (child, anim) =>
+                    FadeTransition(opacity: anim, child: child),
+                child: Text(
+                  S.of(context).pageNOfTotal(widget.currentPage, _maxPage),
+                  key: ValueKey('page_${widget.currentPage}'),
+                  style: TextStyle(
+                    color: cs.onSurface,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(4),
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   S.of(context).totalNItems(widget.totalCount),
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: cs.onSurfaceVariant,
                     fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           // 按钮组
           Row(
@@ -290,11 +315,11 @@ class _PaginationBarState extends State<PaginationBar> {
                 enabled: widget.currentPage > 1 && !widget.isLoading,
                 onPressed: widget.onPreviousPage,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
 
               // 跳转输入
               _buildPageJumpButton(),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
 
               // 下一页
               _buildPageButton(

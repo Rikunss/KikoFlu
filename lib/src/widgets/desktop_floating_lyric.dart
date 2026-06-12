@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:window_manager/window_manager.dart';
+import '../services/log_service.dart';
 
 class DesktopFloatingLyric extends StatefulWidget {
   final dynamic windowId;
@@ -45,18 +46,24 @@ class _DesktopFloatingLyricState extends State<DesktopFloatingLyric>
   }
 
   void _updateStyleProperties(Map args) {
-    if (args.containsKey('fontSize'))
+    if (args.containsKey('fontSize')) {
       _fontSize = (args['fontSize'] as num).toDouble();
-    if (args.containsKey('textColor'))
+    }
+    if (args.containsKey('textColor')) {
       _textColor = Color(args['textColor'] as int);
-    if (args.containsKey('backgroundColor'))
+    }
+    if (args.containsKey('backgroundColor')) {
       _backgroundColor = Color(args['backgroundColor'] as int);
-    if (args.containsKey('cornerRadius'))
+    }
+    if (args.containsKey('cornerRadius')) {
       _cornerRadius = (args['cornerRadius'] as num).toDouble();
-    if (args.containsKey('paddingHorizontal'))
+    }
+    if (args.containsKey('paddingHorizontal')) {
       _paddingHorizontal = (args['paddingHorizontal'] as num).toDouble();
-    if (args.containsKey('paddingVertical'))
+    }
+    if (args.containsKey('paddingVertical')) {
       _paddingVertical = (args['paddingVertical'] as num).toDouble();
+    }
   }
 
   Future<void> _initWindow() async {
@@ -72,7 +79,7 @@ class _DesktopFloatingLyricState extends State<DesktopFloatingLyric>
       final controller = await WindowController.fromCurrentEngine();
       controller.setWindowMethodHandler(_handleMethodCall);
     } catch (e) {
-      print('[DesktopFloatingLyric] Failed to init window: $e');
+      LogService.instance.error('[DesktopFloatingLyric] Failed to init window: $e', tag: 'UI');
     }
   }
 
@@ -140,12 +147,12 @@ class _DesktopFloatingLyricState extends State<DesktopFloatingLyric>
                       Shadow(
                         offset: const Offset(1.0, 1.0),
                         blurRadius: 3.0,
-                        color: Colors.black.withOpacity(0.8),
+                        color: Colors.black.withValues(alpha: 0.8),
                       ),
                       Shadow(
                         offset: const Offset(-1.0, -1.0),
                         blurRadius: 3.0,
-                        color: Colors.black.withOpacity(0.8),
+                        color: Colors.black.withValues(alpha: 0.8),
                       ),
                     ],
                   ),

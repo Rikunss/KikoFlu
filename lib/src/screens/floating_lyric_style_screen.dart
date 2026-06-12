@@ -11,6 +11,9 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final style = ref.watch(floatingLyricStyleProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
     return Scaffold(
       appBar: ScrollableAppBar(
@@ -20,27 +23,27 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           // 预览卡片
-          _buildPreviewCard(context, style),
+          _buildPreviewCard(context, style, colorScheme, textTheme),
           const SizedBox(height: 24),
 
           // 预设样式
-          _buildPresetsCard(context, ref),
+          _buildPresetsCard(context, ref, colorScheme, textTheme),
           const SizedBox(height: 24),
 
           // 字体大小
-          _buildFontSizeCard(context, ref, style),
+          _buildFontSizeCard(context, ref, style, colorScheme, textTheme),
           const SizedBox(height: 16),
 
           // 不透明度
-          _buildOpacityCard(context, ref, style),
+          _buildOpacityCard(context, ref, style, colorScheme, textTheme),
           const SizedBox(height: 16),
 
           // 颜色设置
-          _buildColorsCard(context, ref, style),
+          _buildColorsCard(context, ref, style, colorScheme, textTheme),
           const SizedBox(height: 16),
 
           // 圆角和内边距
-          _buildShapeCard(context, ref, style),
+          _buildShapeCard(context, ref, style, colorScheme, textTheme),
           const SizedBox(height: 16),
 
           // 重置按钮
@@ -51,7 +54,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPreviewCard(BuildContext context, FloatingLyricStyle style) {
+  Widget _buildPreviewCard(BuildContext context, FloatingLyricStyle style, ColorScheme colorScheme, TextTheme textTheme) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -60,7 +63,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
           children: [
             Text(
               S.of(context).preview,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
@@ -92,7 +95,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPresetsCard(BuildContext context, WidgetRef ref) {
+  Widget _buildPresetsCard(BuildContext context, WidgetRef ref, ColorScheme colorScheme, TextTheme textTheme) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -101,7 +104,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
           children: [
             Text(
               S.of(context).presetStyles,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
@@ -127,7 +130,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
   }
 
   Widget _buildFontSizeCard(
-      BuildContext context, WidgetRef ref, FloatingLyricStyle style) {
+      BuildContext context, WidgetRef ref, FloatingLyricStyle style, ColorScheme colorScheme, TextTheme textTheme) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -139,12 +142,12 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
               children: [
                 Text(
                   S.of(context).fontSize,
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: textTheme.titleSmall,
                 ),
                 Text(
                   '${style.fontSize.toInt()}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                  style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
                 ),
@@ -169,7 +172,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
   }
 
   Widget _buildOpacityCard(
-      BuildContext context, WidgetRef ref, FloatingLyricStyle style) {
+      BuildContext context, WidgetRef ref, FloatingLyricStyle style, ColorScheme colorScheme, TextTheme textTheme) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -181,12 +184,12 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
               children: [
                 Text(
                   S.of(context).backgroundOpacity,
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: textTheme.titleSmall,
                 ),
                 Text(
                   '${(style.opacity * 100).toInt()}%',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                  style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
                 ),
@@ -211,7 +214,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
   }
 
   Widget _buildColorsCard(
-      BuildContext context, WidgetRef ref, FloatingLyricStyle style) {
+      BuildContext context, WidgetRef ref, FloatingLyricStyle style, ColorScheme colorScheme, TextTheme textTheme) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -220,7 +223,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
           children: [
             Text(
               S.of(context).colorSettings,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
@@ -242,6 +245,8 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
                     .read(floatingLyricStyleProvider.notifier)
                     .updateTextColor(color);
               },
+              colorScheme,
+              textTheme,
             ),
             const SizedBox(height: 16),
             _buildColorPicker(
@@ -262,6 +267,8 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
                     .read(floatingLyricStyleProvider.notifier)
                     .updateBackgroundColor(color);
               },
+              colorScheme,
+              textTheme,
             ),
           ],
         ),
@@ -275,20 +282,22 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
     Color currentColor,
     List<Color> colors,
     Function(Color) onColorSelected,
+    ColorScheme colorScheme,
+    TextTheme textTheme,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodyMedium,
+          style: textTheme.bodyMedium,
         ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 12,
           runSpacing: 12,
           children: colors.map((color) {
-            final isSelected = color.value == currentColor.value;
+            final isSelected = color.toARGB32() == currentColor.toARGB32();
             return GestureDetector(
               onTap: () => onColorSelected(color),
               child: Container(
@@ -299,17 +308,14 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.withOpacity(0.3),
+                        ? colorScheme.primary
+                        : Colors.grey.withValues(alpha: 0.3),
                     width: isSelected ? 3 : 1,
                   ),
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withOpacity(0.4),
+                            color: colorScheme.primary.withValues(alpha: 0.4),
                             blurRadius: 8,
                             spreadRadius: 2,
                           ),
@@ -334,7 +340,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
   }
 
   Widget _buildShapeCard(
-      BuildContext context, WidgetRef ref, FloatingLyricStyle style) {
+      BuildContext context, WidgetRef ref, FloatingLyricStyle style, ColorScheme colorScheme, TextTheme textTheme) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -343,7 +349,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
           children: [
             Text(
               S.of(context).shapeSettings,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
@@ -351,11 +357,11 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(S.of(context).cornerRadius, style: Theme.of(context).textTheme.bodyMedium),
+                Text(S.of(context).cornerRadius, style: textTheme.bodyMedium),
                 Text(
                   '${style.cornerRadius.toInt()}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                  style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
                 ),
@@ -377,11 +383,11 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(S.of(context).horizontalPadding, style: Theme.of(context).textTheme.bodyMedium),
+                Text(S.of(context).horizontalPadding, style: textTheme.bodyMedium),
                 Text(
                   '${style.paddingHorizontal.toInt()}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                  style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
                 ),
@@ -403,11 +409,11 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(S.of(context).verticalPadding, style: Theme.of(context).textTheme.bodyMedium),
+                Text(S.of(context).verticalPadding, style: textTheme.bodyMedium),
                 Text(
                   '${style.paddingVertical.toInt()}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                  style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
                 ),

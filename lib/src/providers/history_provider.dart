@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:equatable/equatable.dart';
 import '../models/work.dart';
 import '../models/history_record.dart';
 import '../models/audio_track.dart';
 import '../services/history_database.dart';
 import '../services/audio_player_service.dart' as import_service;
 import '../services/playback_history_service.dart';
+import '../services/log_service.dart';
 
-class HistoryState {
+class HistoryState extends Equatable {
   final List<HistoryRecord> records;
   final bool isLoading;
   final int currentPage;
@@ -22,7 +24,7 @@ class HistoryState {
     this.totalCount = 0,
     this.pageSize = 20,
     this.hasMore = true,
-  });
+  }  );
 
   HistoryState copyWith({
     List<HistoryRecord>? records,
@@ -41,6 +43,16 @@ class HistoryState {
       hasMore: hasMore ?? this.hasMore,
     );
   }
+
+  @override
+  List<Object?> get props => [
+        records,
+        isLoading,
+        currentPage,
+        totalCount,
+        pageSize,
+        hasMore,
+      ];
 }
 
 final historyProvider =
@@ -84,7 +96,7 @@ class HistoryNotifier extends StateNotifier<HistoryState> {
       );
     } catch (e) {
       state = state.copyWith(isLoading: false);
-      print('Failed to load history: $e');
+      LogService.instance.error('Failed to load history: $e', tag: 'Playback');
     }
   }
 

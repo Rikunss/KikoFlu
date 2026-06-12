@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/log_service.dart';
 import '../models/work.dart';
 import '../screens/search_result_screen.dart';
 import '../../l10n/app_localizations.dart';
@@ -34,7 +35,7 @@ class VaChip extends StatelessWidget {
       return GestureDetector(
         onTap: onTap ??
             () {
-              print('[VaChip] Clicked VA: ${va.name}, id: ${va.id}');
+              LogService.instance.debug('[VaChip] Clicked VA: ${va.name}, id: ${va.id}', tag: 'UI');
               // 默认跳转到声优搜索结果页面
               Navigator.push(
                 context,
@@ -74,7 +75,7 @@ class VaChip extends StatelessWidget {
         label: Text(va.name),
         onPressed: onTap ??
             () {
-              print('[VaChip] Clicked VA: ${va.name}, id: ${va.id}');
+              LogService.instance.debug('[VaChip] Clicked VA: ${va.name}, id: ${va.id}', tag: 'UI');
               // 默认跳转到声优搜索结果页面
               Navigator.push(
                 context,
@@ -105,7 +106,7 @@ class VaChip extends StatelessWidget {
         label: Text(va.name),
         onPressed: onTap ??
             () {
-              print('[VaChip] Clicked VA: ${va.name}, id: ${va.id}');
+              LogService.instance.debug('[VaChip] Clicked VA: ${va.name}, id: ${va.id}', tag: 'UI');
               // 默认跳转到声优搜索结果页面
               Navigator.push(
                 context,

@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 
 import '../models/playlist.dart';
 import '../services/kikoeru_api_service.dart' hide kikoeruApiServiceProvider;
+import '../services/log_service.dart';
 import 'auth_provider.dart';
 import 'settings_provider.dart';
 
@@ -181,7 +182,7 @@ final playlistsProvider =
     final prevUser = previous;
     final nextUser = next;
     if (prevUser?.name != nextUser?.name || prevUser?.host != nextUser?.host) {
-      print('[PlaylistsProvider] User changed, refreshing playlists');
+      LogService.instance.debug('[PlaylistsProvider] User changed, refreshing playlists', tag: 'UI');
       notifier.refresh();
     }
   });

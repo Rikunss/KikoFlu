@@ -9,7 +9,7 @@ class SZh extends S {
   SZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appTitle => 'KikoFlu';
+  String get appTitle => 'KikoFlu Edge';
 
   @override
   String get navHome => '主页';
@@ -138,12 +138,6 @@ class SZh extends S {
   String get translationSourceGoogle => 'Google 翻译';
 
   @override
-  String get translationSourceYoudao => 'Youdao 翻译';
-
-  @override
-  String get translationSourceMicrosoft => 'Microsoft 翻译';
-
-  @override
   String get translationSourceLlm => 'LLM 翻译';
 
   @override
@@ -204,7 +198,7 @@ class SZh extends S {
   String get passwordMinLength => '密码不能少于5个字符';
 
   @override
-  String accountAdded(String username) {
+  String accountAdded(Object username) {
     return '账户 \"$username\" 已添加';
   }
 
@@ -218,7 +212,7 @@ class SZh extends S {
   String get enterServerAddressToTest => '请输入服务器地址后测试连接';
 
   @override
-  String latencyMs(String ms) {
+  String latencyMs(Object ms) {
     return '${ms}ms';
   }
 
@@ -290,7 +284,7 @@ class SZh extends S {
   String get minRating => '最低评分';
 
   @override
-  String minRatingStars(String stars) {
+  String minRatingStars(Object stars) {
     return '$stars 星';
   }
 
@@ -325,7 +319,7 @@ class SZh extends S {
   String get loadFailed => '加载失败';
 
   @override
-  String loadFailedWithError(String error) {
+  String loadFailedWithError(Object error) {
     return '加载失败: $error';
   }
 
@@ -420,7 +414,7 @@ class SZh extends S {
   String get cacheManagement => '缓存管理';
 
   @override
-  String currentCache(String size) {
+  String currentCache(Object size) {
     return '当前缓存: $size';
   }
 
@@ -461,7 +455,7 @@ class SZh extends S {
   String get newVersionFound => '发现新版本';
 
   @override
-  String newVersionAvailable(String version, String current) {
+  String newVersionAvailable(Object current, Object version) {
     return '$version 可用 (当前版本: $current)';
   }
 
@@ -469,7 +463,7 @@ class SZh extends S {
   String get versionInfo => '版本信息';
 
   @override
-  String currentVersion(String version) {
+  String currentVersion(Object version) {
     return '当前版本：$version';
   }
 
@@ -489,12 +483,12 @@ class SZh extends S {
   String get cannotOpenLink => '无法打开链接';
 
   @override
-  String openLinkFailed(String error) {
+  String openLinkFailed(Object error) {
     return '打开链接失败：$error';
   }
 
   @override
-  String foundNewVersion(String version) {
+  String foundNewVersion(Object version) {
     return '发现新版本 $version';
   }
 
@@ -580,7 +574,7 @@ class SZh extends S {
   String get showOnlySubtitled => '仅显示带字幕作品';
 
   @override
-  String selectedCount(int count) {
+  String selectedCount(Object count) {
     return '已选择 $count 项';
   }
 
@@ -597,12 +591,12 @@ class SZh extends S {
   String get noDownloadTasks => '暂无下载任务';
 
   @override
-  String nFiles(int count) {
+  String nFiles(Object count) {
     return '$count 个文件';
   }
 
   @override
-  String errorWithMessage(String error) {
+  String errorWithMessage(Object error) {
     return '错误: $error';
   }
 
@@ -616,12 +610,12 @@ class SZh extends S {
   String get deletionConfirmTitle => '确认删除';
 
   @override
-  String deletionConfirmMessage(int count) {
+  String deletionConfirmMessage(Object count) {
     return '确定要删除 $count 个已选的下载任务吗？已下载的文件也将被移除。';
   }
 
   @override
-  String deletedNFiles(int count) {
+  String deletedNFiles(Object count) {
     return '已删除 $count 个文件';
   }
 
@@ -641,12 +635,12 @@ class SZh extends S {
   String get downloadStatusPaused => '已暂停';
 
   @override
-  String translationFailed(String error) {
+  String translationFailed(Object error) {
     return '翻译失败: $error';
   }
 
   @override
-  String copiedToClipboard(String label, String text) {
+  String copiedToClipboard(Object label, Object text) {
     return '已复制$label：$text';
   }
 
@@ -654,7 +648,7 @@ class SZh extends S {
   String get loadingFileList => '正在加载文件列表...';
 
   @override
-  String loadFileListFailed(String error) {
+  String loadFileListFailed(Object error) {
     return '加载文件列表失败: $error';
   }
 
@@ -710,7 +704,7 @@ class SZh extends S {
   String get finishCurrentTrack => '完整播完后停止';
 
   @override
-  String addMinutes(int min) {
+  String addMinutes(Object min) {
     return '+$min分钟';
   }
 
@@ -769,12 +763,12 @@ class SZh extends S {
   String get switchAccountTitle => '切换账户';
 
   @override
-  String switchAccountConfirm(String username) {
+  String switchAccountConfirm(Object username) {
     return '确定要切换到账户 \"$username\" 吗？';
   }
 
   @override
-  String switchedToAccount(String username) {
+  String switchedToAccount(Object username) {
     return '已切换到账户: $username';
   }
 
@@ -782,7 +776,7 @@ class SZh extends S {
   String get switchFailed => '切换失败，请检查账户信息';
 
   @override
-  String switchFailedWithError(String error) {
+  String switchFailedWithError(Object error) {
     return '切换失败: $error';
   }
 
@@ -802,7 +796,7 @@ class SZh extends S {
   String get deleteAccount => '删除账户';
 
   @override
-  String deleteAccountConfirm(String username) {
+  String deleteAccountConfirm(Object username) {
     return '确定要删除账户 \"$username\" 吗？此操作无法撤销。';
   }
 
@@ -810,7 +804,7 @@ class SZh extends S {
   String get accountDeleted => '账户已删除';
 
   @override
-  String deletionFailedWithError(String error) {
+  String deletionFailedWithError(Object error) {
     return '删除失败: $error';
   }
 
@@ -920,7 +914,7 @@ class SZh extends S {
   String get voteCancelled => '已取消投票';
 
   @override
-  String voteFailed(String error) {
+  String voteFailed(Object error) {
     return '投票失败: $error';
   }
 
@@ -934,7 +928,7 @@ class SZh extends S {
   String get addTag => '添加标签';
 
   @override
-  String loadTagsFailed(String error) {
+  String loadTagsFailed(Object error) {
     return '加载标签失败: $error';
   }
 
@@ -948,7 +942,7 @@ class SZh extends S {
   String get bindEmailFirst => '请先前往 www.asmr.one 绑定邮箱';
 
   @override
-  String selectedNTags(int count) {
+  String selectedNTags(Object count) {
     return '已选择 $count 个标签:';
   }
 
@@ -977,12 +971,12 @@ class SZh extends S {
   String get systemPlaylistLiked => '我喜欢的';
 
   @override
-  String totalNWorks(int count) {
+  String totalNWorks(Object count) {
     return '$count 个作品';
   }
 
   @override
-  String pageNOfTotal(int current, int total) {
+  String pageNOfTotal(Object current, Object total) {
     return '第 $current / $total 页';
   }
 
@@ -996,7 +990,7 @@ class SZh extends S {
   String get translating => '翻译中...';
 
   @override
-  String translationFallbackNotice(String source) {
+  String translationFallbackNotice(Object source) {
     return '翻译失败，已自动切换至$source';
   }
 
@@ -1076,6 +1070,9 @@ class SZh extends S {
   String get themeModeSystem => '跟随系统';
 
   @override
+  String get themeModeTrueBlack => '纯黑模式';
+
+  @override
   String get colorSchemeOceanBlue => '胖次蓝';
 
   @override
@@ -1089,6 +1086,15 @@ class SZh extends S {
 
   @override
   String get colorSchemeSakuraPink => '哔哩粉';
+
+  @override
+  String get colorSchemeCrimsonRed => '绯红';
+
+  @override
+  String get colorSchemeAmberGold => '琥珀金';
+
+  @override
+  String get colorSchemeSlateGray => '岩灰';
 
   @override
   String get colorSchemeDynamic => '动态取色';
@@ -1145,7 +1151,7 @@ class SZh extends S {
   String get noSubtitleFiles => '未找到字幕文件';
 
   @override
-  String subtitleFilesFound(int count) {
+  String subtitleFilesFound(Object count) {
     return '找到 $count 个字幕文件';
   }
 
@@ -1276,6 +1282,11 @@ class SZh extends S {
   String get relatedRecommendations => '相关推荐';
 
   @override
+  String moreFromCircle(Object circle) {
+    return '来自 $circle 的更多作品';
+  }
+
+  @override
   String get myTabsDisplaySettings => '\"我的\"界面设置';
 
   @override
@@ -1342,12 +1353,12 @@ class SZh extends S {
   String get ratingDistribution => '评分分布';
 
   @override
-  String reviewsCount(int count) {
+  String reviewsCount(Object count) {
     return '$count 条评论';
   }
 
   @override
-  String ratingsCount(int count) {
+  String ratingsCount(Object count) {
     return '共 $count 个评分';
   }
 
@@ -1385,7 +1396,7 @@ class SZh extends S {
   String get reviewSubmitted => '评价已提交';
 
   @override
-  String reviewFailed(String error) {
+  String reviewFailed(Object error) {
     return '评价失败: $error';
   }
 
@@ -1432,7 +1443,7 @@ class SZh extends S {
   String get fetchFailed => '获取失败';
 
   @override
-  String operationFailedWithError(String error) {
+  String operationFailedWithError(Object error) {
     return '操作失败: $error';
   }
 
@@ -1443,7 +1454,7 @@ class SZh extends S {
   String get currentCacheSize => '当前缓存大小';
 
   @override
-  String cacheLimitLabelMB(int size) {
+  String cacheLimitLabelMB(Object size) {
     return '上限: ${size}MB';
   }
 
@@ -1468,7 +1479,7 @@ class SZh extends S {
   String get confirmClearCacheMessage => '确定要清除所有缓存吗？此操作无法撤销。';
 
   @override
-  String clearCacheFailedWithError(String error) {
+  String clearCacheFailedWithError(Object error) {
     return '清除缓存失败: $error';
   }
 
@@ -1509,6 +1520,15 @@ class SZh extends S {
   String get colorSchemeForestGreenDesc => '艹艹艹';
 
   @override
+  String get colorSchemeCrimsonRedDesc => '红红火火！🔴';
+
+  @override
+  String get colorSchemeAmberGoldDesc => '金灿灿，暖洋洋';
+
+  @override
+  String get colorSchemeSlateGrayDesc => '中性优雅，冷静专业';
+
+  @override
   String get colorSchemeDynamicDesc => '使用系统壁纸的颜色 (Android 12+)';
 
   @override
@@ -1542,17 +1562,17 @@ class SZh extends S {
   String get pageSizeSettings => '每页显示数量';
 
   @override
-  String pageSizeCurrent(int size) {
+  String pageSizeCurrent(Object size) {
     return '当前设置: $size 条/页';
   }
 
   @override
-  String currentSettingLabel(String value) {
+  String currentSettingLabel(Object value) {
     return '当前: $value';
   }
 
   @override
-  String setToValue(String value) {
+  String setToValue(Object value) {
     return '已设置为: $value';
   }
 
@@ -1564,12 +1584,6 @@ class SZh extends S {
 
   @override
   String get translationDescGoogle => '需要网络环境支持';
-
-  @override
-  String get translationDescYoudao => '支持默认网络环境';
-
-  @override
-  String get translationDescMicrosoft => '支持默认网络环境';
 
   @override
   String get translationDescLlm => 'OpenAI 兼容接口, 需要手动配置API Key';
@@ -1610,7 +1624,7 @@ class SZh extends S {
   String get notificationPermissionDenied => '通知权限被拒绝';
 
   @override
-  String requestNotificationFailed(String error) {
+  String requestNotificationFailed(Object error) {
     return '请求通知权限失败: $error';
   }
 
@@ -1621,17 +1635,17 @@ class SZh extends S {
   String get backgroundPermissionDenied => '后台运行权限被拒绝';
 
   @override
-  String requestBackgroundFailed(String error) {
+  String requestBackgroundFailed(Object error) {
     return '请求后台运行权限失败: $error';
   }
 
   @override
-  String permissionRequired(String permission) {
+  String permissionRequired(Object permission) {
     return '需要$permission';
   }
 
   @override
-  String permissionPermanentlyDenied(String permission) {
+  String permissionPermanentlyDenied(Object permission) {
     return '$permission已被永久拒绝，请在系统设置中手动开启。';
   }
 
@@ -1648,12 +1662,12 @@ class SZh extends S {
   String get refreshPermissionStatus => '刷新权限状态';
 
   @override
-  String deleteFileConfirm(String fileName) {
+  String deleteFileConfirm(Object fileName) {
     return '确定要删除 \"$fileName\" 吗？';
   }
 
   @override
-  String deleteSelectedFilesConfirm(int count) {
+  String deleteSelectedFilesConfirm(Object count) {
     return '确定要删除选中的 $count 个文件吗？';
   }
 
@@ -1661,12 +1675,12 @@ class SZh extends S {
   String get deleted => '已删除';
 
   @override
-  String cannotOpenFolder(String path) {
+  String cannotOpenFolder(Object path) {
     return '无法打开文件夹: $path';
   }
 
   @override
-  String openFolderFailed(String error) {
+  String openFolderFailed(Object error) {
     return '打开文件夹失败: $error';
   }
 
@@ -1677,27 +1691,27 @@ class SZh extends S {
   String get refreshComplete => '刷新完成';
 
   @override
-  String refreshFailed(String error) {
+  String refreshFailed(Object error) {
     return '刷新失败: $error';
   }
 
   @override
-  String deleteSelectedWorksConfirm(int count) {
+  String deleteSelectedWorksConfirm(Object count) {
     return '确定要删除选中的 $count 个作品吗？';
   }
 
   @override
-  String partialDeleteFailed(String error) {
+  String partialDeleteFailed(Object error) {
     return '部分删除失败: $error';
   }
 
   @override
-  String deletedNOfTotal(int success, int total) {
+  String deletedNOfTotal(Object success, Object total) {
     return '已删除 $success/$total 个任务';
   }
 
   @override
-  String deleteFailedWithError(String error) {
+  String deleteFailedWithError(Object error) {
     return '删除失败: $error';
   }
 
@@ -1705,7 +1719,7 @@ class SZh extends S {
   String get noWorkMetadataForOffline => '该下载任务没有保存作品详情，无法离线查看';
 
   @override
-  String openWorkDetailFailed(String error) {
+  String openWorkDetailFailed(Object error) {
     return '打开作品详情失败: $error';
   }
 
@@ -1750,7 +1764,7 @@ class SZh extends S {
   String get networkConnectionFailed => '网络连接失败，请检查网络';
 
   @override
-  String addFailedWithError(String error) {
+  String addFailedWithError(Object error) {
     return '添加失败: $error';
   }
 
@@ -1758,12 +1772,12 @@ class SZh extends S {
   String get creatingPlaylist => '正在创建播放列表...';
 
   @override
-  String playlistCreatedSuccess(String name) {
+  String playlistCreatedSuccess(Object name) {
     return '播放列表 \"$name\" 创建成功';
   }
 
   @override
-  String createFailedWithError(String error) {
+  String createFailedWithError(Object error) {
     return '创建失败: $error';
   }
 
@@ -1777,7 +1791,7 @@ class SZh extends S {
   String get myPlaylists => '我的播放列表';
 
   @override
-  String totalNItems(int count) {
+  String totalNItems(Object count) {
     return '共 $count 条';
   }
 
@@ -1794,7 +1808,7 @@ class SZh extends S {
   String get deletePlaylistConfirm => '删除后不可恢复，收藏本列表的人将无法再访问。确定要删除吗？';
 
   @override
-  String unfavoritePlaylistConfirm(String name) {
+  String unfavoritePlaylistConfirm(Object name) {
     return '确定要取消收藏\"$name\"吗？';
   }
 
@@ -1838,12 +1852,12 @@ class SZh extends S {
   String get workIdHint => '例如：RJ123456\nrj233333';
 
   @override
-  String detectedNWorkIds(int count) {
+  String detectedNWorkIds(Object count) {
     return '识别到 $count 个作品号';
   }
 
   @override
-  String addNWorks(int count) {
+  String addNWorks(Object count) {
     return '添加 $count 个';
   }
 
@@ -1851,12 +1865,12 @@ class SZh extends S {
   String get noValidWorkIds => '未找到有效的作品号（RJ开头）';
 
   @override
-  String addingNWorks(int count) {
+  String addingNWorks(Object count) {
     return '正在添加 $count 个作品...';
   }
 
   @override
-  String addedNWorksSuccess(int count) {
+  String addedNWorksSuccess(Object count) {
     return '成功添加 $count 个作品';
   }
 
@@ -1864,7 +1878,7 @@ class SZh extends S {
   String get removeWork => '移除作品';
 
   @override
-  String removeWorkConfirm(String title) {
+  String removeWorkConfirm(Object title) {
     return '确定要从播放列表中移除「$title」吗？';
   }
 
@@ -1872,7 +1886,7 @@ class SZh extends S {
   String get removeSuccess => '移除成功';
 
   @override
-  String removeFailedWithError(String error) {
+  String removeFailedWithError(Object error) {
     return '移除失败: $error';
   }
 
@@ -1883,7 +1897,7 @@ class SZh extends S {
   String get saveSuccess => '保存成功';
 
   @override
-  String saveFailedWithError(String error) {
+  String saveFailedWithError(Object error) {
     return '保存失败: $error';
   }
 
@@ -1900,12 +1914,12 @@ class SZh extends S {
   String get createdTime => '创建时间';
 
   @override
-  String nWorksCount(int count) {
+  String nWorksCount(Object count) {
     return '$count 个作品';
   }
 
   @override
-  String nPlaysCount(int count) {
+  String nPlaysCount(Object count) {
     return '$count 播放';
   }
 
@@ -1919,12 +1933,12 @@ class SZh extends S {
   String get reachedEnd => '已经到底啦~杂库~';
 
   @override
-  String excludedNWorks(int count) {
+  String excludedNWorks(Object count) {
     return '已排除 $count 个作品';
   }
 
   @override
-  String pageExcludedNWorks(int count) {
+  String pageExcludedNWorks(Object count) {
     return '本页已排除 $count 个作品';
   }
 
@@ -1971,6 +1985,18 @@ class SZh extends S {
   String get playlistEmpty => '播放列表为空';
 
   @override
+  String get clearQueue => '清空队列';
+
+  @override
+  String get clearQueueConfirm => '确定要清空播放队列吗？';
+
+  @override
+  String get saveAsPlaylist => '保存为播放列表';
+
+  @override
+  String get newPlaylistNameHint => '输入播放列表名称';
+
+  @override
   String get appendModeEnabled => '追加模式已开启';
 
   @override
@@ -1980,12 +2006,12 @@ class SZh extends S {
   String get gotIt => '知道了';
 
   @override
-  String nMinutes(int count) {
+  String nMinutes(Object count) {
     return '$count分钟';
   }
 
   @override
-  String nHours(int count) {
+  String nHours(Object count) {
     return '$count小时';
   }
 
@@ -1999,12 +2025,12 @@ class SZh extends S {
   String get tapToViewRatingDetail => '点击查看评分详情';
 
   @override
-  String priceInYen(int price) {
+  String priceInYen(Object price) {
     return '$price 日元';
   }
 
   @override
-  String soldCount(String count) {
+  String soldCount(Object count) {
     return '售出：$count';
   }
 
@@ -2018,7 +2044,7 @@ class SZh extends S {
   String get otherEditions => '其他版本';
 
   @override
-  String tenThousandSuffix(String count) {
+  String tenThousandSuffix(Object count) {
     return '$count万';
   }
 
@@ -2032,12 +2058,12 @@ class SZh extends S {
   String get packingFailed => '打包失败';
 
   @override
-  String exportSuccess(String path) {
+  String exportSuccess(Object path) {
     return '导出成功：$path';
   }
 
   @override
-  String exportFailed(String error) {
+  String exportFailed(Object error) {
     return '导出失败: $error';
   }
 
@@ -2048,7 +2074,7 @@ class SZh extends S {
   String get offlineBadge => '离线';
 
   @override
-  String loadFilesFailed(String error) {
+  String loadFilesFailed(Object error) {
     return '加载文件失败: $error';
   }
 
@@ -2059,12 +2085,12 @@ class SZh extends S {
   String get noPlayableAudioFiles => '没有找到可播放的音频文件';
 
   @override
-  String cannotFindAudioFile(String title) {
+  String cannotFindAudioFile(Object title) {
     return '无法找到音频文件: $title';
   }
 
   @override
-  String nowPlayingNOfTotal(String title, int current, int total) {
+  String nowPlayingNOfTotal(Object current, Object title, Object total) {
     return '正在播放: $title ($current/$total)';
   }
 
@@ -2093,12 +2119,12 @@ class SZh extends S {
   String get loadingSubtitle => '正在加载字幕...';
 
   @override
-  String subtitleLoadSuccess(String title) {
+  String subtitleLoadSuccess(Object title) {
     return '字幕加载成功：$title';
   }
 
   @override
-  String subtitleLoadFailed(String error) {
+  String subtitleLoadFailed(Object error) {
     return '字幕加载失败：$error';
   }
 
@@ -2136,7 +2162,7 @@ class SZh extends S {
   String get openInBrowserOption => '2. 在浏览器中打开';
 
   @override
-  String playVideoError(String error) {
+  String playVideoError(Object error) {
     return '播放视频时出错: $error';
   }
 
@@ -2147,7 +2173,7 @@ class SZh extends S {
   String get resourceFiles => '资源文件';
 
   @override
-  String resourceFilesTranslated(int count) {
+  String resourceFilesTranslated(Object count) {
     return '资源文件 (已翻译 $count 项)';
   }
 
@@ -2158,12 +2184,12 @@ class SZh extends S {
   String get translationTranslated => '译';
 
   @override
-  String copiedName(String title) {
+  String copiedName(Object title) {
     return '已复制名称: $title';
   }
 
   @override
-  String translationComplete(int count) {
+  String translationComplete(Object count) {
     return '翻译完成：$count 个项目';
   }
 
@@ -2174,12 +2200,12 @@ class SZh extends S {
   String get preparingTranslation => '准备翻译...';
 
   @override
-  String translatingProgress(int current, int total) {
+  String translatingProgress(Object current, Object total) {
     return '翻译中 $current/$total';
   }
 
   @override
-  String nItems(int count) {
+  String nItems(Object count) {
     return '$count 项';
   }
 
@@ -2190,12 +2216,12 @@ class SZh extends S {
   String get preview => '预览';
 
   @override
-  String openVideoFileError(String error) {
+  String openVideoFileError(Object error) {
     return '打开视频文件时出错: $error';
   }
 
   @override
-  String cannotOpenVideoFile(String message) {
+  String cannotOpenVideoFile(Object message) {
     return '无法打开视频文件: $message';
   }
 
@@ -2221,7 +2247,7 @@ class SZh extends S {
   String get cannotFindFilePath => '无法找到文件路径';
 
   @override
-  String fileNotExist(String title) {
+  String fileNotExist(Object title) {
     return '文件不存在：$title';
   }
 
@@ -2235,7 +2261,7 @@ class SZh extends S {
   String get cannotOpenVideo => '无法打开视频';
 
   @override
-  String errorInfo(String message) {
+  String errorInfo(Object message) {
     return '错误信息: $message';
   }
 
@@ -2252,7 +2278,7 @@ class SZh extends S {
   String get offlineFiles => '离线文件';
 
   @override
-  String unsupportedFileType(String title) {
+  String unsupportedFileType(Object title) {
     return '暂不支持打开此类型文件: $title';
   }
 
@@ -2260,7 +2286,7 @@ class SZh extends S {
   String get deleteFilePrompt => '确定要删除这个文件吗？';
 
   @override
-  String deletedItem(String title) {
+  String deletedItem(Object title) {
     return '已删除: $title';
   }
 
@@ -2268,17 +2294,17 @@ class SZh extends S {
   String get selectAtLeastOneFile => '请至少选择一个文件';
 
   @override
-  String addedNFilesToDownloadQueue(int count) {
+  String addedNFilesToDownloadQueue(Object count) {
     return '已添加 $count 个文件到下载队列';
   }
 
   @override
-  String downloadedAndSelected(int downloaded, int selected) {
+  String downloadedAndSelected(Object downloaded, Object selected) {
     return '已下载 $downloaded · 已选择 $selected';
   }
 
   @override
-  String downloadN(int count) {
+  String downloadN(Object count) {
     return '下载 ($count)';
   }
 
@@ -2292,12 +2318,12 @@ class SZh extends S {
   String get selectFilesToDownload => '选择下载文件';
 
   @override
-  String downloadedNCount(int count) {
+  String downloadedNCount(Object count) {
     return '已下载 $count 个';
   }
 
   @override
-  String selectedNCount(int count) {
+  String selectedNCount(Object count) {
     return '已选择 $count 个';
   }
 
@@ -2314,12 +2340,12 @@ class SZh extends S {
   String get notTestedYet => '尚未测试';
 
   @override
-  String latencyResultDetail(String latency, String status) {
+  String latencyResultDetail(Object latency, Object status) {
     return '延迟 $latency ($status)';
   }
 
   @override
-  String connectionFailedWithDetail(String error) {
+  String connectionFailedWithDetail(Object error) {
     return '连接失败: $error';
   }
 
@@ -2345,22 +2371,22 @@ class SZh extends S {
   String get unknownHost => '未知主机';
 
   @override
-  String lastUsedTime(String time) {
+  String lastUsedTime(Object time) {
     return '最后使用: $time';
   }
 
   @override
-  String daysAgo(int count) {
+  String daysAgo(Object count) {
     return '$count天前';
   }
 
   @override
-  String hoursAgo(int count) {
+  String hoursAgo(Object count) {
     return '$count小时前';
   }
 
   @override
-  String minutesAgo(int count) {
+  String minutesAgo(Object count) {
     return '$count分钟前';
   }
 
@@ -2371,12 +2397,12 @@ class SZh extends S {
   String get confirmDelete => '确认删除';
 
   @override
-  String deleteSelectedConfirm(int count) {
+  String deleteSelectedConfirm(Object count) {
     return '确定要删除选中的 $count 项吗？';
   }
 
   @override
-  String deletedNOfTotalItems(int success, int total) {
+  String deletedNOfTotalItems(Object success, Object total) {
     return '已删除 $success/$total 项';
   }
 
@@ -2444,7 +2470,7 @@ class SZh extends S {
   String get renameFailed => '重命名失败';
 
   @override
-  String deleteItemConfirm(String title) {
+  String deleteItemConfirm(Object title) {
     return '确定要删除 \"$title\" 吗？';
   }
 
@@ -2455,7 +2481,7 @@ class SZh extends S {
   String get deleteFailed => '删除失败';
 
   @override
-  String subtitleLoaded(String title) {
+  String subtitleLoaded(Object title) {
     return '字幕已加载：$title';
   }
 
@@ -2466,12 +2492,12 @@ class SZh extends S {
   String get moveFailed => '移动失败';
 
   @override
-  String previewFailed(String error) {
+  String previewFailed(Object error) {
     return '预览失败: $error';
   }
 
   @override
-  String openFailed(String error) {
+  String openFailed(Object error) {
     return '打开失败: $error';
   }
 
@@ -2524,37 +2550,37 @@ class SZh extends S {
   String get reset => '重置';
 
   @override
-  String noBlockedItemsOfType(String type) {
+  String noBlockedItemsOfType(Object type) {
     return '没有屏蔽的$type';
   }
 
   @override
-  String unblockedItem(String item) {
+  String unblockedItem(Object item) {
     return '已移除屏蔽: $item';
   }
 
   @override
-  String addBlockedItem(String type) {
+  String addBlockedItem(Object type) {
     return '添加屏蔽$type';
   }
 
   @override
-  String blockedItemName(String type) {
+  String blockedItemName(Object type) {
     return '$type名称';
   }
 
   @override
-  String enterBlockedItemHint(String type) {
+  String enterBlockedItemHint(Object type) {
     return '请输入要屏蔽的$type';
   }
 
   @override
-  String blockedItemAdded(String item) {
+  String blockedItemAdded(Object item) {
     return '已添加屏蔽: $item';
   }
 
   @override
-  String workCountLabel(int count) {
+  String workCountLabel(Object count) {
     return '作品数: $count';
   }
 
@@ -2616,7 +2642,7 @@ class SZh extends S {
   String get unknownFile => '未知文件';
 
   @override
-  String deleteWithCount(int count) {
+  String deleteWithCount(Object count) {
     return '删除 ($count)';
   }
 
@@ -2624,7 +2650,7 @@ class SZh extends S {
   String get searchSubtitles => '搜索字幕...';
 
   @override
-  String nFilesWithSize(int count, String size) {
+  String nFilesWithSize(Object count, Object size) {
     return '$count 个文件 • $size';
   }
 
@@ -2635,7 +2661,7 @@ class SZh extends S {
   String get goToParent => '返回上级';
 
   @override
-  String moveToTarget(String name) {
+  String moveToTarget(Object name) {
     return '移动到: $name';
   }
 
@@ -2643,12 +2669,12 @@ class SZh extends S {
   String get noSubfoldersHere => '此目录下没有子文件夹';
 
   @override
-  String addedToPlaylist(String name) {
+  String addedToPlaylist(Object name) {
     return '已添加到播放列表「$name」';
   }
 
   @override
-  String removedFromPlaylist(String name) {
+  String removedFromPlaylist(Object name) {
     return '已从播放列表「$name」中移除';
   }
 
@@ -2656,7 +2682,7 @@ class SZh extends S {
   String get alreadyFavorited => '已收藏';
 
   @override
-  String loadImageFailedWithError(String error) {
+  String loadImageFailedWithError(Object error) {
     return '加载图片失败\n$error';
   }
 
@@ -2673,7 +2699,7 @@ class SZh extends S {
   String get saveCoverImage => '保存封面图片';
 
   @override
-  String savedToPath(String path) {
+  String savedToPath(Object path) {
     return '已保存到: $path';
   }
 
@@ -2681,7 +2707,7 @@ class SZh extends S {
   String get doubleTapToZoom => '双击放大 · 双指缩放';
 
   @override
-  String getStatusFailed(String error) {
+  String getStatusFailed(Object error) {
     return '获取状态失败: $error';
   }
 
@@ -2689,7 +2715,7 @@ class SZh extends S {
   String get deleteRecord => '删除记录';
 
   @override
-  String deletePlayRecordConfirm(String title) {
+  String deletePlayRecordConfirm(Object title) {
     return '确定要删除 \"$title\" 的播放记录吗？';
   }
 
@@ -2697,7 +2723,7 @@ class SZh extends S {
   String get notPlayedYet => '尚未播放';
 
   @override
-  String playbackFailed(String error) {
+  String playbackFailed(Object error) {
     return '播放失败: $error';
   }
 
@@ -2714,7 +2740,7 @@ class SZh extends S {
   String get imageSavedToGallery => '图片已保存到相册';
 
   @override
-  String imageSavedToPath(String path) {
+  String imageSavedToPath(Object path) {
     return '图片已保存到: $path';
   }
 
@@ -2731,7 +2757,7 @@ class SZh extends S {
   String get goToPageTitle => '跳转到指定页';
 
   @override
-  String pageNumberRange(int max) {
+  String pageNumberRange(Object max) {
     return '页码 (1-$max)';
   }
 
@@ -2739,7 +2765,7 @@ class SZh extends S {
   String get enterPageNumber => '请输入页码';
 
   @override
-  String enterValidPageNumber(int max) {
+  String enterValidPageNumber(Object max) {
     return '请输入有效页码 (1-$max)';
   }
 
@@ -2756,12 +2782,12 @@ class SZh extends S {
   String get cannotOpenPdf => '无法打开PDF文件';
 
   @override
-  String loadPdfFailed(String error) {
+  String loadPdfFailed(Object error) {
     return '加载PDF失败: $error';
   }
 
   @override
-  String pdfPageOfTotal(int current, int total) {
+  String pdfPageOfTotal(Object current, Object total) {
     return '第 $current 页 / 共 $total 页';
   }
 
@@ -2778,7 +2804,7 @@ class SZh extends S {
   String get openWithSystemApp => '使用系统默认应用打开';
 
   @override
-  String renderPdfFailed(String error) {
+  String renderPdfFailed(Object error) {
     return '渲染PDF失败: $error';
   }
 
@@ -2813,7 +2839,7 @@ class SZh extends S {
   String get noContentToSave => '没有可保存的内容';
 
   @override
-  String fileSavedToPath(String path) {
+  String fileSavedToPath(Object path) {
     return '文件已保存到：$path';
   }
 
@@ -2821,7 +2847,7 @@ class SZh extends S {
   String get localFileNotExist => '本地文件不存在，请尝试重载';
 
   @override
-  String loadTextFailed(String error) {
+  String loadTextFailed(Object error) {
     return '加载文本失败: $error';
   }
 
@@ -2847,17 +2873,17 @@ class SZh extends S {
   String get bookmarkRemoved => '已移除标记';
 
   @override
-  String setProgressAndRating(String progress, int rating) {
+  String setProgressAndRating(Object progress, Object rating) {
     return '已设置为：$progress，评分：$rating 星';
   }
 
   @override
-  String setProgressTo(String progress) {
+  String setProgressTo(Object progress) {
     return '已设置为：$progress';
   }
 
   @override
-  String ratingSetTo(int rating) {
+  String ratingSetTo(Object rating) {
     return '评分已设置为：$rating 星';
   }
 
@@ -2865,12 +2891,12 @@ class SZh extends S {
   String get updated => '已更新';
 
   @override
-  String addTagFailed(String error) {
+  String addTagFailed(Object error) {
     return '添加标签失败: $error';
   }
 
   @override
-  String addWithCount(int count) {
+  String addWithCount(Object count) {
     return '添加 ($count)';
   }
 
@@ -2878,7 +2904,7 @@ class SZh extends S {
   String get undo => '撤销';
 
   @override
-  String nStars(int count) {
+  String nStars(Object count) {
     return '$count 星';
   }
 
@@ -2892,7 +2918,7 @@ class SZh extends S {
   String get votedDown => '已投反对票';
 
   @override
-  String voteFailedWithError(String error) {
+  String voteFailedWithError(Object error) {
     return '投票失败: $error';
   }
 
@@ -2906,7 +2932,7 @@ class SZh extends S {
   String get voted => '已投票';
 
   @override
-  String tagBlockedWithName(String name) {
+  String tagBlockedWithName(Object name) {
     return '已屏蔽标签: $name';
   }
 
@@ -2971,12 +2997,12 @@ class SZh extends S {
   String get encodingUnrecognized => '文件编码无法识别，无法正确显示内容';
 
   @override
-  String editPlaylistFailed(String error) {
+  String editPlaylistFailed(Object error) {
     return '编辑播放列表失败: $error';
   }
 
   @override
-  String unsupportedFileTypeWithTitle(String title) {
+  String unsupportedFileTypeWithTitle(Object title) {
     return '暂不支持打开此类型文件: $title';
   }
 
@@ -3053,7 +3079,7 @@ class SZh extends S {
   String get downloadPathSettings => '下载路径设置';
 
   @override
-  String loadPathFailedWithError(String error) {
+  String loadPathFailedWithError(Object error) {
     return '加载路径失败: $error';
   }
 
@@ -3061,12 +3087,12 @@ class SZh extends S {
   String get platformNotSupportCustomPath => '当前平台不支持自定义下载路径';
 
   @override
-  String activeDownloadsWarning(int count) {
+  String activeDownloadsWarning(Object count) {
     return '有 $count 个下载任务正在进行中，请先取消或完成下载后再切换路径';
   }
 
   @override
-  String setPathFailedWithError(String error) {
+  String setPathFailedWithError(Object error) {
     return '设置路径失败: $error';
   }
 
@@ -3092,7 +3118,7 @@ class SZh extends S {
   String get defaultPathRestored => '已恢复默认路径';
 
   @override
-  String resetPathFailedWithError(String error) {
+  String resetPathFailedWithError(Object error) {
     return '恢复默认路径失败: $error';
   }
 
@@ -3177,7 +3203,7 @@ class SZh extends S {
   String get buttonDisplayRules => '按钮显示规则';
 
   @override
-  String buttonDisplayRulesDesc(int maxVisible) {
+  String buttonDisplayRulesDesc(Object maxVisible) {
     return '• 前 $maxVisible 个按钮会显示在播放器底部\n• 其余按钮会收纳在\"更多\"菜单中';
   }
 
@@ -3269,6 +3295,9 @@ class SZh extends S {
   String get showOnlineMarks => '显示在线标记的作品';
 
   @override
+  String get showStats => '显示收听统计';
+
+  @override
   String get cannotBeDisabled => '不可关闭';
 
   @override
@@ -3285,6 +3314,25 @@ class SZh extends S {
 
   @override
   String get playlistPrivacyPublicDesc => '任何人都可以查看';
+
+  @override
+  String get convertWavAfterDownload => '下载WAV时自动转换为FLAC/ALAC';
+
+  @override
+  String get convertWavAfterDownloadDesc =>
+      '下载WAV文件后自动转换为无损FLAC（iOS为ALAC），节省约50%存储空间';
+
+  @override
+  String get convertWavAfterDownloadEnabled => '已启用 — WAV下载后将自动转换';
+
+  @override
+  String get convertWavAfterDownloadDisabled => '已禁用 — WAV文件保持原样';
+
+  @override
+  String get convertWavFfmpegNotFound => '未找到FFmpeg。请安装FFmpeg或检查PATH设置。';
+
+  @override
+  String get convertingAudio => '正在转换音频…';
 
   @override
   String get clearTranslationCache => '清除翻译缓存';
@@ -3326,6 +3374,9 @@ class SZh extends S {
   String get sortWorkId => 'ID';
 
   @override
+  String get sortTitle => '标题';
+
+  @override
   String get searchDownloads => '搜索已下载作品...';
 
   @override
@@ -3353,12 +3404,12 @@ class SZh extends S {
   String get logCopied => '日志已复制到剪贴板';
 
   @override
-  String logExported(String path) {
+  String logExported(Object path) {
     return '日志已导出到 $path';
   }
 
   @override
-  String logCount(int count) {
+  String logCount(Object count) {
     return '$count 条日志';
   }
 
@@ -3367,6 +3418,720 @@ class SZh extends S {
 
   @override
   String get logEmpty => '暂无日志';
+
+  @override
+  String get crossfadeTitle => '交叉淡化';
+
+  @override
+  String crossfadeEnabledWithDuration(Object ms) {
+    return '交叉淡化: ${ms}ms';
+  }
+
+  @override
+  String get gaplessPlaybackEnabled => '无缝播放（无交叉淡化）';
+
+  @override
+  String get crossfadeDurationLabel => '交叉淡化时长';
+
+  @override
+  String get crossfadeMinLabel => '0.5秒';
+
+  @override
+  String get crossfadeMaxLabel => '10秒';
+
+  @override
+  String get crossfadeDescription => '在曲目之间平滑过渡。关闭时，无缝播放最小化间隙。';
+
+  @override
+  String get equalizerTitle => '均衡器';
+
+  @override
+  String get equalizerEnabled => '均衡器已启用';
+
+  @override
+  String get equalizerDisabled => '均衡器已禁用';
+
+  @override
+  String get equalizerActive => '已激活';
+
+  @override
+  String get equalizerPresets => '预设';
+
+  @override
+  String get equalizerCustomBands => '自定义频段';
+
+  @override
+  String get equalizerCustom => '自定义';
+
+  @override
+  String get equalizerReset => '重置为平坦';
+
+  @override
+  String get equalizerNotSupported => '此设备不支持均衡器';
+
+  @override
+  String get equalizerNotSupportedAndroid => '音频会话尚未初始化，请先播放曲目。';
+
+  @override
+  String get equalizerNotSupportedOther => '此平台不支持硬件均衡器。设置将被保存，在支持的设备上生效。';
+
+  @override
+  String get equalizerInfo => '在Android上，EQ通过硬件音频效果应用。在其他平台上，EQ设置将被保存以便将来使用。';
+
+  @override
+  String get searchSettings => '搜索设置...';
+
+  @override
+  String get searchSettingsTitle => '设置搜索';
+
+  @override
+  String get searchSettingsComingSoon => '完整的设置搜索将在未来的更新中提供。';
+
+  @override
+  String get preferredSampleRate => '首选采样率';
+
+  @override
+  String get preferredSampleRateSubtitle => 'Hi-res 音频输出目标 (Android)';
+
+  @override
+  String get preferredSampleRateAuto => '自动（跟随文件）';
+
+  @override
+  String get preferredSampleRateDesc =>
+      '设置音频输出的首选采样率。较高的采样率可能会降低兼容性，但在支持的DAC上可提升音质。';
+
+  @override
+  String get settingsPlayback => '播放';
+
+  @override
+  String get settingsPlaybackSubtitle => '均衡器、交叉淡化、音频格式';
+
+  @override
+  String get settingsAppearance => '外观';
+
+  @override
+  String get settingsAppearanceSubtitle => '主题、语言、显示设置';
+
+  @override
+  String get settingsDownloadsStorage => '下载与存储';
+
+  @override
+  String get settingsDownloadsStorageSubtitle => '下载路径、缓存管理';
+
+  @override
+  String get settingsPrivacyContent => '隐私与内容';
+
+  @override
+  String get settingsPrivacyContentSubtitle => '隐私模式、屏蔽项目';
+
+  @override
+  String get settingsTranslation => '翻译';
+
+  @override
+  String get settingsTranslationSubtitle => '翻译源、LLM设置';
+
+  @override
+  String get settingsAccount => '账户';
+
+  @override
+  String get settingsAccountSubtitle => '服务器账户、悬浮歌词';
+
+  @override
+  String get settingsAdvanced => '高级';
+
+  @override
+  String get settingsAdvancedSubtitle => '排序顺序、日志、所有设置';
+
+  @override
+  String get settingsAboutSubtitle => '版本、更新、许可证';
+
+  @override
+  String get advancedInfoBanner => '这些设置初始设置后很少更改。';
+
+  @override
+  String get advancedSectionDisplaySorting => '显示与排序';
+
+  @override
+  String get advancedDefaultSortOrderSubtitle => '发布日期、标题、评分等';
+
+  @override
+  String get advancedMyTabsDisplaySubtitle => '显示/隐藏「我的」页面中的标签';
+
+  @override
+  String get advancedSectionContentFiltering => '内容过滤';
+
+  @override
+  String get advancedSubtitlePrioritySubtitle => '高优先级与低优先级';
+
+  @override
+  String get advancedSectionDebugLegacy => '调试与旧版';
+
+  @override
+  String get advancedAllSettingsLegacy => '所有设置（旧版）';
+
+  @override
+  String get advancedAllSettingsLegacySubtitle => '原来的完整设置页面';
+
+  @override
+  String get hiResExclusiveMode => 'Hi-Res 独占模式';
+
+  @override
+  String get hiResExclusiveModeSubtitle => '对 FLAC/WAV 高解析音轨使用原生 ExoPlayer';
+
+  @override
+  String get hiResExclusiveModeDesc =>
+      '启用后，高解析音轨（FLAC/WAV >48kHz）将通过原生 ExoPlayer 播放。切换播放器时可能会有短暂中断。';
+
+  @override
+  String get hiResExclusiveModeEnabled => 'Hi-Res 独占模式已启用';
+
+  @override
+  String get hiResExclusiveModeDisabled => 'Hi-Res 独占模式已禁用';
+
+  @override
+  String get enable => '启用';
+
+  @override
+  String get listeningStatsTitle => '收听统计';
+
+  @override
+  String get listeningStatsSubtitle => '您的收听习惯和历史';
+
+  @override
+  String get statsWorksPlayed => '播放作品数';
+
+  @override
+  String get statsCompleted => '已完成';
+
+  @override
+  String get statsListeningTime => '收听时长';
+
+  @override
+  String get statsStreakDays => '连续天数';
+
+  @override
+  String get statsDays => '天';
+
+  @override
+  String get statsDailyActivity => '每日活动（14天）';
+
+  @override
+  String get statsTopVAs => '热门声优';
+
+  @override
+  String get statsTopCircles => '热门社团';
+
+  @override
+  String get statsRecentPlays => '最近播放';
+
+  @override
+  String get statsNoData => '暂无统计';
+
+  @override
+  String get statsNoDataDesc => '开始收听作品后，统计数据将在此显示。';
+
+  @override
+  String get statsTabDaily => '每日';
+
+  @override
+  String get statsTabWeekly => '每周';
+
+  @override
+  String get statsTabMonthly => '每月';
+
+  @override
+  String get statsWeeklyReport => '每周报告（4周）';
+
+  @override
+  String get statsMonthlyReport => '每月报告（6个月）';
+
+  @override
+  String get statsHeatmap => '活动热力图';
+
+  @override
+  String get statsHeatmapDesc => '过去12周的收听活动';
+
+  @override
+  String get statsMilestones => '成就';
+
+  @override
+  String get statsMilestoneDesc => '在收听旅程中获得的成就';
+
+  @override
+  String get statsMilestoneFirstSteps => '第一步';
+
+  @override
+  String get statsMilestoneFirstStepsDesc => '播放第一个作品';
+
+  @override
+  String get statsMilestoneGettingStarted => '初出茅庐';
+
+  @override
+  String get statsMilestoneGettingStartedDesc => '播放10个不同作品';
+
+  @override
+  String get statsMilestoneListener => '忠实听众';
+
+  @override
+  String get statsMilestoneListenerDesc => '播放50个不同作品';
+
+  @override
+  String get statsMilestoneCentury => '百作达成';
+
+  @override
+  String get statsMilestoneCenturyDesc => '播放100个不同作品';
+
+  @override
+  String get statsMilestoneComplete => '完成！';
+
+  @override
+  String get statsMilestoneCompleteDesc => '完成第一个作品';
+
+  @override
+  String get statsMilestoneDoubleDigits => '两位数';
+
+  @override
+  String get statsMilestoneDoubleDigitsDesc => '累计收听10小时';
+
+  @override
+  String get statsMilestoneLongHaul => '持久战';
+
+  @override
+  String get statsMilestoneLongHaulDesc => '累计收听50小时';
+
+  @override
+  String get statsMilestoneHundredHours => '100小时俱乐部';
+
+  @override
+  String get statsMilestoneHundredHoursDesc => '累计收听100小时';
+
+  @override
+  String get statsMilestoneConsistent => '坚持不懈';
+
+  @override
+  String get statsMilestoneConsistentDesc => '达成7天连续';
+
+  @override
+  String get statsMilestoneUnstoppable => '势不可挡';
+
+  @override
+  String get statsMilestoneUnstoppableDesc => '达成30天连续';
+
+  @override
+  String get bitPerfectPlayback => '无损位完美播放';
+
+  @override
+  String get bitPerfectPlaybackSubtitleOff => 'USB DAC 检测已关闭';
+
+  @override
+  String get bitPerfectPlaybackSubtitleOn => '通过 libusb 直接输出到 USB DAC';
+
+  @override
+  String get bitPerfectPlaybackSelectDevice => '选择 USB DAC';
+
+  @override
+  String get bitPerfectPlaybackSelectHint => '选择 USB 音频设备...';
+
+  @override
+  String get bitPerfectPlaybackNoDevice => '未检测到 USB DAC';
+
+  @override
+  String get bitPerfectPlaybackRefreshTooltip => '刷新设备列表';
+
+  @override
+  String get bitPerfectPlaybackConfirmDesc =>
+      '启用后，将检测您连接的 USB DAC，音频可直接流式传输到 DAC，绕过 Android 混音器，实现纯净的无损播放。';
+
+  @override
+  String get bitPerfectPlaybackEnabled => '无损位完美播放已启用';
+
+  @override
+  String get bitPerfectPlaybackDisabled => '无损位完美播放已禁用';
+
+  @override
+  String get bitPerfectPlaybackDeviceUpdated => 'USB DAC 设备已更新';
+
+  @override
+  String get bitPerfectPlaybackListRefreshed => 'USB 设备列表已刷新';
+
+  @override
+  String get bitPerfectPlaybackInfoTooltip => '关于无损位完美播放';
+
+  @override
+  String get bitPerfectPlaybackInfo =>
+      '无损位完美播放将原始音频数据不经修改地发送到您的外部 DAC，以获得最高保真度。\n\nAndroid 的音频混音器通常将所有音频重采样至 48kHz，从而降低高解析内容的音质。此模式通过 libusb 驱动程序将音频直接路由到您连接的 USB DAC，绕过 Android 混音器，实现纯净、未改动的播放。';
+
+  @override
+  String get bitPerfectPlaybackPermissionDenied =>
+      'USB 权限被拒绝。请在设置中授予 USB 访问权限。';
+
+  @override
+  String get playNext => '播放下一首';
+
+  @override
+  String get noAudioTracks => '未找到音频轨道';
+
+  @override
+  String playingNextTracks(Object count) {
+    return '即将播放: $count 首';
+  }
+
+  @override
+  String get localFileBrowser => '本地文件浏览器';
+
+  @override
+  String get browseFiles => '浏览文件';
+
+  @override
+  String get progressSync => '跨设备进度同步';
+
+  @override
+  String get progressSyncSubtitle => '将播放进度同步到服务器，在不同设备间无缝续播';
+
+  @override
+  String get progressSyncEnabled => '已启用 — 进度已同步到服务器';
+
+  @override
+  String get progressSyncDisabled => '已禁用';
+
+  @override
+  String get autoTranslateLyrics => '自动翻译歌词';
+
+  @override
+  String get autoTranslateLyricsEnabled => '已启用 — 歌词将自动翻译';
+
+  @override
+  String get autoTranslateLyricsDisabled => '已禁用';
+
+  @override
+  String autoTranslateBannerTranslating(Object language) {
+    return '正在自动翻译为 $language…';
+  }
+
+  @override
+  String autoTranslateBannerDone(Object language) {
+    return '已翻译为 $language';
+  }
+
+  @override
+  String get backupTitle => '备份与恢复';
+
+  @override
+  String get backupSubtitle => '导出或恢复应用数据';
+
+  @override
+  String get backupInfoDescription =>
+      '备份应用数据，包括账户、设置、历史记录、播放列表和字幕库。可随时从备份文件恢复。';
+
+  @override
+  String get backupExportTitle => '导出';
+
+  @override
+  String get backupExportSubtitle => '创建完整备份';
+
+  @override
+  String get backupCreateBackup => '创建备份';
+
+  @override
+  String get backupCreateBackupDesc => '将所有数据保存为 .zip 文件';
+
+  @override
+  String get backupExportSuccess => '备份已创建';
+
+  @override
+  String backupSavedTo(Object path, Object size) {
+    return '备份已保存至：\n$path\n\n文件大小：$size';
+  }
+
+  @override
+  String backupExportFailed(Object error) {
+    return '备份失败：\n$error';
+  }
+
+  @override
+  String get backupSelectExportDir => '选择备份目标位置';
+
+  @override
+  String get backupRestoreTitle => '恢复';
+
+  @override
+  String get backupRestoreSubtitle => '从备份恢复';
+
+  @override
+  String get backupRestoreFromBackup => '从备份恢复';
+
+  @override
+  String get backupRestoreFromBackupDesc => '选择要恢复的 .zip 备份文件';
+
+  @override
+  String get backupSelectImportFile => '选择备份文件';
+
+  @override
+  String get backupRestoreConfirmTitle => '恢复数据？';
+
+  @override
+  String get backupRestoreConfirmMessage =>
+      '这将用备份数据替换所有当前应用数据。恢复后需要重启应用。\n\n是否继续？';
+
+  @override
+  String get backupRestoreSuccessTitle => '恢复完成';
+
+  @override
+  String get backupRestoreSuccess => '所有数据已成功恢复。';
+
+  @override
+  String get backupRestoreWarnings => '警告：';
+
+  @override
+  String backupRestoreFailed(Object error) {
+    return '恢复失败：\n$error';
+  }
+
+  @override
+  String get backupRestartApp => '重启应用';
+
+  @override
+  String get backupRestartRequired => '需要重启';
+
+  @override
+  String get backupRestartRequiredDesc => '请重启应用以使恢复的数据完全生效。';
+
+  @override
+  String get backupError => '备份错误';
+
+  @override
+  String get backupDataIncluded => '包含的数据';
+
+  @override
+  String get backupDatabases => '数据库';
+
+  @override
+  String get backupHiveBoxes => '应用状态';
+
+  @override
+  String get backupPreferences => '偏好设置';
+
+  @override
+  String get backupAllSettings => '所有设置、智能播放列表和偏好';
+
+  @override
+  String get smartPlaylist => '智能播放列表';
+
+  @override
+  String get smartPlaylists => '智能播放列表';
+
+  @override
+  String get smartPlaylistSubtitle => '基于规则自动生成';
+
+  @override
+  String get searchRules => '搜索规则';
+
+  @override
+  String activeRules(Object count) {
+    return '激活规则 ($count)';
+  }
+
+  @override
+  String get regularPlaylist => '普通播放列表';
+
+  @override
+  String get audioBookmarksTitle => '书签';
+
+  @override
+  String get audioBookmarksEmpty => '暂无书签';
+
+  @override
+  String get audioBookmarksEmptyTrack => '此音轨暂无书签。\n点击书签图标添加一个。';
+
+  @override
+  String get audioBookmarksHint => '在聆听时标记您喜爱的时刻';
+
+  @override
+  String audioBookmarkAdded(Object position) {
+    return '书签已添加于 $position';
+  }
+
+  @override
+  String get audioBookmarksView => '查看';
+
+  @override
+  String get audioBookmarksEditNote => '编辑备注';
+
+  @override
+  String get audioBookmarksNoteHint => '为此书签添加备注...';
+
+  @override
+  String get audioBookmarksDeleteConfirm => '删除此书签？';
+
+  @override
+  String get appLockTitle => '应用锁';
+
+  @override
+  String get appLockEnabledSubtitle => '已启用 — 需要生物识别或PIN码才能打开应用';
+
+  @override
+  String get appLockDisabledSubtitle => '已禁用 — 打开应用无需验证';
+
+  @override
+  String get appLockDisableConfirmTitle => '关闭应用锁？';
+
+  @override
+  String get appLockDisableConfirmMessage => '这将关闭所有应用锁保护，包括生物识别和PIN码。';
+
+  @override
+  String get appLockDisable => '关闭';
+
+  @override
+  String get appLockDisabledToast => '应用锁已关闭';
+
+  @override
+  String get appLockEnterPin => '输入PIN码';
+
+  @override
+  String get appLockAuthenticating => '正在验证…';
+
+  @override
+  String get appLockWrongPin => 'PIN码错误，请重试。';
+
+  @override
+  String get appLockUseBiometric => '使用指纹 / 面容ID';
+
+  @override
+  String get appLockBiometricReason => '解锁 KikoFlu';
+
+  @override
+  String get appLockBiometric => '生物识别';
+
+  @override
+  String get appLockBiometricEnabledSubtitle => '已启用 — 可使用指纹或面容解锁';
+
+  @override
+  String get appLockBiometricDisabledSubtitle => '已禁用 — 仅PIN码模式';
+
+  @override
+  String get appLockBiometricNotAvailable => '此设备不支持或未录入生物识别';
+
+  @override
+  String get appLockBiometricEnableReason => '启用生物识别解锁';
+
+  @override
+  String get appLockBiometricSubtitle => '使用设备的指纹或面容快速解锁';
+
+  @override
+  String get appLockSetupTitle => '设置应用锁';
+
+  @override
+  String get appLockSetupPinSubtitle => '输入PIN码以保护您的应用';
+
+  @override
+  String get appLockSetupConfirmSubtitle => '确认PIN码';
+
+  @override
+  String get appLockChangePin => '更改PIN码';
+
+  @override
+  String get appLockChangePinSubtitle => '设置新PIN码';
+
+  @override
+  String get appLockPinMismatch => 'PIN码不匹配，请重试。';
+
+  @override
+  String get appLockPinChanged => 'PIN码更改成功';
+
+  @override
+  String get appLockDigits => '位数字';
+
+  @override
+  String get appLockAutoLock => '自动锁定';
+
+  @override
+  String get appLockAutoLockNever => '永不';
+
+  @override
+  String get appLockAutoLockImmediately => '立即';
+
+  @override
+  String get appLockAutoLock1Min => '1分钟';
+
+  @override
+  String get appLockAutoLock5Min => '5分钟';
+
+  @override
+  String get appLockAutoLock15Min => '15分钟';
+
+  @override
+  String get appLockAutoLock30Min => '30分钟';
+
+  @override
+  String get appLockAutoLockMinutes => '分钟';
+
+  @override
+  String get importWork => '导入';
+
+  @override
+  String get selectImportFolder => '选择要导入的文件夹';
+
+  @override
+  String get importDialogTitle => '导入本地作品';
+
+  @override
+  String importDialogMessage(Object path) {
+    return '从以下位置导入文件：\n$path';
+  }
+
+  @override
+  String get workNameTitle => '作品名称';
+
+  @override
+  String get enterWorkName => '输入作品名称...';
+
+  @override
+  String get importAction => '导入';
+
+  @override
+  String get importingWork => '正在导入作品...';
+
+  @override
+  String get importComplete => '导入完成';
+
+  @override
+  String importFailed(Object error) {
+    return '导入失败：$error';
+  }
+
+  @override
+  String get importedWorkDeleteNotSupported => '无法删除导入作品的文件，请直接在源文件夹中删除。';
+
+  @override
+  String get importSingleFolder => '单个文件夹';
+
+  @override
+  String get importSingleFolderDesc => '选择一个文件夹并设置自定义标题';
+
+  @override
+  String get importMultipleFolders => '多个文件夹';
+
+  @override
+  String get importMultipleFoldersDesc => '每个子文件夹成为一个作品（文件夹名称=标题）';
+
+  @override
+  String get selectImportFolderSingle => '选择要导入的文件夹';
+
+  @override
+  String get selectImportFolderMultiple => '选择包含子作品的文件夹';
+
+  @override
+  String get importingMultipleWorks => '正在导入作品...';
+
+  @override
+  String importMultipleComplete(Object count) {
+    return '成功导入 $count 个作品';
+  }
+
+  @override
+  String importPartialComplete(Object count, Object total) {
+    return '已导入 $count/$total 个作品';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -3374,7 +4139,7 @@ class SZhHant extends SZh {
   SZhHant() : super('zh_Hant');
 
   @override
-  String get appTitle => 'KikoFlu';
+  String get appTitle => 'KikoFlu Edge';
 
   @override
   String get navHome => '首頁';
@@ -3503,12 +4268,6 @@ class SZhHant extends SZh {
   String get translationSourceGoogle => 'Google 翻譯';
 
   @override
-  String get translationSourceYoudao => 'Youdao 翻譯';
-
-  @override
-  String get translationSourceMicrosoft => 'Microsoft 翻譯';
-
-  @override
   String get translationSourceLlm => 'LLM 翻譯';
 
   @override
@@ -3569,7 +4328,7 @@ class SZhHant extends SZh {
   String get passwordMinLength => '密碼不能少於5個字元';
 
   @override
-  String accountAdded(String username) {
+  String accountAdded(Object username) {
     return '帳戶 \"$username\" 已新增';
   }
 
@@ -3583,7 +4342,7 @@ class SZhHant extends SZh {
   String get enterServerAddressToTest => '請輸入伺服器位址後測試連線';
 
   @override
-  String latencyMs(String ms) {
+  String latencyMs(Object ms) {
     return '${ms}ms';
   }
 
@@ -3655,7 +4414,7 @@ class SZhHant extends SZh {
   String get minRating => '最低評分';
 
   @override
-  String minRatingStars(String stars) {
+  String minRatingStars(Object stars) {
     return '$stars 星';
   }
 
@@ -3690,7 +4449,7 @@ class SZhHant extends SZh {
   String get loadFailed => '載入失敗';
 
   @override
-  String loadFailedWithError(String error) {
+  String loadFailedWithError(Object error) {
     return '載入失敗: $error';
   }
 
@@ -3785,7 +4544,7 @@ class SZhHant extends SZh {
   String get cacheManagement => '快取管理';
 
   @override
-  String currentCache(String size) {
+  String currentCache(Object size) {
     return '目前快取: $size';
   }
 
@@ -3826,7 +4585,7 @@ class SZhHant extends SZh {
   String get newVersionFound => '發現新版本';
 
   @override
-  String newVersionAvailable(String version, String current) {
+  String newVersionAvailable(Object current, Object version) {
     return '$version 可用（目前版本: $current）';
   }
 
@@ -3834,7 +4593,7 @@ class SZhHant extends SZh {
   String get versionInfo => '版本資訊';
 
   @override
-  String currentVersion(String version) {
+  String currentVersion(Object version) {
     return '目前版本：$version';
   }
 
@@ -3854,12 +4613,12 @@ class SZhHant extends SZh {
   String get cannotOpenLink => '無法開啟連結';
 
   @override
-  String openLinkFailed(String error) {
+  String openLinkFailed(Object error) {
     return '開啟連結失敗：$error';
   }
 
   @override
-  String foundNewVersion(String version) {
+  String foundNewVersion(Object version) {
     return '發現新版本 $version';
   }
 
@@ -3945,7 +4704,7 @@ class SZhHant extends SZh {
   String get showOnlySubtitled => '僅顯示帶字幕作品';
 
   @override
-  String selectedCount(int count) {
+  String selectedCount(Object count) {
     return '已選擇 $count 項';
   }
 
@@ -3962,12 +4721,12 @@ class SZhHant extends SZh {
   String get noDownloadTasks => '暫無下載任務';
 
   @override
-  String nFiles(int count) {
+  String nFiles(Object count) {
     return '$count 個檔案';
   }
 
   @override
-  String errorWithMessage(String error) {
+  String errorWithMessage(Object error) {
     return '錯誤: $error';
   }
 
@@ -3981,12 +4740,12 @@ class SZhHant extends SZh {
   String get deletionConfirmTitle => '確認刪除';
 
   @override
-  String deletionConfirmMessage(int count) {
+  String deletionConfirmMessage(Object count) {
     return '確定要刪除 $count 個已選的下載任務嗎？已下載的檔案也將被移除。';
   }
 
   @override
-  String deletedNFiles(int count) {
+  String deletedNFiles(Object count) {
     return '已刪除 $count 個檔案';
   }
 
@@ -4006,12 +4765,12 @@ class SZhHant extends SZh {
   String get downloadStatusPaused => '已暫停';
 
   @override
-  String translationFailed(String error) {
+  String translationFailed(Object error) {
     return '翻譯失敗: $error';
   }
 
   @override
-  String copiedToClipboard(String label, String text) {
+  String copiedToClipboard(Object label, Object text) {
     return '已複製$label：$text';
   }
 
@@ -4019,7 +4778,7 @@ class SZhHant extends SZh {
   String get loadingFileList => '正在載入檔案清單...';
 
   @override
-  String loadFileListFailed(String error) {
+  String loadFileListFailed(Object error) {
     return '載入檔案清單失敗: $error';
   }
 
@@ -4075,7 +4834,7 @@ class SZhHant extends SZh {
   String get finishCurrentTrack => '完整播完後停止';
 
   @override
-  String addMinutes(int min) {
+  String addMinutes(Object min) {
     return '+$min分鐘';
   }
 
@@ -4134,12 +4893,12 @@ class SZhHant extends SZh {
   String get switchAccountTitle => '切換帳戶';
 
   @override
-  String switchAccountConfirm(String username) {
+  String switchAccountConfirm(Object username) {
     return '確定要切換到帳戶 \"$username\" 嗎？';
   }
 
   @override
-  String switchedToAccount(String username) {
+  String switchedToAccount(Object username) {
     return '已切換到帳戶: $username';
   }
 
@@ -4147,7 +4906,7 @@ class SZhHant extends SZh {
   String get switchFailed => '切換失敗，請檢查帳戶資訊';
 
   @override
-  String switchFailedWithError(String error) {
+  String switchFailedWithError(Object error) {
     return '切換失敗: $error';
   }
 
@@ -4167,7 +4926,7 @@ class SZhHant extends SZh {
   String get deleteAccount => '刪除帳戶';
 
   @override
-  String deleteAccountConfirm(String username) {
+  String deleteAccountConfirm(Object username) {
     return '確定要刪除帳戶 \"$username\" 嗎？此操作無法復原。';
   }
 
@@ -4175,7 +4934,7 @@ class SZhHant extends SZh {
   String get accountDeleted => '帳戶已刪除';
 
   @override
-  String deletionFailedWithError(String error) {
+  String deletionFailedWithError(Object error) {
     return '刪除失敗: $error';
   }
 
@@ -4285,7 +5044,7 @@ class SZhHant extends SZh {
   String get voteCancelled => '已取消投票';
 
   @override
-  String voteFailed(String error) {
+  String voteFailed(Object error) {
     return '投票失敗: $error';
   }
 
@@ -4299,7 +5058,7 @@ class SZhHant extends SZh {
   String get addTag => '新增標籤';
 
   @override
-  String loadTagsFailed(String error) {
+  String loadTagsFailed(Object error) {
     return '載入標籤失敗: $error';
   }
 
@@ -4313,7 +5072,7 @@ class SZhHant extends SZh {
   String get bindEmailFirst => '請先前往 www.asmr.one 綁定電子郵件';
 
   @override
-  String selectedNTags(int count) {
+  String selectedNTags(Object count) {
     return '已選擇 $count 個標籤:';
   }
 
@@ -4342,12 +5101,12 @@ class SZhHant extends SZh {
   String get systemPlaylistLiked => '我喜歡的';
 
   @override
-  String totalNWorks(int count) {
+  String totalNWorks(Object count) {
     return '$count 個作品';
   }
 
   @override
-  String pageNOfTotal(int current, int total) {
+  String pageNOfTotal(Object current, Object total) {
     return '第 $current / $total 頁';
   }
 
@@ -4361,7 +5120,7 @@ class SZhHant extends SZh {
   String get translating => '翻譯中...';
 
   @override
-  String translationFallbackNotice(String source) {
+  String translationFallbackNotice(Object source) {
     return '翻譯失敗，已自動切換至$source';
   }
 
@@ -4441,6 +5200,9 @@ class SZhHant extends SZh {
   String get themeModeSystem => '跟隨系統';
 
   @override
+  String get themeModeTrueBlack => '純黑模式';
+
+  @override
   String get colorSchemeOceanBlue => '胖次藍';
 
   @override
@@ -4454,6 +5216,15 @@ class SZhHant extends SZh {
 
   @override
   String get colorSchemeSakuraPink => '嗶哩粉';
+
+  @override
+  String get colorSchemeCrimsonRed => '緋紅';
+
+  @override
+  String get colorSchemeAmberGold => '琥珀金';
+
+  @override
+  String get colorSchemeSlateGray => '岩灰';
 
   @override
   String get colorSchemeDynamic => '動態取色';
@@ -4510,7 +5281,7 @@ class SZhHant extends SZh {
   String get noSubtitleFiles => '未找到字幕檔案';
 
   @override
-  String subtitleFilesFound(int count) {
+  String subtitleFilesFound(Object count) {
     return '找到 $count 個字幕檔案';
   }
 
@@ -4641,6 +5412,11 @@ class SZhHant extends SZh {
   String get relatedRecommendations => '相關推薦';
 
   @override
+  String moreFromCircle(Object circle) {
+    return '來自 $circle 的更多作品';
+  }
+
+  @override
   String get myTabsDisplaySettings => '「我的」介面設定';
 
   @override
@@ -4707,12 +5483,12 @@ class SZhHant extends SZh {
   String get ratingDistribution => '評分分佈';
 
   @override
-  String reviewsCount(int count) {
+  String reviewsCount(Object count) {
     return '$count 條評論';
   }
 
   @override
-  String ratingsCount(int count) {
+  String ratingsCount(Object count) {
     return '共 $count 個評分';
   }
 
@@ -4750,7 +5526,7 @@ class SZhHant extends SZh {
   String get reviewSubmitted => '評價已提交';
 
   @override
-  String reviewFailed(String error) {
+  String reviewFailed(Object error) {
     return '評價失敗: $error';
   }
 
@@ -4797,7 +5573,7 @@ class SZhHant extends SZh {
   String get fetchFailed => '取得失敗';
 
   @override
-  String operationFailedWithError(String error) {
+  String operationFailedWithError(Object error) {
     return '操作失敗: $error';
   }
 
@@ -4808,7 +5584,7 @@ class SZhHant extends SZh {
   String get currentCacheSize => '目前快取大小';
 
   @override
-  String cacheLimitLabelMB(int size) {
+  String cacheLimitLabelMB(Object size) {
     return '上限: ${size}MB';
   }
 
@@ -4833,7 +5609,7 @@ class SZhHant extends SZh {
   String get confirmClearCacheMessage => '確定要清除所有快取嗎？此操作無法撤銷。';
 
   @override
-  String clearCacheFailedWithError(String error) {
+  String clearCacheFailedWithError(Object error) {
     return '清除快取失敗: $error';
   }
 
@@ -4874,6 +5650,15 @@ class SZhHant extends SZh {
   String get colorSchemeForestGreenDesc => '草草草';
 
   @override
+  String get colorSchemeCrimsonRedDesc => '紅紅火火！🔴';
+
+  @override
+  String get colorSchemeAmberGoldDesc => '金燦燦，暖洋洋';
+
+  @override
+  String get colorSchemeSlateGrayDesc => '中性優雅，冷靜專業';
+
+  @override
   String get colorSchemeDynamicDesc => '使用系統桌布的顏色 (Android 12+)';
 
   @override
@@ -4907,17 +5692,17 @@ class SZhHant extends SZh {
   String get pageSizeSettings => '每頁顯示數量';
 
   @override
-  String pageSizeCurrent(int size) {
+  String pageSizeCurrent(Object size) {
     return '目前設定: $size 條/頁';
   }
 
   @override
-  String currentSettingLabel(String value) {
+  String currentSettingLabel(Object value) {
     return '目前: $value';
   }
 
   @override
-  String setToValue(String value) {
+  String setToValue(Object value) {
     return '已設定為: $value';
   }
 
@@ -4929,12 +5714,6 @@ class SZhHant extends SZh {
 
   @override
   String get translationDescGoogle => '需要網路環境支援';
-
-  @override
-  String get translationDescYoudao => '支援預設網路環境';
-
-  @override
-  String get translationDescMicrosoft => '支援預設網路環境';
 
   @override
   String get translationDescLlm => 'OpenAI 相容介面，需要手動設定API Key';
@@ -4975,7 +5754,7 @@ class SZhHant extends SZh {
   String get notificationPermissionDenied => '通知權限被拒絕';
 
   @override
-  String requestNotificationFailed(String error) {
+  String requestNotificationFailed(Object error) {
     return '請求通知權限失敗: $error';
   }
 
@@ -4986,17 +5765,17 @@ class SZhHant extends SZh {
   String get backgroundPermissionDenied => '背景執行權限被拒絕';
 
   @override
-  String requestBackgroundFailed(String error) {
+  String requestBackgroundFailed(Object error) {
     return '請求背景執行權限失敗: $error';
   }
 
   @override
-  String permissionRequired(String permission) {
+  String permissionRequired(Object permission) {
     return '需要$permission';
   }
 
   @override
-  String permissionPermanentlyDenied(String permission) {
+  String permissionPermanentlyDenied(Object permission) {
     return '$permission已被永久拒絕，請在系統設定中手動開啟。';
   }
 
@@ -5013,12 +5792,12 @@ class SZhHant extends SZh {
   String get refreshPermissionStatus => '重新整理權限狀態';
 
   @override
-  String deleteFileConfirm(String fileName) {
+  String deleteFileConfirm(Object fileName) {
     return '確定要刪除 \"$fileName\" 嗎？';
   }
 
   @override
-  String deleteSelectedFilesConfirm(int count) {
+  String deleteSelectedFilesConfirm(Object count) {
     return '確定要刪除選中的 $count 個檔案嗎？';
   }
 
@@ -5026,12 +5805,12 @@ class SZhHant extends SZh {
   String get deleted => '已刪除';
 
   @override
-  String cannotOpenFolder(String path) {
+  String cannotOpenFolder(Object path) {
     return '無法開啟資料夾: $path';
   }
 
   @override
-  String openFolderFailed(String error) {
+  String openFolderFailed(Object error) {
     return '開啟資料夾失敗: $error';
   }
 
@@ -5042,27 +5821,27 @@ class SZhHant extends SZh {
   String get refreshComplete => '重新整理完成';
 
   @override
-  String refreshFailed(String error) {
+  String refreshFailed(Object error) {
     return '重新整理失敗: $error';
   }
 
   @override
-  String deleteSelectedWorksConfirm(int count) {
+  String deleteSelectedWorksConfirm(Object count) {
     return '確定要刪除選中的 $count 個作品嗎？';
   }
 
   @override
-  String partialDeleteFailed(String error) {
+  String partialDeleteFailed(Object error) {
     return '部分刪除失敗: $error';
   }
 
   @override
-  String deletedNOfTotal(int success, int total) {
+  String deletedNOfTotal(Object success, Object total) {
     return '已刪除 $success/$total 個任務';
   }
 
   @override
-  String deleteFailedWithError(String error) {
+  String deleteFailedWithError(Object error) {
     return '刪除失敗: $error';
   }
 
@@ -5070,7 +5849,7 @@ class SZhHant extends SZh {
   String get noWorkMetadataForOffline => '該下載任務沒有儲存作品詳情，無法離線查看';
 
   @override
-  String openWorkDetailFailed(String error) {
+  String openWorkDetailFailed(Object error) {
     return '開啟作品詳情失敗: $error';
   }
 
@@ -5115,7 +5894,7 @@ class SZhHant extends SZh {
   String get networkConnectionFailed => '網路連線失敗，請檢查網路';
 
   @override
-  String addFailedWithError(String error) {
+  String addFailedWithError(Object error) {
     return '新增失敗: $error';
   }
 
@@ -5123,12 +5902,12 @@ class SZhHant extends SZh {
   String get creatingPlaylist => '正在建立播放清單...';
 
   @override
-  String playlistCreatedSuccess(String name) {
+  String playlistCreatedSuccess(Object name) {
     return '播放清單 \"$name\" 建立成功';
   }
 
   @override
-  String createFailedWithError(String error) {
+  String createFailedWithError(Object error) {
     return '建立失敗: $error';
   }
 
@@ -5142,7 +5921,7 @@ class SZhHant extends SZh {
   String get myPlaylists => '我的播放清單';
 
   @override
-  String totalNItems(int count) {
+  String totalNItems(Object count) {
     return '共 $count 條';
   }
 
@@ -5159,7 +5938,7 @@ class SZhHant extends SZh {
   String get deletePlaylistConfirm => '刪除後不可恢復，收藏本清單的人將無法再存取。確定要刪除嗎？';
 
   @override
-  String unfavoritePlaylistConfirm(String name) {
+  String unfavoritePlaylistConfirm(Object name) {
     return '確定要取消收藏「$name」嗎？';
   }
 
@@ -5203,12 +5982,12 @@ class SZhHant extends SZh {
   String get workIdHint => '例如：RJ123456\nrj233333';
 
   @override
-  String detectedNWorkIds(int count) {
+  String detectedNWorkIds(Object count) {
     return '辨識到 $count 個作品號';
   }
 
   @override
-  String addNWorks(int count) {
+  String addNWorks(Object count) {
     return '新增 $count 個';
   }
 
@@ -5216,12 +5995,12 @@ class SZhHant extends SZh {
   String get noValidWorkIds => '未找到有效的作品號（RJ開頭）';
 
   @override
-  String addingNWorks(int count) {
+  String addingNWorks(Object count) {
     return '正在新增 $count 個作品...';
   }
 
   @override
-  String addedNWorksSuccess(int count) {
+  String addedNWorksSuccess(Object count) {
     return '成功新增 $count 個作品';
   }
 
@@ -5229,7 +6008,7 @@ class SZhHant extends SZh {
   String get removeWork => '移除作品';
 
   @override
-  String removeWorkConfirm(String title) {
+  String removeWorkConfirm(Object title) {
     return '確定要從播放清單中移除「$title」嗎？';
   }
 
@@ -5237,7 +6016,7 @@ class SZhHant extends SZh {
   String get removeSuccess => '移除成功';
 
   @override
-  String removeFailedWithError(String error) {
+  String removeFailedWithError(Object error) {
     return '移除失敗: $error';
   }
 
@@ -5248,7 +6027,7 @@ class SZhHant extends SZh {
   String get saveSuccess => '儲存成功';
 
   @override
-  String saveFailedWithError(String error) {
+  String saveFailedWithError(Object error) {
     return '儲存失敗: $error';
   }
 
@@ -5265,12 +6044,12 @@ class SZhHant extends SZh {
   String get createdTime => '建立時間';
 
   @override
-  String nWorksCount(int count) {
+  String nWorksCount(Object count) {
     return '$count 個作品';
   }
 
   @override
-  String nPlaysCount(int count) {
+  String nPlaysCount(Object count) {
     return '$count 播放';
   }
 
@@ -5284,12 +6063,12 @@ class SZhHant extends SZh {
   String get reachedEnd => '已經到底了~';
 
   @override
-  String excludedNWorks(int count) {
+  String excludedNWorks(Object count) {
     return '已排除 $count 個作品';
   }
 
   @override
-  String pageExcludedNWorks(int count) {
+  String pageExcludedNWorks(Object count) {
     return '本頁已排除 $count 個作品';
   }
 
@@ -5336,6 +6115,18 @@ class SZhHant extends SZh {
   String get playlistEmpty => '播放列表為空';
 
   @override
+  String get clearQueue => '清空佇列';
+
+  @override
+  String get clearQueueConfirm => '確定要清空播放佇列嗎？';
+
+  @override
+  String get saveAsPlaylist => '儲存為播放清單';
+
+  @override
+  String get newPlaylistNameHint => '輸入播放清單名稱';
+
+  @override
   String get appendModeEnabled => '追加模式已開啟';
 
   @override
@@ -5345,12 +6136,12 @@ class SZhHant extends SZh {
   String get gotIt => '知道了';
 
   @override
-  String nMinutes(int count) {
+  String nMinutes(Object count) {
     return '$count分鐘';
   }
 
   @override
-  String nHours(int count) {
+  String nHours(Object count) {
     return '$count小時';
   }
 
@@ -5364,12 +6155,12 @@ class SZhHant extends SZh {
   String get tapToViewRatingDetail => '點擊查看評分詳情';
 
   @override
-  String priceInYen(int price) {
+  String priceInYen(Object price) {
     return '$price 日元';
   }
 
   @override
-  String soldCount(String count) {
+  String soldCount(Object count) {
     return '售出：$count';
   }
 
@@ -5383,7 +6174,7 @@ class SZhHant extends SZh {
   String get otherEditions => '其他版本';
 
   @override
-  String tenThousandSuffix(String count) {
+  String tenThousandSuffix(Object count) {
     return '$count萬';
   }
 
@@ -5397,12 +6188,12 @@ class SZhHant extends SZh {
   String get packingFailed => '打包失敗';
 
   @override
-  String exportSuccess(String path) {
+  String exportSuccess(Object path) {
     return '匯出成功：$path';
   }
 
   @override
-  String exportFailed(String error) {
+  String exportFailed(Object error) {
     return '匯出失敗: $error';
   }
 
@@ -5413,7 +6204,7 @@ class SZhHant extends SZh {
   String get offlineBadge => '離線';
 
   @override
-  String loadFilesFailed(String error) {
+  String loadFilesFailed(Object error) {
     return '載入檔案失敗: $error';
   }
 
@@ -5424,12 +6215,12 @@ class SZhHant extends SZh {
   String get noPlayableAudioFiles => '沒有找到可播放的音訊檔案';
 
   @override
-  String cannotFindAudioFile(String title) {
+  String cannotFindAudioFile(Object title) {
     return '無法找到音訊檔案: $title';
   }
 
   @override
-  String nowPlayingNOfTotal(String title, int current, int total) {
+  String nowPlayingNOfTotal(Object current, Object title, Object total) {
     return '正在播放: $title ($current/$total)';
   }
 
@@ -5458,12 +6249,12 @@ class SZhHant extends SZh {
   String get loadingSubtitle => '正在載入字幕...';
 
   @override
-  String subtitleLoadSuccess(String title) {
+  String subtitleLoadSuccess(Object title) {
     return '字幕載入成功：$title';
   }
 
   @override
-  String subtitleLoadFailed(String error) {
+  String subtitleLoadFailed(Object error) {
     return '字幕載入失敗：$error';
   }
 
@@ -5501,7 +6292,7 @@ class SZhHant extends SZh {
   String get openInBrowserOption => '2. 在瀏覽器中開啟';
 
   @override
-  String playVideoError(String error) {
+  String playVideoError(Object error) {
     return '播放影片時出錯: $error';
   }
 
@@ -5512,7 +6303,7 @@ class SZhHant extends SZh {
   String get resourceFiles => '資源檔案';
 
   @override
-  String resourceFilesTranslated(int count) {
+  String resourceFilesTranslated(Object count) {
     return '資源檔案 (已翻譯 $count 項)';
   }
 
@@ -5523,12 +6314,12 @@ class SZhHant extends SZh {
   String get translationTranslated => '譯';
 
   @override
-  String copiedName(String title) {
+  String copiedName(Object title) {
     return '已複製名稱: $title';
   }
 
   @override
-  String translationComplete(int count) {
+  String translationComplete(Object count) {
     return '翻譯完成：$count 個項目';
   }
 
@@ -5539,12 +6330,12 @@ class SZhHant extends SZh {
   String get preparingTranslation => '準備翻譯...';
 
   @override
-  String translatingProgress(int current, int total) {
+  String translatingProgress(Object current, Object total) {
     return '翻譯中 $current/$total';
   }
 
   @override
-  String nItems(int count) {
+  String nItems(Object count) {
     return '$count 項';
   }
 
@@ -5555,12 +6346,12 @@ class SZhHant extends SZh {
   String get preview => '預覽';
 
   @override
-  String openVideoFileError(String error) {
+  String openVideoFileError(Object error) {
     return '開啟影片檔案時出錯: $error';
   }
 
   @override
-  String cannotOpenVideoFile(String message) {
+  String cannotOpenVideoFile(Object message) {
     return '無法開啟影片檔案: $message';
   }
 
@@ -5586,7 +6377,7 @@ class SZhHant extends SZh {
   String get cannotFindFilePath => '無法找到檔案路徑';
 
   @override
-  String fileNotExist(String title) {
+  String fileNotExist(Object title) {
     return '檔案不存在：$title';
   }
 
@@ -5600,7 +6391,7 @@ class SZhHant extends SZh {
   String get cannotOpenVideo => '無法開啟影片';
 
   @override
-  String errorInfo(String message) {
+  String errorInfo(Object message) {
     return '錯誤資訊: $message';
   }
 
@@ -5617,7 +6408,7 @@ class SZhHant extends SZh {
   String get offlineFiles => '離線檔案';
 
   @override
-  String unsupportedFileType(String title) {
+  String unsupportedFileType(Object title) {
     return '暫不支援開啟此類型檔案: $title';
   }
 
@@ -5625,7 +6416,7 @@ class SZhHant extends SZh {
   String get deleteFilePrompt => '確定要刪除這個檔案嗎？';
 
   @override
-  String deletedItem(String title) {
+  String deletedItem(Object title) {
     return '已刪除: $title';
   }
 
@@ -5633,17 +6424,17 @@ class SZhHant extends SZh {
   String get selectAtLeastOneFile => '請至少選擇一個檔案';
 
   @override
-  String addedNFilesToDownloadQueue(int count) {
+  String addedNFilesToDownloadQueue(Object count) {
     return '已新增 $count 個檔案到下載佇列';
   }
 
   @override
-  String downloadedAndSelected(int downloaded, int selected) {
+  String downloadedAndSelected(Object downloaded, Object selected) {
     return '已下載 $downloaded · 已選擇 $selected';
   }
 
   @override
-  String downloadN(int count) {
+  String downloadN(Object count) {
     return '下載 ($count)';
   }
 
@@ -5657,12 +6448,12 @@ class SZhHant extends SZh {
   String get selectFilesToDownload => '選擇下載檔案';
 
   @override
-  String downloadedNCount(int count) {
+  String downloadedNCount(Object count) {
     return '已下載 $count 個';
   }
 
   @override
-  String selectedNCount(int count) {
+  String selectedNCount(Object count) {
     return '已選擇 $count 個';
   }
 
@@ -5679,12 +6470,12 @@ class SZhHant extends SZh {
   String get notTestedYet => '尚未測試';
 
   @override
-  String latencyResultDetail(String latency, String status) {
+  String latencyResultDetail(Object latency, Object status) {
     return '延遲 $latency ($status)';
   }
 
   @override
-  String connectionFailedWithDetail(String error) {
+  String connectionFailedWithDetail(Object error) {
     return '連線失敗: $error';
   }
 
@@ -5710,22 +6501,22 @@ class SZhHant extends SZh {
   String get unknownHost => '未知主機';
 
   @override
-  String lastUsedTime(String time) {
+  String lastUsedTime(Object time) {
     return '最後使用: $time';
   }
 
   @override
-  String daysAgo(int count) {
+  String daysAgo(Object count) {
     return '$count天前';
   }
 
   @override
-  String hoursAgo(int count) {
+  String hoursAgo(Object count) {
     return '$count小時前';
   }
 
   @override
-  String minutesAgo(int count) {
+  String minutesAgo(Object count) {
     return '$count分鐘前';
   }
 
@@ -5736,12 +6527,12 @@ class SZhHant extends SZh {
   String get confirmDelete => '確認刪除';
 
   @override
-  String deleteSelectedConfirm(int count) {
+  String deleteSelectedConfirm(Object count) {
     return '確定要刪除選中的 $count 項嗎？';
   }
 
   @override
-  String deletedNOfTotalItems(int success, int total) {
+  String deletedNOfTotalItems(Object success, Object total) {
     return '已刪除 $success/$total 項';
   }
 
@@ -5809,7 +6600,7 @@ class SZhHant extends SZh {
   String get renameFailed => '重新命名失敗';
 
   @override
-  String deleteItemConfirm(String title) {
+  String deleteItemConfirm(Object title) {
     return '確定要刪除 \"$title\" 嗎？';
   }
 
@@ -5820,7 +6611,7 @@ class SZhHant extends SZh {
   String get deleteFailed => '刪除失敗';
 
   @override
-  String subtitleLoaded(String title) {
+  String subtitleLoaded(Object title) {
     return '字幕已載入：$title';
   }
 
@@ -5831,12 +6622,12 @@ class SZhHant extends SZh {
   String get moveFailed => '移動失敗';
 
   @override
-  String previewFailed(String error) {
+  String previewFailed(Object error) {
     return '預覽失敗: $error';
   }
 
   @override
-  String openFailed(String error) {
+  String openFailed(Object error) {
     return '開啟失敗: $error';
   }
 
@@ -5889,37 +6680,37 @@ class SZhHant extends SZh {
   String get reset => '重設';
 
   @override
-  String noBlockedItemsOfType(String type) {
+  String noBlockedItemsOfType(Object type) {
     return '沒有封鎖的$type';
   }
 
   @override
-  String unblockedItem(String item) {
+  String unblockedItem(Object item) {
     return '已移除封鎖: $item';
   }
 
   @override
-  String addBlockedItem(String type) {
+  String addBlockedItem(Object type) {
     return '新增封鎖$type';
   }
 
   @override
-  String blockedItemName(String type) {
+  String blockedItemName(Object type) {
     return '$type名稱';
   }
 
   @override
-  String enterBlockedItemHint(String type) {
+  String enterBlockedItemHint(Object type) {
     return '請輸入要封鎖的$type';
   }
 
   @override
-  String blockedItemAdded(String item) {
+  String blockedItemAdded(Object item) {
     return '已新增封鎖: $item';
   }
 
   @override
-  String workCountLabel(int count) {
+  String workCountLabel(Object count) {
     return '作品數: $count';
   }
 
@@ -5981,7 +6772,7 @@ class SZhHant extends SZh {
   String get unknownFile => '未知檔案';
 
   @override
-  String deleteWithCount(int count) {
+  String deleteWithCount(Object count) {
     return '刪除 ($count)';
   }
 
@@ -5989,7 +6780,7 @@ class SZhHant extends SZh {
   String get searchSubtitles => '搜尋字幕...';
 
   @override
-  String nFilesWithSize(int count, String size) {
+  String nFilesWithSize(Object count, Object size) {
     return '$count 個檔案 • $size';
   }
 
@@ -6000,7 +6791,7 @@ class SZhHant extends SZh {
   String get goToParent => '返回上級';
 
   @override
-  String moveToTarget(String name) {
+  String moveToTarget(Object name) {
     return '移動到: $name';
   }
 
@@ -6008,12 +6799,12 @@ class SZhHant extends SZh {
   String get noSubfoldersHere => '此目錄下沒有子資料夾';
 
   @override
-  String addedToPlaylist(String name) {
+  String addedToPlaylist(Object name) {
     return '已新增到播放清單「$name」';
   }
 
   @override
-  String removedFromPlaylist(String name) {
+  String removedFromPlaylist(Object name) {
     return '已從播放清單「$name」中移除';
   }
 
@@ -6021,7 +6812,7 @@ class SZhHant extends SZh {
   String get alreadyFavorited => '已收藏';
 
   @override
-  String loadImageFailedWithError(String error) {
+  String loadImageFailedWithError(Object error) {
     return '載入圖片失敗\n$error';
   }
 
@@ -6038,7 +6829,7 @@ class SZhHant extends SZh {
   String get saveCoverImage => '儲存封面圖片';
 
   @override
-  String savedToPath(String path) {
+  String savedToPath(Object path) {
     return '已儲存到: $path';
   }
 
@@ -6046,7 +6837,7 @@ class SZhHant extends SZh {
   String get doubleTapToZoom => '雙擊放大 · 雙指縮放';
 
   @override
-  String getStatusFailed(String error) {
+  String getStatusFailed(Object error) {
     return '取得狀態失敗: $error';
   }
 
@@ -6054,7 +6845,7 @@ class SZhHant extends SZh {
   String get deleteRecord => '刪除記錄';
 
   @override
-  String deletePlayRecordConfirm(String title) {
+  String deletePlayRecordConfirm(Object title) {
     return '確定要刪除 \"$title\" 的播放記錄嗎？';
   }
 
@@ -6062,7 +6853,7 @@ class SZhHant extends SZh {
   String get notPlayedYet => '尚未播放';
 
   @override
-  String playbackFailed(String error) {
+  String playbackFailed(Object error) {
     return '播放失敗: $error';
   }
 
@@ -6079,7 +6870,7 @@ class SZhHant extends SZh {
   String get imageSavedToGallery => '圖片已儲存到相簿';
 
   @override
-  String imageSavedToPath(String path) {
+  String imageSavedToPath(Object path) {
     return '圖片已儲存到: $path';
   }
 
@@ -6096,7 +6887,7 @@ class SZhHant extends SZh {
   String get goToPageTitle => '跳轉到指定頁';
 
   @override
-  String pageNumberRange(int max) {
+  String pageNumberRange(Object max) {
     return '頁碼 (1-$max)';
   }
 
@@ -6104,7 +6895,7 @@ class SZhHant extends SZh {
   String get enterPageNumber => '請輸入頁碼';
 
   @override
-  String enterValidPageNumber(int max) {
+  String enterValidPageNumber(Object max) {
     return '請輸入有效頁碼 (1-$max)';
   }
 
@@ -6121,12 +6912,12 @@ class SZhHant extends SZh {
   String get cannotOpenPdf => '無法開啟PDF檔案';
 
   @override
-  String loadPdfFailed(String error) {
+  String loadPdfFailed(Object error) {
     return '載入PDF失敗: $error';
   }
 
   @override
-  String pdfPageOfTotal(int current, int total) {
+  String pdfPageOfTotal(Object current, Object total) {
     return '第 $current 頁 / 共 $total 頁';
   }
 
@@ -6143,7 +6934,7 @@ class SZhHant extends SZh {
   String get openWithSystemApp => '使用系統預設應用開啟';
 
   @override
-  String renderPdfFailed(String error) {
+  String renderPdfFailed(Object error) {
     return '渲染PDF失敗: $error';
   }
 
@@ -6178,7 +6969,7 @@ class SZhHant extends SZh {
   String get noContentToSave => '沒有可儲存的內容';
 
   @override
-  String fileSavedToPath(String path) {
+  String fileSavedToPath(Object path) {
     return '檔案已儲存到：$path';
   }
 
@@ -6186,7 +6977,7 @@ class SZhHant extends SZh {
   String get localFileNotExist => '本地檔案不存在，請嘗試重新載入';
 
   @override
-  String loadTextFailed(String error) {
+  String loadTextFailed(Object error) {
     return '載入文字失敗: $error';
   }
 
@@ -6212,17 +7003,17 @@ class SZhHant extends SZh {
   String get bookmarkRemoved => '已移除標記';
 
   @override
-  String setProgressAndRating(String progress, int rating) {
+  String setProgressAndRating(Object progress, Object rating) {
     return '已設定為：$progress，評分：$rating 星';
   }
 
   @override
-  String setProgressTo(String progress) {
+  String setProgressTo(Object progress) {
     return '已設定為：$progress';
   }
 
   @override
-  String ratingSetTo(int rating) {
+  String ratingSetTo(Object rating) {
     return '評分已設定為：$rating 星';
   }
 
@@ -6230,12 +7021,12 @@ class SZhHant extends SZh {
   String get updated => '已更新';
 
   @override
-  String addTagFailed(String error) {
+  String addTagFailed(Object error) {
     return '新增標籤失敗: $error';
   }
 
   @override
-  String addWithCount(int count) {
+  String addWithCount(Object count) {
     return '新增 ($count)';
   }
 
@@ -6243,7 +7034,7 @@ class SZhHant extends SZh {
   String get undo => '撤銷';
 
   @override
-  String nStars(int count) {
+  String nStars(Object count) {
     return '$count 星';
   }
 
@@ -6257,7 +7048,7 @@ class SZhHant extends SZh {
   String get votedDown => '已投反對票';
 
   @override
-  String voteFailedWithError(String error) {
+  String voteFailedWithError(Object error) {
     return '投票失敗: $error';
   }
 
@@ -6271,7 +7062,7 @@ class SZhHant extends SZh {
   String get voted => '已投票';
 
   @override
-  String tagBlockedWithName(String name) {
+  String tagBlockedWithName(Object name) {
     return '已屏蔽標籤: $name';
   }
 
@@ -6336,12 +7127,12 @@ class SZhHant extends SZh {
   String get encodingUnrecognized => '檔案編碼無法識別，無法正確顯示內容';
 
   @override
-  String editPlaylistFailed(String error) {
+  String editPlaylistFailed(Object error) {
     return '編輯播放清單失敗: $error';
   }
 
   @override
-  String unsupportedFileTypeWithTitle(String title) {
+  String unsupportedFileTypeWithTitle(Object title) {
     return '暫不支援開啟此類型檔案: $title';
   }
 
@@ -6418,7 +7209,7 @@ class SZhHant extends SZh {
   String get downloadPathSettings => '下載路徑設定';
 
   @override
-  String loadPathFailedWithError(String error) {
+  String loadPathFailedWithError(Object error) {
     return '載入路徑失敗: $error';
   }
 
@@ -6426,12 +7217,12 @@ class SZhHant extends SZh {
   String get platformNotSupportCustomPath => '目前平台不支援自訂下載路徑';
 
   @override
-  String activeDownloadsWarning(int count) {
+  String activeDownloadsWarning(Object count) {
     return '有 $count 個下載任務正在進行中，請先取消或完成下載後再切換路徑';
   }
 
   @override
-  String setPathFailedWithError(String error) {
+  String setPathFailedWithError(Object error) {
     return '設定路徑失敗: $error';
   }
 
@@ -6457,7 +7248,7 @@ class SZhHant extends SZh {
   String get defaultPathRestored => '已恢復預設路徑';
 
   @override
-  String resetPathFailedWithError(String error) {
+  String resetPathFailedWithError(Object error) {
     return '恢復預設路徑失敗: $error';
   }
 
@@ -6542,7 +7333,7 @@ class SZhHant extends SZh {
   String get buttonDisplayRules => '按鈕顯示規則';
 
   @override
-  String buttonDisplayRulesDesc(int maxVisible) {
+  String buttonDisplayRulesDesc(Object maxVisible) {
     return '• 前 $maxVisible 個按鈕會顯示在播放器底部\n• 其餘按鈕會收納在「更多」選單中';
   }
 
@@ -6634,6 +7425,9 @@ class SZhHant extends SZh {
   String get showOnlineMarks => '顯示線上標記的作品';
 
   @override
+  String get showStats => '顯示收聽統計';
+
+  @override
   String get cannotBeDisabled => '不可關閉';
 
   @override
@@ -6650,6 +7444,25 @@ class SZhHant extends SZh {
 
   @override
   String get playlistPrivacyPublicDesc => '任何人都可以查看';
+
+  @override
+  String get convertWavAfterDownload => '下載後轉換為 FLAC/ALAC';
+
+  @override
+  String get convertWavAfterDownloadDesc =>
+      '下載WAV檔案後自動轉換為無損FLAC（iOS為ALAC），節省約50%儲存空間';
+
+  @override
+  String get convertWavAfterDownloadEnabled => '已啟用 - WAV 將轉換為 FLAC/ALAC';
+
+  @override
+  String get convertWavAfterDownloadDisabled => '未啟用 - 保持原始 WAV 格式';
+
+  @override
+  String get convertWavFfmpegNotFound => '系統未找到FFmpeg。請安裝FFmpeg或檢查您的PATH設定。';
+
+  @override
+  String get convertingAudio => '正在轉換音訊…';
 
   @override
   String get clearTranslationCache => '清除翻譯快取';
@@ -6691,6 +7504,9 @@ class SZhHant extends SZh {
   String get sortWorkId => 'ID';
 
   @override
+  String get sortTitle => '標題';
+
+  @override
   String get searchDownloads => '搜尋已下載作品...';
 
   @override
@@ -6718,12 +7534,12 @@ class SZhHant extends SZh {
   String get logCopied => '日誌已複製到剪貼簿';
 
   @override
-  String logExported(String path) {
+  String logExported(Object path) {
     return '日誌已匯出到 $path';
   }
 
   @override
-  String logCount(int count) {
+  String logCount(Object count) {
     return '$count 條日誌';
   }
 
@@ -6732,4 +7548,650 @@ class SZhHant extends SZh {
 
   @override
   String get logEmpty => '暫無日誌';
+
+  @override
+  String get crossfadeTitle => '交叉淡化';
+
+  @override
+  String crossfadeEnabledWithDuration(Object ms) {
+    return '交叉淡化: ${ms}ms';
+  }
+
+  @override
+  String get gaplessPlaybackEnabled => '無縫播放（無交叉淡化）';
+
+  @override
+  String get crossfadeDurationLabel => '交叉淡化時長';
+
+  @override
+  String get crossfadeMinLabel => '0.5秒';
+
+  @override
+  String get crossfadeMaxLabel => '10秒';
+
+  @override
+  String get crossfadeDescription => '在曲目之間平滑過渡。關閉時，無縫播放最小化間隙。';
+
+  @override
+  String get equalizerTitle => '均衡器';
+
+  @override
+  String get equalizerEnabled => '均衡器已啟用';
+
+  @override
+  String get equalizerDisabled => '均衡器已禁用';
+
+  @override
+  String get equalizerActive => '已啟用';
+
+  @override
+  String get equalizerPresets => '預設';
+
+  @override
+  String get equalizerCustomBands => '自訂頻段';
+
+  @override
+  String get equalizerCustom => '自訂';
+
+  @override
+  String get equalizerReset => '重設為平坦';
+
+  @override
+  String get equalizerNotSupported => '此裝置不支援均衡器';
+
+  @override
+  String get equalizerNotSupportedAndroid => '音訊會話尚未初始化，請先播放曲目。';
+
+  @override
+  String get equalizerNotSupportedOther => '此平台不支援硬體均衡器。設定將被儲存，在支援的裝置上生效。';
+
+  @override
+  String get equalizerInfo => '在Android上，EQ透過硬體音訊效果應用。在其他平台上，EQ設定將被儲存以供將來使用。';
+
+  @override
+  String get searchSettings => '搜尋設定...';
+
+  @override
+  String get searchSettingsTitle => '設定搜尋';
+
+  @override
+  String get searchSettingsComingSoon => '完整的設定搜尋將在未來的更新中提供。';
+
+  @override
+  String get preferredSampleRate => '首選取樣率';
+
+  @override
+  String get preferredSampleRateSubtitle => 'Hi-res 音訊輸出目標 (Android)';
+
+  @override
+  String get preferredSampleRateAuto => '自動（跟隨檔案）';
+
+  @override
+  String get preferredSampleRateDesc =>
+      '設定音訊輸出的首選取樣率。較高的取樣率可能會降低相容性，但在支援的DAC上可提升音質。';
+
+  @override
+  String get settingsPlayback => '播放';
+
+  @override
+  String get settingsPlaybackSubtitle => '均衡器、交叉淡化、音訊格式';
+
+  @override
+  String get settingsAppearance => '外觀';
+
+  @override
+  String get settingsAppearanceSubtitle => '主題、語言、顯示設定';
+
+  @override
+  String get settingsDownloadsStorage => '下載與儲存';
+
+  @override
+  String get settingsDownloadsStorageSubtitle => '下載路徑、快取管理';
+
+  @override
+  String get settingsPrivacyContent => '隱私與內容';
+
+  @override
+  String get settingsPrivacyContentSubtitle => '隱私模式、封鎖項目';
+
+  @override
+  String get settingsTranslation => '翻譯';
+
+  @override
+  String get settingsTranslationSubtitle => '翻譯源、LLM設定';
+
+  @override
+  String get settingsAccount => '帳戶';
+
+  @override
+  String get settingsAccountSubtitle => '伺服器帳戶、懸浮歌詞';
+
+  @override
+  String get settingsAdvanced => '進階';
+
+  @override
+  String get settingsAdvancedSubtitle => '排序順序、日誌、所有設定';
+
+  @override
+  String get settingsAboutSubtitle => '版本、更新、授權';
+
+  @override
+  String get advancedInfoBanner => '這些設定初始設定後很少變更。';
+
+  @override
+  String get advancedSectionDisplaySorting => '顯示與排序';
+
+  @override
+  String get advancedDefaultSortOrderSubtitle => '發布日期、標題、評分等';
+
+  @override
+  String get advancedMyTabsDisplaySubtitle => '顯示/隱藏「我的」頁面中的標籤';
+
+  @override
+  String get advancedSectionContentFiltering => '內容過濾';
+
+  @override
+  String get advancedSubtitlePrioritySubtitle => '高優先級與低優先級';
+
+  @override
+  String get advancedSectionDebugLegacy => '除錯與舊版';
+
+  @override
+  String get advancedAllSettingsLegacy => '所有設定（舊版）';
+
+  @override
+  String get advancedAllSettingsLegacySubtitle => '原來的完整設定頁面';
+
+  @override
+  String get hiResExclusiveMode => 'Hi-Res 獨佔模式';
+
+  @override
+  String get hiResExclusiveModeSubtitle => '對 FLAC/WAV 高解析音軌使用原生 ExoPlayer';
+
+  @override
+  String get hiResExclusiveModeDesc =>
+      '啟用後，高解析音軌（FLAC/WAV >48kHz）將透過原生 ExoPlayer 播放。切換播放器時可能會有短暫中斷。';
+
+  @override
+  String get hiResExclusiveModeEnabled => 'Hi-Res 獨佔模式已啟用';
+
+  @override
+  String get hiResExclusiveModeDisabled => 'Hi-Res 獨佔模式已停用';
+
+  @override
+  String get enable => '啟用';
+
+  @override
+  String get listeningStatsTitle => '收聽統計';
+
+  @override
+  String get listeningStatsSubtitle => '您的收聽習慣與歷史';
+
+  @override
+  String get statsWorksPlayed => '播放作品數';
+
+  @override
+  String get statsCompleted => '已完成';
+
+  @override
+  String get statsListeningTime => '收聽時長';
+
+  @override
+  String get statsStreakDays => '連續天數';
+
+  @override
+  String get statsDays => '天';
+
+  @override
+  String get statsDailyActivity => '每日活動（14天）';
+
+  @override
+  String get statsTopVAs => '熱門聲優';
+
+  @override
+  String get statsTopCircles => '熱門社團';
+
+  @override
+  String get statsRecentPlays => '最近播放';
+
+  @override
+  String get statsNoData => '暫無統計';
+
+  @override
+  String get statsNoDataDesc => '開始收聽作品後，統計數據將在此顯示。';
+
+  @override
+  String get statsTabDaily => '每日';
+
+  @override
+  String get statsTabWeekly => '每週';
+
+  @override
+  String get statsTabMonthly => '每月';
+
+  @override
+  String get statsWeeklyReport => '每週報告（4週）';
+
+  @override
+  String get statsMonthlyReport => '每月報告（6個月）';
+
+  @override
+  String get statsHeatmap => '活動熱力圖';
+
+  @override
+  String get statsHeatmapDesc => '過去12週的收聽活動';
+
+  @override
+  String get statsMilestones => '成就';
+
+  @override
+  String get statsMilestoneDesc => '在收聽旅程中獲得的成就';
+
+  @override
+  String get statsMilestoneFirstSteps => '第一步';
+
+  @override
+  String get statsMilestoneFirstStepsDesc => '播放第一個作品';
+
+  @override
+  String get statsMilestoneGettingStarted => '初出茅廬';
+
+  @override
+  String get statsMilestoneGettingStartedDesc => '播放10個不同作品';
+
+  @override
+  String get statsMilestoneListener => '忠實聽眾';
+
+  @override
+  String get statsMilestoneListenerDesc => '播放50個不同作品';
+
+  @override
+  String get statsMilestoneCentury => '百作達成';
+
+  @override
+  String get statsMilestoneCenturyDesc => '播放100個不同作品';
+
+  @override
+  String get statsMilestoneComplete => '完成！';
+
+  @override
+  String get statsMilestoneCompleteDesc => '完成第一個作品';
+
+  @override
+  String get statsMilestoneDoubleDigits => '兩位數';
+
+  @override
+  String get statsMilestoneDoubleDigitsDesc => '累計收聽10小時';
+
+  @override
+  String get statsMilestoneLongHaul => '持久戰';
+
+  @override
+  String get statsMilestoneLongHaulDesc => '累計收聽50小時';
+
+  @override
+  String get statsMilestoneHundredHours => '100小時俱樂部';
+
+  @override
+  String get statsMilestoneHundredHoursDesc => '累計收聽100小時';
+
+  @override
+  String get statsMilestoneConsistent => '堅持不懈';
+
+  @override
+  String get statsMilestoneConsistentDesc => '達成7天連續';
+
+  @override
+  String get statsMilestoneUnstoppable => '勢不可擋';
+
+  @override
+  String get statsMilestoneUnstoppableDesc => '達成30天連續';
+
+  @override
+  String get bitPerfectPlayback => '無損位元完美播放';
+
+  @override
+  String get bitPerfectPlaybackSubtitleOff => 'USB DAC 偵測已關閉';
+
+  @override
+  String get bitPerfectPlaybackSubtitleOn => '透過 libusb 直接輸出到 USB DAC';
+
+  @override
+  String get bitPerfectPlaybackSelectDevice => '選擇 USB DAC';
+
+  @override
+  String get bitPerfectPlaybackSelectHint => '選擇 USB 音訊裝置...';
+
+  @override
+  String get bitPerfectPlaybackNoDevice => '未偵測到 USB DAC';
+
+  @override
+  String get bitPerfectPlaybackRefreshTooltip => '重新整理裝置列表';
+
+  @override
+  String get bitPerfectPlaybackConfirmDesc =>
+      '啟用後，將偵測您連接的 USB DAC，音訊可直接串流到 DAC，繞過 Android 混音器，實現純淨的無損播放。';
+
+  @override
+  String get bitPerfectPlaybackEnabled => '無損位元完美播放已啟用';
+
+  @override
+  String get bitPerfectPlaybackDisabled => '無損位元完美播放已停用';
+
+  @override
+  String get bitPerfectPlaybackDeviceUpdated => 'USB DAC 裝置已更新';
+
+  @override
+  String get bitPerfectPlaybackListRefreshed => 'USB 裝置列表已重新整理';
+
+  @override
+  String get bitPerfectPlaybackInfoTooltip => '關於無損位元完美播放';
+
+  @override
+  String get bitPerfectPlaybackInfo =>
+      '無損位元完美播放將原始音訊資料未經修改地發送到您的外部 DAC，以獲得最高保真度。\n\nAndroid 的音訊混音器通常將所有音訊重新取樣至 48kHz，從而降低高解析內容的音質。此模式透過 libusb 驅動程式將音訊直接路由到您連接的 USB DAC，繞過 Android 混音器，實現純淨、未改動的播放。';
+
+  @override
+  String get bitPerfectPlaybackPermissionDenied =>
+      'USB 權限被拒絕。請在設定中授予 USB 存取權限。';
+
+  @override
+  String get playNext => '播放下一首';
+
+  @override
+  String get noAudioTracks => '未找到音訊軌道';
+
+  @override
+  String playingNextTracks(Object count) {
+    return '即將播放: $count 首';
+  }
+
+  @override
+  String get localFileBrowser => '本機檔案瀏覽器';
+
+  @override
+  String get browseFiles => '瀏覽檔案';
+
+  @override
+  String get progressSync => '跨裝置進度同步';
+
+  @override
+  String get progressSyncSubtitle => '將播放進度同步到伺服器，在不同裝置間無縫續播';
+
+  @override
+  String get progressSyncEnabled => '已啟用 — 進度已同步到伺服器';
+
+  @override
+  String get progressSyncDisabled => '已停用';
+
+  @override
+  String get autoTranslateLyrics => '自動翻譯歌詞';
+
+  @override
+  String get autoTranslateLyricsEnabled => '已啟用 — 歌詞將自動翻譯';
+
+  @override
+  String get autoTranslateLyricsDisabled => '已停用';
+
+  @override
+  String autoTranslateBannerTranslating(Object language) {
+    return '正在自動翻譯為 $language…';
+  }
+
+  @override
+  String autoTranslateBannerDone(Object language) {
+    return '已翻譯為 $language';
+  }
+
+  @override
+  String get backupTitle => '備份與還原';
+
+  @override
+  String get backupSubtitle => '匯出或還原應用程式資料';
+
+  @override
+  String get backupInfoDescription =>
+      '備份應用程式資料，包括帳戶、設定、歷史記錄、播放清單和字幕庫。可隨時從備份檔案還原。';
+
+  @override
+  String get backupExportTitle => '匯出';
+
+  @override
+  String get backupExportSubtitle => '建立完整備份';
+
+  @override
+  String get backupCreateBackup => '建立備份';
+
+  @override
+  String get backupCreateBackupDesc => '將所有資料儲存為 .zip 檔案';
+
+  @override
+  String get backupExportSuccess => '備份已建立';
+
+  @override
+  String backupSavedTo(Object path, Object size) {
+    return '備份已儲存至：\n$path\n\n檔案大小：$size';
+  }
+
+  @override
+  String backupExportFailed(Object error) {
+    return '備份失敗：\n$error';
+  }
+
+  @override
+  String get backupSelectExportDir => '選擇備份目標位置';
+
+  @override
+  String get backupRestoreTitle => '還原';
+
+  @override
+  String get backupRestoreSubtitle => '從備份還原';
+
+  @override
+  String get backupRestoreFromBackup => '從備份還原';
+
+  @override
+  String get backupRestoreFromBackupDesc => '選擇要還原的 .zip 備份檔案';
+
+  @override
+  String get backupSelectImportFile => '選擇備份檔案';
+
+  @override
+  String get backupRestoreConfirmTitle => '還原資料？';
+
+  @override
+  String get backupRestoreConfirmMessage =>
+      '這將用備份資料取代所有目前應用程式資料。還原後需要重新啟動應用程式。\n\n是否繼續？';
+
+  @override
+  String get backupRestoreSuccessTitle => '還原完成';
+
+  @override
+  String get backupRestoreSuccess => '所有資料已成功還原。';
+
+  @override
+  String get backupRestoreWarnings => '警告：';
+
+  @override
+  String backupRestoreFailed(Object error) {
+    return '還原失敗：\n$error';
+  }
+
+  @override
+  String get backupRestartApp => '重新啟動應用程式';
+
+  @override
+  String get backupRestartRequired => '需要重新啟動';
+
+  @override
+  String get backupRestartRequiredDesc => '請重新啟動應用程式以使還原的資料完全生效。';
+
+  @override
+  String get backupError => '備份錯誤';
+
+  @override
+  String get backupDataIncluded => '包含的資料';
+
+  @override
+  String get backupDatabases => '資料庫';
+
+  @override
+  String get backupHiveBoxes => '應用程式狀態';
+
+  @override
+  String get backupPreferences => '偏好設定';
+
+  @override
+  String get backupAllSettings => '所有設定、智慧播放清單和偏好';
+
+  @override
+  String get smartPlaylist => '智慧播放清單';
+
+  @override
+  String get smartPlaylists => '智慧播放清單';
+
+  @override
+  String get smartPlaylistSubtitle => '基於規則自動生成';
+
+  @override
+  String get searchRules => '搜尋規則';
+
+  @override
+  String activeRules(Object count) {
+    return '啟用規則 ($count)';
+  }
+
+  @override
+  String get regularPlaylist => '普通播放清單';
+
+  @override
+  String get audioBookmarksTitle => '書籤';
+
+  @override
+  String get audioBookmarksEmpty => '暫無書籤';
+
+  @override
+  String get audioBookmarksEmptyTrack => '此音軌暫無書籤。\n點擊書籤圖示新增一個。';
+
+  @override
+  String get audioBookmarksHint => '在聆聽時標記您喜愛的時刻';
+
+  @override
+  String audioBookmarkAdded(Object position) {
+    return '書籤已新增於 $position';
+  }
+
+  @override
+  String get audioBookmarksView => '檢視';
+
+  @override
+  String get audioBookmarksEditNote => '編輯備註';
+
+  @override
+  String get audioBookmarksNoteHint => '為此書籤新增備註...';
+
+  @override
+  String get audioBookmarksDeleteConfirm => '刪除此書籤？';
+
+  @override
+  String get appLockTitle => '應用程式鎖';
+
+  @override
+  String get appLockEnabledSubtitle => '已啟用 — 需要生物辨識或PIN碼才能開啟應用程式';
+
+  @override
+  String get appLockDisabledSubtitle => '已停用 — 開啟應用程式無需驗證';
+
+  @override
+  String get appLockDisableConfirmTitle => '關閉應用程式鎖？';
+
+  @override
+  String get appLockDisableConfirmMessage => '這將關閉所有應用程式鎖保護，包括生物辨識和PIN碼。';
+
+  @override
+  String get appLockDisable => '關閉';
+
+  @override
+  String get appLockDisabledToast => '應用程式鎖已關閉';
+
+  @override
+  String get appLockEnterPin => '輸入PIN碼';
+
+  @override
+  String get appLockAuthenticating => '正在驗證…';
+
+  @override
+  String get appLockWrongPin => 'PIN碼錯誤，請重試。';
+
+  @override
+  String get appLockUseBiometric => '使用指紋 / Face ID';
+
+  @override
+  String get appLockBiometricReason => '解鎖 KikoFlu';
+
+  @override
+  String get appLockBiometric => '生物辨識';
+
+  @override
+  String get appLockBiometricEnabledSubtitle => '已啟用 — 可使用指紋或臉部辨識解鎖';
+
+  @override
+  String get appLockBiometricDisabledSubtitle => '已停用 — 僅PIN碼模式';
+
+  @override
+  String get appLockBiometricNotAvailable => '此裝置不支援或未設定生物辨識';
+
+  @override
+  String get appLockBiometricEnableReason => '啟用生物辨識解鎖';
+
+  @override
+  String get appLockBiometricSubtitle => '使用裝置的指紋或臉部辨識快速解鎖';
+
+  @override
+  String get appLockSetupTitle => '設定應用程式鎖';
+
+  @override
+  String get appLockSetupPinSubtitle => '輸入PIN碼以保護您的應用程式';
+
+  @override
+  String get appLockSetupConfirmSubtitle => '確認PIN碼';
+
+  @override
+  String get appLockChangePin => '變更PIN碼';
+
+  @override
+  String get appLockChangePinSubtitle => '設定新PIN碼';
+
+  @override
+  String get appLockPinMismatch => 'PIN碼不匹配，請重試。';
+
+  @override
+  String get appLockPinChanged => 'PIN碼變更成功';
+
+  @override
+  String get appLockDigits => '位數字';
+
+  @override
+  String get appLockAutoLock => '自動鎖定';
+
+  @override
+  String get appLockAutoLockNever => '永不';
+
+  @override
+  String get appLockAutoLockImmediately => '立即';
+
+  @override
+  String get appLockAutoLock1Min => '1分鐘';
+
+  @override
+  String get appLockAutoLock5Min => '5分鐘';
+
+  @override
+  String get appLockAutoLock15Min => '15分鐘';
+
+  @override
+  String get appLockAutoLock30Min => '30分鐘';
+
+  @override
+  String get appLockAutoLockMinutes => '分鐘';
 }

@@ -11,6 +11,7 @@ enum SortOrder {
   updatedAt('updated_at', '标记时间'),
   downloadDate('download_date', '下载日期'),
   workId('work_id', 'ID'),
+  title('title', '标题'),
   ;
 
   const SortOrder(this.value, this.label);

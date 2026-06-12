@@ -27,7 +27,7 @@ class AddToPlaylistDialog extends ConsumerStatefulWidget {
     required String workTitle,
   }) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     if (isLandscape) {
       return showDialog<bool>(
@@ -270,8 +270,12 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+    final size = MediaQuery.of(context).size;
+    final orientation = MediaQuery.orientationOf(context);
+    final isLandscape = orientation == Orientation.landscape;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
 
     Widget content = Column(
       mainAxisSize: MainAxisSize.min,
@@ -292,18 +296,15 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
                   children: [
                     Text(
                       S.of(context).addToPlaylist,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      style: tt.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       widget.workTitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withOpacity(0.6),
+                      style: tt.bodySmall?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -362,13 +363,13 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
                 Icon(
                   Icons.playlist_add,
                   size: 48,
-                  color: Theme.of(context).colorScheme.outline,
+                  color: cs.outline,
                 ),
                 const SizedBox(height: 16),
                 Text(
                   S.of(context).noPlaylists,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.outline,
+                    color: cs.outline,
                   ),
                 ),
               ],
@@ -388,7 +389,7 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
                     children: [
                       CircleAvatar(
                         backgroundColor: isInPlaylist
-                            ? Theme.of(context).colorScheme.primaryContainer
+                            ? cs.primaryContainer
                             : null,
                         child: Icon(
                           playlist.privacy == PlaylistPrivacy.private.value
@@ -398,7 +399,7 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
                                   ? Icons.link
                                   : Icons.public,
                           color: isInPlaylist
-                              ? Theme.of(context).colorScheme.primary
+                              ? cs.primary
                               : null,
                         ),
                       ),
@@ -409,13 +410,13 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
                           child: Container(
                             padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary,
+                              color: cs.primary,
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
                               Icons.check,
                               size: 10,
-                              color: Theme.of(context).colorScheme.onPrimary,
+                              color: cs.onPrimary,
                             ),
                           ),
                         ),
@@ -430,7 +431,7 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
                     children: [
                       Text(
                         S.of(context).nWorksCount(playlist.worksCount),
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: tt.bodySmall,
                       ),
                       if (isInPlaylist) ...[
                         const SizedBox(width: 8),
@@ -440,17 +441,13 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).colorScheme.primaryContainer,
+                            color: cs.primaryContainer,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             S.of(context).alreadyFavorited,
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
+                            style: tt.labelSmall?.copyWith(
+                                  color: cs.primary,
                                 ),
                           ),
                         ),
@@ -467,7 +464,7 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
                           ? IconButton(
                               icon: Icon(
                                 Icons.remove_circle_outline,
-                                color: Theme.of(context).colorScheme.error,
+                                color: cs.error,
                               ),
                               onPressed: _isAdding
                                   ? null
@@ -477,7 +474,7 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
                           : IconButton(
                               icon: Icon(
                                 Icons.add_circle_outline,
-                                color: Theme.of(context).colorScheme.primary,
+                                color: cs.primary,
                               ),
                               onPressed: _isAdding
                                   ? null
@@ -515,8 +512,8 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
       return Dialog(
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.5,
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
+            maxWidth: size.width * 0.5,
+            maxHeight: size.height * 0.7,
           ),
           child: content,
         ),
@@ -525,7 +522,7 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.7,
+          maxHeight: size.height * 0.7,
         ),
         child: content,
       );

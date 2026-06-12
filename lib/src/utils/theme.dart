@@ -1,102 +1,77 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../providers/theme_provider.dart';
 
 class AppTheme {
   // iOS 使用 Cupertino 转场以支持侧滑返回
-  static final _pageTransitionsTheme = PageTransitionsTheme(
+  static const _pageTransitionsTheme = PageTransitionsTheme(
     builders: {
-      TargetPlatform.iOS: const CupertinoPageTransitionsBuilder(),
-      TargetPlatform.android: const FadeUpwardsPageTransitionsBuilder(),
-      TargetPlatform.linux: const FadeUpwardsPageTransitionsBuilder(),
-      TargetPlatform.macOS: const CupertinoPageTransitionsBuilder(),
-      TargetPlatform.windows: const FadeUpwardsPageTransitionsBuilder(),
+      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.android: ZoomPageTransitionsBuilder(),
+      TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+      TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
     },
   );
 
-  // 平台字体配置
+  // Platform-aware font configuration with GoogleSans as the primary font.
+  // Falls back to CJK-compatible system fonts for Chinese/Japanese/Korean text.
   static TextTheme? _getTextTheme() {
-    if (Platform.isWindows) {
-      // 使用 Microsoft YaHei 作为主字体，确保中文显示一致
-      const fontFamily = 'Microsoft YaHei';
-      return const TextTheme(
-        displayLarge:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400),
-        displayMedium:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400),
-        displaySmall:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400),
-        headlineLarge:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400),
-        headlineMedium:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400),
-        headlineSmall:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400),
-        titleLarge:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w500),
-        titleMedium:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w500),
-        titleSmall:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w500),
-        bodyLarge:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400),
-        bodyMedium:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400),
-        bodySmall:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400),
-        labelLarge:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w500),
-        labelMedium:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w500),
-        labelSmall:
-            TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w500),
-      );
-    }
-    if (Platform.isLinux) {
-      // Linux 上 Flutter 默认使用 Roboto，不含 CJK 字符
-      // 通过 fontFamilyFallback 回退到系统 CJK 字体
-      const fallback = [
-        'Noto Sans CJK SC',
-        'Noto Sans CJK TC',
-        'Noto Sans CJK JP',
-        'Source Han Sans SC',
-        'WenQuanYi Micro Hei',
-        'Droid Sans Fallback',
-      ];
-      return const TextTheme(
-        displayLarge:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
-        displayMedium:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
-        displaySmall:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
-        headlineLarge:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
-        headlineMedium:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
-        headlineSmall:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
-        titleLarge:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w500),
-        titleMedium:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w500),
-        titleSmall:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w500),
-        bodyLarge:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
-        bodyMedium:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
-        bodySmall:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
-        labelLarge:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w500),
-        labelMedium:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w500),
-        labelSmall:
-            TextStyle(fontFamilyFallback: fallback, fontWeight: FontWeight.w500),
-      );
-    }
-    return null;
+    const fontFamily = 'GoogleSans';
+    const cjkFallback = [
+      'Microsoft YaHei',
+      'Noto Sans CJK SC',
+      'Noto Sans CJK TC',
+      'Noto Sans CJK JP',
+      'Noto Sans CJK KR',
+      'Source Han Sans SC',
+      'WenQuanYi Micro Hei',
+      'Droid Sans Fallback',
+      'Roboto',
+    ];
+
+    // On Windows, prefer Microsoft YaHei first in the CJK fallback chain
+    // since it's always available and renders Chinese text natively.
+    final fallback = Platform.isWindows
+        ? <String>[
+            'Microsoft YaHei',
+            ...cjkFallback.where((f) => f != 'Microsoft YaHei'),
+          ]
+        : cjkFallback.toList();
+
+    return TextTheme(
+      displayLarge:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
+      displayMedium:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
+      displaySmall:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
+      headlineLarge:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
+      headlineMedium:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
+      headlineSmall:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
+      titleLarge:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w500),
+      titleMedium:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w500),
+      titleSmall:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w500),
+      bodyLarge:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
+      bodyMedium:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
+      bodySmall:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w400),
+      labelLarge:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w500),
+      labelMedium:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w500),
+      labelSmall:
+          TextStyle(fontFamily: fontFamily, fontFamilyFallback: fallback, fontWeight: FontWeight.w500),
+    );
   }
 
   static ThemeData lightTheme(ColorScheme? lightDynamic,
@@ -106,7 +81,7 @@ class AppTheme {
       colorScheme = lightDynamic;
     } else {
       colorScheme =
-          _getColorScheme(themeType ?? ColorSchemeType.oceanBlue, false);
+          getColorScheme(themeType ?? ColorSchemeType.oceanBlue, false);
     }
 
     return ThemeData(
@@ -156,7 +131,7 @@ class AppTheme {
       colorScheme = darkDynamic;
     } else {
       colorScheme =
-          _getColorScheme(themeType ?? ColorSchemeType.oceanBlue, true);
+          getColorScheme(themeType ?? ColorSchemeType.oceanBlue, true);
     }
 
     return ThemeData(
@@ -212,14 +187,22 @@ class AppTheme {
         return isDark ? _lavenderPurpleDark : _lavenderPurpleLight;
       case ColorSchemeType.sakuraPink:
         return isDark ? _sakuraPinkDark : _sakuraPinkLight;
+      case ColorSchemeType.crimsonRed:
+        return isDark ? _crimsonRedDark : _crimsonRedLight;
+      case ColorSchemeType.amberGold:
+        return isDark ? _amberGoldDark : _amberGoldLight;
+      case ColorSchemeType.slateGray:
+        return isDark ? _slateGrayDark : _slateGrayLight;
       case ColorSchemeType.dynamic:
         return isDark ? _oceanBlueDark : _oceanBlueLight; // 动态主题的后备方案
     }
   }
 
-  // 根据主题类型获取对应的颜色方案
-  static ColorScheme _getColorScheme(ColorSchemeType type, bool isDark) {
-    return getColorScheme(type, isDark);
+  /// Return the seed (primary) color for a given [ColorSchemeType].
+  /// Used by the splash screen before Riverpod / SharedPreferences are ready.
+  static Color seedColorForType(ColorSchemeType type) {
+    // Extract primary color from the matching light scheme as the seed.
+    return getColorScheme(type, false).primary;
   }
 
   // ========== 海洋蓝主题 ==========
@@ -455,5 +438,166 @@ class AppTheme {
     surface: Color(0xFF1A1A1A),
     onSurface: Color(0xFFEBE0E1),
     onSurfaceVariant: Color(0xFFD5C2C6),
+  );
+
+  // ========== 绯红主题 ==========
+  static const _crimsonRedLight = ColorScheme(
+    brightness: Brightness.light,
+    primary: Color(0xFFB3261E),
+    onPrimary: Color(0xFFFFFFFF),
+    primaryContainer: Color(0xFFFFDAD5),
+    onPrimaryContainer: Color(0xFF410002),
+    secondary: Color(0xFF775652),
+    onSecondary: Color(0xFFFFFFFF),
+    secondaryContainer: Color(0xFFFFDAD8),
+    onSecondaryContainer: Color(0xFF2C1512),
+    tertiary: Color(0xFF6B5C7C),
+    onTertiary: Color(0xFFFFFFFF),
+    tertiaryContainer: Color(0xFFF2DFFF),
+    onTertiaryContainer: Color(0xFF251935),
+    error: Color(0xFFBA1A1A),
+    onError: Color(0xFFFFFFFF),
+    errorContainer: Color(0xFFFFDAD6),
+    onErrorContainer: Color(0xFF410002),
+    surface: Color(0xFFFFFBFF),
+    onSurface: Color(0xFF201A19),
+    onSurfaceVariant: Color(0xFF504443),
+  );
+
+  static const _crimsonRedDark = ColorScheme(
+    brightness: Brightness.dark,
+    primary: Color(0xFFFFB4AB),
+    onPrimary: Color(0xFF690005),
+    primaryContainer: Color(0xFF93000A),
+    onPrimaryContainer: Color(0xFFFFDAD5),
+    secondary: Color(0xFFE7BDB7),
+    onSecondary: Color(0xFF442926),
+    secondaryContainer: Color(0xFF5D3F3B),
+    onSecondaryContainer: Color(0xFFFFDAD8),
+    tertiary: Color(0xFFD6BEE8),
+    onTertiary: Color(0xFF3B2D4B),
+    tertiaryContainer: Color(0xFF534463),
+    onTertiaryContainer: Color(0xFFF2DFFF),
+    error: Color(0xFFFFB4AB),
+    onError: Color(0xFF690005),
+    errorContainer: Color(0xFF93000A),
+    onErrorContainer: Color(0xFFFFB4AB),
+    surface: Color(0xFF201A19),
+    onSurface: Color(0xFFEDE0DD),
+    onSurfaceVariant: Color(0xFFD5C3C1),
+  );
+
+  // ========== 琥珀金主题 ==========
+  static const _amberGoldLight = ColorScheme(
+    brightness: Brightness.light,
+    primary: Color(0xFF8F5A00),
+    onPrimary: Color(0xFFFFFFFF),
+    primaryContainer: Color(0xFFFFDEAC),
+    onPrimaryContainer: Color(0xFF2D1900),
+    secondary: Color(0xFF6D5B41),
+    onSecondary: Color(0xFFFFFFFF),
+    secondaryContainer: Color(0xFFF8DEBC),
+    onSecondaryContainer: Color(0xFF261906),
+    tertiary: Color(0xFF506540),
+    onTertiary: Color(0xFFFFFFFF),
+    tertiaryContainer: Color(0xFFD3EBBC),
+    onTertiaryContainer: Color(0xFF0F2004),
+    error: Color(0xFFBA1A1A),
+    onError: Color(0xFFFFFFFF),
+    errorContainer: Color(0xFFFFDAD6),
+    onErrorContainer: Color(0xFF410002),
+    surface: Color(0xFFFFFBFF),
+    onSurface: Color(0xFF1E1B16),
+    onSurfaceVariant: Color(0xFF4D4639),
+  );
+
+  static const _amberGoldDark = ColorScheme(
+    brightness: Brightness.dark,
+    primary: Color(0xFFFFBB4A),
+    onPrimary: Color(0xFF4D2D00),
+    primaryContainer: Color(0xFF6E4300),
+    onPrimaryContainer: Color(0xFFFFDEAC),
+    secondary: Color(0xFFDBC2A2),
+    onSecondary: Color(0xFF3C2D18),
+    secondaryContainer: Color(0xFF54432C),
+    onSecondaryContainer: Color(0xFFF8DEBC),
+    tertiary: Color(0xFFB7CFA2),
+    onTertiary: Color(0xFF233514),
+    tertiaryContainer: Color(0xFF394C2A),
+    onTertiaryContainer: Color(0xFFD3EBBC),
+    error: Color(0xFFFFB4AB),
+    onError: Color(0xFF690005),
+    errorContainer: Color(0xFF93000A),
+    onErrorContainer: Color(0xFFFFB4AB),
+    surface: Color(0xFF16130E),
+    onSurface: Color(0xFFE8E2D7),
+    onSurfaceVariant: Color(0xFFCFC6B7),
+  );
+
+  /// True Black (OLED) Dark Theme — overrides surface to pure black.
+  /// Starting from the regular dark theme, then override surfaces to #000000
+  /// so OLED pixels turn off entirely, saving battery and delivering deeper blacks.
+  static ThemeData trueBlackDarkTheme(ColorScheme? darkDynamic,
+      [ColorSchemeType? themeType]) {
+    final theme = darkTheme(darkDynamic, themeType);
+    return theme.copyWith(
+      scaffoldBackgroundColor: const Color(0xFF000000),
+      colorScheme: theme.colorScheme.copyWith(
+        surface: const Color(0xFF000000),
+      ),
+      appBarTheme: theme.appBarTheme.copyWith(
+        backgroundColor: const Color(0xFF000000),
+      ),
+      navigationBarTheme: theme.navigationBarTheme.copyWith(
+        backgroundColor: const Color(0xFF000000),
+      ),
+    );
+  }
+
+  // ========== 岩灰主题 ==========
+  static const _slateGrayLight = ColorScheme(
+    brightness: Brightness.light,
+    primary: Color(0xFF455A64),
+    onPrimary: Color(0xFFFFFFFF),
+    primaryContainer: Color(0xFFC7E7F5),
+    onPrimaryContainer: Color(0xFF001F26),
+    secondary: Color(0xFF4E5B62),
+    onSecondary: Color(0xFFFFFFFF),
+    secondaryContainer: Color(0xFFD2E5ED),
+    onSecondaryContainer: Color(0xFF0A1F25),
+    tertiary: Color(0xFF5D5B7D),
+    onTertiary: Color(0xFFFFFFFF),
+    tertiaryContainer: Color(0xFFE3DFFF),
+    onTertiaryContainer: Color(0xFF1A1836),
+    error: Color(0xFFBA1A1A),
+    onError: Color(0xFFFFFFFF),
+    errorContainer: Color(0xFFFFDAD6),
+    onErrorContainer: Color(0xFF410002),
+    surface: Color(0xFFF6FAFE),
+    onSurface: Color(0xFF181C1E),
+    onSurfaceVariant: Color(0xFF41484B),
+  );
+
+  static const _slateGrayDark = ColorScheme(
+    brightness: Brightness.dark,
+    primary: Color(0xFF9CCCDD),
+    onPrimary: Color(0xFF003640),
+    primaryContainer: Color(0xFF2C4E58),
+    onPrimaryContainer: Color(0xFFC7E7F5),
+    secondary: Color(0xFFB6C9D1),
+    onSecondary: Color(0xFF21343A),
+    secondaryContainer: Color(0xFF374A51),
+    onSecondaryContainer: Color(0xFFD2E5ED),
+    tertiary: Color(0xFFC7C2EA),
+    onTertiary: Color(0xFF2F2D4C),
+    tertiaryContainer: Color(0xFF464364),
+    onTertiaryContainer: Color(0xFFE3DFFF),
+    error: Color(0xFFFFB4AB),
+    onError: Color(0xFF690005),
+    errorContainer: Color(0xFF93000A),
+    onErrorContainer: Color(0xFFFFB4AB),
+    surface: Color(0xFF101416),
+    onSurface: Color(0xFFDEE3E6),
+    onSurfaceVariant: Color(0xFFC0C7CB),
   );
 }

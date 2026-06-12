@@ -38,31 +38,31 @@ void main() {
     });
 
     test('Current version 1.0.5 vs new version 1.0.6', () {
-      final current = '1.0.5';
+      const current = '1.0.5';
       final latest = extractVersion('v1.0.6');
       expect(compareVersions(current, latest), -1); // 1.0.5 < 1.0.6
     });
 
     test('Current version 1.0.5 vs new version 1.0.6(1024)', () {
-      final current = '1.0.5';
+      const current = '1.0.5';
       final latest = extractVersion('v1.0.6(1024)');
       expect(compareVersions(current, latest), -1); // 1.0.5 < 1.0.6
     });
 
     test('Current version 1.0.5 vs same version 1.0.5', () {
-      final current = '1.0.5';
+      const current = '1.0.5';
       final latest = extractVersion('v1.0.5');
       expect(compareVersions(current, latest), 0); // 1.0.5 = 1.0.5
     });
 
     test('Current version 1.0.5 vs same version 1.0.5(0721)', () {
-      final current = '1.0.5';
+      const current = '1.0.5';
       final latest = extractVersion('v1.0.5(0721)');
       expect(compareVersions(current, latest), 0); // 1.0.5 = 1.0.5
     });
 
     test('Current version 1.0.6 vs old version 1.0.5', () {
-      final current = '1.0.6';
+      const current = '1.0.6';
       final latest = extractVersion('v1.0.5');
       expect(compareVersions(current, latest), 1); // 1.0.6 > 1.0.5
     });

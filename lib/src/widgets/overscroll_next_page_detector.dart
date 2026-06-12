@@ -59,7 +59,7 @@ class _OverscrollNextPageDetectorState
                     Theme.of(context)
                         .colorScheme
                         .surfaceContainerHighest
-                        .withOpacity(0.5),
+                        .withValues(alpha: 0.5),
                   ],
                 ),
               ),
@@ -102,7 +102,13 @@ class _OverscrollNextPageDetectorState
       return false;
     }
 
-    if (notification.depth != 0) {
+    if (notification.depth != 0) return false;
+
+    // Skip non-scroll notifications early
+    if (notification is! OverscrollNotification &&
+        notification is! ScrollUpdateNotification &&
+        notification is! ScrollStartNotification &&
+        notification is! ScrollEndNotification) {
       return false;
     }
 

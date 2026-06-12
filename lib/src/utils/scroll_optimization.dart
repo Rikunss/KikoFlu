@@ -20,10 +20,13 @@ class ScrollOptimization {
 
   /// 推荐的缓存范围（像素）
   ///
-  /// 120Hz 设备需要更大的预加载缓存以减少快速滑动时的空白区域。
-  /// 800px ≈ 普通设备约 2~3 个 item 的预渲染距离，
-  /// 对 120fps 设备可以有效减少"白屏一闪"现象。
-  static const double cacheExtent = 800;
+  /// 1500px memberikan waktu lebih bagi CachedNetworkImage untuk memulai download
+  /// sebelum card masuk viewport. Untuk scroll cepat (~1000px/s), ini memberi ~1.5s
+  /// lead time — cukup untuk sebagian besar download gambar.
+  ///
+  /// Nilai 500px sebelumnya hanya memberi ~0.5s lead time, menyebabkan placeholder
+  /// masih terlihat saat scroll cepat karena image belum sempat selesai di-download.
+  static const double cacheExtent = 1500;
 
   /// 平台自适应的滚动物理属性
   ///

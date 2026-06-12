@@ -50,8 +50,8 @@ class FloatingLyricStyle {
     return {
       'fontSize': fontSize,
       'opacity': opacity,
-      'textColor': textColor.value,
-      'backgroundColor': backgroundColor.value,
+      'textColor': textColor.toARGB32(),
+      'backgroundColor': backgroundColor.toARGB32(),
       'cornerRadius': cornerRadius,
       'paddingHorizontal': paddingHorizontal,
       'paddingVertical': paddingVertical,
@@ -63,9 +63,9 @@ class FloatingLyricStyle {
     return FloatingLyricStyle(
       fontSize: map['fontSize']?.toDouble() ?? 14.0,
       opacity: map['opacity']?.toDouble() ?? 0.95,
-      textColor: Color(map['textColor'] ?? Colors.white.value),
+      textColor: Color(map['textColor'] ?? Colors.white.toARGB32()),
       backgroundColor:
-          Color(map['backgroundColor'] ?? const Color(0xFF000000).value),
+          Color(map['backgroundColor'] ?? const Color(0xFF000000).toARGB32()),
       cornerRadius: map['cornerRadius']?.toDouble() ?? 16.0,
       paddingHorizontal: map['paddingHorizontal']?.toDouble() ?? 20.0,
       paddingVertical: map['paddingVertical']?.toDouble() ?? 10.0,
@@ -74,15 +74,15 @@ class FloatingLyricStyle {
 
   // 获取背景颜色（带透明度）
   Color get backgroundColorWithOpacity {
-    return backgroundColor.withOpacity(opacity);
+    return backgroundColor.withValues(alpha: opacity);
   }
 
   // 获取 ARGB 格式的颜色值（用于原生代码）
-  int get textColorArgb => textColor.value;
+  int get textColorArgb => textColor.toARGB32();
 
   int get backgroundColorArgb {
-    final color = backgroundColor.withOpacity(opacity);
-    return color.value;
+    final color = backgroundColor.withValues(alpha: opacity);
+    return color.toARGB32();
   }
 }
 
@@ -198,9 +198,9 @@ class FloatingLyricStyleNotifier extends StateNotifier<FloatingLyricStyle>
     await prefs.setDouble('${_keyPrefix}fontSize', state.fontSize);
     await prefs.setDouble('${_keyPrefix}opacity', state.opacity);
     if (saveColors) {
-      await prefs.setInt('${_keyPrefix}textColor', state.textColor.value);
+      await prefs.setInt('${_keyPrefix}textColor', state.textColor.toARGB32());
       await prefs.setInt(
-          '${_keyPrefix}backgroundColor', state.backgroundColor.value);
+          '${_keyPrefix}backgroundColor', state.backgroundColor.toARGB32());
     }
     await prefs.setDouble('${_keyPrefix}cornerRadius', state.cornerRadius);
     await prefs.setDouble(

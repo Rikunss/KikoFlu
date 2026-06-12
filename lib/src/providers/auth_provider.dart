@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,7 @@ import '../models/account.dart';
 import '../services/kikoeru_api_service.dart';
 import '../services/storage_service.dart';
 import '../services/account_database.dart';
+import '../services/log_service.dart';
 import '../utils/server_utils.dart';
 
 // Kikoeru API Service Provider
@@ -24,6 +26,10 @@ class AuthState extends Equatable {
   final String? error;
   final bool isLoggedIn;
 
+  /// Set to true when a 401/403 response is received during an API call.
+  /// The UI shows a "Session Expired" dialog and navigates to LoginScreen.
+  final bool sessionExpired;
+
   const AuthState({
     this.currentUser,
     this.token,
@@ -31,6 +37,7 @@ class AuthState extends Equatable {
     this.isLoading = false,
     this.error,
     this.isLoggedIn = false,
+    this.sessionExpired = false,
   });
 
   AuthState copyWith({
@@ -40,6 +47,7 @@ class AuthState extends Equatable {
     bool? isLoading,
     String? error,
     bool? isLoggedIn,
+    bool? sessionExpired,
   }) {
     return AuthState(
       currentUser: currentUser ?? this.currentUser,
@@ -48,33 +56,49 @@ class AuthState extends Equatable {
       isLoading: isLoading ?? this.isLoading,
       error: error,
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
+      sessionExpired: sessionExpired ?? this.sessionExpired,
     );
   }
 
   @override
   List<Object?> get props =>
-      [currentUser, token, host, isLoading, error, isLoggedIn];
+      [currentUser, token, host, isLoading, error, isLoggedIn, sessionExpired];
 }
 
 // Auth notifier
 class AuthNotifier extends StateNotifier<AuthState> {
   final KikoeruApiService _apiService;
 
+  /// Guard flag: prevents multiple concurrent unauthorized handlers from
+  /// triggering cascading logouts when 401/403 fires on parallel API calls.
+  bool _isHandlingUnauthorized = false;
+
+  /// Periodic timer that retries connection when in offline mode.
+  Timer? _offlineRetryTimer;
+
   AuthNotifier(this._apiService) : super(const AuthState()) {
+    // Wire up global 401/403 handler from the API service interceptor.
+    _apiService.onUnauthorized = _handleUnauthorized;
     _loadCurrentUser();
   }
 
   Future<void> _loadCurrentUser() async {
+    // Yield to event loop so the initial AuthState(currentUser: null)
+    // gets rendered by the widget tree BEFORE any synchronous state
+    // changes (e.g. restoring cached guest credentials).
+    // This ensures the LoginScreen is always visible on the first frame.
+    await Future<void>.delayed(Duration.zero);
+
     try {
-      print('[Auth] Loading current user...');
+      LogService.instance.debug('[Auth] Loading current user...', tag: 'Network');
 
       // First try to load from storage (faster)
       final token = StorageService.getString('auth_token');
       final host = StorageService.getString('server_host');
       final userJson = StorageService.getMap('current_user');
 
-      print('[Auth] Stored token: ${token != null ? "exists" : "null"}');
-      print('[Auth] Stored host: $host');
+      LogService.instance.debug('[Auth] Stored token: ${token != null ? "exists" : "null"}', tag: 'Network');
+      LogService.instance.debug('[Auth] Stored host: $host', tag: 'Network');
 
       if (token != null && host != null) {
         _apiService.init(token, host);
@@ -82,7 +106,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         User? user;
         if (userJson != null) {
           user = User.fromJson(userJson);
-          print('[Auth] Loaded user from storage: ${user.name}');
+          LogService.instance.debug('[Auth] Loaded user from storage: ${user.name}', tag: 'Network');
         }
 
         state = state.copyWith(
@@ -94,25 +118,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
         // Validate token by fetching user info
         try {
-          print('[Auth] Validating token...');
+          LogService.instance.debug('[Auth] Validating token...', tag: 'Network');
           await _refreshUserInfo();
-          print('[Auth] Token is valid, user logged in successfully');
+          LogService.instance.debug('[Auth] Token is valid, user logged in successfully', tag: 'Network');
           return; // Token is valid, we're done
         } catch (e) {
-          print('[Auth] Token validation failed: $e');
+          LogService.instance.warning('[Auth] Token validation failed: $e', tag: 'Network');
           // Token is invalid, try to re-login with saved account
         }
       }
 
       // If no valid token, try to load from database and re-login
-      print('[Auth] Checking database for active account...');
+      LogService.instance.debug('[Auth] Checking database for active account...', tag: 'Network');
       final activeAccount = await AccountDatabase.instance.getActiveAccount();
 
       if (activeAccount != null) {
         // Silently re-login with saved credentials
-        print(
-            '[Auth] Found active account in database: ${activeAccount.username}');
-        print('[Auth] Re-logging in with saved account...');
+        LogService.instance.debug(
+            '[Auth] Found active account in database: ${activeAccount.username}', tag: 'Network');
+        LogService.instance.debug('[Auth] Re-logging in with saved account...', tag: 'Network');
 
         _apiService.init('', activeAccount.host);
 
@@ -125,13 +149,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
 
         if (success) {
-          print('[Auth] Re-login successful');
+          LogService.instance.debug('[Auth] Re-login successful', tag: 'Network');
+          _stopOfflineRetryTimer();
           return;
         } else {
-          print('[Auth] Re-login failed due to network or server issue');
+          LogService.instance.warning('[Auth] Re-login failed due to network or server issue', tag: 'Network');
           // 网络问题导致登录失败，但我们有缓存的账户信息
           // 允许用户以离线模式进入应用（可以使用本地下载内容）
-          print('[Auth] Entering offline mode with cached account');
+          LogService.instance.warning('[Auth] Entering offline mode with cached account', tag: 'Network');
 
           // 使用缓存的账户信息设置基本状态
           _apiService.init('', activeAccount.host);
@@ -152,25 +177,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
             error: '网络连接失败，以离线模式启动',
           );
 
-          print('[Auth] Offline mode activated');
+          LogService.instance.debug('[Auth] Offline mode activated', tag: 'Network');
+          // Start periodic retry to check when connection is back
+          _startOfflineRetryTimer();
           return;
         }
       } else {
-        print('[Auth] No active account found in database');
+        LogService.instance.debug('[Auth] No active account found in database', tag: 'Network');
       }
 
       // If all fails, logout
-      print('[Auth] No valid authentication found, logging out');
+      LogService.instance.debug('[Auth] No valid authentication found, logging out', tag: 'Network');
       await logout();
     } catch (e) {
-      print('[Auth] Failed to load saved auth: $e');
+      LogService.instance.error('[Auth] Failed to load saved auth: $e', tag: 'Network');
 
       // 在异常情况下，也尝试检查是否有缓存账户
       try {
         final activeAccount = await AccountDatabase.instance.getActiveAccount();
         if (activeAccount != null) {
-          print(
-              '[Auth] Exception occurred but found cached account, entering offline mode');
+          LogService.instance.warning(
+              '[Auth] Exception occurred but found cached account, entering offline mode', tag: 'Network');
 
           _apiService.init('', activeAccount.host);
 
@@ -186,14 +213,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
             ),
             host: activeAccount.host,
             token: '',
-            isLoggedIn: false,
-            error: '网络连接失败，以离线模式启动',
+            isLoggedIn: false,              error: '网络连接失败，以离线模式启动',
           );
 
+          _startOfflineRetryTimer();
           return;
         }
       } catch (dbError) {
-        print('[Auth] Failed to check database: $dbError');
+        LogService.instance.error('[Auth] Failed to check database: $dbError', tag: 'Network');
       }
 
       await logout();
@@ -207,6 +234,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? serverCookie, {
     bool silent = false,
   }) async {
+    // Clear session expired flag on a fresh login attempt
+    if (state.sessionExpired) {
+      state = state.copyWith(sessionExpired: false);
+    }
+
     if (!silent) {
       state = state.copyWith(isLoading: true, error: null);
     }
@@ -218,8 +250,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
 
     try {
-      print(
-          '[Auth] Login attempt - username: $username, host: $host, silent: $silent');
+      LogService.instance.debug(
+          '[Auth] Login attempt - username: $username, host: $host, silent: $silent', tag: 'Network');
 
       // 删除主机地址末尾的斜杠，以免请求资源时出现地址错误
       if (host.endsWith("/")) {
@@ -237,7 +269,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         throw Exception('No token received from server');
       }
 
-      print('[Auth] Login successful, received token');
+      LogService.instance.debug('[Auth] Login successful, received token', tag: 'Network');
 
       // Normalize host URL to include protocol
       String normalizedHost;
@@ -254,7 +286,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
       }
 
-      print('[Auth] Normalized host: $normalizedHost');
+      LogService.instance.debug('[Auth] Normalized host: $normalizedHost', tag: 'Network');
 
       // Update API service with real token and normalized host
       _apiService.init(token, normalizedHost);
@@ -331,9 +363,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
             ),
           );
         }
-        print('[Auth] Account saved to database');
+        LogService.instance.debug('[Auth] Account saved to database', tag: 'Network');
       } catch (e) {
-        print('[Auth] Failed to save account to database: $e');
+        LogService.instance.error('[Auth] Failed to save account to database: $e', tag: 'Network');
       }
 
       state = state.copyWith(
@@ -344,10 +376,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoggedIn: true,
       );
 
-      print('[Auth] Login completed, state updated');
+      LogService.instance.debug('[Auth] Login completed, state updated', tag: 'Network');
       return true;
     } catch (e) {
-      print('[Auth] Login error: $e');
+      LogService.instance.error('[Auth] Login error: $e', tag: 'Network');
 
       if (!silent) {
         state = state.copyWith(
@@ -444,9 +476,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
             lastUsedAt: DateTime.now(),
           ),
         );
-        print('[Auth] Registered account saved to database');
+        LogService.instance.debug('[Auth] Registered account saved to database', tag: 'Network');
       } catch (e) {
-        print('[Auth] Failed to save registered account to database: $e');
+        LogService.instance.error('[Auth] Failed to save registered account to database: $e', tag: 'Network');
       }
 
       state = state.copyWith(
@@ -503,7 +535,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       state = state.copyWith(currentUser: user);
     } catch (e) {
-      print('Failed to refresh user info: $e');
+      LogService.instance.error('[Auth] Failed to refresh user info: $e', tag: 'Network');
       // Rethrow the exception so caller can handle it
       rethrow;
     }
@@ -540,14 +572,36 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Called by the global Dio interceptor when a 401/403 is received.
+  /// Uses [Future.microtask] to decouple from the interceptor call chain.
+  void _handleUnauthorized() {
+    if (_isHandlingUnauthorized) return;
+    _isHandlingUnauthorized = true;
+
+    Future.microtask(() async {
+      try {
+        LogService.instance.warning('[Auth] Session expired (401/403), logging out', tag: 'Network');
+
+        // Mark session as expired in state first so the UI can react.
+        state = state.copyWith(sessionExpired: true);
+
+        await logout();
+      } finally {
+        _isHandlingUnauthorized = false;
+      }
+    });
+  }
+
   Future<void> logout() async {
+    _stopOfflineRetryTimer();
+
     try {
       await StorageService.remove('auth_token');
       await StorageService.remove('server_host');
       await StorageService.remove('current_user');
       await StorageService.remove('server_cookie');
     } catch (e) {
-      print('Failed to clear storage: $e');
+      LogService.instance.error('[Auth] Failed to clear storage: $e', tag: 'Network');
     }
 
     state = const AuthState();
@@ -559,7 +613,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final serverCookie = user.serverCookie;
 
     if (token != null && host != null) {
-      print('[Auth] Switching user - username: ${user.name}, host: $host');
+      LogService.instance.debug('[Auth] Switching user - username: ${user.name}, host: $host', tag: 'Network');
 
       if (serverCookie != null && serverCookie.isNotEmpty) {
         await StorageService.setString('server_cookie', serverCookie);
@@ -579,7 +633,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoggedIn: true,
       );
 
-      print('[Auth] User switched successfully');
+      LogService.instance.debug('[Auth] User switched successfully', tag: 'Network');
     } else {
       throw Exception('Invalid user data: missing token or host');
     }
@@ -625,12 +679,48 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// 重新尝试连接（用于从离线模式恢复）
   Future<void> retryConnection() async {
-    print('[Auth] Retrying connection...');
+    LogService.instance.debug('[Auth] Retrying connection...', tag: 'Network');
+    _stopOfflineRetryTimer();
     await _loadCurrentUser();
   }
 
+  /// Start a periodic timer that retries connection when the app is in
+  /// offline mode. Checks every 30 seconds.
+  void _startOfflineRetryTimer() {
+    _stopOfflineRetryTimer();
+    _offlineRetryTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) async {
+        try {
+          // Only retry if still in offline-like state (not logged in but has cached data)
+          if (state.currentUser != null && !state.isLoggedIn && !state.isLoading) {
+            LogService.instance.debug('[Auth] Offline retry: checking connection...', tag: 'Network');
+            await retryConnection();
+          } else {
+            _stopOfflineRetryTimer();
+          }
+        } catch (e) {
+          LogService.instance.error('[Auth] Offline retry failed: $e', tag: 'Network');
+        }
+      },
+    );
+  }
+
+  void _stopOfflineRetryTimer() {
+    _offlineRetryTimer?.cancel();
+    _offlineRetryTimer = null;
+  }
+
+  @override
+  void dispose() {
+    _stopOfflineRetryTimer();
+    // Unregister the callback so the API service doesn't call into a disposed notifier.
+    _apiService.onUnauthorized = null;
+    super.dispose();
+  }
+
   void clearError() {
-    state = state.copyWith(error: null);
+    state = state.copyWith(error: null, sessionExpired: false);
   }
 }
 

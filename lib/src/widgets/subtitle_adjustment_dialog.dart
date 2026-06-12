@@ -60,15 +60,17 @@ class _SubtitleAdjustmentDialogState
 
   Future<void> _saveToLocal() async {
     setState(() => _isSaving = true);
+    final s = S.of(context);
 
     try {
       final currentTrack = await ref.read(currentTrackProvider.future);
+      if (!mounted) return;
       if (currentTrack == null) {
-        throw Exception(S.of(context).noAudioPlaying);
+        throw Exception(s.noAudioPlaying);
       }
 
       // 选择保存目录
-      final selectedDirectory = await FilePicker.platform.getDirectoryPath(
+      final selectedDirectory = await FilePicker.getDirectoryPath(
         dialogTitle: S.of(context).selectSaveDirectory,
       );
 
@@ -87,8 +89,7 @@ class _SubtitleAdjustmentDialogState
       final lrcContent = lyricController.exportLyrics(format: 'lrc');
       final vttContent = lyricController.exportLyrics(format: 'vtt');
 
-      if (lrcContent.isEmpty && vttContent.isEmpty) {
-        throw Exception(S.of(context).noSubtitleContentToSave);
+      if (lrcContent.isEmpty && vttContent.isEmpty) {            throw Exception(s.noSubtitleContentToSave);
       }
 
       // 保存文件 (默认LRC格式)
@@ -96,14 +97,13 @@ class _SubtitleAdjustmentDialogState
       final file = File(filePath);
       await file.writeAsString(lrcContent);
 
-      if (mounted) {
-        Navigator.pop(context);
-        SnackBarUtil.showSuccess(context, S.of(context).savedToPath(filePath),
-            duration: const Duration(seconds: 3));
-      }
+      if (!mounted) return;
+      Navigator.pop(context);
+      SnackBarUtil.showSuccess(context, s.savedToPath(filePath),
+          duration: const Duration(seconds: 3));
     } catch (e) {
       if (mounted) {
-        SnackBarUtil.showError(context, S.of(context).saveFailedWithError(e.toString()));
+        SnackBarUtil.showError(context, s.saveFailedWithError(e.toString()));
       }
     } finally {
       if (mounted) {
@@ -114,11 +114,13 @@ class _SubtitleAdjustmentDialogState
 
   Future<void> _saveToLibrary() async {
     setState(() => _isSaving = true);
+    final s = S.of(context);
 
     try {
       final currentTrack = await ref.read(currentTrackProvider.future);
+      if (!mounted) return;
       if (currentTrack == null) {
-        throw Exception(S.of(context).noAudioPlaying);
+        throw Exception(s.noAudioPlaying);
       }
 
       // 获取字幕库目录
@@ -138,8 +140,7 @@ class _SubtitleAdjustmentDialogState
       final lyricController = ref.read(lyricControllerProvider.notifier);
       final lrcContent = lyricController.exportLyrics(format: 'lrc');
 
-      if (lrcContent.isEmpty) {
-        throw Exception(S.of(context).noSubtitleContentToSave);
+      if (lrcContent.isEmpty) {            throw Exception(s.noSubtitleContentToSave);
       }
 
       // 保存到字幕库
@@ -150,13 +151,12 @@ class _SubtitleAdjustmentDialogState
       // 局部刷新缓存以便字幕库更新该目录
       await SubtitleLibraryService.refreshDirectoryCache(savedDir.path);
 
-      if (mounted) {
-        Navigator.pop(context);
-        SnackBarUtil.showSuccess(context, S.of(context).savedToSubtitleLibrary);
-      }
+      if (!mounted) return;
+      Navigator.pop(context);
+      SnackBarUtil.showSuccess(context, s.savedToSubtitleLibrary);
     } catch (e) {
       if (mounted) {
-        SnackBarUtil.showError(context, S.of(context).saveFailedWithError(e.toString()));
+        SnackBarUtil.showError(context, s.saveFailedWithError(e.toString()));
       }
     } finally {
       if (mounted) {
@@ -166,32 +166,69 @@ class _SubtitleAdjustmentDialogState
   }
 
   void _showSaveOptions() {
+    if (!mounted) return;
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.folder_open),
-              title: Text(S.of(context).saveToLocal),
-              subtitle: Text(S.of(context).selectDirectoryToSaveFile),
-              onTap: () {
-                Navigator.pop(context);
-                _saveToLocal();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.library_books),
-              title: Text(S.of(context).saveToSubtitleLibrary),
-              subtitle: Text(S.of(context).saveToSubtitleLibraryDesc),
-              onTap: () {
-                Navigator.pop(context);
-                _saveToLibrary();
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 32,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.folder_open, color: cs.primary, size: 20),
+                ),
+                title: Text(S.of(context).saveToLocal,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(S.of(context).selectDirectoryToSaveFile),
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.pop(context);
+                  _saveToLocal();
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: cs.secondaryContainer.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.library_books,
+                      color: cs.secondary, size: 20),
+                ),
+                title: Text(S.of(context).saveToSubtitleLibrary,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(S.of(context).saveToSubtitleLibraryDesc),
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.pop(context);
+                  _saveToLibrary();
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -337,22 +374,34 @@ class _SubtitleAdjustmentDialogState
               children: [
                 _CompactButton(
                   label: '-500',
-                  onPressed: () => _adjustByMilliseconds(-500),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _adjustByMilliseconds(-500);
+                  },
                 ),
                 const SizedBox(width: 8),
                 _CompactButton(
                   label: '-100',
-                  onPressed: () => _adjustByMilliseconds(-100),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _adjustByMilliseconds(-100);
+                  },
                 ),
                 const SizedBox(width: 8),
                 _CompactButton(
                   label: '+100',
-                  onPressed: () => _adjustByMilliseconds(100),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _adjustByMilliseconds(100);
+                  },
                 ),
                 const SizedBox(width: 8),
                 _CompactButton(
                   label: '+500',
-                  onPressed: () => _adjustByMilliseconds(500),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _adjustByMilliseconds(500);
+                  },
                 ),
               ],
             ),
@@ -363,7 +412,12 @@ class _SubtitleAdjustmentDialogState
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: isAdjusted ? _resetOffset : null,
+                    onPressed: isAdjusted
+                        ? () {
+                            HapticFeedback.lightImpact();
+                            _resetOffset();
+                          }
+                        : null,
                     icon: const Icon(Icons.restore, size: 18),
                     label: Text(S.of(context).reset),
                     style: OutlinedButton.styleFrom(
@@ -374,7 +428,10 @@ class _SubtitleAdjustmentDialogState
                 const SizedBox(width: 8),
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.pop(context);
+                    },
                     icon: const Icon(Icons.check, size: 18),
                     label: Text(S.of(context).confirm),
                     style: FilledButton.styleFrom(

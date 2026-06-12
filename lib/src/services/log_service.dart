@@ -1,9 +1,45 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
 enum LogLevel { debug, info, warning, error }
+
+/// Predefined log tag categories for filtering.
+class LogTag {
+  final String name;
+  final String label;
+
+  const LogTag(this.name, this.label);
+
+  static const all = LogTag('', 'All');
+  static const playback = LogTag('Playback', 'Playback');
+  static const usbDac = LogTag('USB', 'USB DAC');
+  static const database = LogTag('Database', 'Database');
+  static const network = LogTag('Network', 'Network');
+  static const ui = LogTag('UI', 'UI');
+  static const download = LogTag('Download', 'Download');
+  static const audio = LogTag('Audio', 'Audio');
+
+  static const List<LogTag> predefined = [
+    all,
+    playback,
+    usbDac,
+    database,
+    network,
+    ui,
+    download,
+    audio,
+  ];
+
+  /// Check if a log entry's tag matches this category.
+  bool matches(String? entryTag) {
+    if (name.isEmpty) return true; // 'All' matches everything
+    if (entryTag == null) return false;
+    return entryTag.toUpperCase() == name.toUpperCase();
+  }
+}
 
 class LogEntry {
   final DateTime timestamp;
@@ -49,36 +85,88 @@ class LogService {
   LogService._();
 
   final List<LogEntry> _logs = [];
-  static const int _maxLogs = 5000;
+  static const int _maxLogs = 1000;
   static const int _maxMessageLength = 500;
+  static const int _maxFileSize = 5 * 1024 * 1024; // 5MB
   final _controller = StreamController<LogEntry>.broadcast();
 
   Stream<LogEntry> get logStream => _controller.stream;
   List<LogEntry> get logs => List.unmodifiable(_logs);
 
   bool _initialized = false;
+  File? _logFile;
 
-  /// 初始化日志系统，拦截 print 输出
-  void initialize() {
+  /// Initialize log system, start file logging.
+  Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
+
+    // Set up log file for persistent storage
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final logDir = Directory(p.join(dir.path, 'logs'));
+      if (!await logDir.exists()) {
+        await logDir.create(recursive: true);
+      }
+      _logFile = File(p.join(logDir.path, 'app.log'));
+
+      // Rotate if file is too large
+      if (await _logFile!.exists()) {
+        final length = await _logFile!.length();
+        if (length > _maxFileSize) {
+          final rotated = File(p.join(logDir.path, 'app_old.log'));
+          await _logFile!.rename(rotated.path);
+          _logFile = File(p.join(logDir.path, 'app.log'));
+        }
+      }
+    } catch (e) {
+      // Intentionally not using LogService here to avoid recursion;
+      // any failures during log initialization are non-critical.
+      debugPrint('[LogService] Init error: $e');
+    }
   }
 
   void _addEntry(LogEntry entry) {
-    // 截断过长的消息
+    // Truncate long messages
     final truncated = entry.message.length > _maxMessageLength
         ? LogEntry(
             timestamp: entry.timestamp,
             level: entry.level,
-            message: '${entry.message.substring(0, _maxMessageLength)}... (截断, 原长${entry.message.length})',
+            message: '${entry.message.substring(0, _maxMessageLength)}... (truncated, original ${entry.message.length})',
             tag: entry.tag,
           )
         : entry;
+
     _logs.add(truncated);
     if (_logs.length > _maxLogs) {
-      _logs.removeRange(0, _logs.length - _maxLogs);
+      _logs.removeAt(0);
     }
+
+    // Write to file
+    _appendToFile(truncated);
+
     _controller.add(truncated);
+  }
+
+  Future<void> _appendToFile(LogEntry entry) async {
+    try {
+      final file = _logFile;
+      if (file == null) return;
+      // Rotate if file is too large (check before writing)
+      if (await file.exists()) {
+        final length = await file.length();
+        if (length > _maxFileSize) {
+          final dir = file.parent;
+          final rotated = File(p.join(dir.path, 'app_old.log'));
+          await file.rename(rotated.path);
+          _logFile = File(p.join(dir.path, 'app.log'));
+        }
+      }
+      await file.writeAsString('${entry.format()}\n', mode: FileMode.append);
+    } catch (e) {
+      // Avoid LogService recursion — use debugPrint for internal failures.
+      debugPrint('[LogService] File write error: $e');
+    }
   }
 
   void debug(String message, {String? tag}) {
@@ -121,9 +209,8 @@ class LogService {
     _addEntry(entry);
   }
 
-  /// 捕获 print 输出并记录
+  /// Capture print output and log it.
   void captureOutput(String line) {
-    // 解析已有的标签格式如 [Audio], [FloatingLyric] 等
     String? tag;
     String message = line;
     final tagMatch = RegExp(r'^\[([^\]]+)\]\s*(.*)$').firstMatch(line);
@@ -150,6 +237,20 @@ class LogService {
 
   void clear() {
     _logs.clear();
+  }
+
+  /// Get logs filtered by optional tag and level.
+  List<LogEntry> getFilteredLogs({LogTag? tag, LogLevel? level, String? search}) {
+    return _logs.where((entry) {
+      if (tag != null && !tag.matches(entry.tag)) return false;
+      if (level != null && entry.level != level) return false;
+      if (search != null && search.isNotEmpty) {
+        if (!entry.format().toLowerCase().contains(search.toLowerCase())) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
   }
 
   String exportAsText() {
@@ -181,14 +282,15 @@ class LogService {
     return file.path;
   }
 
-  /// 生成默认导出文件名
   String get exportFileName {
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
     return 'kikoflu_log_$timestamp.txt';
   }
+
+  int get logCount => _logs.length;
 }
 
-/// 初始化日志系统
+/// Initialize the log system.
 void setupLogCapture() {
   LogService.instance.initialize();
 }

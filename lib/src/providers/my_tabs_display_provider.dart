@@ -6,22 +6,26 @@ class MyTabsDisplaySettings {
   final bool showOnlineMarks;
   final bool showPlaylists;
   final bool showSubtitleLibrary;
+  final bool showStats;
 
   const MyTabsDisplaySettings({
     this.showOnlineMarks = true,
     this.showPlaylists = true,
     this.showSubtitleLibrary = true,
+    this.showStats = true,
   });
 
   MyTabsDisplaySettings copyWith({
     bool? showOnlineMarks,
     bool? showPlaylists,
     bool? showSubtitleLibrary,
+    bool? showStats,
   }) {
     return MyTabsDisplaySettings(
       showOnlineMarks: showOnlineMarks ?? this.showOnlineMarks,
       showPlaylists: showPlaylists ?? this.showPlaylists,
       showSubtitleLibrary: showSubtitleLibrary ?? this.showSubtitleLibrary,
+      showStats: showStats ?? this.showStats,
     );
   }
 }
@@ -32,6 +36,7 @@ class MyTabsDisplaySettingsNotifier
   static const String _onlineMarksKey = 'my_tabs_show_online_marks';
   static const String _playlistsKey = 'my_tabs_show_playlists';
   static const String _subtitleLibraryKey = 'my_tabs_show_subtitle_library';
+  static const String _statsKey = 'my_tabs_show_stats';
 
   MyTabsDisplaySettingsNotifier() : super(const MyTabsDisplaySettings()) {
     _loadSettings();
@@ -44,6 +49,7 @@ class MyTabsDisplaySettingsNotifier
         showOnlineMarks: prefs.getBool(_onlineMarksKey) ?? true,
         showPlaylists: prefs.getBool(_playlistsKey) ?? true,
         showSubtitleLibrary: prefs.getBool(_subtitleLibraryKey) ?? true,
+        showStats: prefs.getBool(_statsKey) ?? true,
       );
     } catch (e) {
       // 加载失败，使用默认值
@@ -64,6 +70,11 @@ class MyTabsDisplaySettingsNotifier
   Future<void> setShowSubtitleLibrary(bool value) async {
     state = state.copyWith(showSubtitleLibrary: value);
     await _saveSetting(_subtitleLibraryKey, value);
+  }
+
+  Future<void> setShowStats(bool value) async {
+    state = state.copyWith(showStats: value);
+    await _saveSetting(_statsKey, value);
   }
 
   Future<void> _saveSetting(String key, bool value) async {

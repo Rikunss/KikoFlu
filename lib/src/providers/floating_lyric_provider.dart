@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:io';
+import '../services/log_service.dart';
 import '../services/floating_lyric_service.dart';
 import '../services/audio_player_service.dart';
 import '../models/lyric.dart';
@@ -185,7 +186,7 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
       if (!hasPermission) {
         final granted = await FloatingLyricService.instance.requestPermission();
         if (!granted) {
-          print('[FloatingLyric] 用户未授予悬浮窗权限');
+          LogService.instance.warning('[FloatingLyric] 用户未授予悬浮窗权限', tag: 'UI');
           return;
         }
       }
@@ -244,7 +245,7 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
   /// 启动后台更新监听
   void _startBackgroundUpdate() {
     _stopBackgroundUpdate();
-    print('[FloatingLyric] 启动后台更新监听');
+    LogService.instance.debug('[FloatingLyric] 启动后台更新监听', tag: 'UI');
 
     // 确保字幕自动加载器始终激活（即使在后台）
     ref.read(lyricAutoLoaderProvider);
@@ -264,11 +265,11 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
     // 监听音轨变化
     _trackSubscription =
         AudioPlayerService.instance.currentTrackStream.listen((track) {
-      print(
-          '[FloatingLyric] 收到音轨事件: id=${track?.id}, title=${track?.title}, lastId=$_lastTrackId');
+      LogService.instance.debug(
+          '[FloatingLyric] 收到音轨事件: id=${track?.id}, title=${track?.title}, lastId=$_lastTrackId', tag: 'UI');
       if (track?.id != _lastTrackId) {
         _lastTrackId = track?.id;
-        print('[FloatingLyric] ✓ 音轨切换确认: ${track?.title}');
+        LogService.instance.debug('[FloatingLyric] ✓ 音轨切换确认: ${track?.title}', tag: 'UI');
         // 音轨切换时先显示"加载中"
         FloatingLyricService.instance.updateText('♪ 加载字幕中 ♪');
 
@@ -276,17 +277,16 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
         if (track != null) {
           final fileListState = ref.read(fileListControllerProvider);
           if (fileListState.files.isNotEmpty) {
-            print('[FloatingLyric] 主动触发字幕加载');
+            LogService.instance.debug('[FloatingLyric] 主动触发字幕加载', tag: 'UI');
             ref.read(lyricControllerProvider.notifier).loadLyricForTrack(
                   track,
                   fileListState.files,
                 );
           } else {
-            print('[FloatingLyric] 文件列表为空，无法加载字幕');
+            LogService.instance.debug('[FloatingLyric] 文件列表为空，无法加载字幕', tag: 'UI');
           }
         }
-      } else {
-        print('[FloatingLyric] ✗ 相同音轨，忽略');
+      } else {          LogService.instance.debug('[FloatingLyric] ✗ 相同音轨，忽略', tag: 'UI');
       }
     });
 
@@ -296,12 +296,12 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
       (previous, next) {
         // 当字幕加载完成（isLoading 从 true 变为 false）时更新
         if (previous?.isLoading == true && next.isLoading == false) {
-          print('[FloatingLyric] 字幕加载完成，更新悬浮窗');
+          LogService.instance.debug('[FloatingLyric] 字幕加载完成，更新悬浮窗', tag: 'UI');
           _updateLyricInBackground();
         }
         // 或者字幕内容发生变化时也更新
         else if (previous?.lyrics != next.lyrics && !next.isLoading) {
-          print('[FloatingLyric] 字幕内容变化，更新悬浮窗');
+          LogService.instance.debug('[FloatingLyric] 字幕内容变化，更新悬浮窗', tag: 'UI');
           _updateLyricInBackground();
         }
       },

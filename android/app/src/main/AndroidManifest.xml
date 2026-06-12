@@ -34,8 +34,11 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     
+    <!-- USB Host feature for direct DAC access -->
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    
     <application
-        android:label="KikoFlu"
+        android:label="KikoFlu Edge"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
         android:usesCleartextTraffic="true"
@@ -64,6 +67,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -89,6 +93,34 @@
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
+        </receiver>
+
+        <!-- Quick Settings Tile for App Lock toggle -->
+        <service
+            android:name=".AppLockTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_lock"
+            android:label="App Lock"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Home Screen Widget -->
+        <receiver
+            android:name=".KikoFluWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.meteor.kikoeruflutter.action.PLAY_PAUSE" />
+                <action android:name="com.meteor.kikoeruflutter.action.NEXT" />
+                <action android:name="com.meteor.kikoeruflutter.action.PREV" />
+                <action android:name="com.meteor.kikoeruflutter.action.OPEN_APP" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
         </receiver>
     </application>
     <!-- Required to query activities that can process text, see:

@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import AVFoundation
 import AVKit
 
 @main
@@ -12,9 +13,253 @@ import AVKit
   ) -> Bool {
     let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
     floatingLyricManager = FloatingLyricManager(controller: controller)
+
+    // Register audio conversion channel (WAV → ALAC)
+    registerAudioConversionChannel(controller: controller)
     
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  // MARK: - WAV to ALAC Conversion (via AVFoundation)
+
+  private func registerAudioConversionChannel(controller: FlutterViewController) {
+    let channel = FlutterMethodChannel(
+      name: "com.kikoeru.flutter/audio_conversion",
+      binaryMessenger: controller.binaryMessenger
+    )
+
+    channel.setMethodCallHandler { [weak self] (call, result) in
+      guard call.method == "convertWav" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+
+      guard let args = call.arguments as? [String: Any],
+            let inputPath = args["inputPath"] as? String,
+            let outputPath = args["outputPath"] as? String,
+            let format = args["format"] as? String else {
+        result(FlutterError(code: "INVALID_ARGS", message: "inputPath, outputPath, format required", details: nil))
+        return
+      }
+
+      switch format {
+      case "alac":
+        self?.convertWavToAlac(inputPath: inputPath, outputPath: outputPath, result: result)
+      case "aac":
+        self?.convertWavToAac(inputPath: inputPath, outputPath: outputPath, result: result)
+      default:
+        result(FlutterError(code: "UNSUPPORTED_FORMAT", message: "Format not supported on iOS: \(format)", details: nil))
+      }
+    }
+  }
+
+  private func convertWavToAlac(inputPath: String, outputPath: String, result: @escaping FlutterResult) {
+    DispatchQueue.global(qos: .utility).async {
+      let inputURL = URL(fileURLWithPath: inputPath)
+      let outputURL = URL(fileURLWithPath: outputPath)
+
+      // Ensure output directory exists
+      try? FileManager.default.createDirectory(
+        at: outputURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+
+      let asset = AVAsset(url: inputURL)
+      guard let reader = try? AVAssetReader(asset: asset) else {
+        result(FlutterError(code: "READ_ERROR", message: "Cannot create AVAssetReader", details: nil))
+        return
+      }
+
+      // Find audio track
+      guard let audioTrack = asset.tracks(withMediaType: .audio).first else {
+        result(FlutterError(code: "NO_AUDIO", message: "No audio track found", details: nil))
+        return
+      }
+
+      // Reader settings: output PCM
+      let outputSettings: [String: Any] = [
+        AVFormatIDKey: kAudioFormatLinearPCM,
+        AVLinearPCMBitDepthKey: 16,
+        AVLinearPCMIsFloatKey: false,
+        AVLinearPCMIsBigEndianKey: false,
+        AVNumberOfChannelsKey: 2,
+        AVSampleRateKey: 44100
+      ]
+      let readerOutput = AVAssetReaderTrackOutput(track: audioTrack, outputSettings: outputSettings)
+      guard reader.canAdd(readerOutput) else {
+        result(FlutterError(code: "READER_ERROR", message: "Cannot add reader output", details: nil))
+        return
+      }
+      reader.add(readerOutput)
+
+      // Writer settings: ALAC (Apple Lossless)
+      let writer: AVAssetWriter
+      do {
+        // Remove existing file if present
+        if FileManager.default.fileExists(atPath: outputPath) {
+          try FileManager.default.removeItem(at: outputURL)
+        }
+        writer = try AVAssetWriter(outputURL: outputURL, fileType: .m4a)
+      } catch {
+        result(FlutterError(code: "WRITER_ERROR", message: "Cannot create AVAssetWriter", details: nil))
+        return
+      }
+
+      let writerSettings: [String: Any] = [
+        AVFormatIDKey: kAudioFormatAppleLossless,
+        AVSampleRateKey: 44100,
+        AVNumberOfChannelsKey: 2,
+        AVEncoderBitDepthHintKey: 16
+      ]
+      let writerInput = AVAssetWriterInput(mediaType: .audio, outputSettings: writerSettings)
+      writerInput.expectsMediaDataInRealTime = false
+      guard writer.canAdd(writerInput) else {
+        result(FlutterError(code: "WRITER_ERROR", message: "Cannot add writer input", details: nil))
+        return
+      }
+      writer.add(writerInput)
+
+      // Start encoding
+      reader.startReading()
+      writer.startWriting()
+      writer.startSession(atSourceTime: .zero)
+
+      let encodingGroup = DispatchGroup()
+      encodingGroup.enter()
+
+      writerInput.requestMediaDataWhenReady(on: DispatchQueue.global(qos: .utility)) {
+        while writerInput.isReadyForMoreMediaData {
+          guard let sampleBuffer = readerOutput.copyNextSampleBuffer() else {
+            writerInput.markAsFinished()
+            encodingGroup.leave()
+            return
+          }
+          writerInput.append(sampleBuffer)
+        }
+      }
+
+      // Wait for encoding to complete
+      _ = encodingGroup.wait(timeout: .now() + 300)
+
+      writer.finishWriting {
+        if reader.status == .completed && writer.status == .completed {
+          // Get file sizes for logging
+          let originalSize = (try? FileManager.default.attributesOfItem(atPath: inputPath))?[.size] as? Int64 ?? 0
+          let convertedSize = (try? FileManager.default.attributesOfItem(atPath: outputPath))?[.size] as? Int64 ?? 0
+          let savedPercent = originalSize > 0
+            ? String(format: "%.1f", (1.0 - Double(convertedSize) / Double(originalSize)) * 100)
+            : "?"
+          print("[AudioConversion] WAV→ALAC success: \(originalSize) → \(convertedSize) bytes (-\(savedPercent)%)")
+
+          // Delete original WAV
+          try? FileManager.default.removeItem(at: inputURL)
+
+          result("success")
+        } else {
+          let errorMsg = writer.error?.localizedDescription ?? reader.error?.localizedDescription ?? "Unknown error"
+          print("[AudioConversion] WAV→ALAC failed: \(errorMsg)")
+          result(FlutterError(code: "ENCODE_ERROR", message: errorMsg, details: nil))
+        }
+      }
+    }
+  }
+
+  private func convertWavToAac(inputPath: String, outputPath: String, result: @escaping FlutterResult) {
+    DispatchQueue.global(qos: .utility).async {
+      let inputURL = URL(fileURLWithPath: inputPath)
+      let outputURL = URL(fileURLWithPath: outputPath)
+
+      try? FileManager.default.createDirectory(
+        at: outputURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+
+      let asset = AVAsset(url: inputURL)
+      guard let reader = try? AVAssetReader(asset: asset) else {
+        result(FlutterError(code: "READ_ERROR", message: "Cannot create AVAssetReader", details: nil))
+        return
+      }
+
+      guard let audioTrack = asset.tracks(withMediaType: .audio).first else {
+        result(FlutterError(code: "NO_AUDIO", message: "No audio track found", details: nil))
+        return
+      }
+
+      // Reader: output PCM
+      let outputSettings: [String: Any] = [
+        AVFormatIDKey: kAudioFormatLinearPCM,
+        AVLinearPCMBitDepthKey: 16,
+        AVLinearPCMIsFloatKey: false,
+        AVLinearPCMIsBigEndianKey: false,
+        AVNumberOfChannelsKey: 2,
+        AVSampleRateKey: 44100
+      ]
+      let readerOutput = AVAssetReaderTrackOutput(track: audioTrack, outputSettings: outputSettings)
+      guard reader.canAdd(readerOutput) else {
+        result(FlutterError(code: "READER_ERROR", message: "Cannot add reader output", details: nil))
+        return
+      }
+      reader.add(readerOutput)
+
+      // Writer: AAC (256 kbps)
+      let writer: AVAssetWriter
+      do {
+        if FileManager.default.fileExists(atPath: outputPath) {
+          try FileManager.default.removeItem(at: outputURL)
+        }
+        writer = try AVAssetWriter(outputURL: outputURL, fileType: .m4a)
+      } catch {
+        result(FlutterError(code: "WRITER_ERROR", message: "Cannot create AVAssetWriter", details: nil))
+        return
+      }
+
+      let writerSettings: [String: Any] = [
+        AVFormatIDKey: kAudioFormatMPEG4AAC,
+        AVSampleRateKey: 44100,
+        AVNumberOfChannelsKey: 2,
+        AVEncoderBitRateKey: 256000
+      ]
+      let writerInput = AVAssetWriterInput(mediaType: .audio, outputSettings: writerSettings)
+      writerInput.expectsMediaDataInRealTime = false
+      guard writer.canAdd(writerInput) else {
+        result(FlutterError(code: "WRITER_ERROR", message: "Cannot add writer input", details: nil))
+        return
+      }
+      writer.add(writerInput)
+
+      reader.startReading()
+      writer.startWriting()
+      writer.startSession(atSourceTime: .zero)
+
+      let encodingGroup = DispatchGroup()
+      encodingGroup.enter()
+
+      writerInput.requestMediaDataWhenReady(on: DispatchQueue.global(qos: .utility)) {
+        while writerInput.isReadyForMoreMediaData {
+          guard let sampleBuffer = readerOutput.copyNextSampleBuffer() else {
+            writerInput.markAsFinished()
+            encodingGroup.leave()
+            return
+          }
+          writerInput.append(sampleBuffer)
+        }
+      }
+
+      _ = encodingGroup.wait(timeout: .now() + 300)
+
+      writer.finishWriting {
+        if reader.status == .completed && writer.status == .completed {
+          print("[AudioConversion] WAV->AAC success")
+          try? FileManager.default.removeItem(at: inputURL)
+          result("success")
+        } else {
+          let errorMsg = writer.error?.localizedDescription ?? reader.error?.localizedDescription ?? "Unknown error"
+          print("[AudioConversion] WAV->AAC failed: \(errorMsg)")
+          result(FlutterError(code: "ENCODE_ERROR", message: errorMsg, details: nil))
+        }
+      }
+    }
   }
 }
 

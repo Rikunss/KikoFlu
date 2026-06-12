@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:saver_gallery/saver_gallery.dart';
 import 'package:file_picker/file_picker.dart';
@@ -88,7 +88,7 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
       _transformController.value = Matrix4.identity();
     } else {
       const newScale = 2.5;
-      _transformController.value = Matrix4.identity()..scale(newScale);
+      _transformController.value = Matrix4.diagonal3Values(newScale, newScale, 1.0);
     }
   }
 
@@ -174,7 +174,7 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
 
   Future<void> _saveToFile(Uint8List bytes, String fileName) async {
     // 桌面端：让用户选择保存位置
-    final result = await FilePicker.platform.saveFile(
+    final result = await FilePicker.saveFile(
       dialogTitle: S.of(context).saveCoverImage,
       fileName: fileName,
       type: FileType.image,
@@ -197,10 +197,11 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
       imageWidget = Image.file(
         File(widget.localPath!),
         fit: BoxFit.contain,
+        cacheWidth: 2160,
         errorBuilder: (context, error, stackTrace) {
-          if (widget.imageUrl != null) {
-            return CachedNetworkImage(
+          if (widget.imageUrl != null) {              return CachedNetworkImage(
               imageUrl: widget.imageUrl!,
+              cacheKey: 'cover_${widget.imageUrl!.hashCode}',
               fit: BoxFit.contain,
               placeholder: (context, url) => const Center(
                 child: CircularProgressIndicator(),
@@ -222,6 +223,7 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
     } else if (widget.imageUrl != null) {
       imageWidget = CachedNetworkImage(
         imageUrl: widget.imageUrl!,
+        cacheKey: 'cover_${widget.imageUrl!.hashCode}',
         fit: BoxFit.contain,
         placeholder: (context, url) => const Center(
           child: CircularProgressIndicator(),
@@ -274,40 +276,60 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
               ),
             ),
 
-            // 顶部工具栏
-            if (_showControls)
+            // 顶部工具栏              if (_showControls)
               Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
-                child: SafeArea(
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // 关闭按钮
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                        // 保存按钮
-                        IconButton(
-                          icon: _isSaving
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.save_alt, color: Colors.white),
-                          onPressed: _isSaving ? null : _saveImage,
-                          tooltip: S.of(context).saveImage,
-                        ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.6),
+                        Colors.transparent,
                       ],
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // 关闭按钮
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white),
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                          // 保存按钮
+                          IconButton(
+                            icon: _isSaving
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.save_alt,
+                                    color: Colors.white),
+                            onPressed: _isSaving
+                                ? null
+                                : () {
+                                    HapticFeedback.lightImpact();
+                                    _saveImage();
+                                  },
+                            tooltip: S.of(context).saveImage,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -319,15 +341,35 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
                 bottom: 0,
                 left: 0,
                 right: 0,
-                child: SafeArea(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      S.of(context).doubleTapToZoom,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.5),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          S.of(context).doubleTapToZoom,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 12,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
                       ),
                     ),
                   ),
