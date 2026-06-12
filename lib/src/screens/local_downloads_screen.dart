@@ -77,6 +77,13 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
   SortOrder _sortOrder = SortOrder.downloadDate;
   SortDirection _sortDirection = SortDirection.desc;
 
+  // Filter by circle / VA / tag
+  _FilterType _filterType = _FilterType.all;
+  String _filterValue = '';
+
+  /// Cache parsed Work objects by workId to avoid re-parsing metadata.
+  final Map<int, Work> _workCache = {};
+
   // ── Reactive subscriptions ──
   StreamSubscription<List<DownloadTask>>? _tasksSub;
   List<DownloadTask> _allTasks = [];
@@ -85,12 +92,9 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
   void initState() {
     super.initState();
     _allTasks = DownloadService.instance.tasks;
-    // Listen to task stream for all updates (new downloads, status changes, conversion completion).
-    // Only _tasksSub is needed — _updateTask() always triggers _tasksController.add(),
-    // which delivers the freshest data. No need for conversionStream: it fires BEFORE
-    // _updateTask(), so reading tasks from it would return stale (still "converting") data.
     _tasksSub = DownloadService.instance.tasksStream.listen((tasks) {
       if (!mounted) return;
+      _workCache.clear(); // invalidate cache on data change
       setState(() => _allTasks = tasks);
     });
   }
@@ -180,6 +184,8 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
 
   Future<void> _refreshMetadata() async {
     if (!mounted) return;
+    // Clear work cache so filter options are rebuilt
+    _workCache.clear();
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
       content: Row(children: [
         const SizedBox(width: 16, height: 16,
@@ -312,11 +318,80 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     });
   }
 
+  /// ── Filter helpers ──
+
+  /// Lazily parse and cache a [Work] from the first task's metadata.
+  Work? _getWork(int workId, List<DownloadTask> tasks) {
+    if (_workCache.containsKey(workId)) return _workCache[workId];
+    final meta = tasks.first.workMetadata;
+    if (meta == null) return null;
+    try {
+      final sanitized = sanitizeMetadata(meta);
+      final work = Work.fromJson(sanitized);
+      _workCache[workId] = work;
+      return work;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Extract unique circles, VAs, and tags from all completed tasks.
+  Map<String, List<String>> _extractFilterOptions(
+      Map<int, List<DownloadTask>> grouped) {
+    final circles = <String>{};
+    final vas = <String>{};
+    final tags = <String>{};
+
+    for (final entry in grouped.entries) {
+      final work = _getWork(entry.key, entry.value);
+      if (work == null) continue;
+
+      if (work.name != null && work.name!.isNotEmpty) circles.add(work.name!);
+      if (work.vas != null) {
+        for (final va in work.vas!) {
+          if (va.name.isNotEmpty) vas.add(va.name);
+        }
+      }
+      if (work.tags != null) {
+        for (final tag in work.tags!) {
+          if (tag.name.isNotEmpty) tags.add(tag.name);
+        }
+      }
+    }
+
+    return {
+      'circles': circles.toList()..sort(),
+      'vas': vas.toList()..sort(),
+      'tags': tags.toList()..sort(),
+    };
+  }
+
+  /// Apply search + metadata filter to the grouped tasks.
   Map<int, List<DownloadTask>> _filterTasks(
       Map<int, List<DownloadTask>> groupedTasks) {
-    if (_searchQuery.isEmpty) return groupedTasks;
+    // Apply metadata filter first
+    Map<int, List<DownloadTask>> result = groupedTasks;
+    if (_filterType != _FilterType.all && _filterValue.isNotEmpty) {
+      result = Map.fromEntries(groupedTasks.entries.where((e) {
+        final work = _getWork(e.key, e.value);
+        if (work == null) return false;
+        switch (_filterType) {
+          case _FilterType.all:
+            return true;
+          case _FilterType.circle:
+            return work.name == _filterValue;
+          case _FilterType.va:
+            return work.vas?.any((va) => va.name == _filterValue) ?? false;
+          case _FilterType.tag:
+            return work.tags?.any((tag) => tag.name == _filterValue) ?? false;
+        }
+      }));
+    }
+
+    // Then apply search query
+    if (_searchQuery.isEmpty) return result;
     final query = _searchQuery.toLowerCase();
-    return Map.fromEntries(groupedTasks.entries.where((e) {
+    return Map.fromEntries(result.entries.where((e) {
       final first = e.value.first;
       if (first.workTitle.toLowerCase().contains(query)) return true;
       final rj = 'RJ${e.key.toString().padLeft(6, '0')}';
@@ -469,10 +544,7 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
   }
 
   /// Import multiple subfolders — each becomes one work.
-  /// Shows a progress dialog with folder name + linear progress bar.
   Future<void> _importMultipleFolders() async {
-    // Capture context BEFORE any async gaps to avoid the
-    // use_build_context_synchronously warning.
     final dialogContext = context;
     final s = S.of(dialogContext);
 
@@ -482,7 +554,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     );
     if (parentPath == null || !mounted) return;
 
-    // Count subfolders first for total
     final parentDir = Directory(parentPath);
     int totalSubfolders = 0;
     if (await parentDir.exists()) {
@@ -503,7 +574,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
 
     if (!dialogContext.mounted) return;
 
-    // Show progress dialog
     final progressNotifier = ValueNotifier<_ImportProgress>(
       _ImportProgress(completed: 0, total: totalSubfolders, currentFolder: ''),
     );
@@ -572,14 +642,12 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       );
 
       if (!mounted) return;
-      // Dismiss progress dialog
       if (dialogContext.mounted) {
         // ignore: use_build_context_synchronously
         Navigator.of(dialogContext, rootNavigator: true).pop();
       }
-      await dialogFuture; // wait for dismiss animation
+      await dialogFuture;
 
-      // Reset to page 1 so the newly imported works are visible
       setState(() => _currentPage = 1);
       _scrollToTop();
 
@@ -597,7 +665,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       ));
     } catch (e) {
       if (!mounted) return;
-      // Dismiss progress dialog
       if (dialogContext.mounted) {
         // ignore: use_build_context_synchronously
         Navigator.of(dialogContext, rootNavigator: true).pop();
@@ -651,6 +718,7 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         onShowSort: _showSortDialog,
       ),
       _buildImportBar(),
+      _buildFilterBar(allGrouped),
       if (_isSearchVisible) _buildSearchBar(),
       Expanded(
         child: allGrouped.isEmpty
@@ -729,8 +797,7 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     ]);
   }
 
-  /// Import bar — sits between the top toolbar and the download grid.
-  /// Shows a simple (+) button to import folders (single or multiple).
+  /// Import bar — sits between the top toolbar and the filter bar.
   Widget _buildImportBar() {
     final cs = Theme.of(context).colorScheme;
     final s = S.of(context);
@@ -792,6 +859,188 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// Filter bar — chips for Circle / VA / Tag filtering.
+  Widget _buildFilterBar(Map<int, List<DownloadTask>> grouped) {
+    final cs = Theme.of(context).colorScheme;
+    final options = _extractFilterOptions(grouped);
+    final hasActiveFilter = _filterType != _FilterType.all;
+
+    // Only show if there are filterable options or an active filter
+    final hasOptions = options.values.any((list) => list.isNotEmpty);
+    if (!hasOptions && !hasActiveFilter) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            // "All" chip (always visible to clear filter)
+            _FilterChip(
+              label: 'All',
+              icon: Icons.filter_alt_off_rounded,
+              isSelected: !hasActiveFilter,
+              onTap: () => setState(() {
+                _filterType = _FilterType.all;
+                _filterValue = '';
+                _currentPage = 1;
+              }),
+              cs: cs,
+            ),
+            const SizedBox(width: 6),
+
+            // Circle filter chip
+            if (options['circles']!.isNotEmpty)
+              _buildFilterChip(
+                label: 'Circle',
+                icon: Icons.business_rounded,
+                type: _FilterType.circle,
+                options: options['circles']!,
+                cs: cs,
+              ),
+
+            // VA filter chip
+            if (options['vas']!.isNotEmpty)
+              _buildFilterChip(
+                label: 'VA',
+                icon: Icons.mic_rounded,
+                type: _FilterType.va,
+                options: options['vas']!,
+                cs: cs,
+              ),
+
+            // Tag filter chip
+            if (options['tags']!.isNotEmpty)
+              _buildFilterChip(
+                label: 'Tag',
+                icon: Icons.label_rounded,
+                type: _FilterType.tag,
+                options: options['tags']!,
+                cs: cs,
+              ),
+
+            // Active filter badge
+            if (hasActiveFilter) ...[
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _filterValue,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.onPrimaryContainer),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build a single filter chip group (Circle / VA / Tag).
+  /// Tapping the chip opens a bottom sheet to pick a value.
+  Widget _buildFilterChip({
+    required String label,
+    required IconData icon,
+    required _FilterType type,
+    required List<String> options,
+    required ColorScheme cs,
+  }) {
+    final isActive = _filterType == type;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ActionChip(
+        avatar: Icon(icon, size: 14,
+          color: isActive ? cs.onPrimaryContainer : cs.onSurfaceVariant),
+        label: Text(
+          isActive ? _filterValue : label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+            color: isActive ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+          ),
+        ),
+        side: isActive
+            ? BorderSide(color: cs.primary, width: 1)
+            : BorderSide(color: cs.outlineVariant.withAlpha(80)),
+        backgroundColor: isActive ? cs.primaryContainer : cs.surfaceContainerHighest.withAlpha(120),
+        onPressed: () => _showFilterPicker(type, options, label),
+      ),
+    );
+  }
+
+  /// Show a bottom sheet to pick a filter value.
+  void _showFilterPicker(_FilterType type, List<String> options, String label) {
+    final s = S.of(context);
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(children: [
+                Text('Filter by $label',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(s.cancel),
+                ),
+              ]),
+            ),
+            const Divider(height: 1),
+            // Options list
+            SizedBox(
+              height: (options.length * 52 + 16).clamp(100, 360).toDouble(),
+              child: ListView.builder(
+                itemCount: options.length,
+                itemBuilder: (ctx, i) {
+                  final value = options[i];
+                  final isSelected = _filterType == type && _filterValue == value;
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(
+                      isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                      color: isSelected ? Theme.of(ctx).colorScheme.primary : null,
+                      size: 20,
+                    ),
+                    title: Text(value, style: const TextStyle(fontSize: 14)),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle, color: Theme.of(ctx).colorScheme.primary, size: 20)
+                        : null,
+                    selected: isSelected,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _filterType = type;
+                        _filterValue = value;
+                        _currentPage = 1;
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
@@ -887,6 +1136,46 @@ class _ImportProgress {
 }
 
 enum _ImportAction { singleFolder, multipleFolders }
+
+/// Filter type for the downloads filter bar.
+enum _FilterType { all, circle, va, tag }
+
+/// Small reusable filter chip widget.
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final ColorScheme cs;
+
+  const _FilterChip({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+    required this.cs,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      avatar: Icon(icon, size: 14,
+        color: isSelected ? cs.primary : cs.onSurfaceVariant),
+      label: Text(label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+          color: isSelected ? cs.primary : cs.onSurfaceVariant,
+        ),
+      ),
+      backgroundColor: isSelected
+          ? cs.primaryContainer.withValues(alpha: 0.4)
+          : cs.surfaceContainerHighest.withValues(alpha: 0.6),
+      side: BorderSide(color: cs.outlineVariant.withAlpha(80)),
+      onPressed: onTap,
+    );
+  }
+}
 
 class _DownloadTopBar extends StatelessWidget {
   final bool isSelectionMode;
@@ -1063,11 +1352,6 @@ class _DownloadTopBar extends StatelessWidget {
     );
   }
 }
-
-/// ===================================================================
-/// Search bar — shown when _isSearchVisible
-/// ===================================================================
-// (Search bar is built inline in _DownloadTopBar parent as a separate container)
 
 /// ===================================================================
 /// Work card — receives auth props instead of ref.watch per card
@@ -1338,12 +1622,9 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover> {
   @override
   Widget build(BuildContext context) {
     final dpr = MediaQuery.devicePixelRatioOf(context);
-    // Grid: maxCrossAxisExtent=210, childAspectRatio=0.72
-    // Card full height ≈ 210/0.72 ≈ 292px. Info area ≈ 94px. Cover ≈ 198px.
     final cacheWidth = (210 * dpr).round();
     final cacheHeight = ((210 / 0.72 - 94.0) * dpr).round();
 
-    // ── Local cached cover ──
     if (_coverPath != null) {
       return Hero(
         tag: 'offline_work_cover_${widget.workId}',
@@ -1363,10 +1644,8 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover> {
       );
     }
 
-    // ── Still resolving — show placeholder ──
     if (!_resolved) return _buildPlaceholder(context);
 
-    // ── Fallback to network cover ──
     final host = ref.watch(authProvider.select((s) => s.host));
     if (widget.work != null && host != null && host.isNotEmpty) {
       return Hero(
