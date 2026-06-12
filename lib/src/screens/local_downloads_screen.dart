@@ -773,7 +773,7 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         onShowSort: _showSortDialog,
       ),
       _buildImportBar(),
-      _buildSourceTabs(),
+      _buildSourceTabs(downloadedCount: downloadedCount, importedCount: importedCount),
       _buildInfoBar(allCount, downloadedCount, importedCount),
       _buildFilterBar(allGrouped),
       if (_isSearchVisible) _buildSearchBar(),
@@ -859,7 +859,7 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
   }
 
   /// Source tabs — segmented pill control: All | Downloaded | Imported
-  Widget _buildSourceTabs() {
+  Widget _buildSourceTabs({required int downloadedCount, required int importedCount}) {
     final cs = Theme.of(context).colorScheme;
     final s = S.of(context);
     const tabs = _SourceFilter.values;
@@ -920,6 +920,13 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
                           color: isSel ? cs.onPrimaryContainer : cs.onSurfaceVariant,
                         ),
                       ),
+                      const SizedBox(width: 6),
+                      // Count badge
+                      _SourceCountBadge(
+                        count: _countForFilter(filter, downloadedCount, importedCount),
+                        isSelected: isSel,
+                        colorScheme: cs,
+                      ),
                     ],
                   ),
                 ),
@@ -950,6 +957,17 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         return 'Downloaded';
       case _SourceFilter.imported:
         return 'Imported';
+    }
+  }
+
+  int _countForFilter(_SourceFilter filter, int downloadedCount, int importedCount) {
+    switch (filter) {
+      case _SourceFilter.all:
+        return downloadedCount + importedCount;
+      case _SourceFilter.downloaded:
+        return downloadedCount;
+      case _SourceFilter.imported:
+        return importedCount;
     }
   }
 
@@ -1743,6 +1761,43 @@ class _DownloadWorkCard extends StatelessWidget {
 Color _workColor(int id) {
   final hue = (id * 137.508) % 360;
   return HSLColor.fromAHSL(0.85, hue, 0.55, 0.5).toColor();
+}
+
+/// Small count badge shown inside source tab pills.
+class _SourceCountBadge extends StatelessWidget {
+  final int count;
+  final bool isSelected;
+  final ColorScheme colorScheme;
+
+  const _SourceCountBadge({
+    required this.count,
+    required this.isSelected,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (count <= 0) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? colorScheme.primary.withAlpha(30)
+            : colorScheme.surfaceContainerHighest.withAlpha(180),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '$count',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: isSelected
+              ? colorScheme.onPrimaryContainer
+              : colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
 }
 
 /// Small badge indicating whether a work was downloaded from server or imported.
