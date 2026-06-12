@@ -115,7 +115,7 @@
 ### 📱 Android Features
 - Floating lyrics (lock / unlock / touch passthrough)
 - **Home screen widget** — quick playback controls and now-playing info
-- **Exclusive audio mode** — bit-perfect USB DAC support
+- **Exclusive audio mode** — bit-perfect USB DAC support *maybe some devices support need android 14+, failed on my poco x6 5g.. but you can try by yourself :)
 
 ---
 
