@@ -147,7 +147,7 @@ class _CustomFilePickerDialog extends StatefulWidget {
 }
 
 class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
-  late List<FileSystemEntity> _entries;
+  List<FileSystemEntity> _entries = [];
   late String _currentPath;
   bool _isLoading = true;
   String? _error;

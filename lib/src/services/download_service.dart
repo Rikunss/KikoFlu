@@ -5,6 +5,8 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/download_task.dart';
+import 'dart:typed_data';
+import 'package:image/image.dart' as img;
 import '../utils/file_icon_utils.dart';
 import 'audio_conversion_service.dart';
 import 'cache_service.dart';
@@ -1393,7 +1395,11 @@ class DownloadService {
       throw Exception('No supported audio/image/text files found in the selected folder.');
     }
 
-    // Look for a cover image in the imported folder and copy it to cover.jpg
+    // Look for a cover image in the imported folder, resize to a reasonable
+    // max dimension (720px), and save as JPEG quality 85.
+    // This prevents large/resolution covers (>1MB) from failing to display in
+    // the fullscreen player and avoids unnecessary memory pressure during
+    // image decoding (Image.file with cacheWidth).
     String? coverPath;
     try {
       await for (final entity in importDir.list(followLinks: false)) {
@@ -1402,15 +1408,19 @@ class DownloadService {
           if (fName.endsWith('.jpg') || fName.endsWith('.jpeg') ||
               fName.endsWith('.png') || fName.endsWith('.webp') ||
               fName.endsWith('.bmp')) {
-            await entity.copy('${workDir.path}/cover.jpg');
+            await _resizeAndSaveCover(
+              sourcePath: entity.path,
+              destPath: '${workDir.path}/cover.jpg',
+              maxDimension: 720,
+            );
             coverPath = 'cover.jpg';
-            _log.info('Cover image copied: $fName', tag: 'Download');
+            _log.info('Cover image resized and saved as JPEG: $fName (max ${720}px)', tag: 'Download');
             break; // use the first image found
           }
         }
       }
     } catch (e) {
-      _log.warning('Failed to copy cover image: $e', tag: 'Download');
+      _log.warning('Failed to process cover image: $e', tag: 'Download');
     }
 
     // Create work metadata
@@ -1472,6 +1482,56 @@ class DownloadService {
     _tasksController.add(List.from(_tasks));
 
     return workId;
+  }
+
+  /// Resize a cover image to [maxDimension] pixels on the longest edge and
+  /// save as JPEG quality 85. This prevents large images (>1MB) from causing
+  /// silent decode failures in Image.file() on Android with Impeller/Vulkan.
+  Future<void> _resizeAndSaveCover({
+    required String sourcePath,
+    required String destPath,
+    int maxDimension = 720,
+  }) async {
+    final sourceFile = File(sourcePath);
+    if (!await sourceFile.exists()) return;
+
+    // Read the source file bytes
+    final Uint8List bytes = await sourceFile.readAsBytes();
+
+    // Decode the image using the pure-Dart image package
+    final original = img.decodeImage(bytes);
+    if (original == null) {
+      // Fallback: copy the file as-is if decoding fails (better than nothing)
+      _log.warning('Failed to decode cover image, copying as-is: $sourcePath',
+          tag: 'Download');
+      await sourceFile.copy(destPath);
+      return;
+    }
+
+    // Determine if resize is needed
+    final isOversized =
+        original.width > maxDimension || original.height > maxDimension;
+
+    img.Image result;
+    if (isOversized) {
+      // Resize maintaining aspect ratio
+      result = img.copyResize(original,
+          width: original.width > original.height ? maxDimension : null,
+          height: original.height >= original.width ? maxDimension : null);
+    } else {
+      result = original;
+    }
+
+    // Encode as JPEG quality 85 (good visual quality, small file size)
+    final jpegBytes = img.encodeJpg(result, quality: 85);
+    await File(destPath).writeAsBytes(jpegBytes);
+
+    _log.info(
+      'Cover resized: ${original.width}x${original.height} -> ${result.width}x${result.height} '
+      '(${(bytes.length / 1024).toStringAsFixed(1)}KB -> '
+      '${(jpegBytes.length / 1024).toStringAsFixed(1)}KB)',
+      tag: 'Download',
+    );
   }
 
   /// Import multiple folders (each subfolder becomes one work).

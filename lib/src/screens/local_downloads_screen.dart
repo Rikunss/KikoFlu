@@ -452,7 +452,14 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
   }
 
   void _openWorkDetail(int workId, DownloadTask task) async {
-    if (task.workMetadata == null) {
+    Map<String, dynamic>? metadata = task.workMetadata;
+    if (metadata == null) {
+      // Try loading from disk — useful before syncWithDiskAfterInit completes
+      try {
+        metadata = await DownloadService.instance.getWorkMetadata(workId);
+      } catch (_) {}
+    }
+    if (metadata == null) {
       _showSnackBarSafe(SnackBar(
         content: Text(S.of(context).noWorkMetadataForOffline),
         duration: const Duration(seconds: 2),
@@ -460,8 +467,8 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       return;
     }
     try {
-      final metadata = sanitizeMetadata(task.workMetadata!);
-      final work = Work.fromJson(metadata);
+      final sanitized = sanitizeMetadata(metadata);
+      final work = Work.fromJson(sanitized);
       final downloadDir = await DownloadService.instance.getDownloadDirectory();
       final relPath = metadata['localCoverPath'] as String?;
       final localCover = relPath != null ? '${downloadDir.path}/$workId/$relPath' : null;
@@ -1890,7 +1897,7 @@ class _WorkCardCover extends ConsumerStatefulWidget {
 }
 
 class _WorkCardCoverState extends ConsumerState<_WorkCardCover> {
-  /// Cached local cover file path (resolved once in initState)
+  /// Cached local cover file path
   String? _coverPath;
 
   /// Whether we've finished trying to resolve the local cover
@@ -1900,6 +1907,17 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover> {
   void initState() {
     super.initState();
     _resolveCover();
+  }
+
+  @override
+  void didUpdateWidget(covariant _WorkCardCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Re-resolve cover when workMetadata changes (e.g. after disk sync)
+    if (widget.firstTask.workMetadata != oldWidget.firstTask.workMetadata) {
+      _resolved = false;
+      _coverPath = null;
+      _resolveCover();
+    }
   }
 
   Future<void> _resolveCover() async {
