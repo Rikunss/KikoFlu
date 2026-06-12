@@ -165,7 +165,6 @@ flutter pub get
 ## Contributors
 
 - **Meteor-Sage** — Original author & lead developer
-- **Rikunss** — Co-developer
 
 ## License
 
