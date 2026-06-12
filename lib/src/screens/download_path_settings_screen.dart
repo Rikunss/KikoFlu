@@ -76,7 +76,7 @@ class _DownloadPathSettingsScreenState
     setState(() => _isLoading = true);
 
     try {
-      final selectedPath = await DownloadPathService.pickCustomDirectory();
+      final selectedPath = await DownloadPathService.pickCustomDirectory(context: context);
 
       if (selectedPath == null) {
         setState(() => _isLoading = false);

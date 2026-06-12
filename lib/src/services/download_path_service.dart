@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
+import '../widgets/custom_file_picker.dart';
 import 'storage_service.dart';
 import 'log_service.dart';
 
@@ -56,10 +57,12 @@ class DownloadPathService {
   /// 选择自定义下载目录
   /// 返回 null 表示用户取消选择
   /// 返回路径字符串表示成功
-  static Future<String?> pickCustomDirectory() async {
+  ///
+  /// [context] is required on Android to show the custom file picker dialog.
+  static Future<String?> pickCustomDirectory({BuildContext? context}) async {
     // 根据平台不同处理
     if (Platform.isAndroid) {
-      return await _pickDirectoryAndroid();
+      return await _pickDirectoryAndroid(context: context);
     } else if (Platform.isIOS) {
       return await _pickDirectoryIOS();
     } else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
@@ -70,49 +73,20 @@ class DownloadPathService {
 
   /// Android 平台选择目录
   ///
-  /// Di Android 11+ (API 30+), [FilePicker] menggunakan Storage Access Framework
-  /// (SAF) secara internal, sehingga tidak memerlukan MANAGE_EXTERNAL_STORAGE
-  /// atau READ_EXTERNAL_STORAGE. System file picker akan memberikan akses ke
-  /// direktori yang dipilih melalui SAF URI.
-  static Future<String?> _pickDirectoryAndroid() async {
-    // Request storage permission dulu sebelum buka file picker
-    if (await _requestStoragePermission()) {
-      try {
-        final result = await FilePicker.getDirectoryPath();
-        return result;
-      } catch (e) {
-        _log.error('Android directory picker failed: $e', tag: 'DownloadPath');
-        return null;
-      }
+  /// Uses the in-app custom file browser ([CustomFilePicker]) instead of SAF
+  /// (Storage Access Framework), because SAF's `ACTION_OPEN_DOCUMENT_TREE`
+  /// is broken on MIUI/HyperOS (shows empty folder).
+  ///
+  /// On Android 11+, requests [Permission.manageExternalStorage] first.
+  /// If granted, [CustomFilePicker] uses [dart:io] to browse the filesystem.
+  static Future<String?> _pickDirectoryAndroid({BuildContext? context}) async {
+    if (context == null) {
+      _log.error('Context required for Android custom file picker',
+          tag: 'DownloadPath');
+      return null;
     }
-    return null;
-  }
-
-  /// Request storage permission (Android).
-  static Future<bool> _requestStoragePermission() async {
-    if (!Platform.isAndroid) return true;
-
-    // Android 13+ (API 33+) menggunakan scoped storage — tidak perlu MANAGE_EXTERNAL_STORAGE
-    if (Platform.version.contains('13') ||
-        Platform.version.contains('14') ||
-        Platform.version.contains('15')) {
-      return true;
-    }
-
-    // Android 11-12: perlu MANAGE_EXTERNAL_STORAGE
-    var status = await Permission.manageExternalStorage.status;
-    if (!status.isGranted) {
-      status = await Permission.manageExternalStorage.request();
-    }
-    if (!status.isGranted) {
-      // Fallback: coba basic storage permission
-      var storageStatus = await Permission.storage.status;
-      if (!storageStatus.isGranted) {
-        storageStatus = await Permission.storage.request();
-      }
-      return storageStatus.isGranted;
-    }
-    return status.isGranted;
+    // Request storage permission first, then show custom file picker
+    return CustomFilePicker.pickDirectory(context: context);
   }
 
   /// iOS 平台选择目录

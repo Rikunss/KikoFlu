@@ -3,10 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'dart:async';
 import 'dart:io';
+
 
 import '../../l10n/app_localizations.dart';
 import '../../src/services/log_service.dart';
@@ -19,6 +18,7 @@ import '../utils/string_utils.dart';
 
 import '../providers/auth_provider.dart';
 import '../utils/metadata_utils.dart';
+import '../widgets/custom_file_picker.dart';
 import '../widgets/pagination_bar.dart';
 import '../widgets/sort_dialog.dart';
 import 'offline_work_detail_screen.dart';
@@ -26,20 +26,6 @@ import '../widgets/overscroll_next_page_detector.dart';
 import '../widgets/privacy_blur_cover.dart';
 import '../utils/scroll_optimization.dart';
 import 'local_file_browser_screen.dart';
-
-/// Extract a user-friendly folder name from either a file path or SAF content URI.
-String _extractFolderName(String path) {
-  if (path.startsWith('content://')) {
-    try {
-      final uri = Uri.parse(path);
-      final lastSeg = Uri.decodeComponent(uri.pathSegments.lastOrNull ?? 'folder');
-      return lastSeg.startsWith('primary:') ? lastSeg.substring(8) : lastSeg;
-    } catch (_) {
-      return 'folder';
-    }
-  }
-  return path.split(Platform.pathSeparator).last;
-}
 
 /// 本地下载屏幕 - 显示已完成的下载内容
 class LocalDownloadsScreen extends ConsumerStatefulWidget {
@@ -390,71 +376,18 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     }
   }
 
-  /// SAF file copy channel — used to copy files from content:// URIs on Android 11+.
-  static const _safChannel = MethodChannel('com.kikoeru.flutter/saf_file_utils');
-
-  /// Resolve the picked import path. If it's a SAF content URI (Android 11+),
-  /// copy the files to a temp directory via native platform channel.
-  /// Returns the local file path ready for import.
-  Future<String> _resolveImportPath(String pickedPath, String workTitle) async {
-    // Normal path on desktop or Android with full file access
-    if (!pickedPath.startsWith('content://')) return pickedPath;
-
-    // SAF content URI — copy via native Android DocumentFile API
-    final tempDir = await getTemporaryDirectory();
-    final safeName = workTitle.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
-    final destDir = '${tempDir.path}/kikoflu_import_$safeName';
-
-    // Clean up any leftover from previous attempt
-    final dest = Directory(destDir);
-    if (await dest.exists()) {
-      await dest.delete(recursive: true);
-    }
-
-    await _safChannel.invokeMethod('copyFromSafUri', {
-      'safUri': pickedPath,
-      'destDir': destDir,
-    });
-
-    return destDir;
-  }
-
-  /// Clean up the temp directory created for a SAF import.
-  /// Only deletes if the path is inside the system temp directory
-  /// AND is a subdirectory we created (contains 'kikoflu_import_').
-  void _cleanupImportTemp(String path) {
-    try {
-      final tempDir = Directory.systemTemp.path;
-      if (path.startsWith(tempDir) &&
-          path.length > tempDir.length + 1 &&
-          path.contains('kikoflu_import_')) {
-        unawaited(Directory(path).delete(recursive: true));
-      }
-    } catch (_) {}
-  }
-
-
 
   /// Import a single folder as one work.
   Future<void> _importSingleFolder() async {
     final s = S.of(context);
 
-    // Note: FilePicker uses SAF (Storage Access Framework) on Android 11+,
-    // which does NOT require MANAGE_EXTERNAL_STORAGE permission. The system
-    // file picker handles its own permissions.
-
-    final folderPath = await FilePicker.getDirectoryPath(
-      dialogTitle: s.selectImportFolderSingle,
+    final folderPath = await CustomFilePicker.pickDirectory(
+      context: context,
+      title: s.selectImportFolderSingle,
     );
     if (folderPath == null || !mounted) return;
-
-    // Resolve SAF content URI on Android 11+ via native DocumentFile copy
-    final safeTitle = _extractFolderName(folderPath);
-    final resolvedPath = await _resolveImportPath(folderPath, safeTitle);
-    if (!mounted) return;
-    // Show the user-friendly path in the dialog
-    final displayPath = folderPath.startsWith('content://') ? safeTitle : folderPath;
-    final titleCtrl = TextEditingController(text: safeTitle);
+    final displayPath = folderPath.split(Platform.pathSeparator).last;
+    final titleCtrl = TextEditingController(text: displayPath);
     final title = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -509,7 +442,7 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
 
     try {
       await DownloadService.instance.importLocalWork(
-        folderPath: resolvedPath,
+        folderPath: folderPath,
         title: title,
       );
       if (!mounted) return;
@@ -532,9 +465,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         content: Text(s.importFailed(e.toString())),
         duration: const Duration(seconds: 4),
       ));
-    } finally {
-      // Clean up SAF temp copy
-      _cleanupImportTemp(resolvedPath);
     }
   }
 
@@ -546,21 +476,14 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     final dialogContext = context;
     final s = S.of(dialogContext);
 
-    // Note: FilePicker uses SAF (Storage Access Framework) on Android 11+,
-    // which does NOT require MANAGE_EXTERNAL_STORAGE permission.
-
-    // Pick parent folder containing subfolders
-    final parentPath = await FilePicker.getDirectoryPath(
-      dialogTitle: s.selectImportFolderMultiple,
+    final parentPath = await CustomFilePicker.pickDirectory(
+      context: dialogContext,
+      title: s.selectImportFolderMultiple,
     );
     if (parentPath == null || !mounted) return;
 
-    // Resolve SAF content URI on Android 11+ by copying the whole tree locally
-    final safeName = _extractFolderName(parentPath);
-    final resolvedParentPath = await _resolveImportPath(parentPath, safeName);
-
     // Count subfolders first for total
-    final parentDir = Directory(resolvedParentPath);
+    final parentDir = Directory(parentPath);
     int totalSubfolders = 0;
     if (await parentDir.exists()) {
       await for (final e in parentDir.list(followLinks: false)) {
@@ -640,7 +563,7 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
 
     try {
       final createdIds = await DownloadService.instance.importMultipleLocalWorks(
-        parentFolderPath: resolvedParentPath,
+        parentFolderPath: parentPath,
         onProgress: (current, total, folderName) {
           progressNotifier.value = _ImportProgress(
             completed: current, total: total, currentFolder: folderName,
@@ -684,9 +607,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         content: Text(s.importFailed(e.toString())),
         duration: const Duration(seconds: 4),
       ));
-    } finally {
-      // Clean up SAF temp copy
-      _cleanupImportTemp(resolvedParentPath);
     }
   }
 
