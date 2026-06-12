@@ -116,13 +116,13 @@
 ### 📱 Android Features
 - Floating lyrics (lock / unlock / touch passthrough)
 - **Home screen widget** — quick playback controls and now-playing info
-- **Exclusive audio mode** — bit-perfect USB DAC support *maybe some devices support need android 14+, failed on my poco x6 5g.. but you can try by yourself :)
+- **Exclusive audio mode** — bit-perfect USB DAC support *AAudio Exclusive Mode Not Supported for All Android Devices. failed on my poco x6 5g.. but you can try by yourself :)
 
 ---
 
 ## Download
 
-Go to [Releases](https://github.com/pa-jesusf/KikoFlu/releases/latest) for the latest version.
+Go to [Releases](https://github.com/Rikunss/KikoFlu/releases/latest) for the latest version.
 
 Platforms: Android (universal / arm64 / armeabi-v7a / x86_64), iOS (unsigned IPA), Windows (installer / portable), macOS (DMG), Linux (x64 / arm64)
 
@@ -141,7 +141,7 @@ iOS users can add the KikoFlu Edge source to AltStore or SideStore for easy inst
 - Dart SDK 3.0+
 
 ```bash
-git clone https://github.com/pa-jesusf/KikoFlu.git
+git clone https://github.com/Rikunss/KikoFlu.git
 cd KikoFlu
 flutter pub get
 ```
@@ -166,6 +166,7 @@ flutter pub get
 ## Contributors
 
 - **Meteor-Sage** — Original author & lead developer
+- **Rikunss** - sigma male
 
 ## License
 
@@ -173,7 +174,7 @@ flutter pub get
 
 ## Contact
 
-- **Bug Reports**: [Issues](https://github.com/pa-jesusf/KikoFlu/issues)
+- **Bug Reports**: [Issues](https://github.com/Rikunss/KikoFlu/issues)
 - **Community**: [Telegram](https://t.me/+PrkiN-pZrXs4ZTU1)
 
 ---
