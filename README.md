@@ -14,7 +14,7 @@
 </div>
 
 <div align="center">
-  <img src="screenshots/8.png" width="900" alt="KikoFlu Screenshot">
+  <img src="screenshots/1.jpg" width="900" alt="KikoFlu Screenshot">
 </div>
 
 ## Features
