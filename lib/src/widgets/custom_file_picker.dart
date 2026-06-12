@@ -154,6 +154,7 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
   String _searchQuery = '';
   final _searchController = TextEditingController();
   bool _showSearch = false;
+  bool _showHiddenFiles = false;
 
   // Path history for back navigation
   final List<String> _pathHistory = [];
@@ -252,7 +253,9 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
 
   bool _isHidden(FileSystemEntity entity) {
     final name = p.basename(entity.path);
-    if (name.startsWith('.')) return true;
+    // Skip hidden dotfiles unless user toggled show hidden
+    if (name.startsWith('.') && !_showHiddenFiles) return true;
+    // These system dirs are locked on Android 11+ and can't be browsed anyway
     if (name == 'data' && entity.path.contains('/Android/')) return true;
     if (name == 'obb' && entity.path.contains('/Android/')) return true;
     return false;
@@ -468,6 +471,16 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
                         style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                       )
                     : const SizedBox.shrink(),
+              ),
+              // Show/hide hidden files
+              _IconButtonSmall(
+                icon: _showHiddenFiles
+                    ? Icons.visibility_rounded
+                    : Icons.visibility_off_rounded,
+                onPressed: () => setState(() => _showHiddenFiles = !_showHiddenFiles),
+                tooltip: _showHiddenFiles ? 'Hide hidden files' : 'Show hidden files',
+                cs: cs,
+                activeColor: _showHiddenFiles ? cs.primary : null,
               ),
               // Refresh
               _IconButtonSmall(
@@ -908,11 +921,13 @@ class _IconButtonSmall extends StatelessWidget {
   final VoidCallback? onPressed;
   final String tooltip;
   final ColorScheme cs;
+  final Color? activeColor;
   const _IconButtonSmall({
     required this.icon,
     this.onPressed,
     required this.tooltip,
     required this.cs,
+    this.activeColor,
   });
 
   @override
@@ -924,11 +939,17 @@ class _IconButtonSmall extends StatelessWidget {
         onTap: onPressed,
         child: Container(
           width: 32, height: 32,
+          decoration: activeColor != null
+              ? BoxDecoration(
+                  color: activeColor!.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                )
+              : null,
           alignment: Alignment.center,
           child: Icon(icon, size: 20,
-            color: onPressed != null
+            color: activeColor ?? (onPressed != null
                 ? cs.onSurfaceVariant
-                : cs.onSurfaceVariant.withAlpha(80)),
+                : cs.onSurfaceVariant.withAlpha(80))),
         ),
       ),
     );
