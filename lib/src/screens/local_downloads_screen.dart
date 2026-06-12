@@ -649,9 +649,8 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         onOpenFolder: _openDownloadFolder,
         onToggleSearch: _toggleSearch,
         onShowSort: _showSortDialog,
-        onImportSingleFolder: _importSingleFolder,
-        onImportMultipleFolders: _importMultipleFolders,
       ),
+      _buildImportBar(),
       if (_isSearchVisible) _buildSearchBar(),
       Expanded(
         child: allGrouped.isEmpty
@@ -728,6 +727,73 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
                   ),
       ),
     ]);
+  }
+
+  /// Import bar — sits between the top toolbar and the download grid.
+  /// Shows a simple (+) button to import folders (single or multiple).
+  Widget _buildImportBar() {
+    final cs = Theme.of(context).colorScheme;
+    final s = S.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.folder_rounded, size: 16, color: cs.onSurfaceVariant.withAlpha(120)),
+          const SizedBox(width: 8),
+          Text(
+            s.importWork,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const Spacer(),
+          PopupMenuButton<_ImportAction>(
+            tooltip: s.importWork,
+            icon: Icon(Icons.add_circle_outline_rounded, size: 22, color: cs.primary),
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            onSelected: (action) {
+              HapticFeedback.lightImpact();
+              switch (action) {
+                case _ImportAction.singleFolder:
+                  _importSingleFolder();
+                case _ImportAction.multipleFolders:
+                  _importMultipleFolders();
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: _ImportAction.singleFolder,
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.create_new_folder_rounded, size: 20),
+                  title: Text(s.importSingleFolder),
+                  subtitle: Text(s.importSingleFolderDesc, style: const TextStyle(fontSize: 11)),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: _ImportAction.multipleFolders,
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.folder_copy_rounded, size: 20),
+                  title: Text(s.importMultipleFolders),
+                  subtitle: Text(s.importMultipleFoldersDesc, style: const TextStyle(fontSize: 11)),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSearchBar() {
@@ -835,8 +901,6 @@ class _DownloadTopBar extends StatelessWidget {
   final VoidCallback onOpenFolder;
   final VoidCallback onToggleSearch;
   final VoidCallback onShowSort;
-  final VoidCallback? onImportSingleFolder;
-  final VoidCallback? onImportMultipleFolders;
 
   const _DownloadTopBar({
     required this.isSelectionMode,
@@ -851,8 +915,6 @@ class _DownloadTopBar extends StatelessWidget {
     required this.onOpenFolder,
     required this.onToggleSearch,
     required this.onShowSort,
-    this.onImportSingleFolder,
-    this.onImportMultipleFolders,
   });
 
   @override
@@ -935,47 +997,6 @@ class _DownloadTopBar extends StatelessWidget {
                   HapticFeedback.lightImpact();
                   onRefresh();
                 },
-              ),
-            ),
-          if (onImportSingleFolder != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: PopupMenuButton<_ImportAction>(
-                tooltip: S.of(context).importWork,
-                icon: const Icon(Icons.add_circle_outline, size: 22),
-                padding: const EdgeInsets.all(8),
-                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                onSelected: (action) {
-                  HapticFeedback.lightImpact();
-                  switch (action) {
-                    case _ImportAction.singleFolder:
-                      onImportSingleFolder!();
-                    case _ImportAction.multipleFolders:
-                      onImportMultipleFolders!();
-                  }
-                },
-                itemBuilder: (ctx) => [
-                  PopupMenuItem(
-                    value: _ImportAction.singleFolder,
-                    child: ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.create_new_folder_rounded, size: 20),
-                      title: Text(S.of(ctx).importSingleFolder),
-                      subtitle: Text(S.of(ctx).importSingleFolderDesc, style: const TextStyle(fontSize: 11)),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: _ImportAction.multipleFolders,
-                    child: ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.folder_copy_rounded, size: 20),
-                      title: Text(S.of(ctx).importMultipleFolders),
-                      subtitle: Text(S.of(ctx).importMultipleFoldersDesc, style: const TextStyle(fontSize: 11)),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                ],
               ),
             ),
           Padding(
