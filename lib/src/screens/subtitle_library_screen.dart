@@ -224,6 +224,7 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
   Future<void> _importFolder() async {
     final updateProgress = _showProgressDialog(S.of(context).preparingImport);
     final result = await SubtitleLibraryService.importFolder(
+      context: context,
       onProgress: updateProgress,
     );
     if (!mounted) return;

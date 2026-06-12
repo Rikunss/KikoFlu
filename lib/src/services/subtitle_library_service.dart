@@ -3,10 +3,12 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:archive/archive.dart';
+import 'package:flutter/widgets.dart';
 import 'package:gbk_codec/gbk_codec.dart';
 import 'download_path_service.dart';
 import 'subtitle_database.dart';
 import '../utils/file_icon_utils.dart';
+import '../widgets/custom_file_picker.dart';
 import 'log_service.dart';
 
 final _log = LogService.instance;
@@ -691,11 +693,17 @@ class SubtitleLibraryService {
   }
 
   /// 导入文件夹（递归检查子目录，自动分配路径）
+  /// [context] - BuildContext for opening the file picker dialog
   /// [onProgress] - 进度回调，参数为当前进度消息
-  static Future<ImportResult> importFolder(
-      {Function(String)? onProgress}) async {
+  static Future<ImportResult> importFolder({
+    required BuildContext context,
+    Function(String)? onProgress,
+  }) async {
     try {
-      final directoryPath = await FilePicker.getDirectoryPath();
+      final directoryPath = await CustomFilePicker.pickDirectory(
+        context: context,
+        title: 'Select subtitle folder',
+      );
 
       if (directoryPath == null) {
         return ImportResult(
