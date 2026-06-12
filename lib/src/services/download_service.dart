@@ -1168,9 +1168,24 @@ class DownloadService {
             tasksToRemove.add(task.id);
             _log.warning('作品文件夹不存在，删除任务: ${task.workTitle}', tag: 'Download');
           } else {
-            // 检查文件是否存在
+            // Check file existence in the work directory first.
             final file = File('${workDir.path}/${task.fileName}');
-            if (!await file.exists()) {
+            bool fileExists = await file.exists();
+
+            // If not found, try loading metadata from disk — imported works
+            // (local_import_path) keep their files in the original source
+            // folder, not the work directory. task.workMetadata is null on
+            // startup because it's not serialized to SharedPreferences.
+            if (!fileExists) {
+              final meta = await _loadWorkMetadata(task.workId);
+              final importPath = meta?['local_import_path'] as String?;
+              if (importPath != null && importPath.isNotEmpty) {
+                final sourceFile = File('$importPath/${task.fileName}');
+                fileExists = await sourceFile.exists();
+              }
+            }
+
+            if (!fileExists) {
               tasksToRemove.add(task.id);
               _log.warning('文件不存在，删除任务: ${task.fileName}', tag: 'Download');
             }
@@ -1378,6 +1393,26 @@ class DownloadService {
       throw Exception('No supported audio/image/text files found in the selected folder.');
     }
 
+    // Look for a cover image in the imported folder and copy it to cover.jpg
+    String? coverPath;
+    try {
+      await for (final entity in importDir.list(followLinks: false)) {
+        if (entity is File) {
+          final fName = entity.path.split(Platform.pathSeparator).last.toLowerCase();
+          if (fName.endsWith('.jpg') || fName.endsWith('.jpeg') ||
+              fName.endsWith('.png') || fName.endsWith('.webp') ||
+              fName.endsWith('.bmp')) {
+            await entity.copy('${workDir.path}/cover.jpg');
+            coverPath = 'cover.jpg';
+            _log.info('Cover image copied: $fName', tag: 'Download');
+            break; // use the first image found
+          }
+        }
+      }
+    } catch (e) {
+      _log.warning('Failed to copy cover image: $e', tag: 'Download');
+    }
+
     // Create work metadata
     final metadata = <String, dynamic>{
       'id': workId,
@@ -1385,6 +1420,9 @@ class DownloadService {
       'children': children,
       'local_import_path': folderPath,
     };
+    if (coverPath != null) {
+      metadata['localCoverPath'] = coverPath;
+    }
 
     final metadataFile = File('${workDir.path}/work_metadata.json');
     await metadataFile.writeAsString(jsonEncode(metadata));
