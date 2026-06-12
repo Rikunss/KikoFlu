@@ -1018,6 +1018,7 @@
   "subtitleFolderUnknown": "Неизвестные",
   "sortDownloadDate": "Дата загрузки",
   "sortWorkId": "ID",
+  "sortTitle": "Название",
   "searchDownloads": "Поиск загруженных...",
   "logTitle": "Логи приложения",
   "logSubtitle": "Просмотр и экспорт логов",

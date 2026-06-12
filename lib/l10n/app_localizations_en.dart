@@ -3490,6 +3490,9 @@ class SEn extends S {
   String get sortWorkId => 'ID';
 
   @override
+  String get sortTitle => 'Title';
+
+  @override
   String get searchDownloads => 'Search downloaded works...';
 
   @override

@@ -15,8 +15,11 @@ import '../models/work.dart';
 import '../services/download_service.dart';
 import '../services/storage_service.dart';
 import '../utils/string_utils.dart';
+import '../utils/responsive_grid_helper.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 import '../providers/auth_provider.dart';
+import '../providers/subtitle_library_provider.dart';
 import '../utils/metadata_utils.dart';
 import '../widgets/custom_file_picker.dart';
 import '../widgets/pagination_bar.dart';
@@ -302,7 +305,7 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         title: S.of(context).sortOptions,
         currentOption: _sortOrder,
         currentDirection: _sortDirection,
-        availableOptions: const [SortOrder.downloadDate, SortOrder.workId],
+        availableOptions: const [SortOrder.downloadDate, SortOrder.workId, SortOrder.title],
         onSort: (option, direction) {
           setState(() {
             _sortOrder = option;
@@ -448,6 +451,11 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
           r = aD.compareTo(bD);
         case SortOrder.workId:
           r = a.compareTo(b);
+        case SortOrder.title:
+          final aTitle = groupedTasks[a]!.first.workTitle.toLowerCase();
+          final bTitle = groupedTasks[b]!.first.workTitle.toLowerCase();
+          // Use natural compare for titles with numbers (e.g. "Work 2" vs "Work 10")
+          r = _naturalCompare(aTitle, bTitle);
         default:
           r = 0;
       }
@@ -494,6 +502,32 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     }
   }
 
+
+  /// Natural sort comparator for work titles (e.g. "Work 2" before "Work 10").
+  static int _naturalCompare(String a, String b) {
+    final pattern = RegExp(r'(\d+|[^\d]+)');
+    final aParts = pattern
+        .allMatches(a.toLowerCase())
+        .map((m) => m.group(1)!)
+        .toList();
+    final bParts = pattern
+        .allMatches(b.toLowerCase())
+        .map((m) => m.group(1)!)
+        .toList();
+
+    final len = aParts.length < bParts.length ? aParts.length : bParts.length;
+    for (int i = 0; i < len; i++) {
+      final aNum = int.tryParse(aParts[i]);
+      final bNum = int.tryParse(bParts[i]);
+      if (aNum != null && bNum != null) {
+        if (aNum != bNum) return aNum.compareTo(bNum);
+      } else {
+        final cmp = aParts[i].compareTo(bParts[i]);
+        if (cmp != 0) return cmp;
+      }
+    }
+    return aParts.length.compareTo(bParts.length);
+  }
 
   /// Import a single folder as one work.
   Future<void> _importSingleFolder() async {
@@ -749,13 +783,50 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         _countBySource(allGrouped);
     final allCount = allGrouped.length;
 
-    // For empty states, show contextual message based on source filter
+    // Grid layout — responsive masonry, matching main menu's big-grid style
+    final size = MediaQuery.sizeOf(context);
+    final orientation = MediaQuery.orientationOf(context);
+    final isLandscape = orientation == Orientation.landscape;
+    final spacing = isLandscape ? 24.0 : 8.0;
+    final crossAxisCount =
+        ResponsiveGridHelper.getBigGridCrossAxisCountForSize(size, orientation);
+
+    // For empty states, show contextual message based on active filters
     Widget? emptyWidget;
     if (allGrouped.isEmpty) {
       emptyWidget = _emptyState(context,
         S.of(context).noLocalDownloads, Icons.download_outlined);
     } else if (grouped.isEmpty) {
-      if (_sourceFilter == _SourceFilter.imported) {
+      // Priority: metadata filter → search query → source filter → default
+      if (_filterType != _FilterType.all) {
+        final filterLabel = switch (_filterType) {
+          _FilterType.circle => 'circle',
+          _FilterType.va => 'VA',
+          _FilterType.tag => 'tag',
+          _FilterType.all => '',
+        };
+        emptyWidget = _emptyState(context,
+          'No matching $filterLabel', Icons.filter_alt_off_rounded,
+          actionLabel: 'Clear filter',
+          onAction: () => setState(() {
+            _filterType = _FilterType.all;
+            _filterValue = '';
+            _currentPage = 1;
+          }),
+        );
+      } else if (_searchQuery.isNotEmpty) {
+        emptyWidget = _emptyState(context,
+          'No results for "$_searchQuery"', Icons.search_off,
+          actionLabel: 'Clear search',
+          onAction: () {
+            _searchController.clear();
+            setState(() {
+              _searchQuery = '';
+              _currentPage = 1;
+            });
+          },
+        );
+      } else if (_sourceFilter == _SourceFilter.imported) {
         emptyWidget = _emptyState(context,
           'No imported works', Icons.folder_open_rounded,
           actionLabel: 'Import now',
@@ -791,10 +862,17 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       if (_isSearchVisible) _buildSearchBar(),
       Expanded(
         child: emptyWidget ?? AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
+          duration: const Duration(milliseconds: 300),
           switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeIn,
-          transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            return ScaleTransition(
+              scale: Tween<double>(begin: 0.85, end: 1.0).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              ),
+              child: FadeTransition(opacity: animation, child: child),
+            );
+          },
           child: grouped.isEmpty
               ? _emptyState(context, S.of(context).noResults, Icons.search_off)
               : OverscrollNextPageDetector(
@@ -811,44 +889,45 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
                       physics: ScrollOptimization.physics,
                       slivers: [
                         SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                          sliver: SliverGrid(
-                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 210,
-                              childAspectRatio: 0.72,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                            ),
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                final id = pageIds[index];
-                                final workTasks = pageMap[id]!;
-                                return RepaintBoundary(
-                                  key: ValueKey('dl_$id'),
-                                  child: _DownloadWorkCard(
-                                  workId: id,
-                                  workTasks: workTasks,
-                                  firstTask: workTasks.first,
-                                  isSelected: _selectedWorkIds.contains(id),
-                                  isSelectionMode: _isSelectionMode,
-                                  onTap: _isSelectionMode
-                                      ? () => _toggleWorkSelection(id)
-                                      : () => _openWorkDetail(id, workTasks.first),
-                                  onLongPress: !_isSelectionMode
-                                      ? () => setState(() {
-                                          _isSelectionMode = true;
-                                          _toggleWorkSelection(id);
-                                        })
-                                      : null,
-                                  ),
-                                );
-                              },
-                              childCount: pageMap.length,
-                            ),
+                          padding: EdgeInsets.all(spacing),
+                          sliver: SliverMasonryGrid.count(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: spacing,
+                            mainAxisSpacing: spacing,
+                            childCount: pageMap.length,
+                            itemBuilder: (context, index) {
+                              final id = pageIds[index];
+                              final workTasks = pageMap[id]!;
+                              // Compute actual card width from grid dimensions
+                              final cardWidth = (size.width -
+                                      2 * spacing -
+                                      (crossAxisCount - 1) * spacing) /
+                                  crossAxisCount;
+                              return RepaintBoundary(
+                                key: ValueKey('dl_$id'),
+                                child: _DownloadWorkCard(
+                                workId: id,
+                                workTasks: workTasks,
+                                firstTask: workTasks.first,
+                                cardWidth: cardWidth,
+                                isSelected: _selectedWorkIds.contains(id),
+                                isSelectionMode: _isSelectionMode,
+                                onTap: _isSelectionMode
+                                    ? () => _toggleWorkSelection(id)
+                                    : () => _openWorkDetail(id, workTasks.first),
+                                onLongPress: !_isSelectionMode
+                                    ? () => setState(() {
+                                        _isSelectionMode = true;
+                                        _toggleWorkSelection(id);
+                                      })
+                                    : null,
+                                ),
+                              );
+                            },
                           ),
                         ),
                         SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                          padding: EdgeInsets.fromLTRB(spacing, spacing, spacing, 24),
                           sliver: SliverToBoxAdapter(
                             child: PaginationBar(
                               currentPage: _currentPage,
@@ -1607,12 +1686,13 @@ class _CompactIconButton extends StatelessWidget {
 }
 
 /// ===================================================================
-/// Work card — receives auth props instead of ref.watch per card
+/// Work card — redesigned to match EnhancedWorkCard medium card style
 /// ===================================================================
 class _DownloadWorkCard extends StatelessWidget {
   final int workId;
   final List<DownloadTask> workTasks;
   final DownloadTask firstTask;
+  final double cardWidth;
   final bool isSelected;
   final bool isSelectionMode;
   final VoidCallback? onTap;
@@ -1622,6 +1702,7 @@ class _DownloadWorkCard extends StatelessWidget {
     required this.workId,
     required this.workTasks,
     required this.firstTask,
+    required this.cardWidth,
     required this.isSelected,
     required this.isSelectionMode,
     this.onTap,
@@ -1634,6 +1715,7 @@ class _DownloadWorkCard extends StatelessWidget {
       0, (sum, t) => sum + (t.totalBytes ?? 0),
     );
     final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     Work? work;
     if (firstTask.workMetadata != null) {
@@ -1644,6 +1726,9 @@ class _DownloadWorkCard extends StatelessWidget {
         LogService.instance.warning('[LocalDownloads] Failed to parse work metadata for offline card: $e', tag: 'Download');
       }
     }
+
+    final workTitle = work?.title ?? firstTask.workTitle;
+    final isImported = firstTask.workMetadata?['local_import_path'] != null;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -1660,106 +1745,145 @@ class _DownloadWorkCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        child: Stack(children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Cover
-            Expanded(
-              child: Stack(fit: StackFit.expand, children: [
-                _WorkCardCover(workId: workId, work: work, firstTask: firstTask),
-                // Source badge (top-right)
-                Positioned(
-                  top: 8, right: 8,
-                  child: _SourceBadge(isImported: firstTask.workMetadata?['local_import_path'] != null),
-                ),
-                // Colored avatar with work title initial
-                Positioned(
-                  top: 8, left: 8,
-                  child: _WorkAvatar(
-                    workId: workId,
-                    title: work?.title ?? firstTask.workTitle,
-                    size: 34,
-                  ),
-                ),
-                Positioned(
-                  left: 0, right: 0, bottom: 0,
-                  child: Container(
-                    height: 60,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Cover — AspectRatio 1.3 (matching EnhancedWorkCard medium)
+            AspectRatio(
+              aspectRatio: 1.3,
+              child: Stack(
+                children: [
+                  _WorkCardCover(workId: workId, work: work, firstTask: firstTask, cardWidth: cardWidth),
+                  // RJ tag (top-left) — matches EnhancedWorkCard style
+                  Positioned(
+                    top: 6,
+                    left: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        formatRJCode(workId),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ]),
-            ),
-            // Info
-            Container(
-              padding: const EdgeInsets.all(12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(
-                  work?.title ?? firstTask.workTitle,
-                  maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                    height: 1.3, color: cs.onSurface),
-                ),
-                const SizedBox(height: 8),
-                if (work?.vas != null && work!.vas!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(children: [
-                      Icon(Icons.mic, size: 12,
-                        color: cs.onSurfaceVariant),
-                      const SizedBox(width: 4),
-                      Expanded(child: Text(work.vas!.first.name,
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 11,
-                          color: cs.onSurfaceVariant))),
-                    ]),
-                  ),
-                Row(children: [
-                  Icon(Icons.folder_outlined, size: 12,
-                    color: cs.primary),
-                  const SizedBox(width: 4),
-                  Text('${workTasks.length}', style: TextStyle(fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: cs.primary)),
-                  const SizedBox(width: 8),
-                  Icon(Icons.storage, size: 12,
-                    color: cs.onSurfaceVariant),
-                  const SizedBox(width: 4),
-                  Flexible(child: Text(formatBytes(totalSize),
-                    style: TextStyle(fontSize: 11,
-                      color: cs.onSurfaceVariant),
-                    overflow: TextOverflow.ellipsis)),
-                ]),
-              ]),
-            ),
-          ]),
-          if (isSelectionMode)
-            Positioned(
-              top: 8, right: 8,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? cs.primary
-                      : Colors.white.withValues(alpha: 0.95),
-                  shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 8, offset: const Offset(0, 2))],
-                ),
-                padding: const EdgeInsets.all(6),
-                child: Icon(
-                  isSelected ? Icons.check : Icons.circle_outlined,
-                  color: isSelected ? Colors.white
-                      : cs.outline,
-                  size: 20,
-                ),
+                  // Source badge (top-right) — only show when NOT in selection mode
+                  if (!isSelectionMode)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: _SourceBadge(isImported: isImported),
+                    ),
+                  // Selection check (top-right) — overlaps source badge in selection mode
+                  if (isSelectionMode)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? cs.primary
+                              : Colors.white.withValues(alpha: 0.95),
+                          shape: BoxShape.circle,
+                          boxShadow: [BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 8, offset: const Offset(0, 2))],
+                        ),
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(
+                          isSelected ? Icons.check : Icons.circle_outlined,
+                          color: isSelected ? Colors.white : cs.outline,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-        ]),
+            // Info area — matching EnhancedWorkCard medium card padding & font sizes
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Title
+                  Text(
+                    workTitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: tt.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      height: 1.1,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // VA (if available)
+                  if (work?.vas != null && work!.vas!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.mic, size: 12,
+                            color: cs.onSurfaceVariant),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              work.vas!.first.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: tt.bodySmall?.copyWith(
+                                fontSize: 10,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // File count + size row
+                  Row(
+                    children: [
+                      Icon(Icons.folder_outlined, size: 12,
+                        color: cs.primary),
+                      const SizedBox(width: 3),
+                      Text('${workTasks.length}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: cs.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(Icons.storage, size: 12,
+                        color: cs.onSurfaceVariant),
+                      const SizedBox(width: 3),
+                      Flexible(
+                        child: Text(
+                          formatBytes(totalSize),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1768,12 +1892,6 @@ class _DownloadWorkCard extends StatelessWidget {
 /// ===================================================================
 /// Work card cover — fetches auth only when needed (not per-card)
 /// ===================================================================
-/// Generate a consistent color from a workId using the golden angle.
-/// Each work gets a distinct hue that stays the same across sessions.
-Color _workColor(int id) {
-  final hue = (id * 137.508) % 360;
-  return HSLColor.fromAHSL(0.85, hue, 0.55, 0.5).toColor();
-}
 
 /// Small count badge shown inside source tab pills.
 class _SourceCountBadge extends StatelessWidget {
@@ -1835,52 +1953,27 @@ class _SourceBadge extends StatelessWidget {
   }
 }
 
-/// Small circle avatar with the first character of the work title.
-/// Placed as an overlay on the cover image to help distinguish works.
-class _WorkAvatar extends StatelessWidget {
-  final int workId;
-  final String? title;
-  final double size;
+/// Small subtitle tag overlay shown on the cover when the work has local subtitles.
+/// Matches the style of EnhancedWorkCard's subtitle tag.
+class _SubtitleTag extends StatelessWidget {
+  final bool isLocal;
 
-  const _WorkAvatar({
-    required this.workId,
-    this.title,
-    this.size = 32,
-  });
+  const _SubtitleTag({this.isLocal = false});
 
   @override
   Widget build(BuildContext context) {
-    final color = _workColor(workId);
-    final initial = (title ?? '').isNotEmpty ? title![0].toUpperCase() : '?';
-
     return Container(
-      width: size,
-      height: size,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.5),
-          width: 1.5,
-        ),
+        color: isLocal
+            ? Colors.green.withValues(alpha: 0.9)
+            : Colors.black.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(4),
       ),
-      child: Center(
-        child: Text(
-          initial,
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: size * 0.48,
-            letterSpacing: 0,
-          ),
-        ),
+      child: const Icon(
+        Icons.closed_caption,
+        color: Colors.white,
+        size: 14,
       ),
     );
   }
@@ -1890,11 +1983,13 @@ class _WorkCardCover extends ConsumerStatefulWidget {
   final int workId;
   final Work? work;
   final DownloadTask firstTask;
+  final double cardWidth;
 
   const _WorkCardCover({
     required this.workId,
     this.work,
     required this.firstTask,
+    required this.cardWidth,
   });
 
   @override
@@ -1969,8 +2064,9 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
   @override
   Widget build(BuildContext context) {
     final dpr = MediaQuery.devicePixelRatioOf(context);
-    final cacheWidth = (210 * dpr).round();
-    final cacheHeight = ((210 / 0.72 - 94.0) * dpr).round();
+    // Use actual card width from masonry grid, scaled by aspect ratio 1.3
+    final cacheWidth = (widget.cardWidth * dpr).round();
+    final cacheHeight = ((widget.cardWidth / 1.3) * dpr).round();
 
     // Check if this work's cover is being processed
     final processingIds = ref.watch(processingCoversProvider);
@@ -2080,6 +2176,28 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
                 );
               },
             ),
+          ),
+        ],
+      );
+    }
+
+    // Check if work has local subtitle — use .select() to avoid unnecessary rebuilds
+    final work = widget.work;
+    final hasLocalSubtitle = ref.watch(
+      subtitleLibraryProvider.select((set) =>
+          work != null && set.contains(work.id)),
+    );
+
+    // Wrap in Stack to add subtitle tag overlay when applicable
+    if (hasLocalSubtitle && coverWidget is! Stack) {
+      return Stack(
+        children: [
+          coverWidget,
+          // Subtitle tag (bottom-left) — matching EnhancedWorkCard style
+          Positioned(
+            bottom: 6,
+            left: 6,
+            child: const _SubtitleTag(isLocal: true),
           ),
         ],
       );

@@ -73,6 +73,7 @@ extension SortOrderL10n on SortOrder {
       SortOrder.updatedAt => s.sortUpdatedAt,
       SortOrder.downloadDate => s.sortDownloadDate,
       SortOrder.workId => s.sortWorkId,
+      SortOrder.title => s.sortTitle,
     };
   }
 }

@@ -3394,6 +3394,9 @@ class SJa extends S {
   String get sortWorkId => 'ID';
 
   @override
+  String get sortTitle => 'タイトル';
+
+  @override
   String get searchDownloads => 'ダウンロード済み作品を検索...';
 
   @override

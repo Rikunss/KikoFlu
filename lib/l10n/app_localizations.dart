@@ -6210,6 +6210,12 @@ abstract class S {
   /// **'ID'**
   String get sortWorkId;
 
+  /// No description provided for @sortTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get sortTitle;
+
   /// No description provided for @searchDownloads.
   ///
   /// In en, this message translates to:

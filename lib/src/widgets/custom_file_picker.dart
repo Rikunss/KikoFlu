@@ -417,7 +417,7 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
 
             // ── Content ──
             SizedBox(
-              height: 380,
+              height: MediaQuery.of(context).size.height * 0.55,
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 child: _isLoading

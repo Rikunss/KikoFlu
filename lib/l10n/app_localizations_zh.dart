@@ -3374,6 +3374,9 @@ class SZh extends S {
   String get sortWorkId => 'ID';
 
   @override
+  String get sortTitle => '标题';
+
+  @override
   String get searchDownloads => '搜索已下载作品...';
 
   @override
@@ -7499,6 +7502,9 @@ class SZhHant extends SZh {
 
   @override
   String get sortWorkId => 'ID';
+
+  @override
+  String get sortTitle => '標題';
 
   @override
   String get searchDownloads => '搜尋已下載作品...';

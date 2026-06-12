@@ -873,6 +873,17 @@ public class AudioService extends MediaBrowserServiceCompat {
         if (listener != null) {
             listener.onTaskRemoved();
         }
+        // Stop the foreground service and dismiss the notification when the user
+        // swipes the app from the recent tasks list. The Dart-side onTaskRemoved()
+        // handler tries to stop via method channel (the _observePlaybackState() idle
+        // transition triggers _platform.stopService()), but that channel is unreliable
+        // at this point because FlutterJNI may already be detaching. Stopping natively
+        // ensures the notification is always dismissed.
+        handler.post(() -> {
+            if (AudioService.instance != null) {
+                AudioService.instance.stop();
+            }
+        });
         super.onTaskRemoved(rootIntent);
     }
 

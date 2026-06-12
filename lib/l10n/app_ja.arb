@@ -1018,6 +1018,7 @@
   "subtitleFolderUnknown": "不明な作品",
   "sortDownloadDate": "ダウンロード日",
   "sortWorkId": "ID",
+  "sortTitle": "タイトル",
   "searchDownloads": "ダウンロード済み作品を検索...",
   "logTitle": "アプリログ",
   "logSubtitle": "アプリログの表示とエクスポート",

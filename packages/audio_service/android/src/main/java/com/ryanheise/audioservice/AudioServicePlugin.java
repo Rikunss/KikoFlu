@@ -124,7 +124,15 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         }
         FlutterEngine flutterEngine = FlutterEngineCache.getInstance().get(flutterEngineId);
         if (flutterEngine != null) {
-            flutterEngine.destroy();
+            try {
+                flutterEngine.destroy();
+            } catch (RuntimeException e) {
+                // FlutterJNI may already be detached from native (e.g. when the app
+                // was swiped from recents and the Activity was destroyed before the
+                // AudioService's onTaskRemoved fired). Ignore — the engine is being
+                // cleaned up by the main process anyway.
+                System.out.println("disposeFlutterEngine: engine already detached — " + e.getMessage());
+            }
             FlutterEngineCache.getInstance().remove(flutterEngineId);
         }
     }

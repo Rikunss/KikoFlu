@@ -3509,6 +3509,9 @@ class SRu extends S {
   String get sortWorkId => 'ID';
 
   @override
+  String get sortTitle => 'Название';
+
+  @override
   String get searchDownloads => 'Поиск загруженных...';
 
   @override

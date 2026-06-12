@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/download_task.dart';
-import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 import '../utils/file_icon_utils.dart';
 import 'audio_conversion_service.dart';
@@ -932,7 +933,14 @@ class DownloadService {
       buildPathMap(tracks, '');
 
       // 扫描工作目录中的所有文件
-      await for (final entity in workDir.list()) {
+      final workEntities = await workDir.list(followLinks: false).toList();
+      workEntities.sort((a, b) {
+        final aName = a.path.split(Platform.pathSeparator).last;
+        final bName = b.path.split(Platform.pathSeparator).last;
+        return _naturalCompare(aName, bName);
+      });
+
+      for (final entity in workEntities) {
         if (entity is File) {
           final fileName = entity.path.split(Platform.pathSeparator).last;
 
@@ -982,12 +990,22 @@ class DownloadService {
 
   /// 同步磁盘文件到 work_metadata.json 的 children 文件树
   /// 确保手动添加的文件也能在离线浏览器中正确显示
+  ///
+  /// Always sorts the children tree recursively after sync so tracks
+  /// appear in natural filename order (1.mp3, 2.mp3, ..., 10.mp3).
   Future<void> _syncFileTreeWithDisk(int workId, Directory workDir) async {
     // 1. 收集磁盘上所有实际文件的相对路径
     final diskFiles = <String, File>{};
 
     Future<void> collectFiles(Directory dir, String relativePath) async {
-      await for (final entity in dir.list()) {
+      final entities = await dir.list(followLinks: false).toList();
+      entities.sort((a, b) {
+        final aName = a.path.split(Platform.pathSeparator).last;
+        final bName = b.path.split(Platform.pathSeparator).last;
+        return _naturalCompare(aName, bName);
+      });
+
+      for (final entity in entities) {
         if (entity is File) {
           final fileName = entity.path.split(Platform.pathSeparator).last;
           // 跳过元数据、封面和临时下载文件
@@ -1009,9 +1027,8 @@ class DownloadService {
     }
 
     await collectFiles(workDir, '');
-    if (diskFiles.isEmpty) return;
 
-    // 2. 加载现有元数据
+    // 2. 加载现有元数据 (always, even when diskFiles is empty for imported works)
     final metadataFile = File('${workDir.path}/work_metadata.json');
     Map<String, dynamic>? metadata;
 
@@ -1024,7 +1041,6 @@ class DownloadService {
       }
     }
 
-    bool metadataCreated = false;
     if (metadata == null) {
       // 没有任何元数据，创建基础元数据
       metadata = {
@@ -1032,108 +1048,117 @@ class DownloadService {
         'title': 'RJ$workId',
         'children': <dynamic>[],
       };
-      metadataCreated = true;
     }
 
-    // 3. 收集已有文件树中所有文件的相对路径
-    final existingChildren = (metadata['children'] as List<dynamic>?) ?? [];
-    final knownPaths = <String>{};
+    // 3. Sync new files from disk into the children tree (if any)
+    if (diskFiles.isNotEmpty) {
+      // 收集已有文件树中所有文件的相对路径
+      final existingChildren = (metadata['children'] as List<dynamic>?) ?? [];
+      final knownPaths = <String>{};
 
-    void collectKnownPaths(List<dynamic> items, String parentPath) {
-      for (final item in items) {
-        if (item is! Map<String, dynamic>) continue;
-        final type = item['type'] as String? ?? '';
-        final title = item['title'] as String? ?? '';
-        if (type == 'folder') {
-          final folderPath = parentPath.isEmpty ? title : '$parentPath/$title';
-          final children = item['children'] as List<dynamic>?;
-          if (children != null) {
-            collectKnownPaths(children, folderPath);
-          }
-        } else {
-          final filePath = parentPath.isEmpty ? title : '$parentPath/$title';
-          knownPaths.add(filePath);
-        }
-      }
-    }
-
-    collectKnownPaths(existingChildren, '');
-
-    // 4. 找出磁盘上有但文件树中没有的文件
-    final newFiles = <String, File>{};
-    for (final entry in diskFiles.entries) {
-      if (!knownPaths.contains(entry.key)) {
-        newFiles[entry.key] = entry.value;
-      }
-    }
-
-    if (newFiles.isEmpty && !metadataCreated) return;
-
-    // 5. 将新文件添加到 children 树中的正确位置
-    final mutableChildren = List<dynamic>.from(existingChildren);
-
-    for (final entry in newFiles.entries) {
-      final relativePath = entry.key;
-      final file = entry.value;
-      final parts = relativePath.split('/');
-
-      final fileType = FileIconUtils.inferFileType(parts.last);
-      final syntheticHash = 'local_${workId}_$relativePath';
-
-      int? fileSize;
-      try {
-        fileSize = await file.length();
-      } catch (_) {}
-
-      final fileEntry = <String, dynamic>{
-        'type': fileType,
-        'title': parts.last,
-        'hash': syntheticHash,
-        if (fileSize != null) 'size': fileSize,
-      };
-
-      if (parts.length == 1) {
-        // 根级别文件
-        mutableChildren.add(fileEntry);
-      } else {
-        // 嵌套文件，确保父文件夹存在
-        var currentLevel = mutableChildren;
-        for (var i = 0; i < parts.length - 1; i++) {
-          final folderName = parts[i];
-          // 查找或创建文件夹
-          Map<String, dynamic>? folder;
-          for (final item in currentLevel) {
-            if (item is Map<String, dynamic> &&
-                item['type'] == 'folder' &&
-                item['title'] == folderName) {
-              folder = item;
-              break;
+      void collectKnownPaths(List<dynamic> items, String parentPath) {
+        for (final item in items) {
+          if (item is! Map<String, dynamic>) continue;
+          final type = item['type'] as String? ?? '';
+          final title = item['title'] as String? ?? '';
+          if (type == 'folder') {
+            final folderPath = parentPath.isEmpty ? title : '$parentPath/$title';
+            final children = item['children'] as List<dynamic>?;
+            if (children != null) {
+              collectKnownPaths(children, folderPath);
             }
+          } else {
+            final filePath = parentPath.isEmpty ? title : '$parentPath/$title';
+            knownPaths.add(filePath);
           }
-
-          if (folder == null) {
-            folder = <String, dynamic>{
-              'type': 'folder',
-              'title': folderName,
-              'children': <dynamic>[],
-            };
-            currentLevel.add(folder);
-          } else if (folder['children'] == null) {
-            folder['children'] = <dynamic>[];
-          }
-          currentLevel = folder['children'] as List<dynamic>;
         }
-        currentLevel.add(fileEntry);
       }
 
-      _log.info('添加手动文件到文件树: $relativePath (RJ$workId)', tag: 'Download');
-    }
+      collectKnownPaths(existingChildren, '');
 
-    if (newFiles.isNotEmpty || metadataCreated) {
+      // 找出磁盘上有但文件树中没有的文件
+      final newFiles = <String, File>{};
+      for (final entry in diskFiles.entries) {
+        if (!knownPaths.contains(entry.key)) {
+          newFiles[entry.key] = entry.value;
+        }
+      }
+
+      // 将新文件添加到 children 树中的正确位置
+      final mutableChildren = List<dynamic>.from(existingChildren);
+
+      for (final entry in newFiles.entries) {
+        final relativePath = entry.key;
+        final file = entry.value;
+        final parts = relativePath.split('/');
+
+        final fileType = FileIconUtils.inferFileType(parts.last);
+        final syntheticHash = 'local_${workId}_$relativePath';
+
+        int? fileSize;
+        try {
+          fileSize = await file.length();
+        } catch (_) {}
+
+        final fileEntry = <String, dynamic>{
+          'type': fileType,
+          'title': parts.last,
+          'hash': syntheticHash,
+          if (fileSize != null) 'size': fileSize,
+        };
+
+        if (parts.length == 1) {
+          // 根级别文件
+          mutableChildren.add(fileEntry);
+        } else {
+          // 嵌套文件，确保父文件夹存在
+          var currentLevel = mutableChildren;
+          for (var i = 0; i < parts.length - 1; i++) {
+            final folderName = parts[i];
+            // 查找或创建文件夹
+            Map<String, dynamic>? folder;
+            for (final item in currentLevel) {
+              if (item is Map<String, dynamic> &&
+                  item['type'] == 'folder' &&
+                  item['title'] == folderName) {
+                folder = item;
+                break;
+              }
+            }
+
+            if (folder == null) {
+              folder = <String, dynamic>{
+                'type': 'folder',
+                'title': folderName,
+                'children': <dynamic>[],
+              };
+              currentLevel.add(folder);
+            } else if (folder['children'] == null) {
+              folder['children'] = <dynamic>[];
+            }
+            currentLevel = folder['children'] as List<dynamic>;
+          }
+          currentLevel.add(fileEntry);
+        }
+
+        _log.info('添加手动文件到文件树: $relativePath (RJ$workId)', tag: 'Download');
+      }
+
+      // Sort + write
+      _sortChildrenTree(mutableChildren);
       metadata['children'] = mutableChildren;
       await metadataFile.writeAsString(jsonEncode(metadata));
       _log.info('已更新作品文件树: RJ$workId, 新增 ${newFiles.length} 个文件',
           tag: 'Download');
+    } else {
+      // No disk files found (e.g. imported works with only metadata.json).
+      // Still sort existing children and write back so tracks appear in
+      // natural filename order, not arbitrary filesystem order.
+      final existingChildren = (metadata['children'] as List<dynamic>?) ?? [];
+      _sortChildrenTree(existingChildren);
+      metadata['children'] = existingChildren;
+      await metadataFile.writeAsString(jsonEncode(metadata));
+      _log.info('已排序作品文件树: RJ$workId (no new files)', tag: 'Download');
     }
   }
 
@@ -1250,7 +1275,14 @@ class DownloadService {
 
         // 递归扫描文件夹中的所有文件
         Future<void> scanDirectory(Directory dir, String relativePath) async {
-          await for (final entity in dir.list()) {
+          final entities = await dir.list(followLinks: false).toList();
+          entities.sort((a, b) {
+            final aName = a.path.split(Platform.pathSeparator).last;
+            final bName = b.path.split(Platform.pathSeparator).last;
+            return _naturalCompare(aName, bName);
+          });
+
+          for (final entity in entities) {
             if (entity is File) {
               final fileName = entity.path.split(Platform.pathSeparator).last;
 
@@ -1348,6 +1380,61 @@ class DownloadService {
     }
   }
 
+  /// Human-friendly natural sort comparator — sorts "2.mp3" before "10.mp3".
+  /// Handles mixed text+numeric filenames by comparing numeric segments
+  /// as integers and text segments as strings.
+  static int _naturalCompare(String a, String b) {
+    final pattern = RegExp(r'(\d+|[^\d]+)');
+    final aParts = pattern
+        .allMatches(a.toLowerCase())
+        .map((m) => m.group(1)!)
+        .toList();
+    final bParts = pattern
+        .allMatches(b.toLowerCase())
+        .map((m) => m.group(1)!)
+        .toList();
+
+    final len = aParts.length < bParts.length ? aParts.length : bParts.length;
+    for (int i = 0; i < len; i++) {
+      final aNum = int.tryParse(aParts[i]);
+      final bNum = int.tryParse(bParts[i]);
+      if (aNum != null && bNum != null) {
+        if (aNum != bNum) return aNum.compareTo(bNum);
+      } else {
+        final cmp = aParts[i].compareTo(bParts[i]);
+        if (cmp != 0) return cmp;
+      }
+    }
+    return aParts.length.compareTo(bParts.length);
+  }
+
+  /// Recursively sort a children tree in natural filename order.
+  /// Sorts files first, then folders (each group sorted by name).
+  /// Also recursively sorts nested folder children.
+  static void _sortChildrenTree(List<dynamic> children) {
+    children.sort((a, b) {
+      final aIsFolder = a is Map && a['type'] == 'folder';
+      final bIsFolder = b is Map && b['type'] == 'folder';
+      // Folders before files
+      if (aIsFolder && !bIsFolder) return -1;
+      if (!aIsFolder && bIsFolder) return 1;
+      // Same type — natural sort by title
+      final aName = (a is Map ? (a['title'] as String? ?? '') : '').toLowerCase();
+      final bName = (b is Map ? (b['title'] as String? ?? '') : '').toLowerCase();
+      return _naturalCompare(aName, bName);
+    });
+
+    // Recursively sort subfolders
+    for (final item in children) {
+      if (item is Map && item['type'] == 'folder') {
+        final subChildren = item['children'] as List<dynamic>?;
+        if (subChildren != null && subChildren.isNotEmpty) {
+          _sortChildrenTree(subChildren);
+        }
+      }
+    }
+  }
+
   /// Import a local folder as a new work (reference only — no file copy).
   /// Creates a synthetic work entry with a negative ID so it appears
   /// alongside downloaded works in the local downloads screen.
@@ -1376,7 +1463,17 @@ class DownloadService {
 
     Future<void> scanDir(Directory dir, List<dynamic> parentList,
         String relativePath) async {
-      await for (final entity in dir.list(followLinks: false)) {
+      // Collect entities first, sort by name, then process.
+      // dir.list() returns files in filesystem order (arbitrary), not
+      // alphabetical — without sorting, tracks end up in random order.
+      final entities = await dir.list(followLinks: false).toList();
+      entities.sort((a, b) {
+        final aName = a.path.split(Platform.pathSeparator).last;
+        final bName = b.path.split(Platform.pathSeparator).last;
+        return _naturalCompare(aName, bName);
+      });
+
+      for (final entity in entities) {
         final name = entity.path.split(Platform.pathSeparator).last;
         // Skip hidden files
         if (name.startsWith('.')) continue;
@@ -1493,7 +1590,16 @@ class DownloadService {
   Future<void> _processCoverForImport(
       int workId, String workDirPath, Directory importDir) async {
     try {
-      await for (final entity in importDir.list(followLinks: false)) {
+      // Collect and sort entities so the first valid image is deterministic
+      // (based on filename order), not arbitrary filesystem order.
+      final entities = await importDir.list(followLinks: false).toList();
+      entities.sort((a, b) {
+        final aName = a.path.split(Platform.pathSeparator).last;
+        final bName = b.path.split(Platform.pathSeparator).last;
+        return _naturalCompare(aName, bName);
+      });
+
+      for (final entity in entities) {
         if (entity is File) {
           final fName = entity.path.split(Platform.pathSeparator).last.toLowerCase();
           if (fName.endsWith('.jpg') || fName.endsWith('.jpeg') ||
@@ -1541,6 +1647,11 @@ class DownloadService {
   /// Resize a cover image to [maxDimension] pixels on the longest edge and
   /// save as JPEG quality 85. This prevents large images (>1MB) from causing
   /// silent decode failures in Image.file() on Android with Impeller/Vulkan.
+  ///
+  /// If the pure-Dart [img.decodeImage] fails (e.g. CMYK JPEG, unusual PNG
+  /// color types), falls back to Flutter's platform decoder (dart:ui) which
+  /// supports more formats. If both decoders fail, the cover is skipped
+  /// entirely — no fallback copy of the original large file.
   Future<void> _resizeAndSaveCover({
     required String sourcePath,
     required String destPath,
@@ -1552,38 +1663,76 @@ class DownloadService {
     // Read the source file bytes
     final Uint8List bytes = await sourceFile.readAsBytes();
 
-    // Decode the image using the pure-Dart image package
-    final original = img.decodeImage(bytes);
-    if (original == null) {
-      // Fallback: copy the file as-is if decoding fails (better than nothing)
-      _log.warning('Failed to decode cover image, copying as-is: $sourcePath',
+    // Decode the image using the pure-Dart image package first
+    img.Image? result = img.decodeImage(bytes);
+
+    if (result == null) {
+      // Pure-Dart decoder failed — try the platform decoder (dart:ui) which
+      // handles more formats (CMYK JPEG, certain PNG types, animated WebP
+      // static frame, etc.).
+      _log.warning('Pure-Dart decoder failed, trying platform decoder: $sourcePath',
           tag: 'Download');
-      await sourceFile.copy(destPath);
+      try {
+        final codec = await ui.instantiateImageCodec(
+          bytes,
+          targetWidth: maxDimension * 2, // decode at ~2x for quality headroom
+        );
+        final frame = await codec.getNextFrame();
+        final rgbaData = await frame.image.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        );
+        if (rgbaData != null) {
+          result = img.Image.fromBytes(
+            width: frame.image.width,
+            height: frame.image.height,
+            bytes: rgbaData.buffer,
+            numChannels: 4,
+          );
+          _log.info(
+            'Platform decoder succeeded: ${frame.image.width}x${frame.image.height}',
+            tag: 'Download',
+          );
+        }
+      } catch (e) {
+        _log.warning('Platform decoder also failed: $e', tag: 'Download');
+      }
+    }
+
+    if (result == null) {
+      // Both decoders failed — skip cover creation entirely rather than
+      // copying the original >1MB file which would fail to load on
+      // Android/Impeller.
+      _log.warning('Skipping cover (could not decode): $sourcePath',
+          tag: 'Download');
       return;
     }
 
-    // Determine if resize is needed
-    final isOversized =
-        original.width > maxDimension || original.height > maxDimension;
-
-    img.Image result;
-    if (isOversized) {
-      // Resize maintaining aspect ratio
-      result = img.copyResize(original,
-          width: original.width > original.height ? maxDimension : null,
-          height: original.height >= original.width ? maxDimension : null);
-    } else {
-      result = original;
+    // Resize if needed (maintaining aspect ratio)
+    if (result.width > maxDimension || result.height > maxDimension) {
+      result = img.copyResize(result,
+        width: result.width > result.height ? maxDimension : null,
+        height: result.height >= result.width ? maxDimension : null,
+      );
     }
 
-    // Encode as JPEG quality 85 (good visual quality, small file size)
-    final jpegBytes = img.encodeJpg(result, quality: 85);
+    // Encode as JPEG — start at quality 85, then step down if still too large
+    const maxBytes = 500 * 1024; // 500KB safety limit for Impeller
+    int quality = 85;
+    Uint8List jpegBytes;
+
+    do {
+      jpegBytes = img.encodeJpg(result, quality: quality);
+      if (jpegBytes.length <= maxBytes) break;
+      quality -= 10;
+    } while (quality >= 25);
+
     await File(destPath).writeAsBytes(jpegBytes);
 
     _log.info(
-      'Cover resized: ${original.width}x${original.height} -> ${result.width}x${result.height} '
+      'Cover resized: ${result.width}x${result.height} '
       '(${(bytes.length / 1024).toStringAsFixed(1)}KB -> '
-      '${(jpegBytes.length / 1024).toStringAsFixed(1)}KB)',
+      '${(jpegBytes.length / 1024).toStringAsFixed(1)}KB, '
+      'quality=$quality)',
       tag: 'Download',
     );
   }
@@ -1616,6 +1765,13 @@ class DownloadService {
       throw Exception('No subfolders found in the selected folder.');
     }
 
+    // Sort subfolders by name so multi-import processes in a predictable order
+    subDirs.sort((a, b) {
+      final aName = a.path.split(Platform.pathSeparator).last;
+      final bName = b.path.split(Platform.pathSeparator).last;
+      return _naturalCompare(aName, bName);
+    });
+
     final total = subDirs.length;
     final createdIds = <int>[];
     final errors = <String>[];
@@ -1641,6 +1797,10 @@ class DownloadService {
         tag: 'Download',
       );
     }
+
+    // Full disk sync after all imports complete — ensures file trees match
+    // what's on disk (picks up any files the syncFileTreeWithDisk step adds)
+    await reloadMetadataFromDisk();
 
     return createdIds;
   }

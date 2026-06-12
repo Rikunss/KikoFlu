@@ -1021,6 +1021,7 @@
   "subtitleFolderUnknown": "Unknown Works",
   "sortDownloadDate": "Download Date",
   "sortWorkId": "ID",
+  "sortTitle": "Title",
   "searchDownloads": "Search downloaded works...",
   "logTitle": "App Logs",
   "logSubtitle": "View and export app logs",
