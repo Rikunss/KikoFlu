@@ -4,6 +4,7 @@
   # KikoFlu Edge
 
   A cross-platform doujin voice client. Supports self-hosted Kikoeru servers and online services.
+  I just tested it for Android, I don't know if Windows/Linux/MacOS can run smoothly without bugs or not
 
   [![Flutter](https://img.shields.io/badge/Flutter-3.0+-02569B?logo=flutter)](https://flutter.dev)
   [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#)
