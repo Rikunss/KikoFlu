@@ -81,6 +81,9 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
   _FilterType _filterType = _FilterType.all;
   String _filterValue = '';
 
+  // Source filter
+  _SourceFilter _sourceFilter = _SourceFilter.all;
+
   /// Cache parsed Work objects by workId to avoid re-parsing metadata.
   final Map<int, Work> _workCache = {};
 
@@ -366,11 +369,39 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     };
   }
 
-  /// Apply search + metadata filter to the grouped tasks.
+  /// Check if a work group is from local import.
+  bool _isImported(List<DownloadTask> tasks) {
+    final meta = tasks.first.workMetadata;
+    return meta != null && meta['local_import_path'] != null;
+  }
+
+  /// Count works by source type.
+  (int, int) _countBySource(Map<int, List<DownloadTask>> grouped) {
+    int imported = 0, downloaded = 0;
+    for (final entry in grouped.entries) {
+      if (_isImported(entry.value)) {
+        imported++;
+      } else {
+        downloaded++;
+      }
+    }
+    return (downloaded, imported);
+  }
+
+  /// Apply source + search + metadata filter to the grouped tasks.
   Map<int, List<DownloadTask>> _filterTasks(
       Map<int, List<DownloadTask>> groupedTasks) {
-    // Apply metadata filter first
     Map<int, List<DownloadTask>> result = groupedTasks;
+
+    // Apply source filter
+    if (_sourceFilter != _SourceFilter.all) {
+      final targetImported = _sourceFilter == _SourceFilter.imported;
+      result = Map.fromEntries(result.entries.where((e) =>
+        _isImported(e.value) == targetImported,
+      ));
+    }
+
+    // Apply metadata filter
     if (_filterType != _FilterType.all && _filterValue.isNotEmpty) {
       result = Map.fromEntries(groupedTasks.entries.where((e) {
         final work = _getWork(e.key, e.value);
@@ -702,6 +733,30 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       pageIds.map((id) => MapEntry(id, grouped[id]!)),
     );
 
+    final (downloadedCount, importedCount) =
+        _countBySource(allGrouped);
+    final allCount = allGrouped.length;
+
+    // For empty states, show contextual message based on source filter
+    Widget? emptyWidget;
+    if (allGrouped.isEmpty) {
+      emptyWidget = _emptyState(context,
+        S.of(context).noLocalDownloads, Icons.download_outlined);
+    } else if (grouped.isEmpty) {
+      if (_sourceFilter == _SourceFilter.imported) {
+        emptyWidget = _emptyState(context,
+          'No imported works', Icons.folder_open_rounded,
+          actionLabel: 'Import now',
+          onAction: () => _importSingleFolder());
+      } else if (_sourceFilter == _SourceFilter.downloaded) {
+        emptyWidget = _emptyState(context,
+          'No downloaded works', Icons.cloud_download_rounded);
+      } else {
+        emptyWidget = _emptyState(context,
+          S.of(context).noResults, Icons.search_off);
+      }
+    }
+
     return Column(children: [
       _DownloadTopBar(
         isSelectionMode: _isSelectionMode,
@@ -718,14 +773,19 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         onShowSort: _showSortDialog,
       ),
       _buildImportBar(),
+      _buildSourceTabs(),
+      _buildInfoBar(allCount, downloadedCount, importedCount),
       _buildFilterBar(allGrouped),
       if (_isSearchVisible) _buildSearchBar(),
       Expanded(
-        child: allGrouped.isEmpty
-            ? _emptyState(context, S.of(context).noLocalDownloads, Icons.download_outlined)
-            : grouped.isEmpty
-                ? _emptyState(context, S.of(context).noResults, Icons.search_off)
-                : OverscrollNextPageDetector(
+        child: emptyWidget ?? AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+          child: grouped.isEmpty
+              ? _emptyState(context, S.of(context).noResults, Icons.search_off)
+              : OverscrollNextPageDetector(
                     hasNextPage: _currentPage < totalPages,
                     isLoading: false,
                     onNextPage: () async {
@@ -793,8 +853,153 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
                       ],
                     ),
                   ),
+                ),
       ),
     ]);
+  }
+
+  /// Source tabs — segmented pill control: All | Downloaded | Imported
+  Widget _buildSourceTabs() {
+    final cs = Theme.of(context).colorScheme;
+    final s = S.of(context);
+    const tabs = _SourceFilter.values;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: List.generate(tabs.length, (i) {
+            final filter = tabs[i];
+            final isSel = _sourceFilter == filter;
+
+            return Padding(
+              padding: EdgeInsets.only(right: i < tabs.length - 1 ? 6 : 0),
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    _sourceFilter = filter;
+                    _currentPage = 1;
+                    _workCache.clear();
+                  });
+                },
+                behavior: HitTestBehavior.opaque,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: isSel
+                        ? cs.primaryContainer
+                        : cs.surfaceContainerHighest.withAlpha(150),
+                    borderRadius: BorderRadius.circular(12),
+                    border: isSel
+                        ? Border.all(color: cs.primary.withAlpha(60), width: 1)
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _sourceIcon(filter),
+                        size: 16,
+                        color: isSel ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        _sourceLabel(s, filter),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSel ? FontWeight.w600 : FontWeight.w500,
+                          color: isSel ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  IconData _sourceIcon(_SourceFilter filter) {
+    switch (filter) {
+      case _SourceFilter.all:
+        return Icons.all_inclusive_rounded;
+      case _SourceFilter.downloaded:
+        return Icons.cloud_download_rounded;
+      case _SourceFilter.imported:
+        return Icons.folder_rounded;
+    }
+  }
+
+  String _sourceLabel(S l10n, _SourceFilter filter) {
+    switch (filter) {
+      case _SourceFilter.all:
+        return 'All';
+      case _SourceFilter.downloaded:
+        return 'Downloaded';
+      case _SourceFilter.imported:
+        return 'Imported';
+    }
+  }
+
+  /// Info bar — summary counts below source tabs.
+  Widget _buildInfoBar(int allCount, int downloadedCount, int importedCount) {
+    final cs = Theme.of(context).colorScheme;
+    if (allCount == 0) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: cs.outlineVariant, width: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded, size: 12,
+            color: cs.onSurfaceVariant.withAlpha(100)),
+          const SizedBox(width: 6),
+          Text(
+            '$allCount works',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500,
+              color: cs.onSurfaceVariant),
+          ),
+          if (downloadedCount > 0) ...[
+            const SizedBox(width: 4),
+            Text('·', style: TextStyle(fontSize: 11, color: cs.outline)),
+            const SizedBox(width: 4),
+            Icon(Icons.cloud_download_rounded, size: 11,
+              color: cs.primary),
+            const SizedBox(width: 3),
+            Text('$downloadedCount',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500,
+                color: cs.primary)),
+          ],
+          if (importedCount > 0) ...[
+            const SizedBox(width: 4),
+            Text('·', style: TextStyle(fontSize: 11, color: cs.outline)),
+            const SizedBox(width: 4),
+            Icon(Icons.folder_rounded, size: 11,
+              color: Colors.orange.shade400),
+            const SizedBox(width: 3),
+            Text('$importedCount',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500,
+                color: Colors.orange.shade400)),
+          ],
+        ],
+      ),
+    );
   }
 
   /// Import bar — sits between the top toolbar and the filter bar.
@@ -1082,7 +1287,10 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     );
   }
 
-  Widget _emptyState(BuildContext context, String message, IconData icon) {
+  Widget _emptyState(BuildContext context, String message, IconData icon, {
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final tt = theme.textTheme;
@@ -1113,6 +1321,14 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
                   ),
               textAlign: TextAlign.center,
             ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: onAction,
+                icon: const Icon(Icons.add, size: 18),
+                label: Text(actionLabel),
+              ),
+            ],
           ],
         ),
       ),
@@ -1139,6 +1355,9 @@ enum _ImportAction { singleFolder, multipleFolders }
 
 /// Filter type for the downloads filter bar.
 enum _FilterType { all, circle, va, tag }
+
+/// Source type filter for the downloads screen.
+enum _SourceFilter { all, downloaded, imported }
 
 /// Small reusable filter chip widget.
 class _FilterChip extends StatelessWidget {
@@ -1257,15 +1476,19 @@ class _DownloadTopBar extends StatelessWidget {
   }
 
   Widget _buildActionBar(BuildContext context, double hPad) {
+    final s = S.of(context);
+    final cs = Theme.of(context).colorScheme;
     return Align(
       alignment: Alignment.centerLeft,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: Row(mainAxisSize: MainAxisSize.min, children: [            Padding(
-            padding: const EdgeInsets.only(left: 16, right: 6),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          // Select (primary action — keep prominent)
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 4),
             child: FilledButton.tonalIcon(
               icon: const Icon(Icons.checklist, size: 18),
-              label: Text(S.of(context).select),
+              label: Text(s.select),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
@@ -1275,79 +1498,79 @@ class _DownloadTopBar extends StatelessWidget {
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 6),              child: FilledButton.tonalIcon(
-                icon: const Icon(Icons.refresh, size: 18),
-                label: Text(S.of(context).reload),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                ),
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  onRefresh();
-                },
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: FilledButton.tonalIcon(
-              icon: const Icon(Icons.folder_rounded, size: 18),
-              label: Text(S.of(context).browseFiles),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              ),
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const LocalFileBrowserScreen(),
-                  ),
-                );
-              },
-            ),
+          // Reload — icon only
+          _CompactIconButton(
+            icon: Icons.refresh_rounded,
+            tooltip: s.reload,
+            onPressed: onRefresh,
           ),
+          // Browse Files — icon only
+          _CompactIconButton(
+            icon: Icons.folder_rounded,
+            tooltip: s.browseFiles,
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const LocalFileBrowserScreen(),
+                ),
+              );
+            },
+          ),
+          // Open Folder — icon only (desktop only)
           if (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
-            Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: FilledButton.tonalIcon(
-                icon: const Icon(Icons.folder_open, size: 18),
-                label: Text(S.of(context).openFolder),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                ),
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  onOpenFolder();
-                },
-              ),
+            _CompactIconButton(
+              icon: Icons.folder_open,
+              tooltip: s.openFolder,
+              onPressed: onOpenFolder,
             ),
+          // Separator
           Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: IconButton(
-              icon: Icon(isSearchVisible ? Icons.search_off : Icons.search, size: 22),
-              padding: const EdgeInsets.all(8),
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                onToggleSearch();
-              },
-              tooltip: S.of(context).search,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Icon(Icons.more_horiz, size: 16, color: cs.outlineVariant),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: IconButton(
-              icon: const Icon(Icons.sort, size: 22),
-              padding: const EdgeInsets.all(8),
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                onShowSort();
-              },
-              tooltip: S.of(context).sortOptions,
-            ),
+          // Search
+          _CompactIconButton(
+            icon: isSearchVisible ? Icons.search_off : Icons.search,
+            tooltip: s.search,
+            onPressed: onToggleSearch,
+          ),
+          // Sort
+          _CompactIconButton(
+            icon: Icons.sort,
+            tooltip: s.sortOptions,
+            onPressed: onShowSort,
           ),
         ]),
+      ),
+    );
+  }
+}
+
+/// Compact icon button with consistent sizing.
+class _CompactIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _CompactIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 2),
+      child: IconButton(
+        icon: Icon(icon, size: 20),
+        padding: const EdgeInsets.all(8),
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          onPressed();
+        },
+        tooltip: tooltip,
       ),
     );
   }
@@ -1413,6 +1636,11 @@ class _DownloadWorkCard extends StatelessWidget {
             Expanded(
               child: Stack(fit: StackFit.expand, children: [
                 _WorkCardCover(workId: workId, work: work, firstTask: firstTask),
+                // Source badge (top-right)
+                Positioned(
+                  top: 8, right: 8,
+                  child: _SourceBadge(isImported: firstTask.workMetadata?['local_import_path'] != null),
+                ),
                 // Colored avatar with work title initial
                 Positioned(
                   top: 8, left: 8,
@@ -1515,6 +1743,29 @@ class _DownloadWorkCard extends StatelessWidget {
 Color _workColor(int id) {
   final hue = (id * 137.508) % 360;
   return HSLColor.fromAHSL(0.85, hue, 0.55, 0.5).toColor();
+}
+
+/// Small badge indicating whether a work was downloaded from server or imported.
+class _SourceBadge extends StatelessWidget {
+  final bool isImported;
+
+  const _SourceBadge({required this.isImported});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Icon(
+        isImported ? Icons.folder_rounded : Icons.cloud_download_rounded,
+        size: 14,
+        color: isImported ? Colors.orange.shade300 : Colors.white.withAlpha(220),
+      ),
+    );
+  }
 }
 
 /// Small circle avatar with the first character of the work title.
