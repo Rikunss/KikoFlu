@@ -32,6 +32,10 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+# Silence VS2022+ error C2338/STL1011: <experimental/coroutine> is deprecated.
+# Required by local_auth_windows and permission_handler_windows plugins.
+add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by
@@ -88,10 +92,12 @@ if(PLUGIN_BUNDLED_LIBRARIES)
 endif()
 
 # Copy the native assets provided by the build.dart from all packages.
+# OPTIONAL: the directory may not exist if no package provides native assets.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"
    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-   COMPONENT Runtime)
+   COMPONENT Runtime
+   OPTIONAL)
 
 # Fully re-copy the assets directory on each build to avoid having stale files
 # from a previous install.

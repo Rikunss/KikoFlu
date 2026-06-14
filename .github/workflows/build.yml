@@ -92,8 +92,6 @@ jobs:
         run: flutter pub get
         
       - name: Build Windows Release
-        env:
-          CL: "/D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
         run: flutter build windows --release
 
       - name: Install Inno Setup
@@ -150,7 +148,7 @@ jobs:
       - name: Install Pods
         run: |
           cd ios
-          pod install
+          pod install --repo-update
           
       - name: Build iOS Archive (Unsigned)
         run: |
@@ -199,8 +197,7 @@ jobs:
         
       - name: Build macOS Release
         env:
-          ARCHS: arm64
-          ONLY_ACTIVE_ARCH: "YES"
+          EXCLUDED_ARCHS: x86_64
         run: flutter build macos --release
         
       - name: Create DMG
