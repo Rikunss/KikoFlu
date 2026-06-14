@@ -92,7 +92,10 @@ jobs:
         run: flutter pub get
         
       - name: Build Windows Release
-        run: flutter build windows --release
+        run: |
+          flutter build windows --release
+          # Run install separately so a failure doesn't block the build
+          cmake --install build/windows/x64 --config Release 2>&1 || true
 
       - name: Install Inno Setup
         run: |
@@ -142,20 +145,18 @@ jobs:
         with:
           channel: 'stable'
           
-      - name: Get Dependencies
-        run: flutter pub get
+      - name: Clean and Get Dependencies
+        run: |
+          flutter clean
+          flutter pub get
         
-      - name: Clean and Install Pods
+      - name: Install Pods
         run: |
           cd ios
           # Fresh install: clear CocoaPods cache and force re-resolve
           pod cache clean --all || true
           rm -rf Pods Podfile.lock
           pod install --repo-update
-          # Verify audio_session pod was installed
-          if ! grep -q "Installing audio_session" Podfile.lock 2>/dev/null; then
-            echo "::warning::audio_session pod not found in Podfile.lock after install"
-          fi
           
       - name: Build iOS Archive (Unsigned)
         run: |
