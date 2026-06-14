@@ -8,12 +8,16 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:whisper_ggml_plus/whisper_ggml_plus.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../models/work.dart';
 import '../providers/auth_provider.dart';
+import '../providers/batch_transcription_provider.dart';
+import '../providers/ai_settings_provider.dart';
 import '../services/translation_service.dart';
 import '../services/download_service.dart';
+import '../services/ai_model_service.dart';
 import '../utils/snackbar_util.dart';
 import '../widgets/scrollable_appbar.dart';
 import '../widgets/tag_chip.dart';
@@ -25,6 +29,8 @@ import '../widgets/download_fab.dart';
 import '../utils/string_utils.dart';
 import '../widgets/privacy_blur_cover.dart';
 import '../widgets/image_gallery_screen.dart';
+import '../widgets/ai_model_picker_dialog.dart';
+import '../widgets/batch_transcription_sheet.dart';
 
 /// 离线作品详情页 - 使用下载时保存的元数据展示作品信息
 /// 不依赖网络请求，完全离线可用
@@ -264,6 +270,153 @@ class _OfflineWorkDetailScreenState
     }
   }
 
+  /// Build the batch AI transcription action button in the app bar.
+  /// Shows a spinner while running, a check when completed, and an AI
+  /// icon otherwise.  Disabled when no model is installed.
+  Widget _buildBatchTranscribeButton() {
+    final batchState = ref.watch(batchTranscriptionProvider);
+    final settings = ref.watch(aiSettingsProvider);
+    final modelInstalled = settings.modelDownloaded;
+
+    // Running — show tappable spinner that opens the detail sheet
+    if (batchState.status == BatchJobStatus.running) {
+      return IconButton(
+        icon: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        tooltip: 'AI Transcribing…'
+            ' (${batchState.currentIndex + 1}/${batchState.totalFiles})',
+        onPressed: () => BatchTranscriptionSheet.show(context),
+      );
+    }
+
+    // Completed / Cancelled — show status icon (tappable to open sheet)
+    if (batchState.status == BatchJobStatus.completed ||
+        batchState.status == BatchJobStatus.cancelled) {
+      final isCancelled = batchState.status == BatchJobStatus.cancelled;
+      return IconButton(
+        icon: Icon(
+          isCancelled ? Icons.cancel : Icons.check_circle,
+          color: isCancelled
+              ? Colors.orange[600]
+              : batchState.failedCount > 0
+                  ? Colors.orange[600]
+                  : Colors.green[600],
+        ),
+        tooltip: isCancelled
+            ? 'Cancelled'
+            : batchState.failedCount > 0
+                ? 'Done (${batchState.failedCount} failed)'
+                : 'All ${batchState.totalFiles} transcribed ✓',
+        onPressed: () => BatchTranscriptionSheet.show(context),
+      );
+    }
+
+    // Idle — show AI icon
+    return IconButton(
+      icon: const Icon(Icons.auto_awesome),
+      tooltip: 'AI Transcribe All',
+      onPressed: !modelInstalled ? null : () => _startBatchTranscribe(),
+    );
+  }
+
+  /// Collect audio files from the work's children and start batch
+  /// transcription via [BatchTranscriptionNotifier].
+  /// Shows the AI model picker dialog first.
+  Future<void> _startBatchTranscribe() async {
+    final work = widget.work;
+    final localImportPath = widget.localImportPath ?? work.localImportPath;
+
+    // Collect audio files
+    final files = await BatchTranscriptionHelper.collectAudioFiles(
+      work: work,
+      localImportPath: localImportPath,
+    );
+
+    if (files.isEmpty) {
+      if (mounted) {
+        SnackBarUtil.showInfo(
+          context,
+          'No audio files found in this work',
+        );
+      }
+      return;
+    }
+
+    // Check if files exist on disk
+    final anyExist = await BatchTranscriptionHelper.anyFilesExist(files: files);
+    if (!anyExist) {
+      if (mounted) {
+        SnackBarUtil.showInfo(
+          context,
+          'Audio files not found on disk. Make sure the work is downloaded.',
+        );
+      }
+      return;
+    }
+
+    // Check installed models
+    final aiService = ref.read(aiModelServiceProvider);
+    final settings = ref.read(aiSettingsProvider);
+
+    final installedConfigs = <AiModelConfig>[];
+    for (final config in aiModelConfigs) {
+      if (await aiService.checkModelInstalled(model: config.model)) {
+        installedConfigs.add(config);
+      }
+    }
+
+    if (installedConfigs.isEmpty) {
+      if (mounted) {
+        SnackBarUtil.showInfo(
+          context,
+          'No AI models installed. Download one in Settings \u2192 AI Features.',
+        );
+      }
+      return;
+    }
+
+    // Determine initial model from settings
+    WhisperModel initialModel;
+    try {
+      initialModel = WhisperModel.values.firstWhere(
+        (m) => m.name == settings.selectedModel,
+      );
+      if (!installedConfigs.any((c) => c.model == initialModel)) {
+        initialModel = installedConfigs.first.model;
+      }
+    } catch (_) {
+      initialModel = installedConfigs.first.model;
+    }
+
+    // Show AI model picker dialog (replaces old confirmation dialog)
+    if (!mounted) return;
+    final config = await showAIModelPickerDialog(
+      context,
+      installedModels: installedConfigs,
+      initialModel: initialModel,
+      initialThreads: settings.transcriptionThreads,
+      initialSplitOnWord: settings.splitOnWord,
+      fileCount: '${files.length} file${files.length > 1 ? 's' : ''}',
+    );
+
+    if (config == null || !mounted) return;
+
+    // Start batch with chosen config
+    ref.read(batchTranscriptionProvider.notifier).startBatch(
+      files: files,
+      workId: work.id,
+      model: config.model,
+      threads: config.threads,
+      splitOnWord: config.splitOnWord,
+    );
+  }
+
   // 构建网络封面图片（使用缓存）
   Widget _buildNetworkCover(Work work, String host, String token) {
     final cs = Theme.of(context).colorScheme;
@@ -304,6 +457,8 @@ class _OfflineWorkDetailScreenState
           appBar: ScrollableAppBar(
             systemOverlayStyle: systemOverlayStyle,
             actions: [
+              // Batch AI Transcribe button (disabled if model not installed)
+              _buildBatchTranscribeButton(),
               IconButton(
                 icon: const Icon(Icons.archive_outlined),
                 tooltip: S.of(context).exportAsZip,

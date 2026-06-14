@@ -17,6 +17,8 @@ import 'src/utils/theme.dart';
 import 'src/utils/global_keys.dart';
 import 'src/utils/platform_utils.dart';
 import 'src/services/audio_player_service.dart';
+import 'src/services/ai_download_notification_service.dart';
+import 'src/services/batch_transcription_notification_service.dart';
 import 'src/services/conversion_notification_service.dart';
 import 'src/services/download_service.dart';
 import 'src/services/floating_lyric_service.dart';
@@ -179,6 +181,8 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     _initHomeWidget();
     _setupWidgetActionHandler();
     _initConversionNotifications();
+    _initAiDownloadNotifications();
+    _initBatchTranscriptionNotifications();
     _initBookmarkService();
     _initScreenStateService();
     _initListeningStatsSubscription();
@@ -195,6 +199,20 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     if (!Platform.isAndroid) return;
     ConversionNotificationService.instance.initialize().catchError((e) {
       debugPrint('[Main] Failed to init conversion notifications: $e');
+    });
+  }
+
+  void _initAiDownloadNotifications() {
+    if (!Platform.isAndroid) return;
+    AiDownloadNotificationService.instance.initialize().catchError((e) {
+      debugPrint('[Main] Failed to init AI download notifications: $e');
+    });
+  }
+
+  void _initBatchTranscriptionNotifications() {
+    if (!Platform.isAndroid) return;
+    BatchTranscriptionNotificationService.instance.initialize().catchError((e) {
+      debugPrint('[Main] Failed to init batch transcription notifications: $e');
     });
   }
 

@@ -18,7 +18,7 @@ val hasReleaseKeystore = releaseKeystoreFile?.exists() == true
 android {
     namespace = "com.meteor.kikoeruflutter"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "29.0.13113456"
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true

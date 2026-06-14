@@ -4160,4 +4160,79 @@ class SJa extends S {
   String importPartialComplete(Object count, Object total) {
     return 'Imported $count/$total works';
   }
+
+  @override
+  String get aiFeatures => 'AI Features';
+
+  @override
+  String get aiFeaturesSubtitle =>
+      'AI-powered transcription & lyrics generation';
+
+  @override
+  String get aiModelNotInstalled => 'AI Pack not installed';
+
+  @override
+  String get aiModelInstalled => 'AI Pack installed';
+
+  @override
+  String aiModelName(Object name) {
+    return 'Model: $name';
+  }
+
+  @override
+  String aiModelSize(Object size) {
+    return 'Size: $size';
+  }
+
+  @override
+  String get aiDownloadModel => 'Download Model';
+
+  @override
+  String aiDownloadProgress(Object percent) {
+    return 'Downloading... $percent%';
+  }
+
+  @override
+  String get aiDeleteModel => 'Delete Model';
+
+  @override
+  String get aiDeleteModelConfirm =>
+      'Are you sure you want to delete the AI model?';
+
+  @override
+  String get aiTranscribing => 'Transcribing...';
+
+  @override
+  String get aiTranscribeComplete => 'Transcription complete';
+
+  @override
+  String aiTranscribeFailed(Object error) {
+    return 'Transcription failed: $error';
+  }
+
+  @override
+  String get aiGenerateLyrics => 'Generate AI Lyrics';
+
+  @override
+  String get aiModelRequired =>
+      'AI model not installed. Please download it first in Settings → AI Features.';
+
+  @override
+  String get aiModelDownloadRequired => 'AI Pack Required';
+
+  @override
+  String aiModelDownloadRequiredDesc(Object size) {
+    return 'AI Pack is not installed. Download Whisper Base Q5 ($size) model to generate lyrics.';
+  }
+
+  @override
+  String get aiDownload => 'Download';
+
+  @override
+  String aiModelInstalledWithSize(Object name, Object size) {
+    return 'Installed: $name ($size)';
+  }
+
+  @override
+  String get aiStorageUsed => 'Storage Used';
 }

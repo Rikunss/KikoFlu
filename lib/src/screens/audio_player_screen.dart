@@ -28,7 +28,11 @@ import '../widgets/player/work_info_panel.dart' show showWorkInfoPanel;
 import '../utils/artwork_color_extractor.dart';
 import 'work_detail_screen.dart';
 import '../../l10n/app_localizations.dart';
+import '../services/ai_model_service.dart';
 import '../services/streaming_speed_tracker.dart';
+import '../providers/ai_settings_provider.dart';
+import '../widgets/ai_model_picker_dialog.dart';
+import 'package:whisper_ggml_plus/whisper_ggml_plus.dart';
 
 /// 音频播放器主屏幕
 class AudioPlayerScreen extends ConsumerStatefulWidget {
@@ -391,6 +395,124 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   /// so the status bar style never needs to change after initial setup.
   /// Guarding this avoids a platform-channel method call on every build().
   bool _systemUiStyleSet = false;
+
+  /// Guards against double-clicking the "Generate AI Lyrics" button.
+  bool _isTranscribing = false;
+
+  /// Returns the local file path for AI transcription, or null if streamed.
+  String? _getLocalAudioPath(AudioTrack? track) {
+    final url = track?.url;
+    if (url == null || !url.startsWith('file://')) return null;
+    return url.replaceFirst('file://', '');
+  }
+
+  /// Generate AI lyrics for the current local audio file.
+  /// Shows the model picker dialog first, then transcribes with chosen settings.
+  Future<void> _onGenerateAiLyrics() async {
+    if (_isTranscribing) return;
+
+    // Get current track and audio path first
+    final track = ref.read(currentTrackProvider).valueOrNull;
+    if (track == null) return;
+    final audioPath = _getLocalAudioPath(track);
+    if (audioPath == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Only local audio files are supported for AI transcription'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Check which models are installed
+    final aiService = ref.read(aiModelServiceProvider);
+    final settings = ref.read(aiSettingsProvider);
+
+    final installedConfigs = <AiModelConfig>[];
+    for (final config in aiModelConfigs) {
+      if (await aiService.checkModelInstalled(model: config.model)) {
+        installedConfigs.add(config);
+      }
+    }
+
+    if (installedConfigs.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context).aiModelRequired),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Determine initial model — prefer the one from settings if it's installed
+    WhisperModel initialModel;
+    try {
+      initialModel = WhisperModel.values.firstWhere(
+        (m) => m.name == settings.selectedModel,
+      );
+      if (!installedConfigs.any((c) => c.model == initialModel)) {
+        initialModel = installedConfigs.first.model;
+      }
+    } catch (_) {
+      initialModel = installedConfigs.first.model;
+    }
+
+    // Show model picker dialog
+    if (!mounted) return;
+    final config = await showAIModelPickerDialog(
+      context,
+      installedModels: installedConfigs,
+      initialModel: initialModel,
+      initialThreads: settings.transcriptionThreads,
+      initialSplitOnWord: settings.splitOnWord,
+    );
+
+    if (config == null || !mounted) return;
+
+    // Start transcribing with chosen settings
+    setState(() => _isTranscribing = true);
+    try {
+      final lrcPath = await aiService.generateLrc(
+        audioPath,
+        track.title,
+        model: config.model,
+        threads: config.threads,
+        splitOnWord: config.splitOnWord,
+      );
+      if (mounted) {
+        if (lrcPath != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(S.of(context).aiTranscribeComplete),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          ref
+              .read(lyricControllerProvider.notifier)
+              .loadLyricFromLocalFile(lrcPath);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context).aiTranscribeFailed(e.toString())),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isTranscribing = false);
+      }
+    }
+  }
 
   /// In landscape mode, only drags started on the cover/controls side (left ~40%)
   /// should trigger dismiss — the right side (lyrics) must remain scrollable.
@@ -903,9 +1025,11 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     );
   }
 
-  /// Small overlay top bar: back button + background toggle + queue button
+  /// Small overlay top bar: back button + AI generate + background toggle + queue button
   Widget _buildTopBar(BuildContext context) {
     final showBlur = ref.watch(showBlurredBackgroundProvider);
+    final currentTrack = ref.watch(currentTrackProvider).valueOrNull;
+    final localAudioPath = _getLocalAudioPath(currentTrack);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -925,6 +1049,31 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
             ),
           ),
           const Spacer(),
+          // AI Generate Lyrics — only visible for local audio files
+          if (localAudioPath != null)
+            IconButton(
+              onPressed: _isTranscribing ? null : _onGenerateAiLyrics,
+              icon: _isTranscribing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white70,
+                      ),
+                    )
+                  : const Icon(Icons.auto_awesome, color: Colors.white),
+              tooltip: _isTranscribing
+                  ? S.of(context).aiTranscribing
+                  : S.of(context).aiGenerateLyrics,
+              style: IconButton.styleFrom(
+                backgroundColor: _isTranscribing
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.white.withValues(alpha: 0.15),
+                shape: const CircleBorder(),
+              ),
+            ),
+          if (localAudioPath != null) const SizedBox(width: 4),
           IconButton(
             icon: Icon(
               showBlur ? Icons.blur_on : Icons.blur_off,
@@ -1507,6 +1656,35 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 15),
+                          ),
+                          const SizedBox(height: 24),
+                          OutlinedButton.icon(
+                            onPressed: _isTranscribing
+                                ? null
+                                : _onGenerateAiLyrics,
+                            icon: _isTranscribing
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white70,
+                                    ),
+                                  )
+                                : const Icon(Icons.auto_awesome,
+                                    size: 18),
+                            label: Text(
+                                _isTranscribing
+                                    ? S.of(context).aiTranscribing
+                                    : S.of(context).aiGenerateLyrics),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor:
+                                  Colors.white.withValues(alpha: 0.9),
+                              side: BorderSide(
+                                color: Colors.white
+                                    .withValues(alpha: 0.3),
+                              ),
+                            ),
                           ),
                         ],
                       ),

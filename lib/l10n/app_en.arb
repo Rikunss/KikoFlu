@@ -1277,6 +1277,27 @@
   "selectImportFolderMultiple": "Select a folder containing sub-works",
   "importingMultipleWorks": "Importing works...",
   "importMultipleComplete": "Imported {count} works successfully",
-  "importPartialComplete": "Imported {count}/{total} works"
+  "importPartialComplete": "Imported {count}/{total} works",
+
+  "aiFeatures": "AI Features",
+  "aiFeaturesSubtitle": "AI-powered transcription & lyrics generation",
+  "aiModelNotInstalled": "AI Pack not installed",
+  "aiModelInstalled": "AI Pack installed",
+  "aiModelName": "Model: {name}",
+  "aiModelSize": "Size: {size}",
+  "aiDownloadModel": "Download Model",
+  "aiDownloadProgress": "Downloading... {percent}%",
+  "aiDeleteModel": "Delete Model",
+  "aiDeleteModelConfirm": "Are you sure you want to delete the AI model?",
+  "aiTranscribing": "Transcribing...",
+  "aiTranscribeComplete": "Transcription complete",
+  "aiTranscribeFailed": "Transcription failed: {error}",
+  "aiGenerateLyrics": "Generate AI Lyrics",
+  "aiModelRequired": "AI model not installed. Please download it first in Settings \u2192 AI Features.",
+  "aiModelDownloadRequired": "AI Pack Required",
+  "aiModelDownloadRequiredDesc": "AI Pack is not installed. Download Whisper Base Q5 ({size}) model to generate lyrics.",
+  "aiDownload": "Download",
+  "aiModelInstalledWithSize": "Installed: {name} ({size})",
+  "aiStorageUsed": "Storage Used"
 }
 

@@ -1439,6 +1439,10 @@ class DownloadService {
   /// Creates a synthetic work entry with a negative ID so it appears
   /// alongside downloaded works in the local downloads screen.
   ///
+  /// If the same [folderPath] has already been imported, **replaces** the
+  /// existing entry (deletes old tasks + work directory) and re-imports
+  /// using the original workId so no duplicate is created.
+  ///
   /// Returns the synthetic workId on success, or throws on error.
   Future<int> importLocalWork({
     required String folderPath,
@@ -1449,8 +1453,45 @@ class DownloadService {
       throw Exception('Folder not found: $folderPath');
     }
 
-    // Generate a unique negative workId
-    final workId = -DateTime.now().millisecondsSinceEpoch;
+    // ── Check for existing import with the same folder path ───────────
+    // If the user already imported this folder, reuse the original workId
+    // so we overwrite instead of creating a duplicate.
+    int? existingWorkId;
+    for (final task in _tasks) {
+      final importPath = task.workMetadata?['local_import_path'] as String?;
+      if (importPath != null &&
+          importPath.replaceAll(Platform.pathSeparator, '/') ==
+              folderPath.replaceAll(Platform.pathSeparator, '/')) {
+        existingWorkId = task.workId;
+        _log.info('Found existing import for same folder, reusing workId=$existingWorkId: $folderPath',
+            tag: 'Download');
+        break;
+      }
+    }
+
+    // Generate a unique negative workId (only if no existing import found)
+    final workId = existingWorkId ?? -DateTime.now().millisecondsSinceEpoch;
+
+    // ── If reusing an existing workId, clean up old data ──────────────
+    if (existingWorkId != null) {
+      // 1. Remove old DownloadTask entries for this workId
+      _tasks.removeWhere((t) => t.workId == existingWorkId);
+      _tasksController.add(List.from(_tasks));
+
+      // 2. Delete the old work directory on disk (ignore if missing)
+      final downloadDir = await _getDownloadDirectory();
+      final oldWorkDir = Directory('${downloadDir.path}/$existingWorkId');
+      if (await oldWorkDir.exists()) {
+        try {
+          await oldWorkDir.delete(recursive: true);
+          _log.info('Deleted old work directory for re-import: $existingWorkId',
+              tag: 'Download');
+        } catch (e) {
+          _log.warning('Failed to delete old work directory: $e',
+              tag: 'Download');
+        }
+      }
+    }
 
     // Create work directory in download folder
     final downloadDir = await _getDownloadDirectory();
@@ -1590,9 +1631,10 @@ class DownloadService {
   Future<void> _processCoverForImport(
       int workId, String workDirPath, Directory importDir) async {
     try {
-      // Collect and sort entities so the first valid image is deterministic
-      // (based on filename order), not arbitrary filesystem order.
-      final entities = await importDir.list(followLinks: false).toList();
+      // Recursively scan the entire import directory tree (including
+      // subdirectories) to find the first image. Many works store their
+      // cover image in a subfolder, not at the root.
+      final entities = await importDir.list(recursive: true).toList();
       entities.sort((a, b) {
         final aName = a.path.split(Platform.pathSeparator).last;
         final bName = b.path.split(Platform.pathSeparator).last;
@@ -1600,41 +1642,41 @@ class DownloadService {
       });
 
       for (final entity in entities) {
-        if (entity is File) {
-          final fName = entity.path.split(Platform.pathSeparator).last.toLowerCase();
-          if (fName.endsWith('.jpg') || fName.endsWith('.jpeg') ||
-              fName.endsWith('.png') || fName.endsWith('.webp') ||
-              fName.endsWith('.bmp')) {
-            await _resizeAndSaveCover(
-              sourcePath: entity.path,
-              destPath: '$workDirPath/cover.jpg',
-              maxDimension: 720,
-            );
+        // Skip directories; we only care about files
+        if (entity is! File) continue;
+        final fName = entity.path.split(Platform.pathSeparator).last.toLowerCase();
+        if (fName.endsWith('.jpg') || fName.endsWith('.jpeg') ||
+            fName.endsWith('.png') || fName.endsWith('.webp') ||
+            fName.endsWith('.bmp')) {
+          await _resizeAndSaveCover(
+            sourcePath: entity.path,
+            destPath: '$workDirPath/cover.jpg',
+            maxDimension: 720,
+          );
 
-            // Update the metadata file to include localCoverPath
-            final metadataFile = File('$workDirPath/work_metadata.json');
-            if (await metadataFile.exists()) {
-              try {
-                final content = await metadataFile.readAsString();
-                final meta = jsonDecode(content) as Map<String, dynamic>;
-                meta['localCoverPath'] = 'cover.jpg';
-                await metadataFile.writeAsString(jsonEncode(meta));
+          // Update the metadata file to include localCoverPath
+          final metadataFile = File('$workDirPath/work_metadata.json');
+          if (await metadataFile.exists()) {
+            try {
+              final content = await metadataFile.readAsString();
+              final meta = jsonDecode(content) as Map<String, dynamic>;
+              meta['localCoverPath'] = 'cover.jpg';
+              await metadataFile.writeAsString(jsonEncode(meta));
 
-                // Update tasks in memory so the card re-resolves the cover
-                for (var i = 0; i < _tasks.length; i++) {
-                  if (_tasks[i].workId == workId) {
-                    _tasks[i] = _tasks[i].copyWith(workMetadata: meta);
-                  }
+              // Update tasks in memory so the card re-resolves the cover
+              for (var i = 0; i < _tasks.length; i++) {
+                if (_tasks[i].workId == workId) {
+                  _tasks[i] = _tasks[i].copyWith(workMetadata: meta);
                 }
-                _tasksController.add(List.from(_tasks));
-              } catch (e) {
-                _log.warning('Failed to update metadata after cover resize: $e', tag: 'Download');
               }
+              _tasksController.add(List.from(_tasks));
+            } catch (e) {
+              _log.warning('Failed to update metadata after cover resize: $e', tag: 'Download');
             }
-
-            _log.info('Cover image resized and saved as JPEG: $fName (max 720px)', tag: 'Download');
-            break; // use the first image found
           }
+
+          _log.info('Cover image resized and saved as JPEG: $fName (max 720px)', tag: 'Download');
+          break; // use the first image found
         }
       }
     } catch (e) {

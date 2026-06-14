@@ -7,6 +7,9 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../l10n/app_localizations.dart';
 import '../services/log_service.dart';
 
+/// Picker mode: browse for a directory or select a specific file.
+enum CustomPickerMode { directory, file }
+
 /// A custom in-app file/directory browser that uses [dart:io] directly
 /// instead of SAF (Storage Access Framework), which is broken on MIUI.
 ///
@@ -61,6 +64,46 @@ class CustomFilePicker {
       builder: (ctx) => _CustomFilePickerDialog(
         initialPath: rootPath,
         dialogTitle: title,
+        mode: CustomPickerMode.directory,
+      ),
+    );
+  }
+
+  /// Open the custom file picker dialog to select a single file.
+  ///
+  /// Returns the selected file path, or `null` if cancelled.
+  /// [allowedExtensions] filters visible files by extension (e.g. `['.bin']`).
+  /// Leave empty to show all files.
+  static Future<String?> pickFile({
+    required BuildContext context,
+    String title = '',
+    String? initialPath,
+    List<String> allowedExtensions = const [],
+  }) async {
+    // Request permission first
+    final hasPermission = await requestStoragePermission();
+    if (!hasPermission) {
+      if (!context.mounted) return null;
+      _showPermissionDeniedDialog(context);
+      return null;
+    }
+
+    // Determine initial path
+    String rootPath = initialPath ?? _getDefaultRoot();
+    final dir = Directory(rootPath);
+    if (!await dir.exists()) {
+      rootPath = _getDefaultRoot();
+    }
+
+    if (!context.mounted) return null;
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _CustomFilePickerDialog(
+        initialPath: rootPath,
+        dialogTitle: title,
+        mode: CustomPickerMode.file,
+        allowedExtensions: allowedExtensions,
       ),
     );
   }
@@ -135,10 +178,14 @@ class _QuickAccessLocation {
 class _CustomFilePickerDialog extends StatefulWidget {
   final String initialPath;
   final String dialogTitle;
+  final CustomPickerMode mode;
+  final List<String> allowedExtensions;
 
   const _CustomFilePickerDialog({
     required this.initialPath,
     this.dialogTitle = '',
+    this.mode = CustomPickerMode.directory,
+    this.allowedExtensions = const [],
   });
 
   @override
@@ -161,6 +208,9 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
 
   // Pre-cached modified dates for list items
   final Map<String, DateTime> _modifiedDates = {};
+
+  // File selection (only used when mode == file)
+  String? _selectedFilePath;
 
   @override
   void initState() {
@@ -259,6 +309,14 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     if (name == 'data' && entity.path.contains('/Android/')) return true;
     if (name == 'obb' && entity.path.contains('/Android/')) return true;
     return false;
+  }
+
+  /// Returns `true` for files that should be visible based on allowed extensions.
+  bool _isAllowedFile(FileSystemEntity entity) {
+    if (entity is! File) return true; // directories are always visible
+    if (widget.allowedExtensions.isEmpty) return true; // no filter
+    final ext = p.extension(entity.path).toLowerCase();
+    return widget.allowedExtensions.contains(ext);
   }
 
   /// Build breadcrumb segments from the current path.
@@ -364,11 +422,14 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
 
   // ── Filtered entries for search ──
   List<FileSystemEntity> get _filteredEntries {
-    if (_searchQuery.isEmpty) return _entries;
     final q = _searchQuery.toLowerCase();
     return _entries.where((e) {
       if (_isHidden(e)) return false;
-      return _getDisplayName(e).toLowerCase().contains(q);
+      if (!_isAllowedFile(e)) return false;
+      if (_searchQuery.isNotEmpty) {
+        return _getDisplayName(e).toLowerCase().contains(q);
+      }
+      return true;
     }).toList();
   }
 
@@ -673,9 +734,17 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
           const Spacer(),
           // Select button
           FilledButton.icon(
-            onPressed: () => Navigator.pop(context, _currentPath),
+            onPressed: widget.mode == CustomPickerMode.file && _selectedFilePath == null
+                ? null
+                : () {
+                    if (widget.mode == CustomPickerMode.file) {
+                      Navigator.pop(context, _selectedFilePath);
+                    } else {
+                      Navigator.pop(context, _currentPath);
+                    }
+                  },
             icon: const Icon(Icons.check_rounded, size: 18),
-            label: const Text('Select'),
+            label: Text(widget.mode == CustomPickerMode.file ? 'Select File' : 'Select'),
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -809,14 +878,15 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     final items = _filteredEntries;
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
+      itemCount: items.length,        itemBuilder: (context, index) {
         final entity = items[index];
         if (_isHidden(entity)) return const SizedBox.shrink();
 
         final isDir = entity is Directory;
         final name = _getDisplayName(entity);
         final isSelected = entity.path == _currentPath;
+        final isFileSelected = widget.mode == CustomPickerMode.file &&
+            _selectedFilePath == entity.path;
 
         // Count sub-items for folders
         int subCount = 0;
@@ -827,13 +897,21 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
           child: Material(
-            color: isSelected
+            color: isSelected || isFileSelected
                 ? cs.primaryContainer.withValues(alpha: 0.3)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             child: InkWell(
               borderRadius: BorderRadius.circular(10),
-              onTap: isDir ? () => _navigateTo(entity.path) : null,
+              onTap: () {
+                if (isDir) {
+                  _navigateTo(entity.path);
+                } else if (widget.mode == CustomPickerMode.file) {
+                  setState(() {
+                    _selectedFilePath = entity.path;
+                  });
+                }
+              },
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 child: Row(

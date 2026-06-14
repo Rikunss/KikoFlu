@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -622,9 +623,61 @@ class _OfflineFileExplorerWidgetState
     // 获取作品封面URL（用于播放器显示）
     String? coverUrl;
     try {
-      final coverFile = File(p.join(basePath, 'cover.jpg'));
-      if (await coverFile.exists()) {
-        coverUrl = 'file://${coverFile.path}';
+      // Priority 1: Read localCoverPath from work_metadata.json (always
+      // points to cover.jpg for properly imported works, but may reference
+      // a different file for works imported with older versions).
+      final metadataFile = File(p.join(basePath, 'work_metadata.json'));
+      if (await metadataFile.exists()) {
+        try {
+          final content = await metadataFile.readAsString();
+          // ignore: avoid_dynamic_calls
+          final json = (jsonDecode(content) as Map<String, dynamic>);
+          final relPath = json['localCoverPath'] as String?;
+          if (relPath != null && relPath.isNotEmpty) {
+            final coverFile = File(p.join(basePath, relPath));
+            if (await coverFile.exists()) {
+              coverUrl = 'file://${coverFile.path}';
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Priority 2: Fallback to cover.jpg
+      if (coverUrl == null) {
+        final coverFile = File(p.join(basePath, 'cover.jpg'));
+        if (await coverFile.exists()) {
+          coverUrl = 'file://${coverFile.path}';
+        }
+      }
+
+      // Priority 3: Recursively scan the base directory (including
+      // subdirectories) for any image file. This covers legacy imported
+      // works whose cover is in a subfolder and whose metadata doesn't
+      // have a localCoverPath field.
+      if (coverUrl == null) {
+        final dir = Directory(basePath);
+        if (await dir.exists()) {
+          final entries = await dir.list(recursive: true).toList();
+          entries.sort((a, b) {
+            final aN = a.path.split(Platform.pathSeparator).last;
+            final bN = b.path.split(Platform.pathSeparator).last;
+            return aN.toLowerCase().compareTo(bN.toLowerCase());
+          });
+          for (final entry in entries) {
+            // Skip directories; only care about files
+            if (entry is! File) continue;
+            final lower = entry.path.toLowerCase();
+            // Skip work_metadata.json and .downloading temp files
+            if (lower.endsWith('.downloading') ||
+                lower.endsWith('work_metadata.json')) continue;
+            if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') ||
+                lower.endsWith('.png') || lower.endsWith('.webp') ||
+                lower.endsWith('.bmp')) {
+              coverUrl = 'file://${entry.path}';
+              break;
+            }
+          }
+        }
       }
     } catch (e) {
       // 封面不存在，忽略

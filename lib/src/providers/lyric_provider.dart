@@ -9,6 +9,7 @@ import '../models/audio_track.dart';
 import '../services/cache_service.dart';
 import '../services/subtitle_library_service.dart';
 import '../services/subtitle_database.dart';
+import '../services/download_service.dart';
 import '../services/log_service.dart';
 import '../utils/encoding_utils.dart';
 import '../services/translation_service.dart';
@@ -220,86 +221,133 @@ class LyricController extends StateNotifier<LyricState> {
       final fileName = lyricFile['title'] ?? lyricFile['name'];
       final workId = track.workId;
 
-      if (hash == null || host.isEmpty || workId == null) {
+      if (hash == null || workId == null) {
         if (!_isStale(myGen)) {
           state = LyricState(lyrics: [], isLoading: false);
         }
         return;
       }
 
-      // 构建字幕 URL
-      String normalizedUrl = host;
-      if (!host.startsWith('http://') && !host.startsWith('https://')) {
-        normalizedUrl = 'https://$host';
-      }
-      final lyricUrl = '$normalizedUrl/api/media/stream/$hash?token=$token';
-
       String? content;
+      String? resolvedLyricUrl;
 
-      // 1. 先尝试从缓存加载（包括下载文件和缓存文件）
-      final cachedContent = await CacheService.getCachedTextContent(
-        workId: workId,
-        hash: hash,
-        fileName: fileName,
-      );
-
-      if (_isStale(myGen)) {
-        LogService.instance.debug('[Lyric] 取消加载（已过期）: gen=$myGen, current=$_currentLoadGeneration', tag: 'Playback');
-        return;
+      // ── Local imported work: hash starts with 'local_' ──────────────
+      // Read the lyric file directly from the local filesystem via
+      // the work's local_import_path, instead of trying to stream it
+      // from the server (which would fail since the file isn't on the
+      // Kikoeru server).
+      if (hash is String && hash.startsWith('local_')) {
+        LogService.instance.debug(
+            '[Lyric] Local hash detected — reading from local filesystem: $hash', tag: 'Playback');
+        final localPath = await _resolveLocalLyricPath(
+          workId: workId,
+          lyricTitle: fileName,
+          allFiles: allFiles,
+        );
+        if (localPath != null && await File(localPath).exists()) {
+          final (decodedContent, _) = await EncodingUtils.readFileWithEncoding(File(localPath));
+          if (!_isStale(myGen)) {
+            content = decodedContent;
+            resolvedLyricUrl = 'file://$localPath';
+            LogService.instance.debug(
+                '[Lyric] Loaded local lyric file: $localPath (${content.length} chars)', tag: 'Playback');
+          }
+        } else {
+          LogService.instance.warning(
+              '[Lyric] Local lyric file not found at resolved path: $localPath', tag: 'Playback');
+        }
       }
 
-      if (cachedContent != null) {
-        LogService.instance.debug('[Lyric] 从缓存加载字幕: $hash', tag: 'Playback');
-        content = cachedContent;
-      } else {
-        // 2. 缓存未命中，从网络下载
-        LogService.instance.debug('[Lyric] 从网络下载字幕: $hash', tag: 'Playback');
-        final dio = Dio();
-        final response = await dio.get<List<int>>(
-          lyricUrl,
-          options: Options(
-            responseType: ResponseType.bytes,
-            receiveTimeout: const Duration(seconds: 30),
-            headers: StorageService.serverCookieHeaders,
-          ),
+      // ── Try cache (including downloaded files) ──
+      if (content == null) {
+        final cachedContent = await CacheService.getCachedTextContent(
+          workId: workId,
+          hash: hash,
+          fileName: fileName,
         );
-
         if (_isStale(myGen)) {
           LogService.instance.debug('[Lyric] 取消加载（已过期）: gen=$myGen, current=$_currentLoadGeneration', tag: 'Playback');
           return;
         }
+        if (cachedContent != null) {
+          LogService.instance.debug('[Lyric] 从缓存加载字幕: $hash', tag: 'Playback');
+          content = cachedContent;
+          // Build a server URL as fallback lyricUrl for display purposes
+          if (host.isNotEmpty) {
+            String normalizedUrl = host;
+            if (!host.startsWith('http://') && !host.startsWith('https://')) {
+              normalizedUrl = 'https://$host';
+            }
+            resolvedLyricUrl = '$normalizedUrl/api/media/stream/$hash?token=$token';
+          }
+        }
+      }
 
-        if (response.statusCode == 200) {
-          // 使用智能编码检测解码字节
-          final (decodedContent, encoding) =
-              EncodingUtils.decodeBytes(response.data!);
-          LogService.instance.debug('[Lyric] 网络字幕编码: $encoding', tag: 'Playback');
-          content = decodedContent;
+      // ── Fallback: stream from server (only for non-local hashes) ──
+      String? normalizedUrl;
+      if (content == null && host.isNotEmpty) {
+        normalizedUrl = host;
+        if (!host.startsWith('http://') && !host.startsWith('https://')) {
+          normalizedUrl = 'https://$host';
+        }
+        final lyricUrl = '$normalizedUrl/api/media/stream/$hash?token=$token';
+        resolvedLyricUrl = lyricUrl;
 
-          // 3. 缓存字幕内容
-          await CacheService.cacheTextContent(
-            workId: workId,
-            hash: hash,
-            content: content,
+        LogService.instance.debug('[Lyric] 从网络下载字幕: $hash', tag: 'Playback');
+        try {
+          final dio = Dio();
+          final response = await dio.get<List<int>>(
+            lyricUrl,
+            options: Options(
+              responseType: ResponseType.bytes,
+              receiveTimeout: const Duration(seconds: 30),
+              headers: StorageService.serverCookieHeaders,
+            ),
           );
-
           if (_isStale(myGen)) {
             LogService.instance.debug('[Lyric] 取消加载（已过期）: gen=$myGen, current=$_currentLoadGeneration', tag: 'Playback');
             return;
           }
-        } else {
-          if (!_isStale(myGen)) {
-            state = LyricState(
-              lyrics: [],
-              isLoading: false,
-              error: 'HTTP ${response.statusCode}',
+          if (response.statusCode == 200) {
+            final (decodedContent, encoding) =
+                EncodingUtils.decodeBytes(response.data!);
+            LogService.instance.debug('[Lyric] 网络字幕编码: $encoding', tag: 'Playback');
+            content = decodedContent;
+            // Cache the text content for next time
+            await CacheService.cacheTextContent(
+              workId: workId,
+              hash: hash,
+              content: content,
             );
+            if (_isStale(myGen)) {
+              LogService.instance.debug('[Lyric] 取消加载（已过期）: gen=$myGen, current=$_currentLoadGeneration', tag: 'Playback');
+              return;
+            }
+          } else {
+            if (!_isStale(myGen)) {
+              state = LyricState(
+                lyrics: [],
+                isLoading: false,
+                error: 'HTTP ${response.statusCode}',
+              );
+            }
+            return;
           }
-          return;
+        } catch (e) {
+          LogService.instance.warning('[Lyric] Network load failed: $e', tag: 'Playback');
         }
       }
 
-      // 4. 解析字幕
+      // ── If still no content, abort ──
+      if (content == null) {
+        if (!_isStale(myGen)) {
+          state = LyricState(lyrics: [], isLoading: false,
+            error: host.isEmpty ? 'No server configured for lyric streaming' : null);
+        }
+        return;
+      }
+
+      // 解析字幕
       final lyrics = LyricParser.parse(content); // 自动检测格式
       LogService.instance.debug('[Lyric] 解析完成: ${lyrics.length} 行字幕', tag: 'Playback');
 
@@ -309,7 +357,10 @@ class LyricController extends StateNotifier<LyricState> {
         state = LyricState(
           lyrics: lyrics,
           isLoading: false,
-          lyricUrl: lyricUrl,
+          lyricUrl: resolvedLyricUrl ??
+              (host.isNotEmpty
+                  ? '$normalizedUrl/api/media/stream/$hash?token=$token'
+                  : null),
         );
 
         // 5. 自动翻译（如果启用）
@@ -750,6 +801,101 @@ class LyricController extends StateNotifier<LyricState> {
   // 手动加载字幕文件
   /// 从本地文件路径加载字幕（用于字幕库）
   /// 接受可选的 [generation] 用于协调快速切换时的陈旧操作取消。
+  /// For imported local works, resolve the absolute file path on disk.
+  ///
+  /// 1. Look up the download task for [workId] and read its
+  ///    `local_import_path` from `workMetadata`.
+  /// 2. Walk the [allFiles] children tree to find the relative path of
+  ///    the lyric file (matching [lyricTitle]).
+  /// 3. Join `local_import_path` + relative path to get the absolute path.
+  ///
+  /// Returns null if any step fails (task not found, no local_import_path,
+  /// lyric file not located in the tree, or path doesn't exist on disk).
+  Future<String?> _resolveLocalLyricPath({
+    required int? workId,
+    required String? lyricTitle,
+    required List<dynamic> allFiles,
+  }) async {
+    if (workId == null || lyricTitle == null || lyricTitle.isEmpty) {
+      LogService.instance.debug(
+          '[Lyric] _resolveLocalLyricPath: null params (workId=$workId, title=$lyricTitle)',
+          tag: 'Playback');
+      return null;
+    }
+
+    // 1. Find the download task and extract local_import_path
+    String? localImportPath;
+    try {
+      for (final task in DownloadService.instance.tasks) {
+        if (task.workId == workId && task.workMetadata != null) {
+          final path = task.workMetadata!['local_import_path'] as String?;
+          if (path != null && path.isNotEmpty) {
+            localImportPath = path;
+            LogService.instance.debug(
+                '[Lyric] Found local_import_path for workId=$workId: $path',
+                tag: 'Playback');
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      LogService.instance.debug(
+          '[Lyric] Error reading DownloadService tasks: $e', tag: 'Playback');
+    }
+
+    if (localImportPath == null) {
+      LogService.instance.debug(
+          '[Lyric] No local_import_path found for workId=$workId',
+          tag: 'Playback');
+      return null;
+    }
+
+    // 2. Walk the allFiles children tree to find the matching lyric file
+    //    and compute its relative path within the imported folder.
+    String? relativePath;
+
+    void walkTree(List<dynamic> items, String currentPath) {
+      if (relativePath != null) return; // already found
+
+      for (final item in items) {
+        final type = item['type'] ?? '';
+        final name = item['title'] ?? item['name'] ?? '';
+
+        if (type == 'folder') {
+          final children = item['children'] as List<dynamic>?;
+          if (children != null) {
+            final folderPath =
+                currentPath.isEmpty ? name : '$currentPath/$name';
+            walkTree(children, folderPath);
+          }
+        } else if (name == lyricTitle) {
+          relativePath = currentPath.isEmpty ? name : '$currentPath/$name';
+          LogService.instance.debug(
+              '[Lyric] Found lyric in file tree: $relativePath',
+              tag: 'Playback');
+          return;
+        }
+      }
+    }
+
+    walkTree(allFiles, '');
+
+    if (relativePath == null) {
+      LogService.instance.debug(
+          '[Lyric] Could not locate "$lyricTitle" in file tree for workId=$workId',
+          tag: 'Playback');
+      return null;
+    }
+
+    // 3. Construct absolute path
+    final absolutePath = '$localImportPath/$relativePath'
+        .replaceAll(Platform.pathSeparator, '/');
+
+    LogService.instance.debug(
+        '[Lyric] Resolved local path: $absolutePath', tag: 'Playback');
+    return absolutePath;
+  }
+
   Future<void> loadLyricFromLocalFile(String filePath, {int? generation}) async {
     state = state.copyWith(isLoading: true, error: null);
 
