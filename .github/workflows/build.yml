@@ -145,10 +145,17 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
         
-      - name: Install Pods
+      - name: Clean and Install Pods
         run: |
           cd ios
+          # Fresh install: clear CocoaPods cache and force re-resolve
+          pod cache clean --all || true
+          rm -rf Pods Podfile.lock
           pod install --repo-update
+          # Verify audio_session pod was installed
+          if ! grep -q "Installing audio_session" Podfile.lock 2>/dev/null; then
+            echo "::warning::audio_session pod not found in Podfile.lock after install"
+          fi
           
       - name: Build iOS Archive (Unsigned)
         run: |
