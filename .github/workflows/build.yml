@@ -134,60 +134,6 @@ jobs:
             build/windows/x64/runner/Release/KikoFlu-windows.zip
             Output/KikoFlu-windows-setup.exe
 
-  ios:
-    name: iOS Build (Unsigned)
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-      
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          
-      - name: Clean and Get Dependencies
-        run: |
-          flutter clean
-          flutter pub get
-        
-      - name: Install Pods
-        run: |
-          cd ios
-          # Fresh install: clear CocoaPods cache and force re-resolve
-          pod cache clean --all || true
-          rm -rf Pods Podfile.lock
-          pod install --repo-update
-          
-      - name: Build iOS Archive (Unsigned)
-        run: |
-          cd ios
-          xcodebuild \
-            -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -sdk iphoneos \
-            -configuration Release \
-            -archivePath build/Runner.xcarchive \
-            -arch arm64 \
-            archive \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
-            PROVISIONING_PROFILE="" \
-            ONLY_ACTIVE_ARCH=NO
-            
-      - name: Package IPA
-        run: |
-          mkdir -p build/Payload
-          cp -r ios/build/Runner.xcarchive/Products/Applications/Runner.app build/Payload/
-          cd build
-          zip -qr KikoFlu-ios-unsigned.ipa Payload
-          
-      - name: Upload iOS Artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: ios-unsigned-release
-          path: build/KikoFlu-ios-unsigned.ipa
 
   macos:
     name: macOS Build
@@ -307,7 +253,6 @@ jobs:
     needs:
       - android
       - windows
-      - ios
       - macos
       - linux
       - linux-arm64
@@ -355,7 +300,6 @@ jobs:
           files: |
             artifacts/android-release/*
             artifacts/windows-release/*
-            artifacts/ios-unsigned-release/*
             artifacts/macos-release/*
             artifacts/linux-release/*
             artifacts/linux-arm64-release/*
