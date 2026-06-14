@@ -39,6 +39,11 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
           
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          yes | $ANDROID_HOME/tools/bin/sdkmanager --licenses || true
+          
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -87,6 +92,8 @@ jobs:
         run: flutter pub get
         
       - name: Build Windows Release
+        env:
+          CL: "/D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
         run: flutter build windows --release
 
       - name: Install Inno Setup
@@ -191,6 +198,9 @@ jobs:
         run: flutter pub get
         
       - name: Build macOS Release
+        env:
+          ARCHS: arm64
+          ONLY_ACTIVE_ARCH: "YES"
         run: flutter build macos --release
         
       - name: Create DMG
