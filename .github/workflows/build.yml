@@ -286,3 +286,61 @@ jobs:
         with:
           name: linux-arm64-release
           path: KikoFlu-linux-arm64.tar.gz
+
+  release:
+    name: Create GitHub Release
+    needs:
+      - android
+      - windows
+      - ios
+      - macos
+      - linux
+      - linux-arm64
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Get Version from Tag
+        id: get_version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Tag version: $TAG"
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          # Collect artifact file listing
+          echo "## 📦 Artifacts" > release-notes.md
+          echo "" >> release-notes.md
+          find artifacts -type f | sort | while read f; do
+            size=$(du -h "$f" | cut -f1)
+            name=$(basename "$f")
+            echo "- \`$name\` ($size)" >> release-notes.md
+          done
+          echo "" >> release-notes.md
+          echo "---" >> release-notes.md
+          echo "_Built automatically by GitHub Actions._" >> release-notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "KikoFlu v${{ steps.get_version.outputs.VERSION }}"
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/android-release/*
+            artifacts/windows-release/*
+            artifacts/ios-unsigned-release/*
+            artifacts/macos-release/*
+            artifacts/linux-release/*
+            artifacts/linux-arm64-release/*
