@@ -10,6 +10,7 @@ import 'settings/downloads_storage_screen.dart';
 import 'settings/privacy_content_screen.dart';
 import 'settings/translation_screen.dart';
 import 'settings/advanced_screen.dart';
+import 'settings/ai_features_screen.dart';
 import 'listening_statistics_screen.dart';
 import 'about_screen.dart';
 import 'settings/widgets/settings_dashboard_card.dart';
@@ -112,6 +113,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         subtitle: 'USB DAC routing & AAudio exclusive mode',
         screen: UsbDacSettingsScreen(),
         keywords: ['usb', 'dac', 'aaudio', 'exclusive mode', 'bit-perfect', 'mixer bypass', 'volume lock'],
+      ),
+      _SettingsCardData(
+        icon: Icons.auto_awesome_rounded,
+        iconColor: const Color(0xFF7B1FA2),
+        title: s.aiFeatures,
+        subtitle: s.aiFeaturesSubtitle,
+        screen: const AIFeaturesScreen(),
+        keywords: ['ai', 'whisper', 'transcript', 'transcription', 'lyric', 'subtitle', 'generate', 'speech to text', 'model'],
       ),
       _SettingsCardData(
         icon: Icons.bar_chart_rounded,

@@ -4,7 +4,8 @@
   # KikoFlu Edge
 
   A cross-platform doujin voice client. Supports self-hosted Kikoeru servers and online services.
-  I just tested it for Android, I don't know if Windows/Linux/MacOS can run smoothly without bugs or not
+  Built with Flutter — tested on Android, also builds for Windows / macOS / Linux / iOS.
+  *Tested primarily on Android — other platforms may have bugs.*
 
   [![Flutter](https://img.shields.io/badge/Flutter-3.0+-02569B?logo=flutter)](https://flutter.dev)
   [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#)
@@ -36,6 +37,19 @@
 - **Volume normalization** — automatic volume leveling
 - **Streaming speed tracker** — real-time buffering and streaming stats
 - **MPV player integration** — configurable MPV backend
+
+### 🤖 AI-Powered Transcription
+- **Whisper.cpp integration** — on-device speech-to-text using OpenAI Whisper
+- **Multiple model sizes** — Tiny (~75 MB) to Large V3 (~3 GB), with speed/accuracy trade-off
+- **Model download manager** — download, pause, resume, and delete models from Settings
+- **Alternative download** — download via browser or import model file directly
+- **Batch transcription** — transcribe entire works with one tap; progress tracking per file
+- **CPU thread tuning** — adjustable thread count for speed vs. battery balance
+- **Word-level timestamps** — toggle per-word or per-sentence timing
+- **Wakelock support** — keeps device awake during long transcription jobs
+- **Notification progress** — background download & transcription notifications (Android)
+- **Automatic LRC generation** — saves LRC files alongside audio and to subtitle library
+- **Inline transcription** — "Generate AI Lyrics" button in the full-screen player (local files)
 
 ### 📝 Subtitle System
 - Automatic subtitle loading

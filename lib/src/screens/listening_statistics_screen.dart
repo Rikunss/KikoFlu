@@ -101,7 +101,7 @@ class _StatsContent extends ConsumerStatefulWidget {
 }
 
 class _StatsContentState extends ConsumerState<_StatsContent>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeIn;
   late final TabController _chartTabCtrl;

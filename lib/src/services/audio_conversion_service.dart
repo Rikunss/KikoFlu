@@ -6,9 +6,9 @@ import 'package:flutter/services.dart' show MethodChannel;
 import 'log_service.dart';
 
 // FFmpegKit for Android — bundles static FFmpeg binaries
-import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
-import 'package:ffmpeg_kit_flutter_new_audio/session.dart';
+import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
+import 'package:ffmpeg_kit_flutter_new_min/session.dart';
 
 final _log = LogService.instance;
 
@@ -74,8 +74,14 @@ class AudioConversionService {
     if (format == WavConversionFormat.none) return true;
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true; // system ffmpeg
     if (Platform.isAndroid) {
-      // Android: bundled ffmpeg-kit handles ALL formats (FLAC, ALAC, Opus, MP3, AAC)
-      return true;
+      // Android: bundled ffmpeg-kit (min variant) supports:
+      //   ✓ FLAC, ALAC, AAC (built-in FFmpeg encoders)
+      //   ✗ MP3  (needs libmp3lame — only in audio variant)
+      //   ✗ Opus (needs libopus — only in audio variant)
+      return format == WavConversionFormat.mp3 ||
+             format == WavConversionFormat.opus
+          ? false
+          : true;
     }
     if (Platform.isIOS) {
       return format == WavConversionFormat.alac || format == WavConversionFormat.aac;
@@ -84,13 +90,16 @@ class AudioConversionService {
   }
 
   /// Check if a specific encoder is available on Android at runtime.
-  /// With bundled ffmpeg-kit, all formats are always available.
+  /// With bundled ffmpeg-kit (min variant), only built-in FFmpeg encoders
+  /// (FLAC, ALAC, AAC) are available — MP3 (libmp3lame) and Opus (libopus)
+  /// require the audio variant.
   Future<bool> checkEncoderAvailability(WavConversionFormat format) async {
     if (!Platform.isAndroid) return true;
     if (format == WavConversionFormat.none) return true;
-    // ffmpeg-kit audio variant includes all audio encoders
-    _encoderCache[format.value] = true;
-    return true;
+    final available = format != WavConversionFormat.mp3 &&
+        format != WavConversionFormat.opus;
+    _encoderCache[format.value] = available;
+    return available;
   }
 
   /// Check all platform-appropriate encoders and cache results.

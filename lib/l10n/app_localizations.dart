@@ -7655,6 +7655,126 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Imported {count}/{total} works'**
   String importPartialComplete(Object count, Object total);
+
+  /// No description provided for @aiFeatures.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Features'**
+  String get aiFeatures;
+
+  /// No description provided for @aiFeaturesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI-powered transcription & lyrics generation'**
+  String get aiFeaturesSubtitle;
+
+  /// No description provided for @aiModelNotInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Pack not installed'**
+  String get aiModelNotInstalled;
+
+  /// No description provided for @aiModelInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Pack installed'**
+  String get aiModelInstalled;
+
+  /// No description provided for @aiModelName.
+  ///
+  /// In en, this message translates to:
+  /// **'Model: {name}'**
+  String aiModelName(Object name);
+
+  /// No description provided for @aiModelSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Size: {size}'**
+  String aiModelSize(Object size);
+
+  /// No description provided for @aiDownloadModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Model'**
+  String get aiDownloadModel;
+
+  /// No description provided for @aiDownloadProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading... {percent}%'**
+  String aiDownloadProgress(Object percent);
+
+  /// No description provided for @aiDeleteModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Model'**
+  String get aiDeleteModel;
+
+  /// No description provided for @aiDeleteModelConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete the AI model?'**
+  String get aiDeleteModelConfirm;
+
+  /// No description provided for @aiTranscribing.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribing...'**
+  String get aiTranscribing;
+
+  /// No description provided for @aiTranscribeComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcription complete'**
+  String get aiTranscribeComplete;
+
+  /// No description provided for @aiTranscribeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcription failed: {error}'**
+  String aiTranscribeFailed(Object error);
+
+  /// No description provided for @aiGenerateLyrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate AI Lyrics'**
+  String get aiGenerateLyrics;
+
+  /// No description provided for @aiModelRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'AI model not installed. Please download it first in Settings → AI Features.'**
+  String get aiModelRequired;
+
+  /// No description provided for @aiModelDownloadRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Pack Required'**
+  String get aiModelDownloadRequired;
+
+  /// No description provided for @aiModelDownloadRequiredDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Pack is not installed. Download Whisper Base Q5 ({size}) model to generate lyrics.'**
+  String aiModelDownloadRequiredDesc(Object size);
+
+  /// No description provided for @aiDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get aiDownload;
+
+  /// No description provided for @aiModelInstalledWithSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed: {name} ({size})'**
+  String aiModelInstalledWithSize(Object name, Object size);
+
+  /// No description provided for @aiStorageUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Used'**
+  String get aiStorageUsed;
 }
 
 class _SDelegate extends LocalizationsDelegate<S> {
