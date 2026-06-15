@@ -9,6 +9,7 @@ import '../../providers/settings_provider.dart';
 import '../../services/hi_res_audio_service.dart';
 import '../../services/exclusive_audio_service.dart';
 import '../../services/audio_player_service.dart';
+import '../../services/usb_dac_audio_manager.dart';
 import '../../services/log_service.dart';
 import '../../utils/snackbar_util.dart';
 
@@ -646,6 +647,8 @@ class _UsbDacSettingsScreenState extends ConsumerState<UsbDacSettingsScreen> {
               }
 
               ref.read(bitPerfectPlaybackProvider.notifier).toggle(value);
+              // Sync with libusb USB DAC manager
+              UsbDacAudioManager.instance.setAutoDacEnabled(value);
               if (context.mounted) {
                 SnackBarUtil.showInfo(
                   context,
@@ -706,6 +709,7 @@ class _UsbDacSettingsScreenState extends ConsumerState<UsbDacSettingsScreen> {
       ref.read(bitPerfectPlaybackProvider.notifier).setPreferredDevice(firstDevice.id);
       _exclusive.setAaudioDeviceId(firstDevice.id);
       ref.read(bitPerfectPlaybackProvider.notifier).toggle(true);
+      UsbDacAudioManager.instance.setAutoDacEnabled(true);
       if (mounted) {
         setState(() => _autoTargetDevice = firstDevice.productName);
       }

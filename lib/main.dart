@@ -17,6 +17,7 @@ import 'src/utils/theme.dart';
 import 'src/utils/global_keys.dart';
 import 'src/utils/platform_utils.dart';
 import 'src/services/audio_player_service.dart';
+import 'src/services/usb_dac_audio_manager.dart';
 import 'src/services/ai_download_notification_service.dart';
 import 'src/services/batch_transcription_notification_service.dart';
 import 'src/services/conversion_notification_service.dart';
@@ -180,6 +181,7 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     _checkForUpdatesSilently();
     _initHomeWidget();
     _setupWidgetActionHandler();
+    _initUsbDacManager();
     _initConversionNotifications();
     _initAiDownloadNotifications();
     _initBatchTranscriptionNotifications();
@@ -343,6 +345,13 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
       await FloatingLyricService.instance.hide();
     }
     super.onWindowClose();
+  }
+
+  void _initUsbDacManager() {
+    if (!Platform.isAndroid) return;
+    UsbDacAudioManager.instance.initialize().catchError((e) {
+      debugPrint('[Main] USB DAC manager init failed: $e');
+    });
   }
 
   void _initHomeWidget() {

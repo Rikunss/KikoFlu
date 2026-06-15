@@ -11,6 +11,8 @@ import '../../services/hi_res_audio_service.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/exclusive_audio_service.dart';
 import '../../providers/exclusive_audio_provider.dart';
+import '../../providers/usb_dac_provider.dart';
+import '../../services/usb_dac_audio_manager.dart';
 
 /// Shows the Audio Information dialog in the center of the screen.
 Future<void> showAudioInfoSheet(BuildContext context, WidgetRef ref) {
@@ -230,6 +232,13 @@ class _AudioChainSectionCard extends ConsumerWidget {
       loading: () => '',
       error: (_, __) => '',
     );
+    // libusb USB DAC state
+    final libusbStateAsync = ref.watch(usbDacManagerStateProvider);
+    final libusbState = libusbStateAsync.when(
+      data: (s) => s,
+      loading: () => const UsbDacManagerState(),
+      error: (_, __) => const UsbDacManagerState(),
+    );
     final routingAsync = ref.watch(hiResUsbRoutingProvider);
     final hiResRouting = routingAsync.when(
       data: (r) => r,
@@ -397,6 +406,31 @@ class _AudioChainSectionCard extends ConsumerWidget {
                 hiResRouting.routed
                     ? _MiniChip(usbDacNameValue, cs.primaryContainer, cs.onPrimaryContainer)
                     : _MiniChip('$usbDacNameValue (not routed)', cs.surfaceContainerHighest, cs.onSurfaceVariant),
+              ],
+            ),
+          ),
+        // libusb USB DAC status row
+        if (libusbState.initialized)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            child: Row(
+              children: [
+                Icon(Icons.usb, size: 13,
+                    color: libusbState.dacActive
+                        ? const Color(0xFF4CAF50)
+                        : cs.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text('libusb DAC', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                const SizedBox(width: 6),
+                libusbState.dacActive
+                    ? _MiniChip('${libusbState.deviceName} (bit-perfect)',
+                        const Color(0xFF4CAF50).withValues(alpha: 0.15),
+                        const Color(0xFF4CAF50))
+                    : libusbState.dacConnected
+                        ? _MiniChip('Connected (idle)',
+                            cs.surfaceContainerHighest, cs.onSurfaceVariant)
+                        : _MiniChip('Not connected',
+                            cs.surfaceContainerHighest, cs.onSurfaceVariant),
               ],
             ),
           ),
@@ -1156,14 +1190,21 @@ class _BitPerfectIndicator extends ConsumerWidget {
     String bitPerfectLabel;
     bool active;
     if (Platform.isAndroid) {
-      active = state.aaudioExclusive;
-      bitPerfectLabel = state.aaudioExclusive
-          ? 'YES · AAudio Exclusive'
-          : state.aaudioActive
-              ? 'NO · AAudio Shared'
-              : state.enabled
-                  ? 'NO · Vol Lock only'
-                  : 'NO · Android Mixer';
+      // Check if libusb USB DAC is active first (higher priority)
+      final dacActive = ref.watch(isLibusbActiveProvider);
+      if (dacActive) {
+        active = true;
+        bitPerfectLabel = 'YES · libusb USB DAC';
+      } else {
+        active = state.aaudioExclusive;
+        bitPerfectLabel = state.aaudioExclusive
+            ? 'YES · AAudio Exclusive'
+            : state.aaudioActive
+                ? 'NO · AAudio Shared'
+                : state.enabled
+                    ? 'NO · Vol Lock only'
+                    : 'NO · Android Mixer';
+      }
     } else if (Platform.isWindows) {
       active = state.enabled;
       bitPerfectLabel = state.enabled

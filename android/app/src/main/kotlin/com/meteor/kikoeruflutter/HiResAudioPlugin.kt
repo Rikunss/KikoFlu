@@ -120,8 +120,27 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
         positionPushHandler?.removeCallbacks(positionPushRunnable)
     }
 
-    // AAudio exclusive AudioSink mode
+    // ── Audio Sink Selection ──
+    // Priority: libusb > AAudio > Default
+    // libusb (LibusbAudioSink) is the true bit-perfect path via USB DAC.
+    // AAudio (AaudioAudioSink) is the mixer-bypass path for built-in audio.
+    // Default (DefaultAudioSink) uses Android AudioTrack.
+
+    /// When true, use [LibusbAudioSink] for direct USB DAC output.
+    /// Has priority over [useAaudioSink].
+    private var useLibusbSink = false
+
+    /// When true, use [AaudioAudioSink] for AAudio exclusive mode.
+    /// Only used when [useLibusbSink] is false.
     private var useAaudioSink = false
+
+    /// When false, FfmpegAudioRenderer is NOT prepended to the renderer list.
+    /// For low-bitrate lossy formats (MP3 <256kbps, AAC <192kbps, etc.),
+    /// the default MediaCodecAudioRenderer (hardware decoder) is used instead
+    /// of the FFmpeg software decoder to reduce CPU usage / battery drain.
+    /// Default is true (FFmpeg enabled).
+    @Volatile
+    private var useFfmpeg = true
 
     /// When true, the AAudio AudioSink will skip digital volume gain
     /// to preserve bit-perfect PCM output. Requires exclusive mode.
@@ -225,9 +244,28 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
     }
 
     /**
+     * Set whether to use libusb AudioSink for direct USB DAC output.
+     * When enabled, ExoPlayer will be recreated with [LibusbAudioSink]
+     * which routes decoded PCM audio directly to the USB DAC via libusb,
+     * bypassing the Android audio mixer entirely for true bit-perfect output.
+     *
+     * Has priority over [setUseAaudioSink] — if both are enabled, libusb wins.
+     * Only takes effect on the NEXT ExoPlayer creation (next play() call).
+     */
+    fun setUseLibusbSink(enabled: Boolean) {
+        if (useLibusbSink == enabled) return
+        useLibusbSink = enabled
+        // Force player recreation on next play() call
+        releasePlayer()
+        android.util.Log.i("HiResAudio", "Libusb AudioSink ${if (enabled) "enabled" else "disabled"}")
+    }
+
+    /**
      * Set whether to use AAudio exclusive AudioSink.
      * When enabled, ExoPlayer will be recreated with a custom AudioSink
      * that routes decoded PCM audio to the AAudio exclusive stream.
+     *
+     * Only takes effect when [useLibusbSink] is false (libusb has priority).
      */
     fun setUseAaudioSink(enabled: Boolean) {
         if (useAaudioSink == enabled) return
@@ -243,6 +281,22 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
      * ensuring the audio output is bit-identical to the source file.
      * NOTE: Only takes effect on the NEXT ExoPlayer creation (next play() call).
      */
+    /**
+     * Set whether to use the FFmpeg software decoder.
+     *
+     * When false, ExoPlayer uses the default MediaCodecAudioRenderer (hardware)
+     * for supported formats, which uses dedicated DSP blocks and saves CPU/battery.
+     * When true, FfmpegAudioRenderer is prepended to the renderer list.
+     *
+     * Only takes effect on the NEXT ExoPlayer creation (next play() call).
+     */
+    fun setUseFfmpeg(enabled: Boolean) {
+        if (useFfmpeg == enabled) return
+        useFfmpeg = enabled
+        releasePlayer()
+        android.util.Log.i("HiResAudio", "FFmpeg decoder ${if (enabled) "enabled" else "disabled"}")
+    }
+
     fun setBitPerfectMode(enabled: Boolean) {
         if (bitPerfectMode == enabled) return
         bitPerfectMode = enabled
@@ -265,64 +319,90 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
             // Approach 2: Wrap DefaultRenderersFactory via RenderersFactory SAM to explicitly
             //   prepend FfmpegAudioRenderer at position 0 in the renderers array.
             // ──────────────────────────────────────────────────────────────────────────────
-            val baseFactory: DefaultRenderersFactory = if (useAaudioSink) {
-                android.util.Log.i("HiResAudio", "Creating ExoPlayer with AAudio AudioSink + FFmpeg ALAC")
-                val aaudioSinkInstance = AaudioAudioSink({ sr, ch, bits, deviceId ->
-                    val ptr = ExclusiveAudioPlugin.nativeCreatePlayerStatic()
-                    if (ptr != 0L) {
-                        val inited = ExclusiveAudioPlugin.nativeInitPlayerStatic(ptr, sr, ch, bits, deviceId)
-                        if (!inited) {
-                            ExclusiveAudioPlugin.nativeDestroyPlayerStatic(ptr)
-                            0L
-                        } else ptr
-                    } else 0L
-                },
-                /* onExclusiveStatusChanged */ { isExclusive ->
-                    val status = mapOf(
-                        "enabled" to useAaudioSink,
-                        "volumeLocked" to false,
-                        "aaudioAvailable" to true,
-                        "aaudioActive" to true,
-                        "aaudioExclusive" to isExclusive,
-                        "mixerBypassed" to isExclusive,
-                        "aaudioSampleRate" to 0,
-                        "aaudioLatencyMs" to 0.0,
-                        "currentVolume" to 0,
-                        "maxVolume" to 0,
-                        "androidSdk" to android.os.Build.VERSION.SDK_INT
-                    )
-                    channel?.invokeMethod("onExclusiveModeChanged", status)
-                    android.util.Log.i("HiResAudio", "Playback stream exclusive status: $isExclusive")
-                },
-                /* bitPerfectMode */ bitPerfectMode)
+            val baseFactory: DefaultRenderersFactory = when {
+                // Priority 1: libusb USB DAC direct (true bit-perfect, all Android versions with USB OTG)
+                useLibusbSink -> {
+                    android.util.Log.i("HiResAudio", "Creating ExoPlayer with LibusbAudioSink + FFmpeg ALAC")
+                    val libusbSinkInstance = LibusbAudioSink()
 
-                object : DefaultRenderersFactory(context) {
-                    override fun buildAudioSink(
-                        ctx: Context,
-                        enableFloatOutput: Boolean,
-                        enableAudioTrackPlaybackParams: Boolean
-                    ): AudioSink? {
-                        return aaudioSinkInstance
+                    object : DefaultRenderersFactory(context) {
+                        override fun buildAudioSink(
+                            ctx: Context,
+                            enableFloatOutput: Boolean,
+                            enableAudioTrackPlaybackParams: Boolean
+                        ): AudioSink? {
+                            return libusbSinkInstance
+                        }
                     }
                 }
-            } else {
-                android.util.Log.i("HiResAudio", "Creating ExoPlayer with FFmpeg ALAC")
-                DefaultRenderersFactory(context)
+                // Priority 2: AAudio exclusive AudioSink (mixer bypass, flagship devices)
+                useAaudioSink -> {
+                    android.util.Log.i("HiResAudio", "Creating ExoPlayer with AAudio AudioSink + FFmpeg ALAC")
+                    val aaudioSinkInstance = AaudioAudioSink({ sr, ch, bits, deviceId ->
+                        val ptr = ExclusiveAudioPlugin.nativeCreatePlayerStatic()
+                        if (ptr != 0L) {
+                            val inited = ExclusiveAudioPlugin.nativeInitPlayerStatic(ptr, sr, ch, bits, deviceId)
+                            if (!inited) {
+                                ExclusiveAudioPlugin.nativeDestroyPlayerStatic(ptr)
+                                0L
+                            } else ptr
+                        } else 0L
+                    },
+                    /* onExclusiveStatusChanged */ { isExclusive ->
+                        val status = mapOf(
+                            "enabled" to useAaudioSink,
+                            "volumeLocked" to false,
+                            "aaudioAvailable" to true,
+                            "aaudioActive" to true,
+                            "aaudioExclusive" to isExclusive,
+                            "mixerBypassed" to isExclusive,
+                            "aaudioSampleRate" to 0,
+                            "aaudioLatencyMs" to 0.0,
+                            "currentVolume" to 0,
+                            "maxVolume" to 0,
+                            "androidSdk" to android.os.Build.VERSION.SDK_INT
+                        )
+                        channel?.invokeMethod("onExclusiveModeChanged", status)
+                        android.util.Log.i("HiResAudio", "Playback stream exclusive status: $isExclusive")
+                    },
+                    /* bitPerfectMode */ bitPerfectMode)
+
+                    object : DefaultRenderersFactory(context) {
+                        override fun buildAudioSink(
+                            ctx: Context,
+                            enableFloatOutput: Boolean,
+                            enableAudioTrackPlaybackParams: Boolean
+                        ): AudioSink? {
+                            return aaudioSinkInstance
+                        }
+                    }
+                }
+                // Priority 3: Default AudioSink (standard Android audio)
+                else -> {
+                    android.util.Log.i("HiResAudio", "Creating ExoPlayer with FFmpeg ALAC")
+                    DefaultRenderersFactory(context)
+                }
             }
 
-            // Enable ServiceLoader-based extension renderer discovery
-            // This finds FfmpegAudioRenderer via META-INF/services/ and adds it
-            // to the renderers list in PREFER mode (before MediaCodecAudioRenderer).
-            baseFactory.setExtensionRendererMode(
-                DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-            )
+            // Conditionally enable FFmpeg extension renderer discovery.
+            // When useFfmpeg is true: PREFER mode → FFmpeg before MediaCodec.
+            // When useFfmpeg is false: OFF mode → only built-in decoders (MediaCodec).
+            // This saves CPU/battery for low-bitrate lossy formats (MP3 <256kbps, etc.)
+            // that don't benefit from FFmpeg software decoding.
+            if (useFfmpeg) {
+                baseFactory.setExtensionRendererMode(
+                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                )
+            } else {
+                baseFactory.setExtensionRendererMode(
+                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
+                )
+            }
 
-            // Wrap base factory to ALSO prepend FfmpegAudioRenderer explicitly.
-            // This provides redundancy: if ServiceLoader fails, the explicit prepend
-            // still works. If ServiceLoader succeeds, FfmpegAudioRenderer appears twice
-            // but ExoPlayer picks the first one at index 0.
+            // Wrap base factory, optionally prepending FfmpegAudioRenderer.
+            // When useFfmpeg is false, NO FFmpeg renderer is added — ExoPlayer
+            // falls back to the default MediaCodecAudioRenderer (hardware decoder).
             val renderersFactory = RenderersFactory { handler, _, audioListener, _, _ ->
-                android.util.Log.i("HiResAudio", "RenderersFactory.createRenderers() called — prepending FfmpegAudioRenderer")
                 val baseRenderers = baseFactory.createRenderers(
                     handler,
                     object : VideoRendererEventListener {},
@@ -334,14 +414,17 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                         override fun onMetadata(metadata: Metadata) {}
                     }
                 )
-                android.util.Log.i("HiResAudio", "Base factory returned ${baseRenderers.size} renderers")
-                for ((i, r) in baseRenderers.withIndex()) {
-                    android.util.Log.i("HiResAudio", "  Renderer[$i] = ${r::class.java.name}")
+                if (useFfmpeg) {
+                    android.util.Log.i("HiResAudio", "RenderersFactory: prepending FfmpegAudioRenderer")
+                    for ((i, r) in baseRenderers.withIndex()) {
+                        android.util.Log.i("HiResAudio", "  Renderer[$i] = ${r::class.java.name}")
+                    }
+                    val ffmpeg = FfmpegAudioRenderer(handler, audioListener)
+                    arrayOf<Renderer>(ffmpeg) + baseRenderers
+                } else {
+                    android.util.Log.i("HiResAudio", "RenderersFactory: FFmpeg disabled, using hardware decoders only")
+                    baseRenderers
                 }
-                val ffmpeg = FfmpegAudioRenderer(handler, audioListener)
-                android.util.Log.i("HiResAudio", "FfmpegAudioRenderer created, prepending at position 0")
-                android.util.Log.i("HiResAudio", "FfmpegLibrary.isAvailable() = ${FfmpegAudioRenderer::class.java.name}: check supportsFormat")
-                arrayOf<Renderer>(ffmpeg) + baseRenderers
             }
 
             exoPlayer = ExoPlayer.Builder(context, renderersFactory)
@@ -858,6 +941,16 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                     )
                 }
                 result.success(hardwareRate)
+            }
+            "setUseFfmpeg" -> {
+                val enabled = call.argument<Boolean>("enabled") ?: false
+                setUseFfmpeg(enabled)
+                result.success(true)
+            }
+            "setUseLibusbSink" -> {
+                val enabled = call.argument<Boolean>("enabled") ?: false
+                setUseLibusbSink(enabled)
+                result.success(true)
             }
             "setUseAaudioSink" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false

@@ -458,9 +458,44 @@ class HiResAudioService {
     }
   }
 
+  /// Enable or disable the FFmpeg software decoder for hi-res ExoPlayer.
+  ///
+  /// When disabled, ExoPlayer uses the default MediaCodecAudioRenderer
+  /// (hardware decoder) for supported formats, reducing CPU usage / battery
+  /// drain. Recommended for low-bitrate lossy formats (MP3 <256kbps, etc.).
+  ///
+  /// When enabled, FfmpegAudioRenderer is prepended to the renderer list
+  /// for broader format support (FLAC, WAV, ALAC, etc.).
+  ///
+  /// Only takes effect on the next ExoPlayer creation (next play() call).
+  Future<void> setUseFfmpeg(bool enabled) async {
+    try {
+      await _channel.invokeMethod('setUseFfmpeg', {'enabled': enabled});
+    } catch (e) {
+      _log.error('setUseFfmpeg error: $e', tag: 'HiResAudio');
+    }
+  }
+
+  /// Enable or disable the libusb AudioSink for direct USB DAC output.
+  ///
+  /// When enabled, ExoPlayer will route decoded PCM audio directly to the
+  /// USB DAC via libusb, bypassing the Android audio mixer entirely for
+  /// true bit-perfect output. Has priority over [setUseAaudioSink].
+  ///
+  /// NOTE: A USB DAC must be connected and initialized via [UsbDacService]
+  /// for this to produce sound. If no USB DAC is connected, audio is silent.
+  Future<void> setUseLibusbSink(bool enabled) async {
+    try {
+      await _channel.invokeMethod('setUseLibusbSink', {'enabled': enabled});
+    } catch (e) {
+      _log.error('setUseLibusbSink error: $e', tag: 'HiResAudio');
+    }
+  }
+
   /// Enable or disable the AAudio exclusive AudioSink for true bit-perfect playback.
   /// When enabled, ExoPlayer will route decoded PCM audio to the AAudio
   /// exclusive stream instead of the default Android AudioTrack.
+  /// Only used when libusb sink is NOT enabled (libusb has priority).
   Future<void> setUseAaudioSink(bool enabled) async {
     try {
       await _channel.invokeMethod('setUseAaudioSink', {'enabled': enabled});

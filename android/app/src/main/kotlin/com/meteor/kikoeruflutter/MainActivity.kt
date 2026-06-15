@@ -18,6 +18,7 @@ class MainActivity : AudioServiceActivity() {
     private var hiResAudioPlugin: HiResAudioPlugin? = null
     private var exclusiveAudioPlugin: ExclusiveAudioPlugin? = null
     private var screenStatePlugin: ScreenStatePlugin? = null
+    private var usbDacPlugin: UsbDacPlugin? = null
     
     // Home widget action channel — used to forward widget button presses to Dart
     companion object {
@@ -83,6 +84,16 @@ class MainActivity : AudioServiceActivity() {
 
         // 注册 SAF 文件工具（用于导入 content:// URI 的文件夹）
         SafFileUtils.register(flutterEngine, this)
+
+        // 注册 USB DAC 插件 (bit-perfect USB audio output via libusb)
+        usbDacPlugin = UsbDacPlugin.getInstance(this)
+        usbDacPlugin?.loadNativeLibrary()
+        val usbDacChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            UsbDacPlugin.CHANNEL
+        )
+        usbDacPlugin?.attachChannel(usbDacChannel)
+        usbDacChannel.setMethodCallHandler(usbDacPlugin)
 
         // Set up channel for App Lock Quick Settings tile
         appLockTileChannel = MethodChannel(
@@ -164,6 +175,7 @@ class MainActivity : AudioServiceActivity() {
         equalizerPlugin?.cleanup()
         hiResAudioPlugin?.cleanup()
         exclusiveAudioPlugin?.cleanup()
+        usbDacPlugin?.cleanup()
         screenStatePlugin?.cleanup()
         tileReceiver?.let { unregisterReceiver(it) }
         super.onDestroy()

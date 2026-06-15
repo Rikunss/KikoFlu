@@ -15,6 +15,7 @@ import '../utils/audio_format_parser.dart';
 import 'audio_format_gain_service.dart';
 import 'hi_res_audio_service.dart';
 import 'exclusive_audio_service.dart';
+import 'usb_dac_audio_manager.dart';
 import 'mpv_config_service.dart';
 import 'replay_gain_service.dart';
 import 'volume_normalization_service.dart';
@@ -82,6 +83,19 @@ class AudioPlayerService {
   // Exclusive audio mode (volume lock + USB routing)
   final ExclusiveAudioService _exclusiveService = ExclusiveAudioService.instance;
   bool _exclusiveModeEnabled = false;
+
+  // Hi-Res audio playback (ExoPlayer for high sample rate files)
+
+  // ── USB DAC / libusb ──
+  final UsbDacAudioManager _usbDacManager = UsbDacAudioManager.instance;
+  bool _libusbDacActive = false;
+  StreamSubscription<UsbDacManagerState>? _libusbStateSub;
+
+  /// Whether the libusb USB DAC is actively streaming bit-perfect audio.
+  bool get libusbDacActive => _libusbDacActive;
+
+  /// Whether ANY bit-perfect path is active (AAudio exclusive OR libusb).
+  bool get _anyBitPerfectActive => _exclusiveModeEnabled || _libusbDacActive;
 
   // Hi-Res audio playback (ExoPlayer for high sample rate files)
   final HiResAudioService _hiResService = HiResAudioService.instance;
@@ -202,6 +216,51 @@ class AudioPlayerService {
     }
 
     _setupPlayerListeners();
+
+    // Listen for libusb DAC state changes and update the audio routing.
+    // When libusb is active, we need to route ALL audio through the hi-res
+    // ExoPlayer with LibusbAudioSink for true bit-perfect USB DAC output.
+    _libusbStateSub = _usbDacManager.stateStream.listen((state) async {
+      final wasActive = _libusbDacActive;
+      _libusbDacActive = state.dacActive;
+
+      if (state.dacActive && !wasActive) {
+        // libusb just became active — switch to libusb sink
+        _log.info('[AudioPlayerService] libusb USB DAC started streaming — routing all audio through libusb sink',
+            tag: 'Audio');
+
+        // Disable AAudio sink (libusb has priority)
+        await _hiResService.setUseAaudioSink(false);
+        await _hiResService.setUseLibusbSink(true);
+        await _hiResService.setBitPerfectMode(true);
+
+        // If currently playing, restart through libusb path
+        if (_player.playing || _hiResActive) {
+          final track = currentTrack;
+          if (track != null) {
+            _log.info('Restarting current track through libusb', tag: 'Audio');
+            await _loadTrack(track);
+            await play();
+          }
+        }
+      } else if (state.dacConnected && !state.dacActive && wasActive) {
+        // libusb stopped streaming but DAC still connected
+        _log.info('[AudioPlayerService] libusb USB DAC stopped streaming', tag: 'Audio');
+        await _hiResService.setUseLibusbSink(false);
+      } else if (!state.dacConnected && wasActive) {
+        // USB DAC disconnected entirely — fall back to default or AAudio
+        _log.info('[AudioPlayerService] libusb USB DAC disconnected — falling back to default audio',
+            tag: 'Audio');
+        await _hiResService.setUseLibusbSink(false);
+
+        // Re-enable AAudio sink if exclusive mode is on
+        if (_exclusiveModeEnabled) {
+          await _hiResService.setUseAaudioSink(true);
+        }
+      } else if (state.dacConnected) {
+        _log.info('[AudioPlayerService] libusb USB DAC connected (idle)', tag: 'Audio');
+      }
+    });
   }
 
   /// 更新音频会话配置（直通/独占模式）
@@ -1220,6 +1279,25 @@ class AudioPlayerService {
   Future<bool> _shouldUseHiResForTrack(AudioTrack track) async {
     if (!_hiResEnabled) return false;
 
+    // ── Priority 1: libusb USB DAC direct output ──
+    // When libusb is active, ALL tracks must go through Hi-Res ExoPlayer
+    // with LibusbAudioSink so audio data reaches the USB DAC.
+    if (_libusbDacActive) {
+      _log.info('libusb DAC active — routing track through hi-res ExoPlayer',
+          tag: 'Audio');
+      return true;
+    }
+
+    // ── Priority 2: AAudio exclusive mode ──
+    // When exclusive mode is active on Android, ALL tracks must go through
+    // Hi-Res ExoPlayer with AaudioAudioSink for mixer bypass.
+    if (_exclusiveModeEnabled && Platform.isAndroid) {
+      _log.info('Exclusive mode active — routing track through hi-res ExoPlayer',
+          tag: 'Audio');
+      return true;
+    }
+
+    // ── Normal path: only hi-res/lossless tracks ──
     final formatInfo = await _detectAudioFormatDirect(track);
     if (formatInfo == null) return false;
 
@@ -1238,12 +1316,76 @@ class AudioPlayerService {
     return false;
   }
 
+  /// Check if the given audio format is a low-bitrate lossy format that
+  /// doesn't benefit from FFmpeg software decoding.
+  ///
+  /// For these formats, the default MediaCodecAudioRenderer (hardware decoder)
+  /// is sufficient and more efficient (lower CPU/battery usage).
+  ///
+  /// Thresholds:
+  /// - MP3: <256 kbps (hardware decode is fine, no need for FFmpeg)
+  /// - AAC / M4A: <192 kbps
+  /// - Opus / OGG: <128 kbps (Opus is efficient even at low bitrates)
+  /// - FLAC / WAV / ALAC: always return false (lossless, use FFmpeg)
+  ///
+  /// Only applies when libusb USB DAC or AAudio exclusive mode is active
+  /// (tracks are forced through hi-res ExoPlayer for audio sink routing).
+  bool _isLowBitrateFormat(AudioFormatInfo info) {
+    // Lossless codecs always benefit from FFmpeg proper decoding.
+    // M4A is NOT in this list because it contains AAC (lossy), not ALAC.
+    // ALAC-in-M4A is parsed as 'ALAC' by _parseM4aHeader().
+    final codec = info.codec.toUpperCase();
+    if (codec == 'FLAC' || codec == 'WAV' || codec == 'ALAC') {
+      return false;
+    }
+
+    // Use actual encoded bitrate first, then estimated as fallback
+    final bitrate = info.encodedBitrateKbps ?? info.estimatedBitrateKbps;
+    if (bitrate == null) {
+      // No bitrate info — be conservative, use FFmpeg
+      return false;
+    }
+
+    switch (codec) {
+      case 'MP3':
+      case 'MP2':
+      case 'MP1':
+        return bitrate < 256;
+      case 'AAC':
+        return bitrate < 192;
+      case 'OGG':
+      case 'OPUS':
+        return bitrate < 128;
+      default:
+        // Unknown codec — be conservative
+        return false;
+    }
+  }
+
   /// Load a track through the hi-res ExoPlayer instead of just_audio.
   Future<void> _loadHiResTrack(AudioTrack track) async {
     _log.info('_loadHiResTrack: title="${track.title}"', tag: 'Audio');
 
     // Stop previous hi-res playback
     await _stopHiResPlayback();
+
+    // ── Detect format and configure decoder ──
+    // For low-bitrate lossy formats (MP3 <256kbps, AAC <192kbps, etc.),
+    // disable FFmpeg software decoder and use hardware (MediaCodec) instead.
+    // This saves CPU/battery without sacrificing audio quality because the
+    // source is already lossy — bit-perfect output doesn't apply here.
+    final formatInfo = await _detectAudioFormatDirect(track);
+    _audioFormatController.add(formatInfo);
+
+    final isLowBitrate =
+        formatInfo != null ? _isLowBitrateFormat(formatInfo) : false;
+    if (isLowBitrate) {
+      _log.info('Low-bitrate format detected (${formatInfo?.codec}'
+            '${formatInfo.encodedBitrateKbps != null ? ' ${formatInfo.encodedBitrateKbps}kbps' : ''}'
+            ') — disabling FFmpeg, using hardware decoder',
+            tag: 'Audio');
+    }
+    await _hiResService.setUseFfmpeg(!isLowBitrate);
 
     _hiResActive = true;
     _hiResActiveController.add(true);
@@ -1256,10 +1398,6 @@ class AudioPlayerService {
       maskTitle: _privacyMaskTitle,
       customTitle: _privacyCustomTitle,
     );
-
-    // Detect format for sample rate / bit depth hints
-    final formatInfo = await _detectAudioFormatDirect(track);
-    _audioFormatController.add(formatInfo);
 
     // Build the URL to pass to the native player
     String playUrl = track.url;
@@ -1410,12 +1548,11 @@ class AudioPlayerService {
   Future<void> setVolume(double volume) async {
     _userBaseVolume = volume.clamp(0.0, 1.0);
 
-    // When exclusive mode is active, bypass ALL digital gain to preserve
-    // bit-perfect audio output. Volume is handled by the volume-lock mechanism
-    // (system volume at max) and app-level volume via the AAudio AudioSink.
-    // In bit-perfect mode, the AudioSink itself also skips gain, so we set
-    // volume to 1.0 here to avoid double-processing at the just_audio level.
-    if (_exclusiveModeEnabled) {
+    // When any bit-perfect path is active (AAudio exclusive OR libusb DAC),
+    // bypass ALL digital gain to preserve pristine audio output.
+    // Volume is handled by the volume-lock mechanism (system volume at max)
+    // or the USB DAC's hardware volume control.
+    if (_anyBitPerfectActive) {
       await _player.setVolume(1.0);
       return;
     }
@@ -1428,9 +1565,9 @@ class AudioPlayerService {
 
   /// Calculate combined gain multiplier from ReplayGain and Volume Normalization.
   double _calculateGainMultiplier() {
-    // When exclusive mode is active, all gain processing is bypassed
-    // to preserve bit-perfect audio output.
-    if (_exclusiveModeEnabled) return 1.0;
+    // When any bit-perfect path is active, all gain processing is bypassed
+    // to preserve pristine audio output.
+    if (_anyBitPerfectActive) return 1.0;
 
     double multiplier = 1.0;
     if (_replayGainService.enabled) {
@@ -1450,9 +1587,10 @@ class AudioPlayerService {
   /// normalization stays on the main thread since it's pure math when
   /// [_lastAudioFormat] already provides the bit depth.
   Future<void> _applyAudioGain(AudioTrack track) async {
-    // Exclusive mode bypasses all DSP/gain processing for bit-perfect output
-    if (_exclusiveModeEnabled) {
-      _log.info('Exclusive mode active — skipping gain processing', tag: 'AudioGain');
+    // Bit-perfect path (AAudio exclusive / libusb DAC) bypasses all DSP/gain
+    // processing for pristine audio output.
+    if (_anyBitPerfectActive) {
+      _log.info('Bit-perfect path active — skipping gain processing', tag: 'AudioGain');
       return;
     }
 
@@ -1540,6 +1678,8 @@ class AudioPlayerService {
     _smtcSubscription = null;
     _justAudioPositionSub?.cancel();
     _justAudioDurationSub?.cancel();
+    _libusbStateSub?.cancel();
+    _libusbStateSub = null;
     await _stopHiResPlayback();
     await _cleanupTempPlaybackFile();
     await _hiResActiveController.close();
