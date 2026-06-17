@@ -34,6 +34,7 @@ class UsbDacDevice {
   final int productId;
   final int deviceProtocol;
   final String serialNumber;
+  final bool hasPermission;
   final List<UsbAudioEndpoint> audioEndpoints;
 
   const UsbDacDevice({
@@ -43,6 +44,7 @@ class UsbDacDevice {
     this.productId = 0,
     this.deviceProtocol = 0,
     this.serialNumber = '',
+    this.hasPermission = false,
     this.audioEndpoints = const [],
   });
 
@@ -58,13 +60,14 @@ class UsbDacDevice {
       productId: (map['productId'] as int?) ?? 0,
       deviceProtocol: (map['deviceProtocol'] as int?) ?? 0,
       serialNumber: (map['serialNumber'] as String?) ?? '',
+      hasPermission: (map['hasPermission'] as bool?) ?? false,
       audioEndpoints: endpoints,
     );
   }
 
   @override
   String toString() =>
-      'UsbDacDevice($productName, vendor=${vendorId.toRadixString(16)}:${productId.toRadixString(16)})';
+      'UsbDacDevice($productName, vendor=${vendorId.toRadixString(16)}:${productId.toRadixString(16)}, hasPermission=$hasPermission)';
 }
 
 /// A USB audio endpoint descriptor.
@@ -201,6 +204,34 @@ class UsbDacService {
         _log.info('USB device attached with ${devices.length} audio device(s)', tag: 'UsbDac');
         _devicesController.add(devices);
         break;
+      case 'onDeviceListRefreshed':
+        final args = call.arguments;
+        if (args is! Map) break;
+        final devicesList = (args['devices'] as List?) ?? [];
+        final devices = devicesList
+            .map((d) => UsbDacDevice.fromMap(d as Map))
+            .toList();
+        _log.info('USB device list refreshed: ${devices.length} device(s) (permission may have updated metadata)',
+            tag: 'UsbDac');
+        // Log permission status for each device
+        for (final d in devices) {
+          _log.info('  └ #${d.deviceId} ${d.productName} (hasPermission=${d.hasPermission}, serial=${d.serialNumber})',
+              tag: 'UsbDac');
+        }
+        _devicesController.add(devices);
+        break;
+      case 'onPermissionResult':
+        final args = call.arguments;
+        if (args is! Map) break;
+        final deviceId = args['deviceId'];
+        final deviceName = args['deviceName'] ?? 'Unknown';
+        final granted = args['granted'] == true;
+        final hasPermission = args['hasPermission'] == true;
+        _log.info('USB permission result: device #$deviceId ($deviceName)'
+            ', EXTRA_PERMISSION_GRANTED=$granted'
+            ', hasPermission=$hasPermission',
+            tag: 'UsbDac');
+        break;
       case 'onError':
         final args = call.arguments;
         if (args is! Map) break;
@@ -243,14 +274,50 @@ class UsbDacService {
 
   /// Request permission to access a USB audio device.
   /// The user will see a system dialog.
+  ///
+  /// This now properly waits for the user to respond to the dialog before
+  /// returning (the Kotlin side stores the MethodChannel result and resolves
+  /// it from the broadcast receiver).
+  ///
+  /// If the user doesn't respond within 30 seconds, times out and returns
+  /// false as a safety measure.
   Future<bool> requestPermission(int deviceId) async {
+    _log.info('requestPermission(deviceId=$deviceId) called — awaiting user response...',
+        tag: 'UsbDac');
     try {
-      final result = await _channel.invokeMethod<bool>('requestPermission', {
+      final result = await _channel
+          .invokeMethod<bool>('requestPermission', {
+            'deviceId': deviceId,
+          })
+          .timeout(const Duration(seconds: 30));
+      if (result == true) {
+        _log.info('USB permission GRANTED for device #$deviceId',
+            tag: 'UsbDac');
+      } else {
+        _log.warning('USB permission DENIED for device #$deviceId',
+            tag: 'UsbDac');
+      }
+      return result == true;
+    } on TimeoutException {
+      _log.warning('requestPermission timed out after 30s for device #$deviceId',
+          tag: 'UsbDac');
+      return false;
+    } catch (e) {
+      _log.error('requestPermission error for device #$deviceId: $e',
+          tag: 'UsbDac');
+      return false;
+    }
+  }
+
+  /// Check if USB permission has already been granted for the given device.
+  Future<bool> hasPermission(int deviceId) async {
+    try {
+      final result = await _channel.invokeMethod<bool>('hasPermission', {
         'deviceId': deviceId,
       });
       return result == true;
     } catch (e) {
-      _log.error('requestPermission error: $e', tag: 'UsbDac');
+      _log.error('hasPermission error: $e', tag: 'UsbDac');
       return false;
     }
   }

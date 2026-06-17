@@ -79,9 +79,9 @@ class _UsbDacSettingsScreenState extends ConsumerState<UsbDacSettingsScreen> {
         _log.info('USB DAC connected: $deviceName', tag: 'USB');
         setState(() {
           _usbDacConnected = true;
+          // Use deviceName from HiResAudio (no "USB-Audio - " prefix)
           _autoTargetDevice = deviceName;
         });
-        _autoRouteToUsb();
         if (!_exclusiveModeEnabled) {
           _toggleExclusiveMode(true);
         }
@@ -106,11 +106,14 @@ class _UsbDacSettingsScreenState extends ConsumerState<UsbDacSettingsScreen> {
     // Listen for USB attach/detach from exclusive plugin (backup)
     _usbAttachedSub = _exclusive.usbAttachedStream.listen((name) {
       if (mounted) {
+        // Strip "USB-Audio - " prefix if present to match HiResAudio format
+        final cleanName = name.startsWith('USB-Audio - ')
+            ? name.substring('USB-Audio - '.length)
+            : name;
         setState(() {
-          _autoTargetDevice = name;
+          _autoTargetDevice = cleanName;
           _usbDacConnected = true;
         });
-        _autoRouteToUsb();
         if (!_exclusiveModeEnabled) {
           _toggleExclusiveMode(true);
         }
@@ -283,9 +286,6 @@ class _UsbDacSettingsScreenState extends ConsumerState<UsbDacSettingsScreen> {
                       currentName: _autoTargetDevice,
                       onChanged: (name) {
                         setState(() => _autoTargetDevice = name);
-                        if (name.isNotEmpty) {
-                          _autoRouteToUsb();
-                        }
                       },
                     ),
                   ),
@@ -698,23 +698,7 @@ class _UsbDacSettingsScreenState extends ConsumerState<UsbDacSettingsScreen> {
     );
   }
 
-  /// Auto-route to the first detected USB DAC device.
-  Future<void> _autoRouteToUsb() async {
-    _log.info('Auto-routing to USB DAC...', tag: 'USB');
-    final devices = await _hiRes.getUsbAudioDevices();
-    if (devices.isNotEmpty) {
-      final firstDevice = devices.first;
-      _log.info('Auto-routing to ${firstDevice.productName}', tag: 'USB');
-      await _hiRes.setUsbBypassMode(true, deviceId: firstDevice.id);
-      ref.read(bitPerfectPlaybackProvider.notifier).setPreferredDevice(firstDevice.id);
-      _exclusive.setAaudioDeviceId(firstDevice.id);
-      ref.read(bitPerfectPlaybackProvider.notifier).toggle(true);
-      UsbDacAudioManager.instance.setAutoDacEnabled(true);
-      if (mounted) {
-        setState(() => _autoTargetDevice = firstDevice.productName);
-      }
-    }
-  }
+
 
   /// Toggle exclusive mode on/off, handling the full flow.
   ///
@@ -1327,6 +1311,7 @@ class _DevicePicker extends StatefulWidget {
 
 class _DevicePickerState extends State<_DevicePicker> {
   List<UsbAudioDevice> _devices = [];
+  int? _selectedDeviceId;
   StreamSubscription? _devicesSub;
 
   @override
@@ -1335,7 +1320,7 @@ class _DevicePickerState extends State<_DevicePicker> {
     _loadDevices();
     // Listen for device changes so the dropdown stays up-to-date
     _devicesSub = HiResAudioService.instance.usbDevicesStream.listen((devices) {
-      if (mounted) setState(() => _devices = devices);
+      if (mounted) _updateDevices(devices);
     });
   }
 
@@ -1345,10 +1330,36 @@ class _DevicePickerState extends State<_DevicePicker> {
     super.dispose();
   }
 
+  /// Update device list, deduplicating by ID, and sync selected device.
+  void _updateDevices(List<UsbAudioDevice> devices) {
+    // Deduplicate by ID (keep first occurrence)
+    final seen = <int>{};
+    final unique = <UsbAudioDevice>[];
+    for (final d in devices) {
+      if (seen.add(d.id)) {
+        unique.add(d);
+      }
+    }
+    setState(() {
+      _devices = unique;
+      // If current device name matches one of our devices, select it
+      if (widget.currentName.isNotEmpty) {
+        final match =
+            unique.cast<UsbAudioDevice?>().firstWhere(
+              (d) => d!.productName == widget.currentName,
+              orElse: () => null,
+            );
+        if (match != null) {
+          _selectedDeviceId = match.id;
+        }
+      }
+    });
+  }
+
   Future<void> _loadDevices() async {
     final devices = await HiResAudioService.instance.getUsbAudioDevices();
     if (mounted) {
-      setState(() => _devices = devices);
+      _updateDevices(devices);
     }
   }
 
@@ -1367,15 +1378,15 @@ class _DevicePickerState extends State<_DevicePicker> {
     }
 
     return DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-        value: _devices.any((d) => d.productName == widget.currentName)
-            ? widget.currentName
+      child: DropdownButton<int>(
+        value: _devices.any((d) => d.id == _selectedDeviceId)
+            ? _selectedDeviceId
             : null,
         isDense: true,
         hint: Text('Select device', style: theme.textTheme.bodySmall),
         items: _devices.map((d) {
-          return DropdownMenuItem(
-            value: d.productName,
+          return DropdownMenuItem<int>(
+            value: d.id,
             child: Text(
               d.productName,
               style: theme.textTheme.bodySmall?.copyWith(
@@ -1385,8 +1396,17 @@ class _DevicePickerState extends State<_DevicePicker> {
             ),
           );
         }).toList(),
-        onChanged: (name) {
-          if (name != null) widget.onChanged(name);
+        onChanged: (deviceId) {
+          if (deviceId == null) return;
+          setState(() => _selectedDeviceId = deviceId);
+          // Find the device name and call back
+          final match = _devices.cast<UsbAudioDevice?>().firstWhere(
+            (d) => d!.id == deviceId,
+            orElse: () => null,
+          );
+          if (match != null) {
+            widget.onChanged(match.productName);
+          }
         },
       ),
     );

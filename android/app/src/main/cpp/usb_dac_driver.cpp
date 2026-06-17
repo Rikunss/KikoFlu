@@ -222,7 +222,7 @@ public:
           deviceFd_(-1), sampleRate_(0), channelCount_(0), bitsPerSample_(0),
           bytesPerFrame_(0), sampleSize_(0), isActive_(false),
           isBitPerfect_(true), started_(false), streaming_(false),
-          ringBuffer_(kRingBufferCapacity) {}
+          ringBuffer_(kRingBufferCapacity), currentEncoding_(nullptr) {}
 
     ~Impl() { destroy(); }
 
@@ -323,11 +323,32 @@ public:
         if (!isActive_ || started_) return false;
         if (audioInfo_.interfaceNumber < 0) return false;
 
-        LOGI("start() — selecting alt setting %d for interface %d",
+        LOGI("start() — initializing alt setting %d for interface %d",
              audioInfo_.alternateSetting, audioInfo_.interfaceNumber);
 
-        // Step 1: Set alternate setting to enable isochronous endpoint.
+        // Step 1: Set alt setting to 0 (idle) before SET_CUR.
+        // Many UAC devices require the streaming interface to be idle
+        // (alt setting 0) for class-specific control requests to succeed.
+        // Without this, SET_CUR returns EBUSY (errno=16) because the
+        // isochronous endpoint is already active.
         int ret = libusb_set_interface_alt_setting(
+            handle_, audioInfo_.interfaceNumber, 0);
+        if (ret != LIBUSB_SUCCESS) {
+            LOGW("start(): could not set alt 0 (idle): %s", libusb_error_name(ret));
+        } else {
+            LOGI("Alt setting 0 (idle) enabled for SET_CUR");
+        }
+
+        // Step 2: Set sample rate via UAC class-specific control request.
+        // IMPORTANT: Must be done BEFORE enabling the streaming alt setting.
+        // Sending SET_CUR while the isochronous endpoint is active causes
+        // the kernel to reject the control transfer with EBUSY.
+        if (audioInfo_.controlInterfaceNum >= 0) {
+            setSampleRate(sampleRate_);
+        }
+
+        // Step 3: Set alternate setting to enable isochronous endpoint.
+        ret = libusb_set_interface_alt_setting(
             handle_, audioInfo_.interfaceNumber, audioInfo_.alternateSetting);
         if (ret != LIBUSB_SUCCESS) {
             LOGE("libusb_set_interface_alt_setting failed: %s", libusb_error_name(ret));
@@ -335,11 +356,6 @@ public:
         }
 
         LOGI("Alt setting %d enabled", audioInfo_.alternateSetting);
-
-        // Step 2: Set sample rate via UAC class-specific control request.
-        if (audioInfo_.controlInterfaceNum >= 0) {
-            setSampleRate(sampleRate_);
-        }
 
         // Step 3: Allocate and prepare isochronous transfers.
         int packetSize = audioInfo_.maxPacketSize;
@@ -526,6 +542,7 @@ public:
     }
 
     int write(const float* data, int numFrames) {
+        currentEncoding_ = "FLOAT";
         if (!isActive_) {
             LOGE("write() called but driver not active");
             return -1;
@@ -533,6 +550,13 @@ public:
         if (data == nullptr || numFrames <= 0) return 0;
 
         size_t numSamples = static_cast<size_t>(numFrames) * channelCount_;
+
+        LOGI("[NATIVE-AUDIO] IMPL-FLOAT: sampleSize_=%d bitsPerSample_=%d "
+             "channelCount_=%d bytesPerFrame_=%d "
+             "numFrames=%d numSamples=%zu outputBytes=%zu",
+             sampleSize_, bitsPerSample_, channelCount_, bytesPerFrame_,
+             numFrames, numSamples,
+             numSamples * static_cast<size_t>(sampleSize_));
 
         // Convert float PCM to the output format and write to ring buffer.
         // For USB audio, we typically send linear PCM as either:
@@ -554,6 +578,11 @@ public:
         size_t postWriteUsed = ringBuffer_.usedSpace();
         int framesWritten = static_cast<int>(written / bytesPerFrame_);
 
+        LOGI("[NATIVE-AUDIO] IMPL-FLOAT result: bytesReceived=%zu framesReceived=%d "
+             "(requested=%d frames) preUsed=%zu postUsed=%zu",
+             written, framesWritten, numFrames,
+             preWriteUsed, postWriteUsed);
+
         if (framesWritten < numFrames) {
             LOGW("write: ring buffer FULL — requested %d frames (%zu B), "
                  "wrote %d frames (%zu B) "
@@ -568,6 +597,7 @@ public:
     }
 
     int writeI16(const int16_t* data, int numFrames) {
+        currentEncoding_ = "I16";
         if (!isActive_) {
             LOGE("writeI16() called but driver not active");
             return -1;
@@ -576,6 +606,14 @@ public:
 
         size_t numSamples = static_cast<size_t>(numFrames) * channelCount_;
         size_t byteCount = numSamples * sizeof(int16_t);
+
+        LOGI("[NATIVE-AUDIO] IMPL-I16: sampleSize_=%d bitsPerSample_=%d "
+             "channelCount_=%d bytesPerFrame_=%d "
+             "numFrames=%d numSamples=%zu bytesReceived=%zu "
+             "sampleSize_==2(direct)=%s",
+             sampleSize_, bitsPerSample_, channelCount_, bytesPerFrame_,
+             numFrames, numSamples, byteCount,
+             sampleSize_ == 2 ? "true" : "false");
 
         size_t preWriteUsed = ringBuffer_.usedSpace();
         size_t written;
@@ -597,6 +635,11 @@ public:
 
         size_t postWriteUsed = ringBuffer_.usedSpace();
         int framesWritten = static_cast<int>(written / bytesPerFrame_);
+
+        LOGI("[NATIVE-AUDIO] IMPL-I16 result: bytesWritten=%zu framesWritten=%d "
+             "(requested=%d frames) preUsed=%zu postUsed=%zu",
+             written, framesWritten, numFrames,
+             preWriteUsed, postWriteUsed);
 
         if (framesWritten < numFrames) {
             LOGW("writeI16: ring buffer FULL — requested %d frames (%zu B), "
@@ -633,6 +676,7 @@ private:
     bool isBitPerfect_;
     bool started_;
     std::atomic<bool> streaming_;
+    const char* currentEncoding_;  // Set by write functions for [FORMAT-STATS]
 
     UsbAudioInterfaceInfo audioInfo_;
     std::vector<std::unique_ptr<TransferContext>> transfers_;
@@ -648,6 +692,7 @@ private:
     std::atomic<int> transferTimeouts_{0};
     std::atomic<int> transferErrors_{0};
     std::atomic<int> resubmitErrors_{0};
+    std::atomic<long long> totalBytesConsumed_{0};  // Total bytes read from ring by fillTransferBuffer
 
     // ── USB Audio Interface Discovery ───────────────────────
 
@@ -705,14 +750,30 @@ private:
                             LOGI("  Found ISO OUT endpoint: 0x%02x, maxPkt=%d, interval=%d",
                                  ep.bEndpointAddress, ep.wMaxPacketSize, ep.bInterval);
 
-                            // Prefer this streaming interface.
-                            // If we already found one, prefer the one with higher alt setting
-                            // (more alternate settings often mean higher bandwidth).
+                            // ── Alt setting selection logic ──
+                            // Match the alt setting's maxPacketSize to our audio format.
+                            //   Alt 1 (maxPkt≈200) → 16-bit  (expected 48×4=192)
+                            //   Alt 2 (maxPkt≈300) → 24-bit  (expected 48×6=288)
+                            //   Alt 3/4 (maxPkt≈400) → 32-bit (expected 48×8=384)
+                            // Previously we always picked the highest alt setting (32-bit),
+                            // which caused severe crackling when sending PCM16 data on a
+                            // 32-bit-configured endpoint (every sample misaligned by 4 bytes).
+                            int expectedPkt = bytesPerFrame_ * (sampleRate_ / 1000);
                             bool shouldReplace = false;
                             if (foundStreamInterface < 0) {
                                 shouldReplace = true;
-                            } else if (alt.bAlternateSetting > audioInfo_.alternateSetting) {
-                                shouldReplace = true;
+                            } else {
+                                int curDiff = audioInfo_.maxPacketSize - expectedPkt;
+                                if (curDiff < 0) curDiff = -curDiff;
+                                int thisDiff = (int)ep.wMaxPacketSize - expectedPkt;
+                                if (thisDiff < 0) thisDiff = -thisDiff;
+                                // Prefer alt setting closest to expected packet size
+                                if (thisDiff < curDiff) {
+                                    shouldReplace = true;
+                                } else if (thisDiff == curDiff &&
+                                           alt.bAlternateSetting > audioInfo_.alternateSetting) {
+                                    shouldReplace = true;
+                                }
                             }
 
                             if (shouldReplace) {
@@ -721,6 +782,12 @@ private:
                                 audioInfo_.outEndpointAddr = ep.bEndpointAddress;
                                 audioInfo_.maxPacketSize = ep.wMaxPacketSize;
                                 foundStreamInterface = alt.bInterfaceNumber;
+                                LOGI("    → SELECTED: alt=%d, maxPkt=%d (expected=%d, diff=%d)",
+                                     alt.bAlternateSetting, ep.wMaxPacketSize, expectedPkt,
+                                     (int)ep.wMaxPacketSize - expectedPkt);
+                            } else {
+                                LOGI("    → SKIPPED: alt=%d, maxPkt=%d (expected=%d, better alt already selected)",
+                                     alt.bAlternateSetting, ep.wMaxPacketSize, expectedPkt);
                             }
                         }
                     }
@@ -890,6 +957,7 @@ private:
         if (!tc || !tc->buffer || tc->bufferSize <= 0) return;
 
         size_t bytesRead = ringBuffer_.read(tc->buffer, tc->bufferSize);
+        totalBytesConsumed_ += bytesRead;
 
         // If ring buffer is underrun, fill remaining with silence.
         if (bytesRead < static_cast<size_t>(tc->bufferSize)) {
@@ -1010,6 +1078,30 @@ private:
         tv.tv_usec = 100000;  // 100ms timeout — allows checking streaming_ flag
 
         while (streaming_.load(std::memory_order_acquire)) {
+            // ── Per-second [FORMAT-STATS] logging ──
+            static uint64_t lastStatsLogUs = 0;
+            static long long lastBytesConsumed = 0;
+            struct timeval now;
+            gettimeofday(&now, nullptr);
+            uint64_t nowUs = static_cast<uint64_t>(now.tv_sec) * 1000000ULL + now.tv_usec;
+            if (lastStatsLogUs != 0 && nowUs - lastStatsLogUs >= 1000000ULL) {
+                long long curBytes = totalBytesConsumed_.load();
+                long long bytesDelta = curBytes - lastBytesConsumed;
+                size_t ringUsed = ringBuffer_.usedSpace();
+                LOGI("[FORMAT-STATS] encoding=%s ringUsed=%zu/%zu underruns=%d bytesTotal=%lld bytesDelta=%lld",
+                     currentEncoding_ ? currentEncoding_ : "NULL",
+                     ringUsed, ringBuffer_.capacity(),
+                     underrunCount_.load(),
+                     curBytes, bytesDelta);
+                lastStatsLogUs = nowUs;
+                lastBytesConsumed = curBytes;
+            }
+            if (lastStatsLogUs == 0) {
+                gettimeofday(&now, nullptr);
+                lastStatsLogUs = static_cast<uint64_t>(now.tv_sec) * 1000000ULL + now.tv_usec;
+                lastBytesConsumed = totalBytesConsumed_.load();
+            }
+
             int ret = libusb_handle_events_timeout(context_, &tv);
             if (ret != LIBUSB_SUCCESS && ret != LIBUSB_ERROR_INTERRUPTED &&
                 ret != LIBUSB_ERROR_TIMEOUT) {
@@ -1174,8 +1266,14 @@ Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeWritePcmFloatStaticImpl(
         return -1;
     }
 
+    LOGI("[NATIVE-AUDIO] JNI-FLOAT: path=FLOAT frames=%d samples=%d bytesPerSample=%d",
+         num_frames, (int)len, 4);
+
     jint written = driver->write(elements, num_frames);
     env->ReleaseFloatArrayElements(buffer, elements, JNI_ABORT);
+
+    LOGI("[NATIVE-AUDIO] JNI-FLOAT result: written=%d frames, requested=%d frames",
+         written, num_frames);
 
     if (written < 0) {
         LOGE("nativeWritePcmFloatStaticImpl: driver->write returned %d (frames=%d, bufLen=%d)",
@@ -1207,9 +1305,15 @@ Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeWritePcmI16StaticImpl(
         return -1;
     }
 
+    LOGI("[NATIVE-AUDIO] JNI-I16: path=PCM16 frames=%d samples=%d bytesPerSample=2 bytesReceived=%d",
+         num_frames, (int)len, (int)len * 2);
+
     jint written = driver->writeI16(
         reinterpret_cast<int16_t*>(elements), num_frames);
     env->ReleaseShortArrayElements(buffer, elements, JNI_ABORT);
+
+    LOGI("[NATIVE-AUDIO] JNI-I16 result: written=%d frames, requested=%d frames",
+         written, num_frames);
 
     if (written < 0) {
         LOGE("nativeWritePcmI16StaticImpl: driver->writeI16 returned %d (frames=%d, bufLen=%d)",

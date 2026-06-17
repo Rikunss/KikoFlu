@@ -91,11 +91,18 @@ class AudioPlayerService {
   bool _libusbDacActive = false;
   StreamSubscription<UsbDacManagerState>? _libusbStateSub;
 
+  /// Whether libusb was auto-enabled by Exclusive Mode (vs user-enable via USB DAC Routing).
+  /// Used to avoid disabling USB DAC Routing when Exclusive Mode is toggled off.
+  bool _autoEnabledLibusb = false;
+
   /// Whether the libusb USB DAC is actively streaming bit-perfect audio.
   bool get libusbDacActive => _libusbDacActive;
 
   /// Whether ANY bit-perfect path is active (AAudio exclusive OR libusb).
   bool get _anyBitPerfectActive => _exclusiveModeEnabled || _libusbDacActive;
+
+  /// The USB DAC manager — exposed for sink-selection logging.
+  UsbDacAudioManager get usbDacManager => _usbDacManager;
 
   // Hi-Res audio playback (ExoPlayer for high sample rate files)
   final HiResAudioService _hiResService = HiResAudioService.instance;
@@ -224,9 +231,17 @@ class AudioPlayerService {
       final wasActive = _libusbDacActive;
       _libusbDacActive = state.dacActive;
 
+      _log.info('[LIBUSB] stateStream: '
+          'dacConnected=${state.dacConnected}, '
+          'dacActive=${state.dacActive}, '
+          'wasActive=$wasActive, '
+          'autoDacEnabled=${state.autoDacEnabled}, '
+          'device="${state.deviceName}"',
+          tag: 'Audio');
+
       if (state.dacActive && !wasActive) {
         // libusb just became active — switch to libusb sink
-        _log.info('[AudioPlayerService] libusb USB DAC started streaming — routing all audio through libusb sink',
+        _log.info('[LIBUSB] >>> dacActive transitioned false→true — switching to LibusbAudioSink',
             tag: 'Audio');
 
         // Disable AAudio sink (libusb has priority)
@@ -238,27 +253,23 @@ class AudioPlayerService {
         if (_player.playing || _hiResActive) {
           final track = currentTrack;
           if (track != null) {
-            _log.info('Restarting current track through libusb', tag: 'Audio');
+            _log.info('[LIBUSB] Playback active — restarting track through libusb', tag: 'Audio');
             await _loadTrack(track);
             await play();
           }
         }
       } else if (state.dacConnected && !state.dacActive && wasActive) {
-        // libusb stopped streaming but DAC still connected
-        _log.info('[AudioPlayerService] libusb USB DAC stopped streaming', tag: 'Audio');
+        _log.info('[LIBUSB] dacActive transitioned true→false — disabling libusb sink', tag: 'Audio');
         await _hiResService.setUseLibusbSink(false);
       } else if (!state.dacConnected && wasActive) {
-        // USB DAC disconnected entirely — fall back to default or AAudio
-        _log.info('[AudioPlayerService] libusb USB DAC disconnected — falling back to default audio',
-            tag: 'Audio');
+        _log.info('[LIBUSB] DAC disconnected — falling back to default/AAudio', tag: 'Audio');
         await _hiResService.setUseLibusbSink(false);
-
-        // Re-enable AAudio sink if exclusive mode is on
         if (_exclusiveModeEnabled) {
           await _hiResService.setUseAaudioSink(true);
         }
       } else if (state.dacConnected) {
-        _log.info('[AudioPlayerService] libusb USB DAC connected (idle)', tag: 'Audio');
+        _log.info('[LIBUSB] DAC connected but idle (dacActive=${state.dacActive}, _libusbDacActive=$_libusbDacActive)',
+            tag: 'Audio');
       }
     });
   }
@@ -1193,7 +1204,7 @@ class AudioPlayerService {
     final wasPlaying = _player.playing || _hiResActive;
 
     if (Platform.isAndroid) {
-      // ── Android: AAudio exclusive mode ──
+      // ── Android: AAudio exclusive mode + libusb USB DAC ──
       if (enabled) {
         final success = await _exclusiveService.enable();
         _exclusiveModeEnabled = success;
@@ -1201,12 +1212,41 @@ class AudioPlayerService {
           await _hiResService.setUseAaudioSink(true);
           await _hiResService.setBitPerfectMode(true);
           await _player.setVolume(1.0);
+
+          // ── Initialize libusb unconditionally ──
+          // When exclusive mode is enabled, we proactively start the libusb
+          // driver MANDIRI (tidak perlu nunggu isDacConnected yang cuma true
+          // setelah driver terkoneksi — chicken-and-egg).
+          //
+          // Alur:
+          //   1. setAutoDacEnabled(true) → getDevices() → jika ada USB DAC
+          //      fisik, requestPermission → connect → start.
+          //   2. Kalau libusb streaming (dacActive=true), _libusbStateSub
+          //      otomatis switch dari AaudioAudioSink ke LibusbAudioSink.
+          //   3. Kalau tidak ada USB DAC fisik, getDevices() return [] →
+          //      no-op, AAudio fallback jalan normal.
+          _log.info('[LIBUSB] Exclusive Mode ON — '
+              'initiating libusb USB DAC (jika ada perangkat fisik)',
+              tag: 'Audio');
+          await _usbDacManager.setAutoDacEnabled(true);
+          _autoEnabledLibusb = true;
         }
       } else {
         await _exclusiveService.disable();
         _exclusiveModeEnabled = false;
         await _hiResService.setUseAaudioSink(false);
         await _hiResService.setBitPerfectMode(false);
+
+        // ── Disable libusb only if we auto-enabled it ──
+        // If the user had USB DAC Routing independently enabled (not through
+        // Exclusive Mode), we should NOT disable it here. Only clean up the
+        // auto-enabled path to avoid conflicts with the user's explicit setting.
+        if (_autoEnabledLibusb) {
+          _log.info('[LIBUSB] Exclusive Mode OFF — disabling auto-enabled USB DAC Routing',
+              tag: 'Audio');
+          await _usbDacManager.setAutoDacEnabled(false);
+          _autoEnabledLibusb = false;
+        }
       }
     } else if (Platform.isWindows) {
       // ── Windows: WASAPI exclusive via MPV ──
@@ -1279,11 +1319,36 @@ class AudioPlayerService {
   Future<bool> _shouldUseHiResForTrack(AudioTrack track) async {
     if (!_hiResEnabled) return false;
 
+    // ── Gather USB DAC manager state for logging ──
+    final dacConnected = _usbDacManager.isDacConnected;
+    final dacActive = _usbDacManager.isDacActive;
+    final autoDacEnabled = _usbDacManager.autoDacEnabled;
+
+    _log.info('[LIBUSB] _shouldUseHiResForTrack: '
+        '_libusbDacActive=$_libusbDacActive, '
+        'dacConnected(direct)=$dacConnected, '
+        'dacActive(direct)=$dacActive, '
+        'autoDacEnabled=$autoDacEnabled, '
+        '_exclusiveModeEnabled=$_exclusiveModeEnabled',
+        tag: 'Audio');
+
     // ── Priority 1: libusb USB DAC direct output ──
     // When libusb is active, ALL tracks must go through Hi-Res ExoPlayer
     // with LibusbAudioSink so audio data reaches the USB DAC.
     if (_libusbDacActive) {
-      _log.info('libusb DAC active — routing track through hi-res ExoPlayer',
+      _log.info('[LIBUSB] _libusbDacActive=true — routing track through hi-res ExoPlayer with LibusbAudioSink',
+          tag: 'Audio');
+      _log.info('[LIBUSB] DECISION: _libusbDacActive=true — selecting LibusbAudioSink', tag: 'Audio');
+      return true;
+    }
+
+    // ── Priority 1b: libusb DAC connected but not yet actively streaming ──
+    // If the USB DAC is connected AND auto-DAC is enabled, we should use
+    // the libusb sink even before the DAC is fully streaming. This prevents
+    // ExoPlayer from being created with AAudio sink first, then needing a
+    // disruptive restart when libusb becomes active.
+    if (dacConnected && autoDacEnabled) {
+      _log.info('[LIBUSB] DECISION: dacConnected=$dacConnected && autoDacEnabled=$autoDacEnabled — selecting LibusbAudioSink (Priority 1b)',
           tag: 'Audio');
       return true;
     }
@@ -1292,27 +1357,37 @@ class AudioPlayerService {
     // When exclusive mode is active on Android, ALL tracks must go through
     // Hi-Res ExoPlayer with AaudioAudioSink for mixer bypass.
     if (_exclusiveModeEnabled && Platform.isAndroid) {
-      _log.info('Exclusive mode active — routing track through hi-res ExoPlayer',
+      _log.info('[LIBUSB] DECISION: _exclusiveModeEnabled=$_exclusiveModeEnabled — selecting AaudioAudioSink (Priority 2: AAudio exclusive)',
           tag: 'Audio');
       return true;
     }
 
     // ── Normal path: only hi-res/lossless tracks ──
+    _log.info('[LIBUSB] Normal path — libusb=disabled, exclusive=disabled — checking format', tag: 'Audio');
     final formatInfo = await _detectAudioFormatDirect(track);
-    if (formatInfo == null) return false;
+    if (formatInfo == null) {
+      _log.info('[LIBUSB] DECISION: no format info — not using hi-res', tag: 'Audio');
+      return false;
+    }
 
     // Check codec first — lossless formats (FLAC, WAV, ALAC/M4A) should always
     // use the hi-res player for proper decoder support (e.g. FFmpeg for ALAC).
     final codec = formatInfo.codec.toUpperCase();
     if (codec == 'FLAC' || codec == 'WAV' || codec == 'M4A') {
+      _log.info('[LIBUSB] DECISION: lossless codec=$codec — using hi-res ExoPlayer', tag: 'Audio');
       return true;
     }
 
     // For other formats, use sample rate as the hi-res indicator
     if (formatInfo.sampleRate != null) {
-      return formatInfo.sampleRate! > 48000;
+      final isHiRes = formatInfo.sampleRate! > 48000;
+      _log.info('[LIBUSB] DECISION: format sampleRate=${formatInfo.sampleRate}Hz — '
+          'hiRes=${isHiRes}',
+          tag: 'Audio');
+      return isHiRes;
     }
 
+    _log.info('[LIBUSB] DECISION: fallback — not using hi-res', tag: 'Audio');
     return false;
   }
 
@@ -1369,12 +1444,44 @@ class AudioPlayerService {
     // Stop previous hi-res playback
     await _stopHiResPlayback();
 
-    // ── Detect format and configure decoder ──
-    // For low-bitrate lossy formats (MP3 <256kbps, AAC <192kbps, etc.),
-    // disable FFmpeg software decoder and use hardware (MediaCodec) instead.
-    // This saves CPU/battery without sacrificing audio quality because the
-    // source is already lossy — bit-perfect output doesn't apply here.
-    final formatInfo = await _detectAudioFormatDirect(track);
+    // ── Configure AudioSink before creating ExoPlayer ──
+    // Priority: libusb > AAudio > Default
+    // Check USB DAC state directly (not just the cached _libusbDacActive)
+    // so we select the correct sink even if the libusb state listener
+    // hasn't fired yet (timing issue — ExoPlayer is created before
+    // libusb transitions to active state).
+    final dacConnected = _usbDacManager.isDacConnected;
+    final autoDacEnabled = _usbDacManager.autoDacEnabled;
+    if (dacConnected && autoDacEnabled) {
+      _log.info('[LIBUSB] _loadHiResTrack: DAC connected + autoDacEnabled — '
+          'proactively enabling LibusbAudioSink',
+          tag: 'Audio');
+      await _hiResService.setUseAaudioSink(false);
+      await _hiResService.setUseLibusbSink(true);
+      await _hiResService.setBitPerfectMode(true);
+      await _loadHiResTrackStep2(track, formatInfo: null);
+      return;
+    }
+
+    // ── AAudio exclusive mode ──
+    if (_exclusiveModeEnabled && Platform.isAndroid) {
+      _log.info('[LIBUSB] _loadHiResTrack: exclusive mode enabled — '
+          'using AaudioAudioSink',
+          tag: 'Audio');
+      await _hiResService.setUseAaudioSink(true);
+      await _hiResService.setBitPerfectMode(true);
+      await _loadHiResTrackStep2(track, formatInfo: null);
+      return;
+    }
+
+    _log.info('[LIBUSB] _loadHiResTrack: normal hi-res path', tag: 'Audio');
+    await _loadHiResTrackStep2(track, formatInfo: null);
+  }
+
+  /// Second part of [loadHiResTrack] — after AudioSink is configured.
+  Future<void> _loadHiResTrackStep2(AudioTrack track, {AudioFormatInfo? formatInfo}) async {
+    // Detect format if not already done
+    formatInfo ??= await _detectAudioFormatDirect(track);
     _audioFormatController.add(formatInfo);
 
     final isLowBitrate =
@@ -1385,7 +1492,12 @@ class AudioPlayerService {
             ') — disabling FFmpeg, using hardware decoder',
             tag: 'Audio');
     }
-    await _hiResService.setUseFfmpeg(!isLowBitrate);
+    // ── [TEST] Force FFmpeg OFF to test MediaCodecAudioRenderer → LibusbAudioSink ──
+    // When FFmpeg is disabled, ExoPlayer uses the hardware decoder (MediaCodecAudioRenderer)
+    // which is created by DefaultRenderersFactory and may connect to LibusbAudioSink properly.
+    // Remove this override after confirming the root cause.
+    await _hiResService.setUseFfmpeg(false);
+    _log.info('[TEST] FFmpeg FORCED OFF — using hardware decoder (MediaCodecAudioRenderer)', tag: 'Audio');
 
     _hiResActive = true;
     _hiResActiveController.add(true);

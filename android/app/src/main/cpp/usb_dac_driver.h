@@ -97,6 +97,15 @@ public:
     int writeI16(const int16_t* data, int numFrames);
 
     /**
+     * Write packed 24-bit little-endian PCM audio data to the USB DAC.
+     *
+     * @param data  Packed PCM24 samples, 3 bytes per sample
+     * @param numFrames  Number of frames to write
+     * @return Number of frames actually written, or negative on error
+     */
+    int writePcm24(const uint8_t* data, int numFrames);
+
+    /**
      * Check if the DAC is currently active and streaming.
      */
     bool isActive() const;

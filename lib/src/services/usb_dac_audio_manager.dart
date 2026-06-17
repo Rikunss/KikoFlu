@@ -158,7 +158,7 @@ class UsbDacAudioManager {
   Future<bool> connectToDevice(int deviceId, {
     int sampleRate = 48000,
     int channels = 2,
-    int bitDepth = 16,
+    int bitDepth = 24,
   }) async {
     if (!_initialized) return false;
 
@@ -420,6 +420,17 @@ class UsbDacAudioManager {
   }
 
   void _emitState() {
+    _log.info('[USB-MGR] _emitState: '
+        'dacConnected=${_currentDacState.connected}, '
+        'dacActive=${_currentDacState.active}, '
+        'autoDacEnabled=$_autoDacEnabled, '
+        'deviceName="$_activeDeviceName", '
+        'reconnecting=$_isReconnecting, '
+        'attempt=$_reconnectAttempt/$_maxReconnectAttempts, '
+        'lastVendorId=0x${_lastVendorId.toRadixString(16)}, '
+        'lastProductId=0x${_lastProductId.toRadixString(16)}',
+        tag: 'UsbDacMgr');
+
     _stateController.add(UsbDacManagerState(
       initialized: _initialized,
       autoDacEnabled: _autoDacEnabled,

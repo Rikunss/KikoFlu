@@ -38,6 +38,7 @@
 #include <cmath>
 
 #define LOG_TAG "AaudioExclusive"
+#define LOGV(...) __android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
@@ -74,8 +75,30 @@ static struct AaudioApi {
     aaudio_result_t (*AAudioStream_close)(AAudioStream* stream);
 
     aaudio_result_t (*AAudioStream_write)(AAudioStream* stream, const void* buffer, int32_t numFrames, int64_t timeoutNanoseconds);
+    aaudio_result_t (*AAudioStream_getFramesRead)(AAudioStream* stream, int64_t* frames);
+    aaudio_result_t (*AAudioStream_getFramesWritten)(AAudioStream* stream, int64_t* frames);
     aaudio_stream_state_t (*AAudioStream_getState)(AAudioStream* stream);
 } s_aaudio = {false, nullptr};
+
+// ── State-to-string helper ──
+// Converts AAudio stream state enum to human-readable name.
+static const char* aaudioStateToString(aaudio_stream_state_t state) {
+    switch (state) {
+        case AAUDIO_STREAM_STATE_UNINITIALIZED: return "UNINITIALIZED(0)";
+        case AAUDIO_STREAM_STATE_UNKNOWN:       return "UNKNOWN(1)";
+        case AAUDIO_STREAM_STATE_OPEN:          return "OPEN(2)";
+        case AAUDIO_STREAM_STATE_STARTING:      return "STARTING(3)";
+        case AAUDIO_STREAM_STATE_STARTED:       return "STARTED(4)";
+        case AAUDIO_STREAM_STATE_PAUSING:       return "PAUSING(5)";
+        case AAUDIO_STREAM_STATE_PAUSED:        return "PAUSED(6)";
+        case AAUDIO_STREAM_STATE_FLUSHING:      return "FLUSHING(7)";
+        case AAUDIO_STREAM_STATE_FLUSHED:       return "FLUSHED(8)";
+        case AAUDIO_STREAM_STATE_STOPPING:      return "STOPPING(9)";
+        case AAUDIO_STREAM_STATE_STOPPED:       return "STOPPED(10)";
+        case AAUDIO_STREAM_STATE_DISCONNECTED:  return "DISCONNECTED(11)";
+        default:                                return "UNKNOWN";
+    }
+}
 
 // ── Load AAudio library at runtime ──
 // Called once. Returns true if libaaudio.so was loaded and all symbols resolved.
@@ -120,6 +143,8 @@ static bool loadAaudioLibrary() {
     LOAD_SYM(AAudioStream_requestStop);
     LOAD_SYM(AAudioStream_close);
     LOAD_SYM(AAudioStream_write);
+    LOAD_SYM(AAudioStream_getFramesRead);
+    LOAD_SYM(AAudioStream_getFramesWritten);
     LOAD_SYM(AAudioStream_getState);
 
     #undef LOAD_SYM
@@ -162,37 +187,12 @@ public:
         channelCount_ = channelCount;
         bitsPerSample_ = bitsPerSample;
 
-        // Choose the best format for the requested bit depth.
-        // - 16-bit: PCM_I16 (native, always supported)
-        // - 24-bit: Try PCM_I24_PACKED (API 31+, integer bit-perfect), fall back to FLOAT
-        // - 32-bit: Try PCM_I32 (API 31+, integer bit-perfect), fall back to FLOAT
-        // Float is always the safe fallback because AAudio's FLOAT format
-        // has been supported since API 26.
-        //
-        // NOTE: We use a RUNTIME check (android_get_device_api_level) here,
-        // NOT a compile-time check (__ANDROID_API__). This is because
-        // KikoFlu is compiled with a lower minSdkVersion (24) for the
-        // dlopen-based fallback, so __ANDROID_API__ would be 24 even on
-        // devices that support AAudio API 31+ formats.
-        aaudio_format_t format;
-        bool tryIntegerFallback = false;
-        if (bitsPerSample_ <= 16) {
-            format = AAUDIO_FORMAT_PCM_I16;
-        } else if (bitsPerSample_ <= 24) {
-            if (android_get_device_api_level() >= 31) {
-                format = AAUDIO_FORMAT_PCM_I24_PACKED;
-                tryIntegerFallback = true;
-            } else {
-                format = AAUDIO_FORMAT_PCM_FLOAT;
-            }
-        } else {
-            if (android_get_device_api_level() >= 31) {
-                format = AAUDIO_FORMAT_PCM_I32;
-                tryIntegerFallback = true;
-            } else {
-                format = AAUDIO_FORMAT_PCM_FLOAT;
-            }
-        }
+        // Always use PCM_FLOAT because all Kotlin write helpers convert samples
+        // to float before calling nativeWritePcmFloatStatic. Integer formats
+        // (I16, I24_PACKED, I32) expect raw integer data, but we send float
+        // data, which would be misinterpreted by the AAudio HAL as integer bit
+        // patterns, producing crackling/static noise.
+        aaudio_format_t format = AAUDIO_FORMAT_PCM_FLOAT;
 
         aaudio_result_t result = s_aaudio.AAudio_createStreamBuilder(&builder_);
         if (result != AAUDIO_OK) {
@@ -214,26 +214,6 @@ public:
         }
 
         result = s_aaudio.AAudioStreamBuilder_openStream(builder_, &stream_);
-        if (result != AAUDIO_OK && tryIntegerFallback) {
-            // Integer format not supported by this device — fall back to FLOAT
-            LOGW("Integer format not supported (result=%d), falling back to PCM_FLOAT", result);
-            s_aaudio.AAudioStreamBuilder_delete(builder_);
-            builder_ = nullptr;
-            stream_ = nullptr;
-
-            // Re-create builder with float format
-            s_aaudio.AAudio_createStreamBuilder(&builder_);
-            s_aaudio.AAudioStreamBuilder_setSharingMode(builder_, AAUDIO_SHARING_MODE_EXCLUSIVE);
-            s_aaudio.AAudioStreamBuilder_setPerformanceMode(builder_, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-            s_aaudio.AAudioStreamBuilder_setFormat(builder_, AAUDIO_FORMAT_PCM_FLOAT);
-            s_aaudio.AAudioStreamBuilder_setSampleRate(builder_, sampleRate_ > 0 ? sampleRate_ : 48000);
-            s_aaudio.AAudioStreamBuilder_setChannelCount(builder_, channelCount_ > 0 ? channelCount_ : 2);
-            if (deviceId > 0) {
-                s_aaudio.AAudioStreamBuilder_setDeviceId(builder_, deviceId);
-            }
-            format = AAUDIO_FORMAT_PCM_FLOAT;
-            result = s_aaudio.AAudioStreamBuilder_openStream(builder_, &stream_);
-        }
 
         if (result != AAUDIO_OK) {
             LOGE("openStream failed: %d", result);
@@ -285,9 +265,15 @@ public:
         if (!stream_ || !s_aaudio.loaded) return false;
         if (streamStarted_) return true;
 
-        LOGI("start()");
+        aaudio_stream_state_t beforeState = s_aaudio.AAudioStream_getState(stream_);
+        LOGI("start(): stateBefore=%s", aaudioStateToString(beforeState));
         aaudio_result_t result = s_aaudio.AAudioStream_requestStart(stream_);
-        if (result != AAUDIO_OK) { LOGE("start failed: %d", result); return false; }
+        aaudio_stream_state_t afterState = s_aaudio.AAudioStream_getState(stream_);
+        if (result != AAUDIO_OK) {
+            LOGE("start FAILED: result=%d, stateAfter=%s", result, aaudioStateToString(afterState));
+            return false;
+        }
+        LOGI("start() succeeded: result=%d, stateAfter=%s", result, aaudioStateToString(afterState));
 
         streamStarted_ = true;
         isActive_ = true;
@@ -312,7 +298,41 @@ public:
     int32_t write(const float* data, int32_t numFrames) {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!stream_ || !isActive_ || !s_aaudio.loaded) return -1;
-        aaudio_result_t result = s_aaudio.AAudioStream_write(stream_, data, numFrames, 1000000LL * 500);
+
+        // Log stream state before every write for buffer-full diagnostics
+        aaudio_stream_state_t state = s_aaudio.AAudioStream_getState(stream_);
+        int32_t bufCap = s_aaudio.AAudioStream_getBufferCapacityInFrames(stream_);
+        int32_t bufSize = s_aaudio.AAudioStream_getBufferSizeInFrames(stream_);
+        int32_t framesAvail = bufCap - bufSize;
+        int64_t wrote = 0, read = 0;
+        s_aaudio.AAudioStream_getFramesWritten(stream_, &wrote);
+        s_aaudio.AAudioStream_getFramesRead(stream_, &read);
+        int64_t timeoutNs = 1000000LL * 500;  // 500ms
+        LOGV("[AAUDIO-STREAM] write(frames=%d): state=%s, bufCap=%d, bufSize=%d, framesAvail=%d, wrote=%lld, read=%lld, timeoutNs=%lld",
+             numFrames, aaudioStateToString(state), bufCap, bufSize, framesAvail,
+             (long long)wrote, (long long)read, (long long)timeoutNs);
+
+        aaudio_result_t result = s_aaudio.AAudioStream_write(stream_, data, numFrames, timeoutNs);
+
+        if (result >= 0) {
+            int64_t wroteAfter = 0, readAfter = 0;
+            s_aaudio.AAudioStream_getFramesWritten(stream_, &wroteAfter);
+            s_aaudio.AAudioStream_getFramesRead(stream_, &readAfter);
+            int32_t bufSizeAfter = s_aaudio.AAudioStream_getBufferSizeInFrames(stream_);
+            LOGV("[AAUDIO-STREAM] write result: requested=%d, written=%d, stateAfter=%s, bufSizeAfter=%d, framesAvailAfter=%d, wrote=%lld, read=%lld",
+                 numFrames, (int)result,
+                 aaudioStateToString(s_aaudio.AAudioStream_getState(stream_)),
+                 bufSizeAfter,
+                 bufCap - bufSizeAfter,
+                 (long long)wroteAfter, (long long)readAfter);
+        } else {
+            LOGW("[AAUDIO-STREAM] write FAILED: requested=%d, result=%d, stateAfter=%s, bufCap=%d, framesAvail=%d",
+                 numFrames, (int)result,
+                 aaudioStateToString(s_aaudio.AAudioStream_getState(stream_)),
+                 bufCap,
+                 framesAvail);
+        }
+
         if (result < 0) { LOGE("write failed: %d", result); return static_cast<int32_t>(result); }
         totalFramesWritten_ += static_cast<int32_t>(result);
         return static_cast<int32_t>(result);
@@ -321,8 +341,21 @@ public:
     int32_t writeI16(const int16_t* data, int32_t numFrames) {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!stream_ || !isActive_ || !s_aaudio.loaded) return -1;
+
+        // Log stream state before every write for buffer-full diagnostics
+        aaudio_stream_state_t state = s_aaudio.AAudioStream_getState(stream_);
+        int32_t bufCap = s_aaudio.AAudioStream_getBufferCapacityInFrames(stream_);
+        int32_t bufSize = s_aaudio.AAudioStream_getBufferSizeInFrames(stream_);
+        int32_t framesAvail = bufCap - bufSize;
+        int64_t wrote = 0, read = 0;
+        s_aaudio.AAudioStream_getFramesWritten(stream_, &wrote);
+        s_aaudio.AAudioStream_getFramesRead(stream_, &read);
+        int64_t timeoutNs = 1000000LL * 500;  // 500ms
+        LOGV("[AAUDIO-STREAM] writeI16(frames=%d): state=%s, bufCap=%d, bufSize=%d, framesAvail=%d, wrote=%lld, read=%lld, timeoutNs=%lld",
+             numFrames, aaudioStateToString(state), bufCap, bufSize, framesAvail,
+             (long long)wrote, (long long)read, (long long)timeoutNs);
+
         int32_t totalSamples = numFrames * channelCount_;
-        // Grow buffer only when needed — avoids per-call heap allocation
         if (static_cast<size_t>(totalSamples) > floatBufferSize_) {
             floatBuffer_.reset(new float[totalSamples]);
             floatBufferSize_ = static_cast<size_t>(totalSamples);
@@ -330,7 +363,27 @@ public:
         for (int32_t i = 0; i < totalSamples; i++) {
             floatBuffer_[i] = data[i] / 32768.0f;
         }
-        aaudio_result_t result = s_aaudio.AAudioStream_write(stream_, floatBuffer_.get(), numFrames, 1000000LL * 500);
+        aaudio_result_t result = s_aaudio.AAudioStream_write(stream_, floatBuffer_.get(), numFrames, timeoutNs);
+
+        if (result >= 0) {
+            int64_t wroteAfter = 0, readAfter = 0;
+            s_aaudio.AAudioStream_getFramesWritten(stream_, &wroteAfter);
+            s_aaudio.AAudioStream_getFramesRead(stream_, &readAfter);
+            int32_t bufSizeAfter = s_aaudio.AAudioStream_getBufferSizeInFrames(stream_);
+            LOGV("[AAUDIO-STREAM] writeI16 result: requested=%d, written=%d, stateAfter=%s, bufSizeAfter=%d, framesAvailAfter=%d, wrote=%lld, read=%lld",
+                 numFrames, (int)result,
+                 aaudioStateToString(s_aaudio.AAudioStream_getState(stream_)),
+                 bufSizeAfter,
+                 bufCap - bufSizeAfter,
+                 (long long)wroteAfter, (long long)readAfter);
+        } else {
+            LOGW("[AAUDIO-STREAM] writeI16 FAILED: requested=%d, result=%d, stateAfter=%s, bufCap=%d, framesAvail=%d",
+                 numFrames, (int)result,
+                 aaudioStateToString(s_aaudio.AAudioStream_getState(stream_)),
+                 bufCap,
+                 framesAvail);
+        }
+
         if (result < 0) { LOGE("writeI16 failed: %d", result); return static_cast<int32_t>(result); }
         totalFramesWritten_ += static_cast<int32_t>(result);
         return static_cast<int32_t>(result);

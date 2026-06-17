@@ -319,11 +319,29 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
             // Approach 2: Wrap DefaultRenderersFactory via RenderersFactory SAM to explicitly
             //   prepend FfmpegAudioRenderer at position 0 in the renderers array.
             // ──────────────────────────────────────────────────────────────────────────────
+            // ── AudioSink selection ──
+            // Log native libusb driver state at sink-selection time
+            // (getCurrentDriverPtr() internally logs [LIBUSB] driverConnected/ready/streamingCapable)
+            UsbDacPlugin.getCurrentDriverPtr()
+            android.util.Log.i("HiResAudio",
+                "[AUDIO-SINK] Selecting AudioSink: " +
+                "useLibusbSink=$useLibusbSink, useAaudioSink=$useAaudioSink")
+            android.util.Log.i("HiResAudio",
+                "[AUDIO-SINK] Priority: libusb > AAudio > Default. " +
+                "Selected: ${if (useLibusbSink) "LIBUSB (LibusbAudioSink)" else if (useAaudioSink) "AAUDIO (AaudioAudioSink)" else "DEFAULT (DefaultAudioSink)"}")
+
             val baseFactory: DefaultRenderersFactory = when {
                 // Priority 1: libusb USB DAC direct (true bit-perfect, all Android versions with USB OTG)
                 useLibusbSink -> {
+                    android.util.Log.i("USBPCM", "CREATING_EXOPLAYER_WITH_LIBUSB_SINK")
+                    android.util.Log.i("USBPCM", "BUILD_AUDIO_SINK_RETURNING_LIBUSB")
+                    android.util.Log.i("USBPCM", "AudioSink class=LibusbAudioSink")
+                    android.util.Log.i("HiResAudio", "[AUDIO-SINK] CREATING_EXOPLAYER_WITH_LIBUSB_SINK")
+                    android.util.Log.i("HiResAudio", "[AUDIO-SINK] >>> Creating ExoPlayer with LibusbAudioSink (bit-perfect USB DAC path)")
                     android.util.Log.i("HiResAudio", "Creating ExoPlayer with LibusbAudioSink + FFmpeg ALAC")
                     val libusbSinkInstance = LibusbAudioSink()
+                    android.util.Log.i("AUDIO-SINK", "BUILD_AUDIO_SINK_RETURNING_LIBUSB instance=${libusbSinkInstance.javaClass.name}")
+                    android.util.Log.i("AUDIO-SINK", "audioSink.javaClass.name=${libusbSinkInstance.javaClass.name}")
 
                     object : DefaultRenderersFactory(context) {
                         override fun buildAudioSink(
@@ -331,12 +349,14 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                             enableFloatOutput: Boolean,
                             enableAudioTrackPlaybackParams: Boolean
                         ): AudioSink? {
+                            android.util.Log.i("AUDIO-SINK", "BUILD_AUDIO_SINK_RETURNING_LIBUSB instance=${libusbSinkInstance.javaClass.name}")
                             return libusbSinkInstance
                         }
                     }
                 }
                 // Priority 2: AAudio exclusive AudioSink (mixer bypass, flagship devices)
                 useAaudioSink -> {
+                    android.util.Log.i("HiResAudio", "[AUDIO-SINK] >>> Creating ExoPlayer with AaudioAudioSink (AAudio exclusive/shared path)")
                     android.util.Log.i("HiResAudio", "Creating ExoPlayer with AAudio AudioSink + FFmpeg ALAC")
                     val aaudioSinkInstance = AaudioAudioSink({ sr, ch, bits, deviceId ->
                         val ptr = ExclusiveAudioPlugin.nativeCreatePlayerStatic()
@@ -362,25 +382,44 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                             "maxVolume" to 0,
                             "androidSdk" to android.os.Build.VERSION.SDK_INT
                         )
-                        channel?.invokeMethod("onExclusiveModeChanged", status)
+                        android.util.Log.i("HiResAudio", "[THREAD] currentThread=${Thread.currentThread().name} — onExclusiveStatusChanged")
+                        android.util.Log.i("HiResAudio", "[THREAD] invoking Flutter channel 'onExclusiveModeChanged'")
+                        // This callback is invoked from ExoPlayer's playback thread,
+                        // but MethodChannel.invokeMethod() requires the main thread.
+                        // Post to main thread handler to avoid @UiThread violation.
+                        Handler(Looper.getMainLooper()).post {
+                            android.util.Log.i("HiResAudio", "[THREAD] switched to main thread — sending 'onExclusiveModeChanged'")
+                            channel?.invokeMethod("onExclusiveModeChanged", status)
+                        }
                         android.util.Log.i("HiResAudio", "Playback stream exclusive status: $isExclusive")
                     },
                     /* bitPerfectMode */ bitPerfectMode)
 
+object : DefaultRenderersFactory(context) {
+                         override fun buildAudioSink(
+                             ctx: Context,
+                             enableFloatOutput: Boolean,
+                             enableAudioTrackPlaybackParams: Boolean
+                         ): AudioSink? {
+                             android.util.Log.i("AUDIO-SINK", "BUILD_AUDIO_SINK_RETURNING_AAUDIO instance=${aaudioSinkInstance.javaClass.name}")
+                             return aaudioSinkInstance
+                         }
+                     }
+                }
+                // Priority 3: Default AudioSink (standard Android audio)
+                else -> {
+                    android.util.Log.i("HiResAudio", "[AUDIO-SINK] >>> Creating ExoPlayer with DefaultAudioSink (standard Android AudioTrack)")
+                    android.util.Log.i("HiResAudio", "Creating ExoPlayer with FFmpeg ALAC")
                     object : DefaultRenderersFactory(context) {
                         override fun buildAudioSink(
                             ctx: Context,
                             enableFloatOutput: Boolean,
                             enableAudioTrackPlaybackParams: Boolean
                         ): AudioSink? {
-                            return aaudioSinkInstance
+                            android.util.Log.i("AUDIO-SINK", "BUILD_AUDIO_SINK_RETURNING_DEFAULT (DefaultAudioSink)")
+                            return null // Let the base factory create DefaultAudioSink
                         }
                     }
-                }
-                // Priority 3: Default AudioSink (standard Android audio)
-                else -> {
-                    android.util.Log.i("HiResAudio", "Creating ExoPlayer with FFmpeg ALAC")
-                    DefaultRenderersFactory(context)
                 }
             }
 
@@ -435,12 +474,20 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
             exoPlayer?.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     this@HiResAudioPlugin.isPlaying = isPlaying
-                    channel?.invokeMethod("onPlaybackStateChanged", mapOf(
-                        "isPlaying" to isPlaying
-                    ))
+                    android.util.Log.i("HiResAudio", "[THREAD] currentThread=${Thread.currentThread().name} — onIsPlayingChanged")
+                    android.util.Log.i("HiResAudio", "[THREAD] invoking Flutter channel 'onPlaybackStateChanged'")
+                    // Player.Listener callbacks run on ExoPlayer's playback thread.
+                    // MethodChannel requires the main thread — post to main thread.
+                    Handler(Looper.getMainLooper()).post {
+                        android.util.Log.i("HiResAudio", "[THREAD] switched to main thread — sending 'onPlaybackStateChanged'")
+                        channel?.invokeMethod("onPlaybackStateChanged", mapOf(
+                            "isPlaying" to isPlaying
+                        ))
+                    }
                 }
 
                 override fun onPlaybackStateChanged(playbackState: Int) {
+                    android.util.Log.i("HiResAudio", "[THREAD] currentThread=${Thread.currentThread().name} — onPlaybackStateChanged=$playbackState")
                     when (playbackState) {
                         Player.STATE_READY -> {
                             val audioFormat = exoPlayer?.audioFormat
@@ -455,37 +502,62 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                                 }
                                 currentChannels = audioFormat.channelCount
                             }
-                            channel?.invokeMethod("onFormatInfo", mapOf(
-                                "sampleRate" to currentSampleRate,
-                                "bitDepth" to currentBitDepth,
-                                "channels" to currentChannels
-                            ))
+                            android.util.Log.i("HiResAudio", "[THREAD] invoking Flutter channel 'onFormatInfo'")
+                            // Player.Listener callbacks run on ExoPlayer's playback thread.
+                            // MethodChannel requires the main thread — post to main thread.
+                            Handler(Looper.getMainLooper()).post {
+                                android.util.Log.i("HiResAudio", "[THREAD] switched to main thread — sending 'onFormatInfo'")
+                                channel?.invokeMethod("onFormatInfo", mapOf(
+                                    "sampleRate" to currentSampleRate,
+                                    "bitDepth" to currentBitDepth,
+                                    "channels" to currentChannels
+                                ))
+                            }
                         }
                         Player.STATE_ENDED -> {
                             isPlaying = false
-                            channel?.invokeMethod("onPlaybackStateChanged", mapOf(
-                                "isPlaying" to false
-                            ))
-                            // Push dedicated track-ended event — this is the ONLY reliable
-                            // way to detect track completion. onIsPlayingChanged(false) can
-                            // fire for transient reasons (audio focus, format change) and
-                            // should NOT be used for completion detection to avoid false
-                            // positives that destroy the AudioTrack mid-playback.
-                            channel?.invokeMethod("onTrackEnded", true)
+                            android.util.Log.i("HiResAudio", "[THREAD] invoking Flutter channels 'onPlaybackStateChanged' + 'onTrackEnded'")
+                            // Player.Listener callbacks run on ExoPlayer's playback thread.
+                            // MethodChannel requires the main thread — post to main thread.
+                            Handler(Looper.getMainLooper()).post {
+                                android.util.Log.i("HiResAudio", "[THREAD] switched to main thread — sending 'onPlaybackStateChanged' + 'onTrackEnded'")
+                                channel?.invokeMethod("onPlaybackStateChanged", mapOf(
+                                    "isPlaying" to false
+                                ))
+                                // Push dedicated track-ended event — this is the ONLY reliable
+                                // way to detect track completion. onIsPlayingChanged(false) can
+                                // fire for transient reasons (audio focus, format change) and
+                                // should NOT be used for completion detection to avoid false
+                                // positives that destroy the AudioTrack mid-playback.
+                                channel?.invokeMethod("onTrackEnded", true)
+                            }
                         }
                         Player.STATE_BUFFERING -> {
-                            channel?.invokeMethod("onBuffering", mapOf(
-                                "buffering" to true
-                            ))
+                            android.util.Log.i("HiResAudio", "[THREAD] invoking Flutter channel 'onBuffering'")
+                            // Player.Listener callbacks run on ExoPlayer's playback thread.
+                            // MethodChannel requires the main thread — post to main thread.
+                            Handler(Looper.getMainLooper()).post {
+                                android.util.Log.i("HiResAudio", "[THREAD] switched to main thread — sending 'onBuffering'")
+                                channel?.invokeMethod("onBuffering", mapOf(
+                                    "buffering" to true
+                                ))
+                            }
                         }
                     }
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
-                    channel?.invokeMethod("onError", mapOf(
-                        "message" to error.message,
-                        "errorCode" to error.errorCodeName
-                    ))
+                    android.util.Log.i("HiResAudio", "[THREAD] currentThread=${Thread.currentThread().name} — onPlayerError")
+                    android.util.Log.i("HiResAudio", "[THREAD] invoking Flutter channel 'onError'")
+                    // Player.Listener callbacks run on ExoPlayer's playback thread.
+                    // MethodChannel requires the main thread — post to main thread.
+                    Handler(Looper.getMainLooper()).post {
+                        android.util.Log.i("HiResAudio", "[THREAD] switched to main thread — sending 'onError'")
+                        channel?.invokeMethod("onError", mapOf(
+                            "message" to error.message,
+                            "errorCode" to error.errorCodeName
+                        ))
+                    }
                 }
             })
         }
@@ -983,12 +1055,18 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
     }
 
     private fun releasePlayer() {
+        android.util.Log.i("HiResAudio", "[PLAYER-LIFECYCLE] releasePlayer() called — exoPlayer=$exoPlayer, isPlaying=$isPlaying")
         stopPositionPush()
         try {
             exoPlayer?.stop()
+            android.util.Log.i("HiResAudio", "[PLAYER-LIFECYCLE] exoPlayer?.stop() completed")
             exoPlayer?.release()
-        } catch (_: Exception) {}
+            android.util.Log.i("HiResAudio", "[PLAYER-LIFECYCLE] exoPlayer?.release() completed")
+        } catch (e: Exception) {
+            android.util.Log.w("HiResAudio", "[PLAYER-LIFECYCLE] releasePlayer exception: ${e.message}")
+        }
         exoPlayer = null
         isPlaying = false
+        android.util.Log.i("HiResAudio", "[PLAYER-LIFECYCLE] releasePlayer() complete — exoPlayer=null")
     }
 }
