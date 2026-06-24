@@ -88,20 +88,33 @@ jobs:
         shell: pwsh
         continue-on-error: true
 
+      - name: Patch ggml CMakeLists.txt to fix install path
+        shell: pwsh
+        run: |
+          # ggml uses $<TARGET_FILE_DIR:${PROJECT_NAME}>/lib in install() which
+          # doesn't evaluate correctly — replace with plain 'lib' so cmake_install.cmake works.
+          $file = "windows/flutter/ephemeral/.plugin_symlinks/whisper_ggml_plus/macos/Classes/whisper/ggml/CMakeLists.txt"
+          if (Test-Path $file) {
+            $content = Get-Content $file -Raw
+            $replaced = $content -replace '\$<TARGET_FILE_DIR:\$\{[^}]+\}>/lib', 'lib'
+            if ($content -ne $replaced) {
+              Set-Content -Path $file -Value $replaced
+              Write-Host "Patched ggml CMakeLists.txt"
+            } else {
+              Write-Host "ggml CMakeLists.txt already patched or not found"
+            }
+          } else {
+            Write-Host "ggml CMakeLists.txt not found at expected path"
+          }
+
       - name: Build Windows Release
         continue-on-error: true
         run: flutter build windows --release
 
-      - name: Patch cmake_install & re-run install
+      - name: Ensure cmake install completes
         continue-on-error: true
         shell: pwsh
         run: |
-          # whisper_ggml_plus/ggml uses $<TARGET_FILE_DIR:KikoFlu> in cmake_install.cmake
-          $file = "build/windows/x64/plugins/whisper_ggml_plus/ggml/src/cmake_install.cmake"
-          if (Test-Path $file) {
-            (Get-Content $file) -replace '\$<TARGET_FILE_DIR:[^>]+>', 'KikoFlu' | Set-Content $file
-            Write-Host "Patched cmake_install.cmake for whisper_ggml_plus"
-          }
           cmake --install build/windows/x64 --config Release 2>&1 || Write-Host "cmake --install completed with warnings"
 
       - name: Install Inno Setup
