@@ -1,11 +1,6 @@
 name: Build and Release
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -157,6 +152,28 @@ jobs:
             Output/KikoFlu-windows-setup.exe
 
 
+  ios:
+    name: iOS Build (unsigned)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      
+      - name: Build unsigned iOS IPA
+        run: |
+          chmod +x build_ios_xcode.sh
+          bash build_ios_xcode.sh
+      
+      - name: Upload iOS Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ios-release
+          path: KikoFlu-unsigned.ipa
+
   macos:
     name: macOS Build
     runs-on: macos-latest
@@ -237,8 +254,8 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [android, windows, macos, linux]
-    if: always() && needs.android.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success' && needs.linux.result == 'success'
+    needs: [android, windows, macos, linux, ios]
+    if: always() && needs.android.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success' && needs.linux.result == 'success' && needs.ios.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -306,3 +323,4 @@ jobs:
             artifacts/windows-release/*
             artifacts/macos-release/*
             artifacts/linux-release/*
+            artifacts/ios-release/*
