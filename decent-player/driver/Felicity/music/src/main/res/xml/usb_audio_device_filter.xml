@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Matches any USB Audio Class device (class 1 = Audio).
-     This makes Android offer Felicity as a handler when a USB DAC is connected,
-     allowing us to claim the device BEFORE snd-usb-audio kernel driver binds. -->
-<resources>
-    <usb-device class="1" />
-</resources>
