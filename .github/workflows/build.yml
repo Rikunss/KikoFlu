@@ -211,8 +211,7 @@ jobs:
   linux-arm64:
     name: Linux ARM64 Build
     runs-on: ubuntu-22.04
-    if: github.event_name == 'workflow_dispatch' ||
-    startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v6
 
