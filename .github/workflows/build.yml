@@ -90,21 +90,43 @@ jobs:
 
       - name: Patch ggml CMakeLists.txt to fix install path
         shell: pwsh
+        continue-on-error: true
         run: |
-          # ggml uses $<TARGET_FILE_DIR:${PROJECT_NAME}>/lib in install() which
-          # doesn't evaluate correctly — replace with plain 'lib' so cmake_install.cmake works.
-          $file = "windows/flutter/ephemeral/.plugin_symlinks/whisper_ggml_plus/macos/Classes/whisper/ggml/CMakeLists.txt"
-          if (Test-Path $file) {
-            $content = Get-Content $file -Raw
-            $replaced = $content -replace '\$<TARGET_FILE_DIR:\$\{[^}]+\}>/lib', 'lib'
-            if ($content -ne $replaced) {
-              Set-Content -Path $file -Value $replaced
-              Write-Host "Patched ggml CMakeLists.txt"
-            } else {
-              Write-Host "ggml CMakeLists.txt already patched or not found"
+          # ggml uses $<TARGET_FILE_DIR:...>/lib in install() which doesn't
+          # evaluate correctly — replace with 'lib' at source level.
+          # Try multiple possible paths (junction resolve / direct)
+          $paths = @(
+            "windows/flutter/ephemeral/.plugin_symlinks/whisper_ggml_plus/macos/Classes/whisper/ggml/CMakeLists.txt",
+            "windows/flutter/ephemeral/.plugin_symlinks/whisper_ggml_plus/macos/Classes/whisper/ggml/src/CMakeLists.txt"
+          )
+          $patched = $false
+          foreach ($file in $paths) {
+            if (Test-Path $file) {
+              $content = Get-Content $file -Raw -ErrorAction SilentlyContinue
+              if ($content) {
+                $replaced = $content -replace '\$<TARGET_FILE_DIR:[^>]+>/lib', 'lib'
+                if ($content -ne $replaced) {
+                  try {
+                    Set-Content -Path $file -Value $replaced -ErrorAction Stop
+                    Write-Host "Patched: $file"
+                    $patched = $true
+                  } catch {
+                    Write-Host "WARNING: Could not write to $file - trying robocopy fallback"
+                    # If read-only (pub cache), extract to real dir
+                    $target = "windows/flutter/ephemeral/ggml_workaround"
+                    New-Item -ItemType Directory -Force -Path $target | Out-Null
+                    Copy-Item -Path (Split-Path $file -Parent)\* -Destination $target -Recurse -Force
+                    $localFile = Join-Path $target (Split-Path $file -Leaf)
+                    Set-Content -Path $localFile -Value $replaced
+                    Write-Host "Patched local copy: $localFile"
+                    $patched = $true
+                  }
+                }
+              }
             }
-          } else {
-            Write-Host "ggml CMakeLists.txt not found at expected path"
+          }
+          if (-not $patched) {
+            Write-Host "ggml CMakeLists.txt not found — will try post-build cmake --install fallback"
           }
 
       - name: Build Windows Release
