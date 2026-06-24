@@ -59,8 +59,8 @@ flutter pub get
 title "Installing CocoaPods"
 cd ios
 if [ "$CI_MODE" = true ]; then
-  # CI: skip repo update (runners have fresh specs cache)
-  pod install --no-repo-update
+  # CI: skip repo update — runners have fresh specs, but fallback if not
+  pod install --no-repo-update 2>/dev/null || pod install
 else
   pod install
 fi
