@@ -1,107 +1,118 @@
 #!/bin/bash
-
-# iOS 无签名 IPA 简化构建脚本（使用 Xcode Archive 方式）
-# 适用于 Xcode 26.1 等较新版本
+#
+# iOS unsigned IPA build script — optimized for GitHub Actions CI
+#
+# In CI (GITHUB_ACTIONS=true):
+#   - Skips flutter clean (clean runner every time)
+#   - Skips pod repo update (CI runners have fresh specs)
+#   - Uses parallel xcodebuild
+#
+# Local usage:
+#   bash build_ios_xcode.sh
 
 set -e
 
-echo "🚀 开始构建 iOS 无签名 IPA（简化版）..."
-
-# 检查依赖
-echo "🔍 检查依赖环境..."
-if ! command -v flutter &> /dev/null; then
-    echo "❌ Flutter 未安装"
-    exit 1
+# ── Detect CI ──
+CI_MODE=false
+if [ "${GITHUB_ACTIONS}" = "true" ]; then
+  CI_MODE=true
 fi
 
-if ! command -v pod &> /dev/null; then
-    echo "❌ CocoaPods 未安装"
-    exit 1
+# ── Config ──
+ARCH=${ARCH:-arm64}
+XCODE_WORKSPACE="ios/Runner.xcworkspace"
+XCODE_SCHEME="Runner"
+XCODE_ARCHIVE="ios/build/Runner.xcarchive"
+OUTPUT_IPA="KikoFlu-unsigned.ipa"
+
+log()  { echo "[$1] $2"; }
+title(){ echo ""; echo "━━━ $1 ━━━"; echo ""; }
+
+title "iOS unsigned IPA build"
+if [ "$CI_MODE" = true ]; then
+  echo "  Mode: CI (GitHub Actions)"
+else
+  echo "  Mode: Local"
+fi
+echo "  Arch: $ARCH"
+
+# ── Dependencies ──
+title "Checking dependencies"
+command -v flutter >/dev/null 2>&1 || { echo "ERROR: Flutter not found"; exit 1; }
+command -v pod >/dev/null 2>&1     || { echo "ERROR: CocoaPods not found"; exit 1; }
+echo "  flutter, pod — OK"
+
+# ── Clean (local only) ──
+if [ "$CI_MODE" = false ]; then
+  title "Clean"
+  flutter clean
+  rm -rf ios/Pods ios/Podfile.lock
+else
+  echo "  (CI: skip clean — fresh environment)"
 fi
 
-echo "✅ 依赖检查通过"
-echo ""
-
-# 清理
-echo "🧹 清理之前的构建..."
-flutter clean
-rm -rf ios/Pods ios/Podfile.lock
-
-# 获取依赖
-echo "📦 获取 Flutter 依赖..."
+# ── Flutter dependencies ──
+title "Flutter pub get"
 flutter pub get
 
-# 安装 iOS 依赖
-echo "📦 安装 iOS 依赖（首次可能需要较长时间）..."
+# ── CocoaPods ──
+title "Installing CocoaPods"
 cd ios
-pod install
-cd ..
-
-# 使用 xcodebuild 构建（不需要模拟器）
-echo "🔨 构建 iOS Release 版本（无签名）..."
-cd ios
-
-xcodebuild \
-    -workspace Runner.xcworkspace \
-    -scheme Runner \
-    -sdk iphoneos \
-    -configuration Release \
-    -archivePath build/Runner.xcarchive \
-    -arch arm64 \
-    archive \
-    CODE_SIGN_IDENTITY="" \
-    CODE_SIGNING_REQUIRED=NO \
-    CODE_SIGNING_ALLOWED=NO \
-    CODE_SIGN_ENTITLEMENTS="" \
-    PROVISIONING_PROFILE="" \
-    ONLY_ACTIVE_ARCH=NO
-
-cd ..
-
-# 检查 archive 是否成功
-if [ ! -d "ios/build/Runner.xcarchive" ]; then
-    echo "❌ Archive 失败"
-    exit 1
-fi
-
-echo "✅ Archive 成功！"
-echo ""
-
-# 手动打包 IPA（跳过 xcodebuild export，避免签名问题）
-echo "� 打包无签名 IPA..."
-
-# 清理之前的打包文件
-rm -rf build/Payload
-rm -f KikoFlu-unsigned.ipa
-
-# 创建 Payload 目录并复制 .app
-mkdir -p build/Payload
-cp -r ios/build/Runner.xcarchive/Products/Applications/Runner.app build/Payload/
-
-# 打包成 IPA
-cd build
-zip -qr KikoFlu-unsigned.ipa Payload
-cd ..
-
-# 移动到项目根目录
-mv build/KikoFlu-unsigned.ipa ./
-
-# 验证文件
-if [ -f "KikoFlu-unsigned.ipa" ]; then
-    echo "✅ 构建完成！"
-    echo ""
-    echo "📱 无签名 IPA 文件信息："
-    ls -lh KikoFlu-unsigned.ipa
-    echo ""
-    echo "📍 文件位置:"
-    echo "$(pwd)/KikoFlu-unsigned.ipa"
+if [ "$CI_MODE" = true ]; then
+  # CI: skip repo update (runners have fresh specs cache)
+  pod install --no-repo-update
 else
-    echo "❌ 打包失败"
-    exit 1
+  pod install
 fi
+cd ..
 
-echo ""
-echo "📝 用户可以使用以下工具自签名："
-echo "   - AltStore (https://altstore.io/)"
-echo "   - Sideloadly (https://sideloadly.io/)"
-echo "   - iOS App Signer"
+# ── Xcode build ──
+title "Building unsigned archive"
+cd ios
+xcodebuild \
+  -workspace "$XCODE_WORKSPACE" \
+  -scheme "$XCODE_SCHEME" \
+  -sdk iphoneos \
+  -configuration Release \
+  -archivePath "$XCODE_ARCHIVE" \
+  -arch "$ARCH" \
+  -parallelizeTargets \
+  archive \
+  CODE_SIGN_IDENTITY="" \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGN_ENTITLEMENTS="" \
+  PROVISIONING_PROFILE="" \
+  ONLY_ACTIVE_ARCH=NO
+cd ..
+
+# ── Verify archive ──
+if [ ! -d "$XCODE_ARCHIVE" ]; then
+  echo "ERROR: Archive not found at $XCODE_ARCHIVE"
+  exit 1
+fi
+echo "  Archive created successfully"
+
+# ── Package IPA ──
+title "Packaging unsigned IPA"
+rm -rf build/Payload
+rm -f "$OUTPUT_IPA"
+mkdir -p build/Payload
+cp -r "$XCODE_ARCHIVE/Products/Applications/Runner.app" build/Payload/
+
+cd build
+zip -qr "$OUTPUT_IPA" Payload
+cd ..
+mv "build/$OUTPUT_IPA" ./
+
+# ── Verify ──
+if [ -f "$OUTPUT_IPA" ]; then
+  title "Done"
+  echo "  $OUTPUT_IPA"
+  ls -lh "$OUTPUT_IPA"
+  echo ""
+  echo "  Self-sign with: AltStore / Sideloadly / iOS App Signer"
+else
+  echo "ERROR: IPA packaging failed"
+  exit 1
+fi
