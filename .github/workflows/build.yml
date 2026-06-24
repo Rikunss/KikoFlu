@@ -2,6 +2,8 @@ name: Build and Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -257,7 +259,6 @@ jobs:
       - macos
       - linux
       - linux-arm64
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -269,17 +270,38 @@ jobs:
         with:
           path: artifacts
 
-      - name: Get Version from Tag
+      - name: Get Version
         id: get_version
+        shell: pwsh
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          echo "VERSION=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Tag version: $TAG"
+          if ("$env:GITHUB_REF" -match "^refs/tags/v") {
+            $version = "$env:GITHUB_REF_NAME".Substring(1)
+          } else {
+            $content = Get-Content pubspec.yaml -Raw
+            if ($content -match "version:\s*([0-9]+\.[0-9]+\.[0-9]+)") {
+              $version = $matches[1]
+            } else {
+              $version = "0.0.0"
+            }
+          }
+          echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host "Release version: $version"
+
+      - name: Check Existing Release
+        id: check_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.get_version.outputs.VERSION }}" > /dev/null 2>&1; then
+            echo "EXISTS=true" >> "$GITHUB_OUTPUT"
+            echo "Release v${{ steps.get_version.outputs.VERSION }} already exists, skipping."
+          else
+            echo "EXISTS=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Generate Release Notes
-        id: release_notes
+        if: steps.check_release.outputs.EXISTS == 'false'
         run: |
-          # Collect artifact file listing
           echo "## 📦 Artifacts" > release-notes.md
           echo "" >> release-notes.md
           find artifacts -type f | sort | while read f; do
@@ -292,6 +314,7 @@ jobs:
           echo "_Built automatically by GitHub Actions._" >> release-notes.md
 
       - name: Create Release
+        if: steps.check_release.outputs.EXISTS == 'false'
         uses: softprops/action-gh-release@v2
         with:
           name: "KikoFlu v${{ steps.get_version.outputs.VERSION }}"
