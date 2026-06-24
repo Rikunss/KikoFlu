@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Felicity</string>
+    <string name="app_name_bp" translatable="false">Felicity - BP</string>
+    <string name="app_name_full" translatable="false">Felicity Music Player</string>
+    <string name="over_scroll_behavior" translatable="false">app.simple.felicity.decorations.behaviors.OverScrollBehavior</string>
+    <string name="github" translatable="false">GitHub</string>
+    <string name="progress" translatable="false">%d%%</string>
+    <string name="markdown" translatable="false">.MD</string>
+    <string name="html" translatable="false">.HTML</string>
+    <string name="txt" translatable="false">.TXT</string>
+    <string name="xml" translatable="false">.XML</string>
+    <string name="json" translatable="false">.JSON</string>
+    <string name="csv" translatable="false">.CSV</string>
+    <string name="z_spread">z Spread</string>
+    <string name="ffmpeg">FFmpeg</string>
+    <string name="time_minus">- 1s</string>
+    <string name="time_minus_ms">- 0.5s</string>
+    <string name="time_plus">+ 1s</string>
+    <string name="time_plus_ms">+ 0.5s</string>
+    <string name="fisher_yates">Fisher-Yates</string>
+    <string name="miller">Miller</string>
+
+    <!-- Audio Pipeline Dialog — channel display values -->
+    <string name="channel_mono">1 (Mono)</string>
+    <string name="channel_stereo">2 (Stereo)</string>
+
+    <!-- Audio Pipeline Dialog — value format strings -->
+    <string name="format_hz">%1$d Hz</string>
+    <string name="format_hz_cutoff">%1$d Hz, %2$d%%</string>
+    <string name="format_kbps">%1$d kbps</string>
+    <string name="format_bit_depth">%1$d-bit</string>
+    <string name="format_percent">%1$d%%</string>
+    <string name="format_approx_ms">~%1$d ms</string>
+    <string name="format_io_rate">%1$s ➔ %2$s</string>
+    <string name="format_bit_depth_io">In: %1$d-bit  Out: %2$d-bit</string>
+</resources>

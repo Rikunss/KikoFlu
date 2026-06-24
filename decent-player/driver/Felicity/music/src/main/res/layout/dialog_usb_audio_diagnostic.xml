@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/container"
+    android:layout_width="match_parent"
+    android:layout_gravity="bottom"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:padding="@dimen/padding_15"
+    android:layout_height="wrap_content">
+
+    <app.simple.felicity.decorations.corners.DynamicCornerLinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:padding="@dimen/padding_15"
+        android:orientation="vertical">
+
+        <app.simple.felicity.decorations.typeface.TypeFaceTextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/usb_audio_diagnostic"
+            android:textSize="@dimen/text_size_16"
+            app:appFontStyle="bold"
+            app:textColorStyle="heading" />
+
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/padding_10"
+            android:maxHeight="400dp"
+            android:fadingEdge="vertical"
+            android:requiresFadingEdge="vertical"
+            android:fadingEdgeLength="@dimen/padding_15"
+            app:isFadingEdgeRequired="true"
+            app:navigationPaddingRequired="false"
+            app:statusPaddingRequired="false">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Message area (no USB / Android version too low) -->
+                <app.simple.felicity.decorations.typeface.TypeFaceTextView
+                    android:id="@+id/message"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingVertical="@dimen/padding_10"
+                    android:textSize="@dimen/text_size_14"
+                    android:visibility="gone"
+                    app:appFontStyle="medium"
+                    app:textColorStyle="secondary" />
+
+                <!-- Device Info section -->
+                <LinearLayout
+                    android:id="@+id/device_section"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <app.simple.felicity.decorations.typeface.TypeFaceTextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="@dimen/padding_5"
+                        android:text="@string/output_device"
+                        android:textSize="@dimen/text_size_16"
+                        android:gravity="center_vertical"
+                        android:drawablePadding="@dimen/padding_10"
+                        app:appFontStyle="bold"
+                        app:drawableStartCompat="@drawable/ic_volume"
+                        app:drawableTintStyle="accent"
+                        app:textColorStyle="primary" />
+
+                    <app.simple.felicity.decorations.typeface.TypeFaceTextView
+                        android:id="@+id/value_device_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="34dp"
+                        android:paddingVertical="@dimen/padding_1"
+                        android:textSize="@dimen/text_size_12"
+                        app:appFontStyle="bold"
+                        app:textColorStyle="secondary" />
+
+                    <app.simple.felicity.decorations.typeface.TypeFaceTextView
+                        android:id="@+id/value_android_version"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="34dp"
+                        android:paddingVertical="@dimen/padding_1"
+                        android:textSize="@dimen/text_size_12"
+                        app:appFontStyle="bold"
+                        app:textColorStyle="secondary" />
+
+                    <!-- Bit-Perfect status (highlighted) -->
+                    <app.simple.felicity.decorations.typeface.TypeFaceTextView
+                        android:id="@+id/value_bit_perfect_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/padding_10"
+                        android:paddingStart="34dp"
+                        android:paddingVertical="@dimen/padding_5"
+                        android:textSize="@dimen/text_size_14"
+                        app:appFontStyle="bold"
+                        app:textColorStyle="primary" />
+
+                    <!-- Supported Formats section -->
+                    <app.simple.felicity.decorations.typeface.TypeFaceTextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/padding_10"
+                        android:paddingVertical="@dimen/padding_5"
+                        android:text="@string/supported_formats"
+                        android:textSize="@dimen/text_size_16"
+                        android:gravity="center_vertical"
+                        android:drawablePadding="@dimen/padding_10"
+                        app:appFontStyle="bold"
+                        app:drawableStartCompat="@drawable/ic_graphic_eq"
+                        app:drawableTintStyle="accent"
+                        app:textColorStyle="primary" />
+
+                    <app.simple.felicity.decorations.typeface.TypeFaceTextView
+                        android:id="@+id/value_formats_list"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="34dp"
+                        android:paddingVertical="@dimen/padding_1"
+                        android:textSize="@dimen/text_size_12"
+                        app:appFontStyle="bold"
+                        app:textColorStyle="secondary" />
+
+                </LinearLayout>
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+    </app.simple.felicity.decorations.corners.DynamicCornerLinearLayout>
+
+</FrameLayout>

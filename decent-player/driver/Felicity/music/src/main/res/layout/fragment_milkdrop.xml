@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    android:clickable="true"
+    android:focusable="true">
+
+    <app.simple.felicity.milkdrop.views.MilkdropSurfaceView
+        android:id="@+id/milkdrop_surface"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <app.simple.felicity.decorations.padding.InsetLinearLayout
+        android:id="@+id/preset_pager_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:backgroundTint="#80000000"
+        android:layout_margin="@dimen/padding_15"
+        app:navigationPaddingRequired="false"
+        app:statusPaddingRequired="true">
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/preset_pager"
+            android:layout_width="0dp"
+            android:layout_marginEnd="@dimen/padding_5"
+            android:layout_height="60dp"
+            android:layout_gravity="bottom"
+            android:layout_weight="1" />
+
+        <app.simple.felicity.decorations.ripple.DynamicRippleImageButton
+            android:id="@+id/shuffle_preset"
+            android:layout_width="@dimen/button_size"
+            android:layout_height="@dimen/button_size"
+            android:contentDescription="@string/shuffle"
+            android:layout_marginEnd="@dimen/gap"
+            android:src="@drawable/ic_shuffle"
+            app:buttonTintType="white" />
+
+    </app.simple.felicity.decorations.padding.InsetLinearLayout>
+
+</FrameLayout>

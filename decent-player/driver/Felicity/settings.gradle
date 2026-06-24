@@ -1,0 +1,37 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+}
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven { url "https://jitpack.io" }
+    }
+}
+// Include the decent-usb-audio libs as composite builds
+includeBuild('../../libs') {
+    dependencySubstitution {
+        substitute module('com.decent:usb-audio-driver') using project(':decent-usb-audio-driver')
+        substitute module('com.decent:usb-audio-wrapper-media3') using project(':decent-usb-audio-wrapper-media3')
+        substitute module('com.decent:media3-decoder-flac') using project(':decent-media3-decoder-flac')
+    }
+}
+
+rootProject.name = "Felicity"
+include ':music'
+include ':theme'
+include ':decorations'
+include ':preferences'
+include ':shared'
+include ':core'
+include ':repository'
+include ':engine'
+include ':milkdrop'

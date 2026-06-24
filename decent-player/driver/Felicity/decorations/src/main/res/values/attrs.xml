@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="buttonTintType" format="enum">
+        <enum name="regular" value="0" />
+        <enum name="secondary" value="1" />
+        <enum name="accent" value="2" />
+        <enum name="white" value="3" />
+        <enum name="custom" value="-1" />
+    </attr>
+
+    <declare-styleable name="DynamicCornerLayout">
+        <!-- At least one of them needs to be true else roundness will be applies to all corners
+                default is false for both of them -->
+        <attr name="roundTopCorners" format="boolean" />
+        <attr name="roundBottomCorners" format="boolean" />
+        <attr name="roundAllCorners" format="boolean" />
+    </declare-styleable>
+
+    <declare-styleable name="CircularImageImageButton">
+        <attr name="buttonBackgroundType" format="string">
+            <flag name="regular" value="0" />
+            <flag name="secondary" value="1" />
+            <flag name="accent" value="2" />
+            <flag name="semi_transparent" value="3" />
+            <flag name="custom" value="-1" />
+        </attr>
+
+        <attr name="buttonTintType" />
+    </declare-styleable>
+
+    <!-- Type Face Text View -->
+    <declare-styleable name="TypeFaceTextView">
+        <attr name="appFontStyle" format="string">
+            <flag name="extralight" value="-1" />
+            <flag name="light" value="0" />
+            <flag name="regular" value="1" />
+            <flag name="medium" value="2" />
+            <flag name="bold" value="3" />
+            <flag name="black" value="4" />
+        </attr>
+
+        <attr name="textColorStyle" format="string">
+            <flag name="heading" value="0" />
+            <flag name="primary" value="1" />
+            <flag name="secondary" value="2" />
+            <flag name="tertiary" value="3" />
+            <flag name="quaternary" value="4" />
+            <flag name="accent" value="5" />
+            <flag name="white" value="6" />
+        </attr>
+
+        <attr name="drawableTintStyle" format="string">
+            <flag name="accent" value="0" />
+            <flag name="regular" value="1" />
+            <flag name="secondary" value="2" />
+            <flag name="warning" value="3" />
+            <flag name="custom" value="4" />
+        </attr>
+
+        <attr name="isDrawableHidden" format="boolean" />
+    </declare-styleable>
+
+    <declare-styleable name="ThemeIcon">
+        <attr name="tintType" format="string">
+            <flag name="regular" value="0" />
+            <flag name="secondary" value="1" />
+            <flag name="accent" value="2" />
+            <flag name="custom" value="3" />
+        </attr>
+    </declare-styleable>
+
+    <declare-styleable name="ThemeImageButton">
+        <attr name="buttonTintType" />
+    </declare-styleable>
+
+    <declare-styleable name="ModernLrcView">
+        <attr name="lrcTextSize" format="dimension" />
+        <attr name="lrcNormalTextColor" format="reference|color" />
+        <attr name="lrcCurrentTextColor" format="reference|color" />
+    </declare-styleable>
+
+    <attr name="statusPaddingRequired" format="boolean" />
+    <attr name="navigationPaddingRequired" format="boolean" />
+
+    <declare-styleable name="RecyclerView">
+        <attr name="manuallyAnimated" format="boolean" />
+        <attr name="isFastScrollRequired" format="boolean" />
+        <attr name="isEdgeColorRequired" format="boolean" />
+        <attr name="isFadingEdgeRequired" format="boolean" />
+        <attr name="statusPaddingRequired" />
+        <attr name="navigationPaddingRequired" />
+    </declare-styleable>
+
+    <declare-styleable name="PaddingAwareFrameLayout">
+        <attr name="statusPaddingRequired" />
+        <attr name="navigationPaddingRequired" />
+    </declare-styleable>
+
+    <declare-styleable name="PaddingAwareLinearLayout">
+        <attr name="statusPaddingRequired" />
+        <attr name="navigationPaddingRequired" />
+    </declare-styleable>
+
+    <declare-styleable name="InsetLinearLayout">
+        <attr name="statusPaddingRequired" />
+        <attr name="navigationPaddingRequired" />
+    </declare-styleable>
+
+    <declare-styleable name="PaddingAwareRelativeLayout">
+        <attr name="statusPaddingRequired" />
+        <attr name="navigationPaddingRequired" />
+    </declare-styleable>
+
+    <declare-styleable name="PaddingAwareConstraintLayout">
+        <attr name="statusPaddingRequired" />
+        <attr name="navigationPaddingRequired" />
+    </declare-styleable>
+
+    <declare-styleable name="PaddingAwareCoordinatorLayout">
+        <attr name="statusPaddingRequired" />
+        <attr name="navigationPaddingRequired" />
+    </declare-styleable>
+
+    <declare-styleable name="PaddingAwareNestedScrollView">
+        <attr name="statusPaddingRequired" />
+        <attr name="navigationPaddingRequired" />
+    </declare-styleable>
+
+    <declare-styleable name="BasicContentBand">
+        <attr name="gridMode">
+            <flag name="fixed" value="0" />
+            <flag name="dynamic" value="1" />
+        </attr>
+
+        <attr name="deviceSpecificPixelSize" format="integer" />
+    </declare-styleable>
+
+    <declare-styleable name="SpannedGridLayoutManager">
+        <attr name="android:orientation" />
+        <attr name="spanCount" />
+        <attr name="aspectRatio" format="string" />
+    </declare-styleable>
+
+    <declare-styleable name="RotaryKnobView">
+        <attr name="minValue" format="integer" />
+        <attr name="maxValue" format="integer" />
+        <attr name="initialValue" format="integer" />
+    </declare-styleable>
+
+    <declare-styleable name="FelicitySeekbar">
+        <attr name="felicityMin" format="float" />
+        <attr name="felicityMax" format="float" />
+        <attr name="felicityProgress" format="float" />
+        <attr name="felicityTrackColor" format="color|reference" />
+        <attr name="felicityProgressColor" format="color|reference" />
+        <attr name="felicityThumbRingColor" format="color|reference" />
+        <attr name="felicityThumbInnerColor" format="color|reference" />
+        <attr name="felicityTrackHeight" format="dimension" />
+        <attr name="felicityThumbRadius" format="dimension" />
+        <!-- optional pill thumb width (full width). If omitted, a default based on radius is used. -->
+        <attr name="felicityThumbWidth" format="dimension" />
+        <attr name="felicityThumbRingWidth" format="dimension" />
+        <attr name="felicityAnimateInitial" format="boolean" />
+        <attr name="felicitySmudgeEnabled" format="boolean" />
+        <attr name="felicitySmudgeRadius" format="dimension" />
+        <attr name="felicitySmudgeColor" format="color|reference" />
+        <attr name="felicitySmudgeOffsetY" format="dimension" />
+        <attr name="felicityThumbShadowRadius" format="dimension" />
+        <attr name="felicityThumbShadowColor" format="color|reference" />
+        <!-- New: color of small default-value indicator drawn on top of progress -->
+        <attr name="felicityDefaultIndicatorColor" format="color|reference" />
+        <!-- New: choose thumb shape -->
+        <attr name="felicityThumbShape" format="enum">
+            <enum name="pill" value="0" />
+            <enum name="oval" value="1" />
+            <enum name="circle" value="2" />
+        </attr>
+        <!-- Side labels -->
+        <attr name="felicityLabelsEnabled" format="boolean" />
+        <attr name="felicityLabelTextSize" format="dimension" />
+        <attr name="felicityLabelTextColor" format="color|reference" />
+        <!-- Extra gap between label text and thumb edge. Mandatory minimum (thumb+ring) is always enforced. -->
+        <attr name="felicityLabelGap" format="dimension" />
+        <!-- Label background pill -->
+        <attr name="felicityLabelBackgroundEnabled" format="boolean" />
+        <attr name="felicityLabelBackgroundColor" format="color|reference" />
+        <attr name="felicityLabelBackgroundCornerRadius" format="dimension" />
+        <!-- Step mode: when true the seekbar snaps to integer steps and emits Int values -->
+        <attr name="felicityStepMode" format="boolean" />
+        <!-- Step size (integer ≥ 1). Defaults to 1 when step mode is enabled. -->
+        <attr name="felicityStepSize" format="integer" />
+    </declare-styleable>
+
+    <declare-styleable name="FelicitySwitch">
+        <attr name="felicitySwitchTrackOnColor" format="color|reference" />
+        <attr name="felicitySwitchTrackOffColor" format="color|reference" />
+        <attr name="felicitySwitchThumbRingColor" format="color|reference" />
+        <attr name="felicitySwitchPadding" format="dimension" />
+        <attr name="felicitySwitchStrokeWidth" format="dimension" />
+        <attr name="felicitySwitchPressScale" format="float" />
+        <attr name="felicitySwitchChecked" format="boolean" />
+        <!-- Elevation to apply when checked; 0 when unchecked -->
+        <attr name="felicitySwitchCheckedElevation" format="dimension" />
+    </declare-styleable>
+
+    <declare-styleable name="AppHeader">
+        <attr name="scrollMode" format="enum">
+            <enum name="pinned" value="0" />
+            <enum name="hide_on_scroll" value="1" />
+            <enum name="scroll_with_content" value="2" />
+        </attr>
+        <attr name="headerContentLayout" format="reference" />
+        <attr name="hideThreshold" format="dimension" />
+    </declare-styleable>
+
+    <!-- FelicitySlider: auto-sliding image pager with elastic dot indicators -->
+    <declare-styleable name="FelicitySlider">
+        <!-- Milliseconds between automatic page advances. 0 = disabled. Default: 3000. -->
+        <attr name="slideIntervalMs" format="integer" />
+        <!-- 0.0 (slow, ~900 ms) .. 1.0 (fast, ~220 ms). Default: 0.6. -->
+        <attr name="slideSwiftness" format="float" />
+        <!-- Spring stiffness for the dot blob animation. Default: 420. -->
+        <attr name="springStiffness" format="float" />
+        <!-- Spring damping ratio. <1 = bouncy. Default: 0.62. -->
+        <attr name="springDamping" format="float" />
+        <!-- Whether to show the bottom dot indicator. Default: true. -->
+        <attr name="showIndicator" format="boolean" />
+    </declare-styleable>
+
+    <!-- WaveformSeekView: scrollable equalizer-bar waveform with seek overlay -->
+    <declare-styleable name="WaveformSeekView">
+        <!--
+            Maximum bar render height as a fraction of the view height [0.0..1.0].
+            Bars always grow from the bottom of the view upward; this caps how tall they can be.
+            Default: 0.88.
+        -->
+        <attr name="wsvMaxBarHeight" format="float" />
+    </declare-styleable>
+
+    <!--
+        HighlightTextView: pill-shaped, tappable label-button with configurable highlight style.
+        highlightMode    – flat (filled, default), outline (stroke only), or both.
+        highlightCustomColor – pins the fill/stroke color to a fixed value, bypassing any theme or
+                               accent. Omit the attribute (or do not set it) to use theme colors.
+        highlightStrokeWidth – stroke thickness for outline and both modes (default: 1.5dp).
+    -->
+    <declare-styleable name="HighlightTextView">
+        <attr name="highlightMode" format="enum">
+            <enum name="flat" value="0" />
+            <enum name="outline" value="1" />
+            <enum name="both" value="2" />
+        </attr>
+        <attr name="highlightCustomColor" format="color|reference" />
+        <attr name="highlightStrokeWidth" format="dimension" />
+    </declare-styleable>
+
+    <!-- FelicityVisualizer: real-time audio spectrum bar and wave visualizer -->
+    <declare-styleable name="FelicityVisualizer">
+        <!--
+            Maximum bar/wave render height as a fraction of the view height [0.0..1.0].
+            Bars always grow from the physical bottom of the view upward; this value caps
+            how tall they can become. 1.0 = full view height (default). 0.5 = bottom half only.
+        -->
+        <attr name="vizMaxRenderHeight" format="float" />
+        <!-- Whether the ash/snow particle emitter is enabled. Default: false. -->
+        <attr name="vizParticlesEnabled" format="boolean" />
+        <!-- Selects the initial rendering mode. Default: bars. -->
+        <attr name="vizMode" format="enum">
+            <enum name="bars" value="0" />
+            <enum name="wave" value="1" />
+        </attr>
+    </declare-styleable>
+
+    <!-- Attributes for PipelineArrowView -->
+    <declare-styleable name="PipelineArrowView">
+
+        <!--
+            Drawable shown centered at the top of the arrow view, just before the connecting
+            line begins. Represents the start/source stage of this pipeline segment.
+            If not set (or set to @null) the line begins at the very top edge.
+        -->
+        <attr name="startIcon" format="reference" />
+
+        <!--
+            Drawable shown centered at the bottom of the arrow view, below the arrowhead.
+            Represents the destination/end stage of this pipeline segment.
+            If not set (or set to @null) the arrowhead terminates at the very bottom edge.
+        -->
+        <attr name="endIcon" format="reference" />
+
+    </declare-styleable>
+</resources>

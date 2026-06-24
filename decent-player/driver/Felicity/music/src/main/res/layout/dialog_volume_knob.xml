@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom"
+    android:padding="@dimen/padding_15">
+
+    <app.simple.felicity.decorations.corners.DynamicCornerFrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="@dimen/padding_15">
+
+        <app.simple.felicity.decorations.ripple.DynamicRippleImageButton
+            android:id="@+id/equalizer"
+            android:layout_width="@dimen/button_size"
+            android:layout_height="@dimen/button_size"
+            android:contentDescription="@string/equalizer"
+            android:layout_gravity="end|bottom"
+            android:src="@drawable/ic_equalizer" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <app.simple.felicity.decorations.typeface.TypeFaceTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="@dimen/text_size_14"
+                android:text="@string/volume"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="@dimen/padding_15"
+                app:appFontStyle="bold"
+                app:textColorStyle="heading" />
+
+            <app.simple.felicity.decorations.knobs.RotaryKnobView
+                android:id="@+id/volumeKnob"
+                android:layout_width="@dimen/volume_knob_dimension"
+                android:layout_height="@dimen/volume_knob_dimension"
+                android:layout_gravity="center" />
+
+        </LinearLayout>
+
+    </app.simple.felicity.decorations.corners.DynamicCornerFrameLayout>
+
+</FrameLayout>

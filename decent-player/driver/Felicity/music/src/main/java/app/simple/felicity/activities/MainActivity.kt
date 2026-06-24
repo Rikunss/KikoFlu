@@ -1,0 +1,432 @@
+package app.simple.felicity.activities
+
+import android.app.SearchManager
+import android.content.ComponentName
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.Bundle
+import android.os.IBinder
+import android.provider.MediaStore
+import android.util.Log
+import app.simple.felicity.preferences.AudioPreferences
+import com.decent.usbaudio.UsbAudioPermissionHelper
+import android.view.KeyEvent
+import android.view.WindowManager
+import androidx.activity.viewModels
+import androidx.core.widget.NestedScrollView
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.RecyclerView
+import app.simple.felicity.R
+import app.simple.felicity.callbacks.MiniPlayerCallbacks
+import app.simple.felicity.crash.CrashReporter
+import app.simple.felicity.databinding.ActivityMainBinding
+import app.simple.felicity.decorations.miniplayer.MiniPlayer
+import app.simple.felicity.decorations.miniplayer.MiniPlayerItem
+import app.simple.felicity.decorations.utils.PermissionUtils.isManageExternalStoragePermissionGranted
+import app.simple.felicity.decorations.utils.PermissionUtils.isPostNotificationsPermissionGranted
+import app.simple.felicity.dialogs.app.VolumeKnob.Companion.showVolumeKnob
+import app.simple.felicity.extensions.activities.BaseActivity
+import app.simple.felicity.extensions.fragments.MediaFragment
+import app.simple.felicity.extensions.fragments.ScopedFragment
+import app.simple.felicity.glide.util.AudioCoverUtils.loadArtIntoBitmap
+import app.simple.felicity.interfaces.MiniPlayerPolicy
+import app.simple.felicity.preferences.UserInterfacePreferences
+import app.simple.felicity.repository.constants.MediaConstants
+import app.simple.felicity.repository.managers.MediaManager
+import app.simple.felicity.repository.managers.PlaybackStateManager
+import app.simple.felicity.repository.models.Audio
+import app.simple.felicity.repository.services.AudioDatabaseService
+import app.simple.felicity.repository.utils.AudioUtils.getArtists
+import app.simple.felicity.shared.utils.ConditionUtils.isNotNull
+import app.simple.felicity.shared.utils.ConditionUtils.isNull
+import app.simple.felicity.ui.home.ArtFlowHome
+import app.simple.felicity.ui.home.Dashboard
+import app.simple.felicity.ui.home.SimpleHome
+import app.simple.felicity.ui.home.SpannedHome
+import app.simple.felicity.ui.launcher.Setup
+import app.simple.felicity.ui.player.DefaultPlayer
+import app.simple.felicity.viewmodels.setup.PermissionViewModel
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
+@AndroidEntryPoint
+class MainActivity : BaseActivity(), MiniPlayerCallbacks {
+
+    private lateinit var binding: ActivityMainBinding
+
+    private var serviceConnection: ServiceConnection? = null
+    private var audioDatabaseService: AudioDatabaseService? = null
+
+    private val permissionViewModel by viewModels<PermissionViewModel>()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+
+        /**
+         * Initialize the crash reporter to intercept uncaught exceptions
+         */
+        CrashReporter(applicationContext).initialize()
+
+        super.onCreate(savedInstanceState)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        // Handle USB device attached intent (app launched by USB connect)
+        handleUsbDeviceAttached(intent)
+
+        binding.miniPlayer.callbacks = object : MiniPlayer.Callbacks {
+            override fun onPageSelected(position: Int, fromUser: Boolean) {
+                // Only forward to MediaManager when the swipe originated from the
+                // user.  Programmatic setCurrentItem calls (fromUser = false) must
+                // be ignored; otherwise the position feedback loop causes the wrong
+                // song to be played.
+                if (fromUser) {
+                    MediaManager.updatePosition(position)
+                }
+            }
+
+            override fun onLoadArt(position: Int, payload: Any?, setBitmap: (android.graphics.Bitmap?) -> Unit) {
+                if (payload is Audio) {
+                    loadArtIntoBitmap(payload, setBitmap)
+                }
+            }
+
+            override fun onPlayPauseClick() {
+                MediaManager.flipState()
+            }
+
+            override fun onItemClick(position: Int) {
+                val topFragment = supportFragmentManager.fragments.lastOrNull() as? ScopedFragment
+                if (topFragment.isNotNull()) {
+                    topFragment?.openFragment(DefaultPlayer.newInstance(), DefaultPlayer.TAG)
+                }
+            }
+        }
+
+        // Seek via long-press drag on the miniplayer
+        binding.miniPlayer.seekListener = { fraction ->
+            val duration = MediaManager.getDuration()
+            if (duration > 0L) {
+                MediaManager.seekTo((fraction * duration).toLong())
+            }
+        }
+
+        // Keep screen on
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        if (savedInstanceState.isNull()) {
+            // Cold start: push the miniplayer off-screen immediately so it is not
+            // visible before the song queue and themes are fully restored.
+            // onStateReady() will reveal it once everything is ready.
+            binding.miniPlayer.hide(animated = false)
+            setHomePanel()
+        }
+
+        lifecycleScope.launch {
+            MediaManager.songSeekPositionFlow.collect { position ->
+                // Skip external updates while the user is scrubbing to avoid
+                // the flow fighting the touch handler and causing jitter.
+                if (binding.miniPlayer.isSeeking) return@collect
+                val duration = MediaManager.getDuration()
+                if (duration > 0L) {
+                    // animate = false: snap directly for real-time ticks; no tween lag.
+                    binding.miniPlayer.setProgress(
+                            fraction = position.toFloat() / duration.toFloat(),
+                            animate = false
+                    )
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            MediaManager.songPositionFlow.collect { position ->
+                val currentPagerItem = binding.miniPlayer.currentItem
+                if (currentPagerItem != position) {
+                    binding.miniPlayer.setCurrentItem(
+                            position = position,
+                            // Smooth scroll if the new position is within 5 items of the current position
+                            smoothScroll = false)
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            MediaManager.songListFlow.collect { songs ->
+                Log.d("MainActivity", "songListFlow: ${songs.size}")
+                val items = songs.map { audio ->
+                    MiniPlayerItem(
+                            title = audio.title,
+                            artist = audio.getArtists(),
+                            payload = audio
+                    )
+                }
+                binding.miniPlayer.setItems(items)
+                val songPosition = MediaManager.getCurrentPosition()
+                binding.miniPlayer.setCurrentItem(
+                        if (songPosition < songs.size) songPosition else 0,
+                        smoothScroll = false
+                )
+                // Reset the progress bar whenever the queue is replaced
+                binding.miniPlayer.setProgress(0f)
+            }
+        }
+
+        lifecycleScope.launch {
+            MediaManager.playbackStateFlow.collect { state ->
+                when (state) {
+                    MediaConstants.PLAYBACK_PLAYING -> binding.miniPlayer.setPlaying(true)
+                    MediaConstants.PLAYBACK_PAUSED -> binding.miniPlayer.setPlaying(false)
+                }
+            }
+        }
+
+        serviceConnection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                val binder = service as? AudioDatabaseService.AudioDatabaseBinder
+                audioDatabaseService = binder?.getService() ?: return
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                audioDatabaseService = null
+            }
+        }
+
+        permissionViewModel.getManageFilesPermissionState().observe(this) { granted ->
+            if (granted) {
+                audioDatabaseService?.refreshAudioFiles()
+            }
+        }
+    }
+
+    private fun setHomePanel() {
+        // Check if all required permissions are granted
+        val allPermissionsGranted = isManageExternalStoragePermissionGranted() &&
+                isPostNotificationsPermissionGranted()
+
+        if (!allPermissionsGranted) {
+            // Show Setup screen first to request permissions
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, Setup.newInstance(), Setup.TAG)
+                .commit()
+        } else {
+            // All permissions granted, go directly to Home
+            showHome()
+        }
+    }
+
+    fun showHome() {
+        // Check for empty library and show hint on first use
+        lifecycleScope.launch {
+            val count = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    app.simple.felicity.repository.database.instances.AudioDatabase
+                        .getInstance(applicationContext).audioDao()
+                        ?.getAllAudioList()?.size ?: 0
+                } catch (_: Exception) { 0 }
+            }
+            if (count == 0) {
+                android.widget.Toast.makeText(
+                    this@MainActivity,
+                    R.string.no_music_found,
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+
+        when (UserInterfacePreferences.getHomeInterface()) {
+            UserInterfacePreferences.HOME_INTERFACE_DASHBOARD -> {
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, Dashboard.newInstance(), Dashboard.TAG)
+                    .commit()
+            }
+            UserInterfacePreferences.HOME_INTERFACE_SPANNED -> {
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, SpannedHome.newInstance(), SpannedHome.TAG)
+                    .commit()
+            }
+            UserInterfacePreferences.HOME_INTERFACE_ARTFLOW -> {
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, ArtFlowHome.newInstance(), ArtFlowHome.TAG)
+                    .commit()
+            }
+            UserInterfacePreferences.HOME_INTERFACE_SIMPLE -> {
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, SimpleHome.newInstance(), SimpleHome.TAG)
+                    .commit()
+            }
+        }
+    }
+
+    private fun startAudioDatabaseService() {
+        if (audioDatabaseService.isNull()) {
+            val intent = Intent(this, AudioDatabaseService::class.java)
+            bindService(intent, serviceConnection!!, BIND_AUTO_CREATE)
+        }
+    }
+
+    private fun stopAudioDatabaseService() {
+        if (audioDatabaseService.isNotNull()) {
+            unbindService(serviceConnection!!)
+            audioDatabaseService = null
+        }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        return when (keyCode) {
+            KeyEvent.KEYCODE_VOLUME_UP -> {
+                showVolumeKnob()
+                true
+            }
+
+            KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                showVolumeKnob()
+                true
+            }
+
+            else -> {
+                super.onKeyDown(keyCode, event)
+            }
+        }
+    }
+
+    override fun onHideMiniPlayer() {
+        binding.miniPlayer.hide(animated = true)
+    }
+
+    /**
+     * Called by [BaseActivity] once the media queue and playback state have been fully
+     * restored.  At this point it is safe to reveal the miniplayer without showing it
+     * while the screen is still loading.
+     *
+     * @author Hamza417
+     */
+    override fun onStateReady() {
+        if (MediaManager.getSongs().isEmpty()) return
+        val fragment = supportFragmentManager.fragments.lastOrNull { it.isVisible }
+        val wantsVisible = (fragment as? MiniPlayerPolicy)?.wantsMiniPlayerVisible ?: true
+        if (wantsVisible) {
+            binding.miniPlayer.show(animated = true)
+        }
+    }
+
+    override fun onShowMiniPlayer() {
+        if (supportFragmentManager.fragments.last() is MediaFragment) {
+            val currentFragment = supportFragmentManager
+                .fragments
+                .lastOrNull { it.isVisible }
+
+            val visible = (currentFragment as? MiniPlayerPolicy)?.wantsMiniPlayerVisible ?: true
+
+            if (visible) {
+                binding.miniPlayer.show(animated = true)
+            }
+        } else {
+            binding.miniPlayer.show(animated = true)
+        }
+    }
+
+    override fun onAttachMiniPlayer(recyclerView: RecyclerView?) {
+        recyclerView?.let {
+            binding.miniPlayer.attachToRecyclerView(it)
+        }
+    }
+
+    override fun onDetachMiniPlayer(recyclerView: RecyclerView?) {
+        Log.d("MainActivity", "Detaching mini player from RecyclerView")
+        recyclerView?.let {
+            binding.miniPlayer.detachFromRecyclerView(it)
+        }
+    }
+
+    override fun onAttachMiniPlayerScrollView(scrollView: NestedScrollView?) {
+        scrollView?.let {
+            binding.miniPlayer.attachToScrollView(it)
+        }
+    }
+
+    override fun onDetachMiniPlayerScrollView(scrollView: NestedScrollView?) {
+        scrollView?.let {
+            binding.miniPlayer.detachFromScrollView(it)
+        }
+    }
+
+    override fun onMakeTransparentMiniPlayer() {
+        binding.miniPlayer.makeTransparent(animated = true)
+    }
+
+    override fun onMakeOpaqueMiniPlayer() {
+        binding.miniPlayer.makeOpaque(animated = true)
+    }
+
+    private var lastVolumeToastTime = 0L
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN &&
+            (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP || event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            if (AudioPreferences.isBitPerfectUsbEnabled()) {
+                val now = System.currentTimeMillis()
+                if (now - lastVolumeToastTime > 3000) {
+                    android.widget.Toast.makeText(this,
+                        "Volume control disabled — bit-perfect mode active",
+                        android.widget.Toast.LENGTH_SHORT).show()
+                    lastVolumeToastTime = now
+                }
+                return true // consume the event
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Scan is manual-only (Settings → Library → Scan Library).
+        // Automatic scanning caused SD card I/O contention with playback.
+    }
+
+    override fun onResume() {
+        super.onResume()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        savePlaybackState()
+    }
+
+    private fun savePlaybackState() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            PlaybackStateManager.saveCurrentPlaybackState(applicationContext, "MainActivity")
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleUsbDeviceAttached(intent)
+        handleSearchIntent(intent)
+    }
+
+    /**
+     * Handle USB_DEVICE_ATTACHED intent. When a USB Audio device is connected,
+     * immediately claim it to prevent the snd-usb-audio kernel driver from
+     * binding. This is required for direct USB audio output.
+     *
+     * The system sends this intent BEFORE the kernel driver binds, giving us
+     * a window to claim the device exclusively for bit-perfect audio output.
+     */
+    private fun handleUsbDeviceAttached(intent: Intent) {
+        if (!AudioPreferences.isBitPerfectUsbEnabled()) return
+        UsbAudioPermissionHelper.handleIntent(applicationContext, intent)
+    }
+
+    private fun handleSearchIntent(intent: Intent) {
+        if (intent.action == MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) {
+            val query = intent.getStringExtra(SearchManager.QUERY)
+            Log.d(TAG, "Search query: $query")
+        } else {
+            Log.d(TAG, "Received non-search intent: ${intent.action}")
+        }
+    }
+
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+}

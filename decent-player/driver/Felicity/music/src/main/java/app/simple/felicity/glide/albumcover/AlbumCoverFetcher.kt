@@ -1,0 +1,54 @@
+package app.simple.felicity.glide.albumcover
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.util.Log
+import app.simple.felicity.repository.covers.AlbumCover
+import app.simple.felicity.repository.models.Album
+import com.bumptech.glide.Priority
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.data.DataFetcher
+import java.io.FileNotFoundException
+
+/**
+ * Glide DataFetcher for loading album cover artwork.
+ * Delegates to AlbumCover.load() for centralized album cover loading logic.
+ */
+class AlbumCoverFetcher internal constructor(
+        private val context: Context,
+        private val album: Album
+) : DataFetcher<Bitmap> {
+
+    override fun loadData(priority: Priority, callback: DataFetcher.DataCallback<in Bitmap>) {
+        try {
+            // Delegate to AlbumCover for centralized album cover loading
+            val bitmap = AlbumCover.load(context, album)
+                ?: throw FileNotFoundException("Could not find album artwork for: ${album.name}")
+
+            callback.onDataReady(bitmap)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading album cover for: ${album.name}", e)
+            callback.onLoadFailed(e)
+        }
+    }
+
+    override fun cleanup() {
+        // No cleanup needed - AlbumUtils handles resource management
+    }
+
+    override fun cancel() {
+        // No cancellation needed
+    }
+
+    override fun getDataClass(): Class<Bitmap> {
+        return Bitmap::class.java
+    }
+
+    override fun getDataSource(): DataSource {
+        return DataSource.LOCAL
+    }
+
+    companion object {
+        private const val TAG = "AlbumCoverFetcher"
+    }
+}

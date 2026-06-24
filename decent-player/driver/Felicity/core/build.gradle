@@ -1,0 +1,17 @@
+apply plugin: 'com.android.library'
+
+apply from: rootProject.file('common.gradle')
+
+android {
+    namespace 'app.simple.felicity.core'
+
+    buildTypes {
+        release {
+            consumerProguardFiles 'consumer-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    api 'net.jpountz.lz4:lz4:1.3.0'
+}

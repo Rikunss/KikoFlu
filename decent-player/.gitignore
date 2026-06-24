@@ -1,0 +1,55 @@
+# Android / Gradle
+*.iml
+.gradle/
+build/
+local.properties
+.cxx/
+
+# IDE
+.idea/
+*.swp
+*~
+
+# Native
+*.o
+*.so
+*.a
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# APK / Bundle
+*.apk
+*.aab
+*.ap_
+
+# Signing
+*.jks
+*.keystore
+
+# Logs
+*.log
+*.txt.bak
+
+# Local config
+CLAUDE.md
+
+# Secrets / credentials
+.env
+debug-secrets.properties
+
+# Captures / dumps
+*_capture*.txt
+*_logcat*.txt
+
+# Felicity PoC - non-essential
+driver/Felicity/fastlane/
+driver/Felicity/inspirations/
+driver/Felicity/references/
+driver/Felicity/release/
+driver/Felicity/.editorconfig
+driver/Felicity/.github/
+driver/Felicity/*/schemas/
+driver/Felicity/CODE_OF_CONDUCT.md
