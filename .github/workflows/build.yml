@@ -49,12 +49,6 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
         
-      - name: Build Universal APK
-        run: flutter build apk --release
-        
-      - name: Rename Universal APK
-        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/KikoFlu-android-universe-release.apk
-        
       - name: Build Split APKs
         run: flutter build apk --release --split-per-abi
         
@@ -69,7 +63,6 @@ jobs:
         with:
           name: android-release
           path: |
-            build/app/outputs/flutter-apk/KikoFlu-android-universe-release.apk
             build/app/outputs/flutter-apk/KikoFlu-android-arm64-v8a-release.apk
             build/app/outputs/flutter-apk/KikoFlu-android-armeabi-v7a-release.apk
             build/app/outputs/flutter-apk/KikoFlu-android-x86_64-release.apk
