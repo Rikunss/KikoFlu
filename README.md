@@ -1,158 +1,40 @@
 <div align="center">
-  <img src="assets/icons/app_icon_opaque.png" alt="KikoFlu Edge" width="120" height="120">
+  <img src="assets/icons/app_icon_opaque.png" alt="KikoFlu" width="120" height="120">
 
-  # KikoFlu Edge
+  # KikoFlu
 
-  A cross-platform doujin voice client. Supports self-hosted Kikoeru servers and online services.
-  Built with Flutter — tested on Android, also builds for Windows / macOS / Linux / iOS.
-  *Tested primarily on Android — other platforms may have bugs.*
+  A cross-platform doujin voice client for self-hosted Kikoeru servers and online services.
+  Built with Flutter — supports Android, Windows, macOS, Linux, iOS.
 
   [![Flutter](https://img.shields.io/badge/Flutter-3.0+-02569B?logo=flutter)](https://flutter.dev)
   [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#)
   [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-
-</div>
-
-<div align="center">
-  <img src="screenshots/1.jpg" width="950" alt="KikoFlu Screenshot">
 </div>
 
 ## Features
 
-### 🎵 Media Playback
-- Background playback with automatic caching
-- Playback speed control
-- Loop (single / list) and shuffle modes
-- **Queue management** — reorder, skip, and manage your play queue
-- **Fullscreen player** — immersive playback UI with enhanced controls
-- Multi-format support: audio, video, text, images, PDF, etc.
-- Full or selective download with concurrent download management
-- Offline download search and sorting
-- **Playback history** — track and revisit recently played works
-- **Hi-res audio output** — high-resolution audio support
-- **Exclusive audio mode** — bit-perfect audio output
-- **Equalizer** — built-in equalizer with presets
-- **Replay gain** — consistent volume across tracks
-- **Volume normalization** — automatic volume leveling
-- **Streaming speed tracker** — real-time buffering and streaming stats
-- **MPV player integration** — configurable MPV backend
-
-### 🤖 AI-Powered Transcription
-- **Whisper.cpp integration** — on-device speech-to-text using OpenAI Whisper
-- **Multiple model sizes** — Tiny (~75 MB) to Large V3 (~3 GB), with speed/accuracy trade-off
-- **Model download manager** — download, pause, resume, and delete models from Settings
-- **Alternative download** — download via browser or import model file directly
-- **Batch transcription** — transcribe entire works with one tap; progress tracking per file
-- **CPU thread tuning** — adjustable thread count for speed vs. battery balance
-- **Word-level timestamps** — toggle per-word or per-sentence timing
-- **Wakelock support** — keeps device awake during long transcription jobs
-- **Notification progress** — background download & transcription notifications (Android)
-- **Automatic LRC generation** — saves LRC files alongside audio and to subtitle library
-- **Inline transcription** — "Generate AI Lyrics" button in the full-screen player (local files)
-
-### 📝 Subtitle System
-- Automatic subtitle loading
-- Subtitle import, editing, and timing adjustment
-- Real-time subtitle / lyric translation during playback
-- **LLM-powered translation** — AI-assisted subtitle and lyric translation
-- Subtitle library (SQLite indexed, fast search)
-- **Custom file picker** — import subtitle folders with the built-in CustomFilePicker (breadcrumb nav, quick access, search, hidden files toggle)
-- Custom save directory with cross-drive copy support
-
-### 📥 Downloads
-- **Redesigned Downloads screen** — source tab layout (server / offline)
-- **Count badges** on source tabs showing item totals
-- **Filter bar** — filter downloads by circle, VA, and tag
-- **Colored circle avatars** — visual distinction per download source
-- **Separate import button row** — cleaner top bar layout
-- **Sort by title, added time, and file tree** — multiple sorting options
-- **Cover image auto-resize** during import to prevent player failures
-
-### 📋 Playlists & Smart Playlists
-- **Queue management** — full queue UI with reorder and skip controls
-- **Smart playlists** — auto-generated playlists based on custom rules:
-  - By tag, VA (voice actor), circle
-  - By age (release date range)
-  - By rating threshold
-  - By subtitle presence
-- **Smart playlist evaluator** — dynamically updates content as your library grows
-- **Playlist UI/UX enhancements** — improved playlist browsing and management
-
-### 📊 Listening Statistics
-- **Comprehensive statistics dashboard** — track your listening habits
-- Total listening time, works completed, trends over time
-- Listening history breakdown
-- **Redesigned stats UI** — beautiful visual presentation with charts
-
-### 🎨 Interface
-- Full platform support (Android / iOS / Windows / macOS / Linux)
-- Material Design 3
-- Landscape mode support
-- Light and dark theme
-- Title, file directory, and text file translation
-- Automatic tag translation (Chinese / English / Japanese)
-- **Privacy mode** — blur sensitive content
-- Rating system
-- Recommendations
-- **Home screen widget (Android)** — current track info and playback controls on your home screen
-
-### 🔍 Search
-- Advanced search with multi-tag / exclude-tag support
-- Multi-dimensional filtering (tags, rating, release date, etc.)
-- Detailed work information display
-
-### 📁 Custom File Manager
-- **Built-in CustomFilePicker** — replaces system file picker (SAF) for better compatibility
-- **Breadcrumb navigation** — easy folder traversal
-- **Quick access sidebar** — shortcuts to common locations
-- **Search functionality** — find files and folders quickly
-- **Show/hide hidden files** toggle
-- **MIUI compatibility** — works reliably on Xiaomi devices
-
-### 🌐 Internationalization
-- 简体中文 / 繁體中文 / English / 日本語 / Русский
-
-### ⚙️ Settings
-- Multi-account support
-- Custom server address ([Guide](https://github.com/pa-jesusf/KikoFlu/wiki/%E4%BD%BF%E7%94%A8%E8%87%AA%E5%BB%BA%E5%90%8E%E7%AB%AF%E6%9C%8D%E5%8A%A1%E5%99%A8)) with connection latency testing
-- **Custom cookie support** — for server authentication
-- Cache size limit and cleanup strategy
-- Theme and color scheme customization
-- Extensive UI customization options
-- Audio output configuration (hi-res, exclusive mode, equalizer, replay gain, normalization)
-- MPV player configuration
-- **Progress sync** — sync playback progress across devices
-- **Screen state management** — keep screen on during playback
-- In-app log system (with export)
-- Update checker
-
-### 📱 Android Features
-- Floating lyrics (lock / unlock / touch passthrough)
-- **Home screen widget** — quick playback controls and now-playing info
-- **Exclusive audio mode** — bit-perfect USB DAC support *AAudio Exclusive Mode Not Supported for All Android Devices. failed on my poco x6 5g.. but you can try by yourself :)
-
----
+- 🎵 **Media Playback** — Background play, queue management, fullscreen player, speed control, loop/shuffle
+- 🔊 **Hi-Res & USB DAC** — Bit-perfect audio output via AAudio exclusive mode & libusb (decent-player)
+- 🎛️ **Equalizer & Replay Gain** — Built-in EQ with presets, automatic volume normalization
+- 🤖 **AI Transcription** — On-device Whisper.cpp, batch transcription, auto LRC generation
+- 📝 **Subtitle System** — Import, edit, sync, real-time translation with LLM support
+- 📥 **Downloads** — Full/selective download, offline browsing, filter by circle/VA/tag
+- 📋 **Smart Playlists** — Auto-generated playlists by tag, VA, rating, release date, subtitle presence
+- 📊 **Listening Stats** — Comprehensive dashboard with trends and history breakdown
+- 🔍 **Advanced Search** — Multi-tag/exclude-tag filtering with multi-dimensional sorting
+- 📁 **Custom File Picker** — Built-in file manager with breadcrumb nav, search, hidden files toggle
+- 🌐 **i18n** — 简体中文 / 繁體中文 / English / 日本語 / Русский
+- 📱 **Android** — Floating lyrics, home screen widget, keep-screen-on, progress sync
 
 ## Download
 
-Go to [Releases](https://github.com/Rikunss/KikoFlu/releases/latest) for the latest version.
-
-Platforms: Android (universal / arm64 / armeabi-v7a / x86_64), iOS (unsigned IPA), Windows (installer / portable), macOS (DMG), Linux (x64 / arm64)
-
-### AltStore / SideStore
-
-iOS users can add the KikoFlu Edge source to AltStore or SideStore for easy installation and updates:
-
-**Source URL:** `https://raw.githubusercontent.com/pa-jesusf/KikoFlu/main/altstore-source.json`
-
----
+Get the latest build from [Releases](https://github.com/Rikunss/KikoFlu/releases/latest).
 
 ## Build from Source
 
 ### Requirements
-- Flutter SDK 3.0+
-- Dart SDK 3.0+
+- Flutter SDK 3.0+ & Dart SDK 3.0+
 
 ```bash
 git clone https://github.com/Rikunss/KikoFlu.git
@@ -164,23 +46,22 @@ flutter pub get
 
 | Platform | Command |
 |----------|---------|
-| Android | `flutter build apk --release --split-per-abi` |
-| Windows | `flutter build windows --release` |
-| macOS | `flutter build macos --release` |
-| Linux | `flutter build linux --release` |
-| iOS | `./build_ios_xcode.sh` |
+| Android  | `flutter build apk --release --split-per-abi` |
+| Windows  | `flutter build windows --release` |
+| macOS    | `flutter build macos --release` |
+| Linux    | `flutter build linux --release` |
+| iOS      | `./build_ios_xcode.sh` |
 
----
+## Credits
 
-## Related Projects
+- **[decent-player](https://github.com/Ma145/decent-player)** — Bit-perfect USB DAC audio output via libusb (open source)
+- **[Kikoeru](https://github.com/Number178/kikoeru-express)** — Self-hosted backend server
+- **[asmr.one](https://www.asmr.one)** — Online service
 
-- [Kikoeru](https://github.com/Number178/kikoeru-express) — Self-hosted backend server
-- [asmr.one](https://www.asmr.one) — Online service
-
-## Contributors
+### Contributors
 
 - **Meteor-Sage** — Original author & lead developer
-- **Rikunss** - sigma male
+- **Rikunss** — Maintainer
 
 ## License
 
@@ -188,13 +69,5 @@ flutter pub get
 
 ## Contact
 
-- **Bug Reports**: [Issues](https://github.com/Rikunss/KikoFlu/issues)
+- **Issues**: [GitHub Issues](https://github.com/Rikunss/KikoFlu/issues)
 - **Community**: [Telegram](https://t.me/+PrkiN-pZrXs4ZTU1)
-
----
-
-<div align="center">
-
-  **If this project helps you, please give it a ⭐ Star!**
-
-</div>
