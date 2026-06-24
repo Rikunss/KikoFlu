@@ -90,12 +90,24 @@ jobs:
         
       - name: Enable Symlinks & Developer Mode (Windows)
         run: |
-          # Enable symlink traversal (L2L/L2R/R2L/R2R)
           fsutil behavior set SymlinkEvaluation L2L:1 R2R:1 L2L:1 R2R:1 L2R:1 R2L:1 2>&1
-          # Enable Developer Mode so non-admin users can create symlinks
           reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d 1 2>&1
         shell: pwsh
         continue-on-error: true
+
+      - name: Resolve plugin symlinks to real directories
+        shell: pwsh
+        run: |
+          # CMake's file(ARCHIVE_EXTRACT) fails on paths through directory junctions.
+          # Copy .plugin_symlinks to resolve all junctions into real directories.
+          $symlinksDir = "windows/flutter/ephemeral/.plugin_symlinks"
+          $tempDir = "windows/flutter/ephemeral/.plugin_symlinks_real"
+          if (Test-Path $symlinksDir) {
+            Copy-Item -Path $symlinksDir -Destination $tempDir -Recurse -Force
+            Remove-Item -Path $symlinksDir -Recurse -Force
+            Move-Item -Path $tempDir -Destination $symlinksDir
+            Write-Host "Resolved all plugin junctions to real directories"
+          }
 
       - name: Build Windows Release
         continue-on-error: true
@@ -106,7 +118,6 @@ jobs:
         shell: pwsh
         run: |
           # whisper_ggml_plus/ggml uses $<TARGET_FILE_DIR:KikoFlu> in cmake_install.cmake
-          # which doesn't get evaluated — patch it to prevent the build failure
           $file = "build/windows/x64/plugins/whisper_ggml_plus/ggml/src/cmake_install.cmake"
           if (Test-Path $file) {
             (Get-Content $file) -replace '\$<TARGET_FILE_DIR:[^>]+>', 'KikoFlu' | Set-Content $file
