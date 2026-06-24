@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/playlist.dart';
-import '../providers/auth_provider.dart';
+import '../services/kikoeru_api_service.dart';
 import '../providers/playlist_detail_provider.dart';
 import '../providers/playlists_provider.dart';
 import '../services/log_service.dart';

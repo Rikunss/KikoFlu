@@ -51,6 +51,7 @@ class AccountDatabase {
         lastUsedAt TEXT
       )
     ''');
+    await db.execute('CREATE INDEX idx_accounts_isActive ON accounts(isActive)');
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -74,7 +75,7 @@ class AccountDatabase {
         );
       }
 
-      id = await txn.insert('accounts', account.toMap());
+      id = await txn.insert('accounts', await account.toMapEncrypted());
     });
     return account.copyWith(id: id);
   }
@@ -89,7 +90,7 @@ class AccountDatabase {
     );
 
     if (maps.isNotEmpty) {
-      return Account.fromMap(maps.first);
+      return Account.fromMapDecrypted(maps.first);
     }
     return null;
   }
@@ -97,7 +98,11 @@ class AccountDatabase {
   Future<List<Account>> getAllAccounts() async {
     final db = await database;
     final maps = await db.query('accounts', orderBy: 'lastUsedAt DESC');
-    return maps.map((map) => Account.fromMap(map)).toList();
+    final accounts = <Account>[];
+    for (final map in maps) {
+      accounts.add(await Account.fromMapDecrypted(map));
+    }
+    return accounts;
   }
 
   Future<Account?> getActiveAccount() async {
@@ -111,7 +116,7 @@ class AccountDatabase {
     );
 
     if (maps.isNotEmpty) {
-      return Account.fromMap(maps.first);
+      return Account.fromMapDecrypted(maps.first);
     }
     return null;
   }
@@ -133,7 +138,7 @@ class AccountDatabase {
 
       result = await txn.update(
         'accounts',
-        account.toMap(),
+        await account.toMapEncrypted(),
         where: 'id = ?',
         whereArgs: [account.id],
       );

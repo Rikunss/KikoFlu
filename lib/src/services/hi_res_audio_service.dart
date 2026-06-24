@@ -33,6 +33,8 @@ class HiResAudioService {
       StreamController<UsbRoutingState>.broadcast();
   final StreamController<String> _outputDeviceController =
       StreamController<String>.broadcast();
+  final StreamController<UsbDacAutoRoutedEvent> _usbDacAutoRoutedController =
+      StreamController<UsbDacAutoRoutedEvent>.broadcast();
   // Streams for native-pushed position & duration (50ms interval from Kotlin Handler)
   final StreamController<int> _nativePositionController =
       StreamController<int>.broadcast();
@@ -49,6 +51,11 @@ class HiResAudioService {
   bool _isPlaying = false;
   bool _isUsbRouted = false;
   String _lastOutputDeviceType = 'unknown';
+
+  /// Cached last USB routing state — used by Riverpod provider to
+  /// avoid the "broadcast stream loses initial event" bug.
+  UsbRoutingState _lastUsbRoutingState = const UsbRoutingState();
+  UsbRoutingState get lastUsbRoutingState => _lastUsbRoutingState;
 
   HiResAudioService._() {
     _channel.setMethodCallHandler(_handleMethodCall);
@@ -80,6 +87,10 @@ class HiResAudioService {
   Stream<String> get outputDeviceStream =>
       _outputDeviceController.stream;
 
+  /// Stream of auto-routed USB DAC events (device plug + permission grant).
+  Stream<UsbDacAutoRoutedEvent> get usbDacAutoRoutedStream =>
+      _usbDacAutoRoutedController.stream;
+
   /// The last known output device type. Always has a value — starts with
   /// 'unknown' and updates whenever [onOutputDeviceChanged] fires from native.
   /// Use this to avoid the "broadcast stream loses initial event" problem
@@ -100,7 +111,9 @@ class HiResAudioService {
         _lastOutputDeviceType = type;
         return type;
       }
-    } catch (_) {}
+    } catch (e) {
+      _log.warning('[HiResAudio] Failed to get output device type: $e', tag: 'HiRes');
+    }
     return 'unknown';
   }
 
@@ -181,11 +194,12 @@ class HiResAudioService {
           _log.info('USB routing changed: reverted to system default',
               tag: 'USB');
         }
-        _usbRoutingController.add(UsbRoutingState(
+        _lastUsbRoutingState = UsbRoutingState(
           routed: _isUsbRouted,
           deviceName: deviceName,
           mixerAttributesApplied: mixerApplied,
-        ));
+        );
+        _usbRoutingController.add(_lastUsbRoutingState);
         break;
       case 'onOutputDeviceChanged':
         final outArgs = call.arguments;
@@ -194,6 +208,20 @@ class HiResAudioService {
         _lastOutputDeviceType = deviceType;
         _log.info('Output device changed: $deviceType', tag: 'USB');
         _outputDeviceController.add(deviceType);
+        break;
+      case 'onUsbDacAutoRouted':
+        final autoArgs = call.arguments;
+        if (autoArgs is! Map) break;
+        final deviceName = autoArgs['deviceName'] as String? ?? '';
+        final vendorId = autoArgs['vendorId'] as int? ?? 0;
+        final productId = autoArgs['productId'] as int? ?? 0;
+        _isUsbRouted = true;
+        _log.info('USB DAC auto-routed: $deviceName', tag: 'USB');
+        _usbDacAutoRoutedController.add(UsbDacAutoRoutedEvent(
+          deviceName: deviceName,
+          vendorId: vendorId,
+          productId: productId,
+        ));
         break;
       case 'onPositionChanged':
         // Position pushed from native Handler every 50ms
@@ -409,10 +437,11 @@ class HiResAudioService {
       _isUsbRouted = false;
       _log.info('USB DAC routing cleared (reverted to system default)',
           tag: 'USB');
-      _usbRoutingController.add(const UsbRoutingState(
+      _lastUsbRoutingState = const UsbRoutingState(
         routed: false,
         deviceName: '',
-      ));
+      );
+      _usbRoutingController.add(_lastUsbRoutingState);
     } catch (e) {
       _log.error('clearUsbRouting failed: $e', tag: 'USB');
     }
@@ -428,6 +457,22 @@ class HiResAudioService {
       return _isUsbRouted;
     } catch (e) {
       _log.error('checkUsbRouted failed: $e', tag: 'USB');
+      return false;
+    }
+  }
+
+  /// Request USB device permission for the connected USB DAC.
+  ///
+  /// Shows the system permission dialog on first call. Returns `true` if
+  /// permission is already granted. Returns `false` if no USB DAC is found.
+  /// The actual grant result is handled asynchronously — on success the
+  /// device is opened and available for [UsbAudioSink] on next playback.
+  Future<bool> requestUsbPermission() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('requestUsbPermission');
+      return result == true;
+    } catch (e) {
+      _log.error('requestUsbPermission failed: $e', tag: 'USB');
       return false;
     }
   }
@@ -504,6 +549,24 @@ class HiResAudioService {
     }
   }
 
+  /// Enable or disable the decent-player UsbAudioSink for true bit-perfect
+  /// USB audio via usbdevfs direct access.
+  ///
+  /// When enabled, ExoPlayer will route decoded PCM audio through the
+  /// [com.decent.usbaudio.media3.UsbAudioSink] which communicates directly
+  /// with the USB DAC via Linux usbdevfs, bypassing the Android audio mixer
+  /// entirely for true bit-perfect output.
+  ///
+  /// NOTE: Only takes effect on the next ExoPlayer creation (next play() call).
+  Future<void> setUseLibusbSink(bool enabled) async {
+    try {
+      await _channel.invokeMethod('setUseLibusbSink', {'enabled': enabled});
+      _log.info('UsbAudioSink ${enabled ? "enabled" : "disabled"}', tag: 'HiResAudio');
+    } catch (e) {
+      _log.error('setUseLibusbSink error: $e', tag: 'HiResAudio');
+    }
+  }
+
   /// Enable or disable bit-perfect mode in the AAudio AudioSink.
   ///
   /// When enabled, the AudioSink will skip ALL digital volume gain on PCM data,
@@ -569,6 +632,7 @@ class HiResAudioService {
     _usbDevicesController.close();
     _usbRoutingController.close();
     _outputDeviceController.close();
+    _usbDacAutoRoutedController.close();
     _nativePositionController.close();
     _nativeDurationController.close();
     _nativeBufferedPositionController.close();
@@ -619,6 +683,19 @@ class UsbRoutingState {
     this.routed = false,
     this.deviceName = '',
     this.mixerAttributesApplied = false,
+  });
+}
+
+/// Event fired when USB DAC is auto-routed on device plug + permission grant.
+class UsbDacAutoRoutedEvent {
+  final String deviceName;
+  final int vendorId;
+  final int productId;
+
+  const UsbDacAutoRoutedEvent({
+    this.deviceName = '',
+    this.vendorId = 0,
+    this.productId = 0,
   });
 }
 

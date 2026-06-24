@@ -11,6 +11,7 @@ import '../services/cache_service.dart';
 import '../services/translation_service.dart';
 import '../services/subtitle_library_service.dart';
 import '../services/storage_service.dart';
+import '../services/cookie_service.dart';
 import '../utils/snackbar_util.dart';
 import '../utils/encoding_utils.dart';
 import '../utils/scroll_optimization.dart';
@@ -352,7 +353,7 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
         options: Options(
           responseType: ResponseType.bytes, // 改为获取字节数据
           receiveTimeout: const Duration(seconds: 30),
-          headers: StorageService.serverCookieHeaders,
+          headers: CookieService.serverCookieHeaders,
         ),
       );
 

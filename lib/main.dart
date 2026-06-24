@@ -17,8 +17,14 @@ import 'src/utils/theme.dart';
 import 'src/utils/global_keys.dart';
 import 'src/utils/platform_utils.dart';
 import 'src/services/audio_player_service.dart';
+<<<<<<< HEAD
 import 'src/services/usb_dac_audio_manager.dart';
+=======
+import 'src/services/hi_res_audio_service.dart';
+import 'src/services/streaming_speed_tracker.dart';
+>>>>>>> 96f3b38
 import 'src/services/ai_download_notification_service.dart';
+import 'src/services/log_service.dart';
 import 'src/services/batch_transcription_notification_service.dart';
 import 'src/services/conversion_notification_service.dart';
 import 'src/services/download_service.dart';
@@ -43,6 +49,7 @@ import 'src/providers/settings_provider.dart';
 import 'src/providers/theme_provider.dart';
 import 'src/providers/update_provider.dart';
 import 'src/widgets/fps_overlay.dart';
+import 'src/services/kikoeru_api_service.dart';
 
 void main(List<String> args) {
   AppBootstrap.runWithZone(() async {
@@ -140,7 +147,7 @@ Future<void> _runMultiWindow(List<String> args) async {
         ? jsonDecode(args[2]) as Map<String, dynamic>
         : const <String, dynamic>{};
   } catch (e) {
-    debugPrint('[MultiWindow] Failed to parse arguments: $e');
+    LogService.instance.warning('[MultiWindow] Failed to parse arguments: $e', tag: 'Main');
     argument = const <String, dynamic>{};
   }
 
@@ -193,34 +200,34 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
 
     // Heavy download disk scan (fire-and-forget, runs after app is visible)
     DownloadService.instance.syncWithDiskAfterInit().catchError((e) {
-      debugPrint('[Main] Disk sync failed: $e');
+      LogService.instance.warning('[Main] Disk sync failed: $e', tag: 'Main');
     });
   }
 
   void _initConversionNotifications() {
     if (!Platform.isAndroid) return;
     ConversionNotificationService.instance.initialize().catchError((e) {
-      debugPrint('[Main] Failed to init conversion notifications: $e');
+      LogService.instance.warning('[Main] Failed to init conversion notifications: $e', tag: 'Main');
     });
   }
 
   void _initAiDownloadNotifications() {
     if (!Platform.isAndroid) return;
     AiDownloadNotificationService.instance.initialize().catchError((e) {
-      debugPrint('[Main] Failed to init AI download notifications: $e');
+      LogService.instance.warning('[Main] Failed to init AI download notifications: $e', tag: 'Main');
     });
   }
 
   void _initBatchTranscriptionNotifications() {
     if (!Platform.isAndroid) return;
     BatchTranscriptionNotificationService.instance.initialize().catchError((e) {
-      debugPrint('[Main] Failed to init batch transcription notifications: $e');
+      LogService.instance.warning('[Main] Failed to init batch transcription notifications: $e', tag: 'Main');
     });
   }
 
   void _initBookmarkService() {
     BookmarkService.instance.initialize().catchError((e) {
-      debugPrint('[Main] Failed to init bookmark service: $e');
+      LogService.instance.warning('[Main] Failed to init bookmark service: $e', tag: 'Main');
     });
   }
 
@@ -245,7 +252,7 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
         // Sync the in-memory AppLockService with the tile's toggle
         // The native TileService already updated SharedPreferences.
         // The UI will adapt on next build via _buildHomeScreen() check.
-        debugPrint('[AppLockTile] Toggled to $enabled');
+        LogService.instance.debug('[AppLockTile] Toggled to $enabled', tag: 'Main');
         if (mounted) {
           setState(() {});
         }
@@ -274,6 +281,14 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       windowManager.removeListener(this);
     }
+    // Dispose services to prevent memory leaks
+    AudioPlayerService.instance.dispose();
+    HiResAudioService.instance.dispose();
+    StreamingSpeedTracker.instance.dispose();
+    ListeningStatsService.instance.unsubscribeFromHistoryUpdates();
+    PlaybackHistoryService.instance.detach();
+    // Flush remaining logs before exit
+    LogService.instance.flush();
     super.dispose();
   }
 
@@ -394,7 +409,7 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
         ref.read(showUpdateRedDotProvider.notifier).state = shouldShow;
       }
     } catch (e) {
-      // Silent failure
+      LogService.instance.debug('[Update] Check failed: $e', tag: 'Main');
     }
   }
 

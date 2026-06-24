@@ -138,7 +138,7 @@ class _PlayNextSelectionDialogState extends State<PlayNextSelectionDialog> {
           album: widget.workTitle,
           artworkUrl: widget.coverUrl,
           duration: file.duration != null
-              ? Duration(milliseconds: (file.duration * 1000).round())
+              ? Duration(milliseconds: (file.duration! * 1000).round())
               : null,
           workId: widget.workId,
           hash: fileHash,

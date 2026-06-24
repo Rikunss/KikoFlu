@@ -75,13 +75,9 @@ class AudioConversionService {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true; // system ffmpeg
     if (Platform.isAndroid) {
       // Android: bundled ffmpeg-kit (min variant) supports:
-      //   ✓ FLAC, ALAC, AAC (built-in FFmpeg encoders)
-      //   ✗ MP3  (needs libmp3lame — only in audio variant)
-      //   ✗ Opus (needs libopus — only in audio variant)
-      return format == WavConversionFormat.mp3 ||
-             format == WavConversionFormat.opus
-          ? false
-          : true;
+      //   ✓ FLAC, ALAC, AAC, MP3 (built-in FFmpeg encoders)
+      //   ✗ Opus (needs libopus — only in audio/full variant)
+      return format == WavConversionFormat.opus ? false : true;
     }
     if (Platform.isIOS) {
       return format == WavConversionFormat.alac || format == WavConversionFormat.aac;
@@ -96,8 +92,7 @@ class AudioConversionService {
   Future<bool> checkEncoderAvailability(WavConversionFormat format) async {
     if (!Platform.isAndroid) return true;
     if (format == WavConversionFormat.none) return true;
-    final available = format != WavConversionFormat.mp3 &&
-        format != WavConversionFormat.opus;
+    final available = format != WavConversionFormat.opus;
     _encoderCache[format.value] = available;
     return available;
   }
@@ -141,7 +136,9 @@ class AudioConversionService {
       // Remove stale output file from a previous failed conversion attempt
       final outFile = File(outPath);
       if (await outFile.exists()) {
-        try { await outFile.delete(); } catch (_) {}
+        try { await outFile.delete(); } catch (e) {
+          _log.warning('[AudioConversion] Failed to delete stale output: $e', tag: 'AudioConv');
+        }
       }
 
       _log.info('[AudioConversion] Starting: $wavPath → $outPath ($format)', tag: 'AudioConv');
@@ -171,7 +168,8 @@ class AudioConversionService {
       case 'opus':
         return ['-i', input, '-c:a', 'libopus', '-b:a', '128k', '-y', output];
       case 'mp3':
-        return ['-i', input, '-c:a', 'libmp3lame', '-b:a', '320k', '-y', output];
+        // Use native FFmpeg mp3 encoder (libmp3lame not available in min variant)
+        return ['-i', input, '-c:a', 'mp3', '-b:a', '320k', '-y', output];
       case 'alac':
         return ['-i', input, '-c:a', 'alac', '-f', 'mp4', '-y', output];
       case 'aac':
@@ -317,7 +315,9 @@ class AudioConversionService {
       if (ReturnCode.isSuccess(returnCode) && await File(output).exists()) {
         _log.info('[AudioConversion] Android $formatName success via ffmpeg-kit', tag: 'AudioConv');
         // Delete original WAV on success
-        try { await inputFile.delete(); } catch (_) {}
+        try { await inputFile.delete(); } catch (e) {
+          _log.warning('[AudioConversion] Failed to delete input WAV: $e', tag: 'AudioConv');
+        }
         return output;
       } else {
         _log.error('[AudioConversion] Android $formatName failed (rc=$returnCode)', tag: 'AudioConv');
@@ -370,7 +370,9 @@ class AudioConversionService {
 
       if (result == 'success' && await File(output).exists()) {
         _log.info('[AudioConversion] iOS $formatName success', tag: 'AudioConv');
-        try { await File(input).delete(); } catch (_) {}
+        try { await File(input).delete(); } catch (e) {
+          _log.warning('[AudioConversion] Failed to delete input file: $e', tag: 'AudioConv');
+        }
         return output;
       }
     } catch (e) {

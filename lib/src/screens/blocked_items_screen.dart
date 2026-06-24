@@ -4,7 +4,7 @@ import '../../l10n/app_localizations.dart';
 import '../providers/settings_provider.dart';
 import '../utils/snackbar_util.dart';
 import '../utils/tag_localizer.dart';
-import '../providers/auth_provider.dart';
+import '../services/kikoeru_api_service.dart';
 
 class BlockedItemsScreen extends ConsumerWidget {
   const BlockedItemsScreen({super.key});

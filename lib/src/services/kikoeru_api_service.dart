@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:convert';
 import '../models/work.dart';
 import '../utils/server_utils.dart';
-import '../services/storage_service.dart';
+import 'cookie_service.dart';
 import 'cache_service.dart';
 import 'log_service.dart';
+import 'kikoeru_api_strategy.dart';
+import 'official_kikoeru_api_strategy.dart';
+import 'custom_kikoeru_api_strategy.dart';
 
 final _log = LogService.instance;
 
@@ -19,23 +22,30 @@ class KikoeruApiService {
   void Function()? onUnauthorized;
 
   late Dio _dio;
-  String? _token;
+  // Kept for URL building (getDownloadUrl / getStreamUrl / getCoverUrl).
   String? _host;
-  int _subtitle = 0; // 1: 带字幕, 0: 不限制 (默认显示所有作品)
-  String _order = 'create_date';
-  String _sort = 'desc'; // 默认降序排列
+
+  /// The active strategy: [OfficialKikoeruApiStrategy] or [CustomKikoeruApiStrategy].
+  KikoeruApiStrategy? _strategy;
+
+  /// Shared config that is kept in sync with [_strategy].
+  StrategyConfig _currentConfig = const StrategyConfig();
 
   KikoeruApiService() {
     _dio = Dio();
     _setupInterceptors();
   }
 
+  // ── Interceptors ──
+
   void _setupInterceptors() {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          // 仅在访问官方服务器时设置浏览器 UA，自建服务器使用应用标识
-          if (ServerUtils.isOfficialServer(_host)) {
+          final strategy = _strategy;
+
+          // User-Agent differs between official and custom servers
+          if (strategy?.isOfficial ?? false) {
             options.headers['User-Agent'] =
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
             options.headers['Referer'] = 'https://www.asmr.one/';
@@ -43,15 +53,14 @@ class KikoeruApiService {
           } else {
             options.headers['User-Agent'] = 'KikoFlu';
           }
-          // Dart HttpClient 默认支持 gzip，显式声明可确保服务器知晓
           options.headers['Accept-Encoding'] = 'gzip';
+          options.headers.addAll(CookieService.serverCookieHeaders);
 
-          // 如果配置了服务器Cookie则添加到请求头中
-          options.headers.addAll(StorageService.serverCookieHeaders);
-
-          // Add Authorization header if token exists
-          // Only exclude for POST requests to auth endpoints (login/register)
-          if (_token != null && _token!.isNotEmpty) {
+          // Add Authorization header if token exists.
+          // Skip for auth endpoints (login / register) so they can be called
+          // without a Bearer token.
+          final token = strategy?.config.token;
+          if (token != null && token.isNotEmpty) {
             final isLoginRequest = options.method == 'POST' &&
                 options.path.contains('/api/auth/me');
             final isSignupRequest = options.method == 'POST' &&
@@ -59,7 +68,7 @@ class KikoeruApiService {
                     options.path.contains('/api/auth/reg'));
 
             if (!isLoginRequest && !isSignupRequest) {
-              options.headers['Authorization'] = 'Bearer $_token';
+              options.headers['Authorization'] = 'Bearer $token';
             }
           }
 
@@ -68,12 +77,8 @@ class KikoeruApiService {
           handler.next(options);
         },
         onError: (error, handler) async {
-          // Handle errors globally
           _log.error('API Error: ${error.message}');
 
-          // Detect session expiration (401/403) and notify the auth layer.
-          // We only trigger for non-auth endpoints to avoid reacting to
-          // failed login/register calls.
           final statusCode = error.response?.statusCode;
           if ((statusCode == 401 || statusCode == 403) &&
               onUnauthorized != null &&
@@ -84,20 +89,15 @@ class KikoeruApiService {
             onUnauthorized!();
           }
 
-          // 自动重试连接超时错误（仅重试一次）
+          // Auto-retry connection timeout once
           if (error.type == DioExceptionType.connectionTimeout &&
               error.requestOptions.extra['retried'] != true) {
             _log.warning('Connection timeout detected, retrying once...', tag: 'API');
-
-            // 标记已重试，避免无限循环
             error.requestOptions.extra['retried'] = true;
-
             try {
-              // 重试请求
               final response = await _dio.fetch(error.requestOptions);
               return handler.resolve(response);
-            } catch (e) {
-              // 重试也失败，返回错误
+            } catch (_) {
               return handler.next(error);
             }
           }
@@ -108,61 +108,142 @@ class KikoeruApiService {
     );
 
     _dio.interceptors.add(
-      LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        logPrint: (object) {
-          // Custom logging if needed
-          _log.info(object.toString());
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          // Log request without body for sensitive endpoints
+          final isAuthEndpoint = options.path.contains('/api/auth/');
+          if (!isAuthEndpoint) {
+            _log.info('[API] ${options.method} ${options.uri}');
+          } else {
+            _log.info('[API] ${options.method} ${options.path} (auth endpoint, body hidden)');
+          }
+          handler.next(options);
+        },
+        onResponse: (response, handler) {
+          _log.info('[API] Response ${response.statusCode} ${response.requestOptions.path}');
+          handler.next(response);
+        },
+        onError: (error, handler) {
+          _log.error('[API] Error ${error.response?.statusCode} ${error.requestOptions.path}');
+          handler.next(error);
         },
       ),
     );
   }
 
-  void init(String token, String host) {
-    _token = token;
-    // Handle host configuration properly
-    if (host.startsWith('http://') || host.startsWith('https://')) {
-      _host = host;
-    } else {
-      // For remote hosts, use HTTPS; for localhost, use HTTP
-      if (host.contains('localhost') ||
-          host.startsWith('127.0.0.1') ||
-          host.startsWith('192.168.')) {
-        _host = 'http://$host';
-      } else {
-        _host = 'https://$host';
-      }
-    }
+  // ── Shared helpers ──
+
+  /// Sets up [host], creates the appropriate strategy, and updates config.
+  void _initializeForHost(String host) {
+    _host = _normalizeHost(host);
     _dio.options.baseUrl = _host!;
+    _currentConfig = _currentConfig.copyWith(host: _host);
+    _strategy = _createStrategy(_host!);
+    _strategy!.config = _currentConfig;
+  }
+
+  /// Shared GET for simple list endpoints (tags, VAs, circles).
+  Future<List<dynamic>> _simpleGet(String path, String errorMessage) async {
+    try {
+      final response = await _dio.get(path);
+      return response.data;
+    } catch (e) {
+      throw KikoeruApiException(errorMessage, e);
+    }
+  }
+
+  /// Filters a list of named items by [query] and maps them with [mapper].
+  Future<List<T>> _searchNamedItems<T>({
+    required Future<List<dynamic>> Function() fetcher,
+    required String query,
+    required T Function(Map<String, dynamic> json) mapper,
+    required String errorMessage,
+  }) async {
+    try {
+      final items = await fetcher();
+      return items
+          .where((item) =>
+              item['name'].toString().toLowerCase().contains(query.toLowerCase()))
+          .map((item) => mapper(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw KikoeruApiException(errorMessage, e);
+    }
+  }
+
+  /// Shared POST for simple playlist actions (like, remove-like, delete).
+  Future<Map<String, dynamic>> _playlistPostAction(
+      String action, String playlistId, String errorMessage) async {
+    try {
+      final response =
+          await _dio.post('/api/playlist/$action', data: {'id': playlistId});
+      return response.data;
+    } catch (e) {
+      throw KikoeruApiException(errorMessage, e);
+    }
+  }
+
+  // ── Initialisation ──
+
+  void init(String token, String host) {
+    // Normalize host
+    _host = _normalizeHost(host);
+    _dio.options.baseUrl = _host!;
+
+    // Update config and (re)create strategy
+    _currentConfig = StrategyConfig(
+      token: token,
+      host: _host,
+      subtitle: _currentConfig.subtitle,
+      order: _currentConfig.order,
+      sort: _currentConfig.sort,
+    );
+    _strategy = _createStrategy(_host!);
+    _strategy!.config = _currentConfig;
 
     _log.info('Initialized - host: $_host, token: ${token.isEmpty ? "empty" : "exists (${token.length} chars)"}', tag: 'API');
   }
 
-  // Setters for configuration
-  void setOrder(String order) {
-    if (_order == order) {
-      // Toggle sort direction
-      _sort = _sort == 'asc' ? 'desc' : 'asc';
+  /// Creates the appropriate strategy for the given host.
+  KikoeruApiStrategy _createStrategy(String host) {
+    if (ServerUtils.isOfficialServer(host)) {
+      return OfficialKikoeruApiStrategy(_dio, _currentConfig);
     } else {
-      _order = order;
+      return CustomKikoeruApiStrategy(_dio, _currentConfig);
     }
   }
 
-  void setSubtitle(int subtitle) {
-    _subtitle = subtitle;
+  /// Returns the normalized version of [host] (with protocol prefix).
+  String _normalizeHost(String host) => ServerUtils.normalizeHost(host);
+
+  // ── Configuration setters ──
+
+  void setOrder(String order) {
+    if (_currentConfig.order == order) {
+      _currentConfig = _currentConfig.copyWith(
+        sort: _currentConfig.sort == 'asc' ? 'desc' : 'asc',
+      );
+    } else {
+      _currentConfig = _currentConfig.copyWith(order: order);
+    }
+    _strategy?.config = _currentConfig;
   }
 
-  // Check network connectivity
+  void setSubtitle(int subtitle) {
+    _currentConfig = _currentConfig.copyWith(subtitle: subtitle);
+    _strategy?.config = _currentConfig;
+  }
+
+  // ── Connectivity ──
+
   Future<bool> isConnected() async {
     final connectivityResult = await Connectivity().checkConnectivity();
     return connectivityResult != ConnectivityResult.none;
   }
 
-  // Test if a host is reachable
   Future<bool> testHostConnection(String host) async {
+    final testDio = Dio();
     try {
-      final testDio = Dio();
       testDio.options.connectTimeout = const Duration(seconds: 3);
       testDio.options.receiveTimeout = const Duration(seconds: 3);
 
@@ -171,307 +252,41 @@ class KikoeruApiService {
       await testDio.get(
         '$testHost/api/health',
         options: Options(
-          validateStatus: (status) => status! < 500, // Accept any status < 500
+          validateStatus: (status) => status! < 500,
         ),
       );
       return true;
     } catch (e) {
       _log.error('Host connection test failed for $host: $e');
       return false;
+    } finally {
+      testDio.close();
     }
   }
 
-  // Helper to check if we are using the official server
-  bool get isOfficialServer => ServerUtils.isOfficialServer(_host);
-  bool get _isOfficialServer => isOfficialServer;
+  /// Public helper so external callers can check the server type.
+  bool get isOfficialServer => _strategy?.isOfficial ?? false;
 
-  // Helper to fetch combined pages for custom server
-  Future<Map<String, dynamic>> _fetchCombinedPages({
-    required int page,
-    required int pageSize,
-    required Future<Map<String, dynamic>> Function(int page) fetcher,
-    String listKey = 'works',
-    int serverPageSize = 12,
-  }) async {
-    // Calculate item range
-    final startItemIndex = (page - 1) * pageSize;
-    final endItemIndex = startItemIndex + pageSize;
+  // ── Authentication ──
 
-    // Calculate server pages
-    final startServerPage = (startItemIndex / serverPageSize).floor() + 1;
-    final endServerPage = ((endItemIndex - 1) / serverPageSize).floor() + 1;
-
-    List<dynamic> combinedList = [];
-    int totalCount = 0;
-
-    // Fetch pages
-    final futures = <Future<Map<String, dynamic>>>[];
-    for (int p = startServerPage; p <= endServerPage; p++) {
-      futures.add(fetcher(p));
-    }
-
-    final results = await Future.wait(futures);
-
-    // Merge results
-    for (var result in results) {
-      // Try to find the list with the given key, or fallback to common keys
-      List<dynamic> list = [];
-      if (result[listKey] != null) {
-        list = (result[listKey] as List?) ?? [];
-      } else if (result['works'] != null) {
-        list = (result['works'] as List?) ?? [];
-      } else if (result['reviews'] != null) {
-        list = (result['reviews'] as List?) ?? [];
-      }
-
-      combinedList.addAll(list);
-
-      // Try to get total count from any valid response
-      if (result['pagination'] != null &&
-          result['pagination']['totalCount'] != null) {
-        totalCount = result['pagination']['totalCount'];
-      }
-    }
-
-    // Slice the combined list to match requested page
-    final globalStartIndex = (startServerPage - 1) * serverPageSize;
-    final localStartIndex = startItemIndex - globalStartIndex;
-
-    List<dynamic> finalItems = [];
-    if (localStartIndex < combinedList.length) {
-      final localEndIndex = localStartIndex + pageSize;
-      final actualEndIndex = localEndIndex > combinedList.length
-          ? combinedList.length
-          : localEndIndex;
-      finalItems = combinedList.sublist(localStartIndex, actualEndIndex);
-    }
-
-    return {
-      listKey: finalItems,
-      'pagination': {
-        'currentPage': page,
-        'pageSize': pageSize,
-        'totalCount': totalCount,
-      }
-    };
-  }
-
-  // Authentication APIs
   Future<Map<String, dynamic>> login(
       String username, String password, String host) async {
-    // Set up host first without token
-    if (host.startsWith('http://') || host.startsWith('https://')) {
-      _host = host;
-    } else {
-      // For remote hosts, use HTTPS; for localhost, use HTTP
-      if (host.contains('localhost') ||
-          host.startsWith('127.0.0.1') ||
-          host.startsWith('192.168.')) {
-        _host = 'http://$host';
-      } else {
-        _host = 'https://$host';
-      }
-    }
-    _dio.options.baseUrl = _host!;
-
-    if (_isOfficialServer) {
-      return _loginOfficial(username, password);
-    } else {
-      return _loginCustom(username, password);
-    }
-  }
-
-  Future<Map<String, dynamic>> _loginOfficial(
-      String username, String password) async {
-    try {
-      final response = await _dio.post(
-        '/api/auth/me',
-        data: {'name': username, 'password': password},
-      );
-
-      // If login successful, extract and store token
-      if (response.data is Map && response.data['token'] != null) {
-        _token = response.data['token'];
-      }
-
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Login failed', e);
-    }
-  }
-
-  Future<Map<String, dynamic>> _loginCustom(
-      String username, String password) async {
-    try {
-      // Custom/Local server login logic
-      // Currently same endpoint but separated for future customization
-      final response = await _dio.post(
-        '/api/auth/me',
-        data: {'name': username, 'password': password},
-      );
-
-      // If login successful, extract and store token
-      if (response.data is Map && response.data['token'] != null) {
-        _token = response.data['token'];
-      }
-
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Login failed', e);
-    }
+    _initializeForHost(host);
+    return _strategy!.login(username, password);
   }
 
   Future<Map<String, dynamic>> register(
       String username, String password, String host) async {
-    // Save the original token at the very beginning
-    // This ensures we can restore it if registration fails
-    final originalToken = _token;
-
-    // Set up host first without token
-    if (host.startsWith('http://') || host.startsWith('https://')) {
-      _host = host;
-    } else {
-      // For remote hosts, use HTTPS; for localhost, use HTTP
-      if (host.contains('localhost') ||
-          host.startsWith('127.0.0.1') ||
-          host.startsWith('192.168.')) {
-        _host = 'http://$host';
-      } else {
-        _host = 'https://$host';
-      }
-    }
-    _dio.options.baseUrl = _host!;
-
-    if (_isOfficialServer) {
-      return _registerOfficial(username, password, originalToken);
-    } else {
-      return _registerCustom(username, password, originalToken);
-    }
+    _initializeForHost(host);
+    return _strategy!.register(username, password);
   }
 
-  Future<Map<String, dynamic>> _registerOfficial(
-      String username, String password, String? originalToken) async {
-    try {
-      // Step 1: Get recommender UUID
-      String recommenderUuid =
-          '766cc58d-7f1e-4958-9a93-913400f378dc'; // Default recommender
-
-      try {
-        // Clear token to get registration info
-        // (with token, this endpoint returns recommendations; without token, returns registration info)
-        _token = null;
-
-        final recommenderResponse = await _dio.post(
-          '/api/recommender/recommend-for-user',
-          data: {
-            'keyword': ' ',
-            'page': 1,
-            'pageSize': 20,
-          },
-        );
-
-        // Try to get recommender UUID from response
-        if (recommenderResponse.data is Map) {
-          if (recommenderResponse.data['uuid'] != null) {
-            recommenderUuid = recommenderResponse.data['uuid'];
-          } else if (recommenderResponse.data['recommenderUuid'] != null) {
-            recommenderUuid = recommenderResponse.data['recommenderUuid'];
-          }
-        }
-      } catch (e) {
-        // If getting recommender fails, use default UUID
-        _log.warning('Failed to get recommender, using default: $e');
-      }
-
-      // Step 2: Register with recommender UUID
-      // Token is already cleared from step 1
-      final response = await _dio.post(
-        '/api/auth/reg',
-        data: {
-          'name': username,
-          'password': password,
-          'recommenderUuid': recommenderUuid,
-        },
-      );
-
-      // If registration successful, extract and store token
-      if (response.data is Map && response.data['token'] != null) {
-        _token = response.data['token'];
-      } else {
-        // If no token returned, restore original token
-        _token = originalToken;
-      }
-
-      return response.data;
-    } catch (e) {
-      // IMPORTANT: Restore original token on failure
-      // This prevents logged-in users from losing their session
-      _token = originalToken;
-      throw KikoeruApiException('Registration failed', e);
-    }
+  Future<Map<String, dynamic>> getUserInfo() {
+    return _strategy!.getUserInfo();
   }
 
-  Future<Map<String, dynamic>> _registerCustom(
-      String username, String password, String? originalToken) async {
-    try {
-      // Custom server registration might be simpler or different
-      // For now, we'll use a simplified version without recommender logic
-      // assuming local servers might not have the recommender system set up same way
+  // ── Works ──
 
-      // Clear token for registration
-      _token = null;
-
-      final response = await _dio.post(
-        '/api/auth/reg',
-        data: {
-          'name': username,
-          'password': password,
-          // 'recommenderUuid': ... // Skip recommender for custom server if not needed
-        },
-      );
-
-      // If registration successful, extract and store token
-      if (response.data is Map && response.data['token'] != null) {
-        _token = response.data['token'];
-      } else {
-        // If no token returned, restore original token
-        _token = originalToken;
-      }
-
-      return response.data;
-    } catch (e) {
-      _token = originalToken;
-      throw KikoeruApiException('Registration failed', e);
-    }
-  }
-
-  Future<Map<String, dynamic>> getUserInfo() async {
-    if (_isOfficialServer) {
-      return _getUserInfoOfficial();
-    } else {
-      return _getUserInfoCustom();
-    }
-  }
-
-  Future<Map<String, dynamic>> _getUserInfoOfficial() async {
-    try {
-      final response = await _dio.get('/api/auth/me');
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get user info', e);
-    }
-  }
-
-  Future<Map<String, dynamic>> _getUserInfoCustom() async {
-    try {
-      final response = await _dio.get('/api/auth/me');
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get user info', e);
-    }
-  }
-
-  // Works APIs
   Future<Map<String, dynamic>> getWorks({
     int page = 1,
     int pageSize = 40,
@@ -479,192 +294,33 @@ class KikoeruApiService {
     String? sort,
     int? subtitle,
     int? seed,
-  }) async {
-    if (_isOfficialServer) {
-      return _getWorksOfficial(
-        page: page,
-        pageSize: pageSize,
-        order: order,
-        sort: sort,
-        subtitle: subtitle,
-        seed: seed,
-      );
-    } else {
-      return _getWorksCustom(
-        page: page,
-        pageSize: pageSize,
-        order: order,
-        sort: sort,
-        subtitle: subtitle,
-        seed: seed,
-      );
-    }
-  }
-
-  Future<Map<String, dynamic>> _getWorksOfficial({
-    int page = 1,
-    int pageSize = 40,
-    String? order,
-    String? sort,
-    int? subtitle,
-    int? seed,
-  }) async {
-    try {
-      final queryParams = {
-        'page': page,
-        'pageSize': pageSize,
-        'order': order ?? _order,
-        'sort': sort ?? _sort,
-        'subtitle': subtitle ?? _subtitle,
-        'seed': seed ?? (21),
-      };
-
-      final response = await _dio.get(
-        '/api/works',
-        queryParameters: queryParams,
-      );
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get works', e);
-    }
-  }
-
-  Future<Map<String, dynamic>> _getWorksCustom({
-    int page = 1,
-    int pageSize = 40,
-    String? order,
-    String? sort,
-    int? subtitle,
-    int? seed,
-  }) async {
-    return _fetchCombinedPages(
+  }) {
+    return _strategy!.getWorks(
       page: page,
       pageSize: pageSize,
-      fetcher: (p) async {
-        try {
-          // Handle local backend compatibility for sort order
-          String effectiveOrder = order ?? _order;
-          int? nsfwParam;
-
-          if (effectiveOrder == 'create_date') {
-            effectiveOrder = 'release';
-          } else if (effectiveOrder == 'nsfw') {
-            effectiveOrder = 'release';
-            nsfwParam = 1;
-          }
-
-          final queryParams = {
-            'page': p,
-            'pageSize': 12, // Force 12 for custom server
-            'order': effectiveOrder,
-            'sort': sort ?? _sort,
-            'lyric': (subtitle ?? _subtitle) == 1 ? 'local' : '',
-            'seed': seed ?? (21),
-            if (nsfwParam != null) 'nsfw': nsfwParam,
-          };
-
-          final response = await _dio.get(
-            '/api/works',
-            queryParameters: queryParams,
-          );
-          return response.data;
-        } catch (e) {
-          throw KikoeruApiException('Failed to get works', e);
-        }
-      },
+      order: order,
+      sort: sort,
+      subtitle: subtitle,
+      seed: seed,
     );
   }
 
-  // Get popular recommended works (max 100 items, no sorting)
   Future<Map<String, dynamic>> getPopularWorks({
     int page = 1,
     int pageSize = 20,
     String? keyword,
     int? subtitle,
     List<String>? withPlaylistStatus,
-  }) async {
-    if (_isOfficialServer) {
-      return _getPopularWorksOfficial(
-        page: page,
-        pageSize: pageSize,
-        keyword: keyword,
-        subtitle: subtitle,
-        withPlaylistStatus: withPlaylistStatus,
-      );
-    } else {
-      return _getPopularWorksCustom(
-        page: page,
-        pageSize: pageSize,
-        keyword: keyword,
-        subtitle: subtitle,
-        withPlaylistStatus: withPlaylistStatus,
-      );
-    }
-  }
-
-  Future<Map<String, dynamic>> _getPopularWorksOfficial({
-    int page = 1,
-    int pageSize = 20,
-    String? keyword,
-    int? subtitle,
-    List<String>? withPlaylistStatus,
-  }) async {
-    try {
-      final data = {
-        'keyword': keyword ?? ' ',
-        'page': page,
-        'pageSize': pageSize,
-        'subtitle': subtitle ?? 0,
-        'localSubtitledWorks': [],
-        'withPlaylistStatus': withPlaylistStatus ?? [],
-      };
-
-      final response = await _dio.post(
-        '/api/recommender/popular',
-        data: data,
-      );
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get popular works', e);
-    }
-  }
-
-  Future<Map<String, dynamic>> _getPopularWorksCustom({
-    int page = 1,
-    int pageSize = 20,
-    String? keyword,
-    int? subtitle,
-    List<String>? withPlaylistStatus,
-  }) async {
-    return _fetchCombinedPages(
+  }) {
+    return _strategy!.getPopularWorks(
       page: page,
       pageSize: pageSize,
-      fetcher: (p) async {
-        try {
-          // Custom backend doesn't have recommender, use /api/works with dl_count sort
-          final queryParams = {
-            'page': p,
-            'pageSize': 12, // Force 12 for custom server
-            'order': 'dl_count',
-            'sort': 'desc',
-            'lyric': (subtitle ?? 0) == 1 ? 'local' : '',
-          };
-
-          final response = await _dio.get(
-            '/api/works',
-            queryParameters: queryParams,
-          );
-          return response.data;
-        } catch (e) {
-          throw KikoeruApiException('Failed to get popular works', e);
-        }
-      },
+      keyword: keyword,
+      subtitle: subtitle,
+      withPlaylistStatus: withPlaylistStatus,
     );
   }
 
-  // Get recommended works for user (max 100 items, no sorting)
-  // This endpoint returns registration info when not logged in,
-  // and returns recommended works when logged in with token
   Future<Map<String, dynamic>> getRecommendedWorks({
     required String recommenderUuid,
     int page = 1,
@@ -672,142 +328,19 @@ class KikoeruApiService {
     String? keyword,
     int? subtitle,
     List<String>? withPlaylistStatus,
-  }) async {
-    if (_isOfficialServer) {
-      return _getRecommendedWorksOfficial(
-        recommenderUuid: recommenderUuid,
-        page: page,
-        pageSize: pageSize,
-        keyword: keyword,
-        subtitle: subtitle,
-        withPlaylistStatus: withPlaylistStatus,
-      );
-    } else {
-      return _getRecommendedWorksCustom(
-        page: page,
-        pageSize: pageSize,
-        keyword: keyword,
-        subtitle: subtitle,
-        withPlaylistStatus: withPlaylistStatus,
-      );
-    }
-  }
-
-  Future<Map<String, dynamic>> _getRecommendedWorksOfficial({
-    required String recommenderUuid,
-    int page = 1,
-    int pageSize = 20,
-    String? keyword,
-    int? subtitle,
-    List<String>? withPlaylistStatus,
-  }) async {
-    try {
-      final data = {
-        'keyword': keyword ?? ' ',
-        'recommenderUuid': recommenderUuid,
-        'page': page,
-        'pageSize': pageSize,
-        'subtitle': subtitle ?? 0,
-        'localSubtitledWorks': [],
-        'withPlaylistStatus': withPlaylistStatus ?? [],
-      };
-
-      final response = await _dio.post(
-        '/api/recommender/recommend-for-user',
-        data: data,
-      );
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get recommended works', e);
-    }
-  }
-
-  Future<Map<String, dynamic>> _getRecommendedWorksCustom({
-    int page = 1,
-    int pageSize = 20,
-    String? keyword,
-    int? subtitle,
-    List<String>? withPlaylistStatus,
-  }) async {
-    return _fetchCombinedPages(
+  }) {
+    return _strategy!.getRecommendedWorks(
+      recommenderUuid: recommenderUuid,
       page: page,
       pageSize: pageSize,
-      fetcher: (p) async {
-        try {
-          // Custom backend doesn't have recommender, use /api/works with random sort
-          final queryParams = {
-            'page': p,
-            'pageSize': 12, // Force 12 for custom server
-            'order': 'random',
-            'sort': 'desc',
-            'lyric': (subtitle ?? 0) == 1 ? 'local' : '',
-            'seed': DateTime.now().millisecondsSinceEpoch % 1000, // Random seed
-          };
-
-          final response = await _dio.get(
-            '/api/works',
-            queryParameters: queryParams,
-          );
-          return response.data;
-        } catch (e) {
-          throw KikoeruApiException('Failed to get recommended works', e);
-        }
-      },
+      keyword: keyword,
+      subtitle: subtitle,
+      withPlaylistStatus: withPlaylistStatus,
     );
   }
 
-  Future<Map<String, dynamic>> getWork(int workId) async {
-    if (_isOfficialServer) {
-      return _getWorkOfficial(workId);
-    } else {
-      return _getWorkCustom(workId);
-    }
-  }
-
-  Future<Map<String, dynamic>> _getWorkOfficial(int workId) async {
-    try {
-      // 1. 先检查缓存
-      final cachedData = await CacheService.getCachedWorkDetail(workId);
-      if (cachedData != null) {
-        _log.info('作品详情缓存命中: $workId', tag: 'API');
-        return cachedData;
-      }
-
-      // 2. 缓存未命中，从网络获取
-      _log.info('作品详情缓存未命中，从网络获取: $workId', tag: 'API');
-      final response = await _dio.get('/api/work/$workId?v=2');
-      final data = response.data as Map<String, dynamic>;
-
-      // 3. 保存到缓存
-      await CacheService.cacheWorkDetail(workId, data);
-
-      return data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get work', e);
-    }
-  }
-
-  Future<Map<String, dynamic>> _getWorkCustom(int workId) async {
-    try {
-      // 1. 先检查缓存
-      final cachedData = await CacheService.getCachedWorkDetail(workId);
-      if (cachedData != null) {
-        _log.info('作品详情缓存命中: $workId', tag: 'API');
-        return cachedData;
-      }
-
-      // 2. 缓存未命中，从网络获取
-      _log.info('作品详情缓存未命中，从网络获取: $workId', tag: 'API');
-      final metadataResponse = await _dio.get('/api/work/$workId');
-      final data = metadataResponse.data as Map<String, dynamic>;
-
-      // 3. 保存到缓存
-      await CacheService.cacheWorkDetail(workId, data);
-
-      return data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get work', e);
-    }
+  Future<Map<String, dynamic>> getWork(int workId) {
+    return _strategy!.getWork(workId);
   }
 
   Future<Map<String, dynamic>> getWorksByTag({
@@ -818,52 +351,16 @@ class KikoeruApiService {
     String? sort,
     int? subtitle,
     int? seed,
-  }) async {
-    if (!_isOfficialServer) {
-      return _fetchCombinedPages(
-        page: page,
-        pageSize: pageSize,
-        fetcher: (p) async {
-          try {
-            final queryParams = {
-              'page': p,
-              'pageSize': 12, // Force 12 for custom server
-              'order': order ?? _order,
-              'sort': sort ?? _sort,
-              'lyric': (subtitle ?? _subtitle) == 1 ? 'local' : '',
-              'seed': seed ?? (21),
-            };
-
-            final response = await _dio.get(
-              '/api/tags/$tagId/works',
-              queryParameters: queryParams,
-            );
-            return response.data;
-          } catch (e) {
-            throw KikoeruApiException('Failed to get works by tag', e);
-          }
-        },
-      );
-    }
-
-    try {
-      final queryParams = {
-        'page': page,
-        'pageSize': pageSize,
-        'order': order ?? _order,
-        'sort': sort ?? _sort,
-        'subtitle': subtitle ?? _subtitle,
-        'seed': seed ?? (21),
-      };
-
-      final response = await _dio.get(
-        '/api/tags/$tagId/works',
-        queryParameters: queryParams,
-      );
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get works by tag', e);
-    }
+  }) {
+    return _strategy!.getWorksByTag(
+      tagId: tagId,
+      page: page,
+      pageSize: pageSize,
+      order: order,
+      sort: sort,
+      subtitle: subtitle,
+      seed: seed,
+    );
   }
 
   Future<Map<String, dynamic>> getWorksByVa({
@@ -874,122 +371,19 @@ class KikoeruApiService {
     String? sort,
     int? subtitle,
     int? seed,
-  }) async {
-    if (!_isOfficialServer) {
-      return _fetchCombinedPages(
-        page: page,
-        pageSize: pageSize,
-        fetcher: (p) async {
-          try {
-            final queryParams = {
-              'page': p,
-              'pageSize': 12, // Force 12 for custom server
-              'order': order ?? _order,
-              'sort': sort ?? _sort,
-              'lyric': (subtitle ?? _subtitle) == 1 ? 'local' : '',
-              'seed': seed ?? (21),
-            };
-
-            final response = await _dio.get(
-              '/api/vas/$vaId/works',
-              queryParameters: queryParams,
-            );
-            return response.data;
-          } catch (e) {
-            throw KikoeruApiException('Failed to get works by VA', e);
-          }
-        },
-      );
-    }
-
-    try {
-      final queryParams = {
-        'page': page,
-        'pageSize': pageSize,
-        'order': order ?? _order,
-        'sort': sort ?? _sort,
-        'subtitle': subtitle ?? _subtitle,
-        'seed': seed ?? (21),
-      };
-
-      final response = await _dio.get(
-        '/api/vas/$vaId/works',
-        queryParameters: queryParams,
-      );
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get works by VA', e);
-    }
+  }) {
+    return _strategy!.getWorksByVa(
+      vaId: vaId,
+      page: page,
+      pageSize: pageSize,
+      order: order,
+      sort: sort,
+      subtitle: subtitle,
+      seed: seed,
+    );
   }
 
-  // Search API - 新版搜索接口
   Future<Map<String, dynamic>> searchWorks({
-    required String keyword, // 搜索关键词（可以是组合的搜索条件）
-    int page = 1,
-    int pageSize = 40,
-    String? order,
-    String? sort,
-    int? subtitle,
-    int? seed,
-    bool includeTranslationWorks = true,
-  }) async {
-    if (_isOfficialServer) {
-      return _searchWorksOfficial(
-        keyword: keyword,
-        page: page,
-        pageSize: pageSize,
-        order: order,
-        sort: sort,
-        subtitle: subtitle,
-        includeTranslationWorks: includeTranslationWorks,
-      );
-    } else {
-      return _searchWorksCustom(
-        keyword: keyword,
-        page: page,
-        pageSize: pageSize,
-        order: order,
-        sort: sort,
-        subtitle: subtitle,
-        seed: seed,
-        includeTranslationWorks: includeTranslationWorks,
-      );
-    }
-  }
-
-  Future<Map<String, dynamic>> _searchWorksOfficial({
-    required String keyword,
-    int page = 1,
-    int pageSize = 40,
-    String? order,
-    String? sort,
-    int? subtitle,
-    bool includeTranslationWorks = true,
-  }) async {
-    try {
-      // URL编码关键词
-      final encodedKeyword = Uri.encodeComponent(keyword);
-
-      final queryParams = <String, dynamic>{
-        'page': page,
-        'pageSize': pageSize,
-        'order': order ?? _order,
-        'sort': sort ?? _sort,
-        'subtitle': subtitle ?? _subtitle,
-        'includeTranslationWorks': includeTranslationWorks,
-      };
-
-      final response = await _dio.get(
-        '/api/search/$encodedKeyword',
-        queryParameters: queryParams,
-      );
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to search works', e);
-    }
-  }
-
-  Future<Map<String, dynamic>> _searchWorksCustom({
     required String keyword,
     int page = 1,
     int pageSize = 40,
@@ -998,254 +392,63 @@ class KikoeruApiService {
     int? subtitle,
     int? seed,
     bool includeTranslationWorks = true,
-  }) async {
-    try {
-      // Handle local backend compatibility for sort order
-      String effectiveOrder = order ?? _order;
-      if (effectiveOrder == 'create_date') {
-        effectiveOrder = 'release';
-      }
+  }) {
+    return _strategy!.searchWorks(
+      keyword: keyword,
+      page: page,
+      pageSize: pageSize,
+      order: order,
+      sort: sort,
+      subtitle: subtitle,
+      seed: seed,
+      includeTranslationWorks: includeTranslationWorks,
+    );
+  }
 
-      // Construct the JSON keyword structure for custom backend
-      dynamic keywordValue;
-      int? nsfwParam = 0; // 默认为空
+  // ── Tags ──
 
-      try {
-        // 尝试解析 keyword 是否已经是 JSON 格式 (例如聚合搜索的结构)
-        // 如果是合法的 JSON 列表，则直接使用，不再封装
-        final decoded = jsonDecode(keyword);
-        if (decoded is List) {
-          keywordValue = keyword;
-        } else {
-          throw const FormatException('Not a list');
-        }
-      } catch (_) {
-        // 解析自定义格式，如 "$tag:value$ $circle:value$ keyword"
-        final List<Map<String, dynamic>> conditions = [];
-        final regex = RegExp(r'\$(-?)([a-zA-Z]+):([^$]+)\$');
-        String remainingText = keyword;
+  Future<List<dynamic>> getAllTags() =>
+      _simpleGet('/api/tags/', 'Failed to get tags');
 
-        final matches = regex.allMatches(keyword);
-        for (final match in matches) {
-          final isExclude = match.group(1) == '-';
-          final type = match.group(2);
-          final value = match.group(3);
-
-          // 目前仅处理包含逻辑，排除逻辑因后端格式未知暂跳过
-          if (!isExclude && value != null) {
-            if (type == 'tag') {
-              // t=3: Tag, d=0 (placeholder for ID), name=TagName
-              conditions.add({'t': 3, 'd': 0, 'name': value});
-            } else if (type == 'va' || type == 'circle') {
-              // t=2: VA/Circle, d="0" (placeholder for UUID), name=Name
-              conditions.add({'t': 2, 'd': "0", 'name': value});
-            } else if (type == 'age') {
-              if (value == 'general') {
-                nsfwParam = 1;
-              } else if (value == 'adult') {
-                nsfwParam = 2;
-              }
-              // r15 不支持，忽略
-            }
-          }
-
-          remainingText = remainingText.replaceFirst(match.group(0)!, '');
-        }
-
-        final plainText = remainingText.trim();
-        if (plainText.isNotEmpty) {
-          // Check if it is an RJ number
-          if (RegExp(r'^[Rr][Jj]\d+$', caseSensitive: false)
-              .hasMatch(plainText)) {
-            conditions
-                .add({'t': 5, 'd': plainText.toUpperCase(), 'name': plainText});
-          } else {
-            conditions.add({'t': 1, 'd': plainText, 'name': plainText});
-          }
-        }
-
-        // 如果解析后为空（例如只有排除条件或无匹配），且原关键词不为空，则作为普通文本搜索
-        if (conditions.isEmpty && keyword.isNotEmpty) {
-          conditions.add({'t': 1, 'd': keyword, 'name': keyword});
-        }
-
-        // 尝试解析 ID (Tag/VA/Circle)
-        // 因为后端搜索需要具体的 ID (d字段)，而不仅仅是名称
-        if (conditions.isNotEmpty) {
-          // 预加载所有 Tags 和 VAs (如果需要)
-          // 注意：这可能会有性能影响，但在搜索时通常可以接受
-          List<Tag>? allTags;
-          List<Va>? allVas;
-          List<dynamic>? allCircles;
-
-          for (var i = 0; i < conditions.length; i++) {
-            final condition = conditions[i];
-            final name = condition['name'] as String;
-
-            // Resolve Tag ID
-            if (condition['t'] == 3 && condition['d'] == 0) {
-              try {
-                // Lazy load tags
-                if (allTags == null) {
-                  final tagsData = await getAllTags();
-                  allTags = tagsData.map((json) => Tag.fromJson(json)).toList();
-                }
-
-                // Find exact match (case-insensitive)
-                final tag = allTags.firstWhere(
-                  (t) => t.name.toLowerCase() == name.toLowerCase(),
-                  orElse: () => throw Exception('Tag not found'),
-                );
-                condition['d'] = tag.id;
-              } catch (e) {
-                _log.error('Failed to resolve tag ID for "$name": $e', tag: 'API');
-                // Fallback to text search if tag not found
-                condition['t'] = 1;
-                condition['d'] = name;
-              }
-            }
-            // Resolve VA/Circle ID
-            else if (condition['t'] == 2 && condition['d'] == "0") {
-              // Try VA first
-              bool resolved = false;
-              try {
-                if (allVas == null) {
-                  final vasData = await getAllVas();
-                  allVas = vasData.map((json) => Va.fromJson(json)).toList();
-                }
-
-                final va = allVas.firstWhere(
-                  (v) => v.name.toLowerCase() == name.toLowerCase(),
-                  orElse: () => throw Exception('VA not found'),
-                );
-                condition['d'] = va.id;
-                resolved = true;
-              } catch (_) {
-                // Not a VA, try Circle
-              }
-
-              if (!resolved) {
-                try {
-                  allCircles ??= await getAllCircles();
-                } catch (_) {
-                  // Not found
-                }
-
-                if (!resolved) {
-                  condition['t'] = 1;
-                  condition['d'] = name;
-                }
-              }
-            }
-          }
-        }
-
-        keywordValue = jsonEncode(conditions);
-      }
-
-      return _fetchCombinedPages(
-        page: page,
-        pageSize: pageSize,
-        fetcher: (p) async {
-          final queryParams = <String, dynamic>{
-            'keyword': keywordValue,
-            'page': p,
-            'pageSize': 12, // Force 12 for custom server
-            'order': effectiveOrder,
-            'sort': sort ?? _sort,
-            'isAdvance': 1, // Enable advanced search mode
-            if (nsfwParam != null) 'nsfw': nsfwParam,
-            'lyric': (subtitle ?? _subtitle) == 1 ? 'local' : '',
-            'seed': seed ?? 0, // Default seed
-          };
-
-          final response = await _dio.get(
-            '/api/search',
-            queryParameters: queryParams,
-          );
-          return response.data;
-        },
+  Future<List<Tag>> searchTags(String query) => _searchNamedItems<Tag>(
+        fetcher: getAllTags,
+        query: query,
+        mapper: Tag.fromJson,
+        errorMessage: 'Failed to search tags',
       );
-    } catch (e) {
-      throw KikoeruApiException('Failed to search works', e);
-    }
-  }
 
-  // Tags API
-  Future<List<dynamic>> getAllTags() async {
-    try {
-      final response = await _dio.get('/api/tags/');
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get tags', e);
-    }
-  }
+  // ── VAs ──
 
-  Future<List<Tag>> searchTags(String query) async {
-    try {
-      final tags = await getAllTags();
-      final filteredTags = tags
-          .where((tag) => tag['name']
-              .toString()
-              .toLowerCase()
-              .contains(query.toLowerCase()))
-          .map((tag) => Tag.fromJson(tag))
-          .toList();
-      return filteredTags;
-    } catch (e) {
-      throw KikoeruApiException('Failed to search tags', e);
-    }
-  }
 
-  // VAs API
-  Future<List<dynamic>> getAllVas() async {
-    try {
-      final response = await _dio.get('/api/vas/');
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get VAs', e);
-    }
-  }
 
-  Future<List<Va>> searchVas(String query) async {
-    try {
-      final vas = await getAllVas();
-      final filteredVas = vas
-          .where((va) =>
-              va['name'].toString().toLowerCase().contains(query.toLowerCase()))
-          .map((va) => Va.fromJson(va))
-          .toList();
-      return filteredVas;
-    } catch (e) {
-      throw KikoeruApiException('Failed to search VAs', e);
-    }
-  }
+  // ── Circles ──
 
-  // Circles API
-  Future<List<dynamic>> getAllCircles() async {
-    try {
-      final response = await _dio.get('/api/circles/');
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get circles', e);
-    }
-  }
+  Future<List<dynamic>> getAllVas() =>
+      _simpleGet('/api/vas/', 'Failed to get VAs');
 
-  // Tracks API
+  Future<List<Va>> searchVas(String query) => _searchNamedItems<Va>(
+        fetcher: getAllVas,
+        query: query,
+        mapper: Va.fromJson,
+        errorMessage: 'Failed to search VAs',
+      );
+
+  Future<List<dynamic>> getAllCircles() =>
+      _simpleGet('/api/circles/', 'Failed to get circles');
+
+  // ── Tracks ──
+
   Future<List<dynamic>> getWorkTracks(int workId) async {
     try {
-      // 1. 尝试从缓存获取
       final cachedJson = await CacheService.getCachedWorkTracks(workId);
       if (cachedJson != null) {
         _log.info('从缓存加载作品文件列表: $workId', tag: 'API');
         return jsonDecode(cachedJson) as List<dynamic>;
       }
 
-      // 2. 缓存未命中，从网络获取
       final response = await _dio.get('/api/tracks/$workId');
       final tracks = response.data as List<dynamic>;
 
-      // 3. 保存到缓存
       await CacheService.cacheWorkTracks(workId, jsonEncode(tracks));
       _log.info('已缓存作品文件列表: $workId', tag: 'API');
 
@@ -1255,234 +458,49 @@ class KikoeruApiService {
     }
   }
 
-  // Reviews API
+  // ── Reviews ──
+
   Future<Map<String, dynamic>> getWorkReviews(int workId,
-      {int page = 1, int pageSize = 20}) async {
-    if (_isOfficialServer) {
-      return _getWorkReviewsOfficial(workId, page: page, pageSize: pageSize);
-    } else {
-      return _getWorkReviewsCustom(workId, page: page, pageSize: pageSize);
-    }
+      {int page = 1, int pageSize = 20}) {
+    return _strategy!.getWorkReviews(workId, page: page, pageSize: pageSize);
   }
 
-  Future<Map<String, dynamic>> _getWorkReviewsOfficial(int workId,
-      {int page = 1, int pageSize = 20}) async {
-    try {
-      final response = await _dio.get(
-        '/api/review/$workId',
-        queryParameters: {
-          'page': page,
-          'pageSize': pageSize,
-        },
-      );
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to get reviews', e);
-    }
-  }
-
-  Future<Map<String, dynamic>> _getWorkReviewsCustom(int workId,
-      {int page = 1, int pageSize = 20}) async {
-    // Local backend does not support getting reviews for a specific work
-    // Return empty structure to avoid errors
-    return {
-      'reviews': [],
-      'pagination': {
-        'currentPage': 1,
-        'pageSize': pageSize,
-        'totalCount': 0,
-      }
-    };
-  }
-
-  /// 获取当前账户的 Review/收藏状态列表
-  /// 支持的 filter: marked, listening, listened, replay, postponed
-  /// 传入 null 或空字符串时为全部
   Future<Map<String, dynamic>> getMyReviews({
     int page = 1,
     int pageSize = 20,
     String? filter,
     String order = 'updated_at',
     String sort = 'desc',
-  }) async {
-    if (!_isOfficialServer) {
-      return _fetchCombinedPages(
-        page: page,
-        pageSize: pageSize,
-        fetcher: (p) async {
-          try {
-            final query = <String, dynamic>{
-              'page': p,
-              'pageSize': 12, // Force 12 for custom server
-              'order': order,
-              'sort': sort,
-            };
-            if (filter != null && filter.isNotEmpty) {
-              query['filter'] = filter;
-            }
-            final response = await _dio.get(
-              '/api/review',
-              queryParameters: query,
-            );
-            return response.data;
-          } catch (e) {
-            throw KikoeruApiException('Failed to get my reviews', e);
-          }
-        },
-      );
-    }
-
-    // Official server also has a limit of 20 items per page for reviews
-    return _fetchCombinedPages(
+  }) {
+    return _strategy!.getMyReviews(
       page: page,
       pageSize: pageSize,
-      serverPageSize: 20,
-      fetcher: (p) async {
-        try {
-          final query = <String, dynamic>{
-            'page': p,
-            'pageSize': 20, // Force 20 for official server
-            'order': order,
-            'sort': sort,
-          };
-          if (filter != null && filter.isNotEmpty) {
-            query['filter'] = filter;
-          }
-          final response = await _dio.get(
-            '/api/review',
-            queryParameters: query,
-          );
-          return response.data;
-        } catch (e) {
-          throw KikoeruApiException('Failed to get my reviews', e);
-        }
-      },
+      filter: filter,
+      order: order,
+      sort: sort,
     );
   }
 
-  /// 更新作品的收藏/进度状态
   Future<Map<String, dynamic>> updateReviewProgress(
     int workId, {
     String? progress,
     int? rating,
     String? reviewText,
-  }) async {
-    if (_isOfficialServer) {
-      return _updateReviewProgressOfficial(workId,
-          progress: progress, rating: rating, reviewText: reviewText);
-    } else {
-      return _updateReviewProgressCustom(workId,
-          progress: progress, rating: rating, reviewText: reviewText);
-    }
+  }) {
+    return _strategy!.updateReviewProgress(
+      workId,
+      progress: progress,
+      rating: rating,
+      reviewText: reviewText,
+    );
   }
 
-  Future<Map<String, dynamic>> _updateReviewProgressOfficial(
-    int workId, {
-    String? progress,
-    int? rating,
-    String? reviewText,
-  }) async {
-    try {
-      final data = <String, dynamic>{
-        'work_id': workId,
-      };
-      if (progress != null) data['progress'] = progress;
-      if (rating != null) data['rating'] = rating;
-      if (reviewText != null) data['review_text'] = reviewText;
-
-      final response = await _dio.put(
-        '/api/review',
-        data: data,
-      );
-
-      await CacheService.invalidateWorkDetailCache(workId);
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to update review progress', e);
-    }
+  Future<void> deleteReview(int workId) {
+    return _strategy!.deleteReview(workId);
   }
 
-  Future<Map<String, dynamic>> _updateReviewProgressCustom(
-    int workId, {
-    String? progress,
-    int? rating,
-    String? reviewText,
-  }) async {
-    _log.info('更新评论状态: workId=$workId, progress=$progress, rating=$rating', tag: 'API');
-    try {
-      final data = <String, dynamic>{
-        'work_id': workId,
-      };
-      final queryParams = <String, dynamic>{};
+  // ── Tags (vote / attach) ──
 
-      if (progress != null) {
-        data['progress'] = progress;
-      } else {
-        queryParams['starOnly'] = true;
-      }
-      if (rating != null) {
-        data['rating'] = rating;
-      } else {
-        queryParams['starOnly'] = false;
-        queryParams['progressOnly'] = true;
-      }
-      if (reviewText != null) data['review_text'] = reviewText;
-      if ((progress != null && rating != null) || reviewText != null) {
-        queryParams['starOnly'] = false;
-      }
-
-      final response = await _dio.put(
-        '/api/review',
-        data: data,
-        queryParameters: queryParams,
-      );
-
-      // 更新成功后清除该作品的详情缓存，确保下次获取最新状态
-      await CacheService.invalidateWorkDetailCache(workId);
-
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to update review progress', e);
-    }
-  }
-
-  /// 删除作品的评论/收藏状态
-  Future<void> deleteReview(int workId) async {
-    if (_isOfficialServer) {
-      await _deleteReviewOfficial(workId);
-    } else {
-      await _deleteReviewCustom(workId);
-    }
-  }
-
-  Future<void> _deleteReviewOfficial(int workId) async {
-    try {
-      await _dio.delete(
-        '/api/review',
-        queryParameters: {'work_id': workId},
-      );
-      await CacheService.invalidateWorkDetailCache(workId);
-    } catch (e) {
-      throw KikoeruApiException('Failed to delete review', e);
-    }
-  }
-
-  Future<void> _deleteReviewCustom(int workId) async {
-    try {
-      await _dio.delete(
-        '/api/review',
-        queryParameters: {'work_id': workId},
-      );
-
-      // 删除成功后清除该作品的详情缓存，确保下次获取最新状态
-      await CacheService.invalidateWorkDetailCache(workId);
-    } catch (e) {
-      throw KikoeruApiException('Failed to delete review', e);
-    }
-  }
-
-  /// 投票作品标签
-  /// status: 0=取消投票, 1=支持, 2=反对
   Future<Map<String, dynamic>> voteWorkTag({
     required int workId,
     required int tagId,
@@ -1497,18 +515,13 @@ class KikoeruApiService {
           'status': status,
         },
       );
-
-      // 投票成功后清除该作品的详情缓存，确保下次获取最新状态
       await CacheService.invalidateWorkDetailCache(workId);
-
       return response.data;
     } catch (e) {
       throw KikoeruApiException('Failed to vote work tag', e);
     }
   }
 
-  /// 添加标签到作品
-  /// tagIds: 要添加的标签ID数组
   Future<Map<String, dynamic>> attachTagsToWork({
     required int workId,
     required List<int> tagIds,
@@ -1521,13 +534,9 @@ class KikoeruApiService {
           'tagIDs': tagIds,
         },
       );
-
-      // 添加成功后清除该作品的详情缓存，确保下次获取最新状态
       await CacheService.invalidateWorkDetailCache(workId);
-
       return response.data;
     } on DioException catch (e) {
-      // 检查是否是需要绑定邮箱的错误
       if (e.response?.statusCode == 400) {
         final errorData = e.response?.data;
         if (errorData is Map &&
@@ -1544,50 +553,11 @@ class KikoeruApiService {
     }
   }
 
-  // Favorites API
-  Future<Map<String, dynamic>> getFavorites(
-      {int page = 1, int pageSize = 20}) async {
-    if (!_isOfficialServer) {
-      return _fetchCombinedPages(
-        page: page,
-        pageSize: pageSize,
-        fetcher: (p) async {
-          try {
-            final response = await _dio.get(
-              '/api/favourites',
-              queryParameters: {
-                'page': p,
-                'pageSize': 12, // Force 12 for custom server
-              },
-            );
-            return response.data;
-          } catch (e) {
-            throw KikoeruApiException('Failed to get favorites', e);
-          }
-        },
-      );
-    }
+  // ── Favorites ──
 
-    // Official server might also have a limit for favorites, applying similar logic
-    return _fetchCombinedPages(
-      page: page,
-      pageSize: pageSize,
-      serverPageSize: 20,
-      fetcher: (p) async {
-        try {
-          final response = await _dio.get(
-            '/api/favourites',
-            queryParameters: {
-              'page': p,
-              'pageSize': 20, // Force 20 for official server
-            },
-          );
-          return response.data;
-        } catch (e) {
-          throw KikoeruApiException('Failed to get favorites', e);
-        }
-      },
-    );
+  Future<Map<String, dynamic>> getFavorites(
+      {int page = 1, int pageSize = 20}) {
+    return _strategy!.getFavorites(page: page, pageSize: pageSize);
   }
 
   Future<void> addToFavorites(int workId) async {
@@ -1606,7 +576,8 @@ class KikoeruApiService {
     }
   }
 
-  // Playlists API
+  // ── Playlists ──
+
   Future<List<dynamic>> getPlaylists() async {
     try {
       final response = await _dio.get('/api/playlists');
@@ -1616,10 +587,6 @@ class KikoeruApiService {
     }
   }
 
-  /// 获取用户的播放列表（需要token）
-  /// page: 页码（从1开始）
-  /// pageSize: 每页数量
-  /// filterBy: 筛选条件（固定为'all'）
   Future<Map<String, dynamic>> getUserPlaylists({
     int page = 1,
     int pageSize = 20,
@@ -1640,12 +607,6 @@ class KikoeruApiService {
     }
   }
 
-  /// 创建播放列表（需要token）
-  /// name: 播放列表名称（必填）
-  /// privacy: 隐私设置 0=私享(只有您可以观看), 1=不公开(知道链接的人才能观看), 2=公开(任何人都可以观看)
-  /// locale: 语言区域，默认'zh-CN'
-  /// description: 描述（可选）
-  /// works: 作品ID列表，默认为空列表
   Future<Map<String, dynamic>> createPlaylist({
     required String name,
     int privacy = 0,
@@ -1660,7 +621,6 @@ class KikoeruApiService {
         'locale': locale,
         'works': works ?? [],
       };
-
       if (description != null && description.isNotEmpty) {
         data['description'] = description;
       }
@@ -1675,46 +635,15 @@ class KikoeruApiService {
     }
   }
 
-  /// 添加(收藏)别人的播放列表
-  Future<Map<String, dynamic>> likePlaylist(String playlistId) async {
-    try {
-      final response = await _dio.post(
-        '/api/playlist/like-playlist',
-        data: {'id': playlistId},
-      );
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to like playlist', e);
-    }
-  }
+  Future<Map<String, dynamic>> likePlaylist(String playlistId) =>
+      _playlistPostAction('like-playlist', playlistId, 'Failed to like playlist');
 
-  /// 取消收藏播放列表（删除不属于自己的播放列表）
-  Future<Map<String, dynamic>> removeLikePlaylist(String playlistId) async {
-    try {
-      final response = await _dio.post(
-        '/api/playlist/remove-like-playlist',
-        data: {'id': playlistId},
-      );
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to remove liked playlist', e);
-    }
-  }
+  Future<Map<String, dynamic>> removeLikePlaylist(String playlistId) =>
+      _playlistPostAction('remove-like-playlist', playlistId, 'Failed to remove liked playlist');
 
-  /// 删除自己创建的播放列表
-  Future<Map<String, dynamic>> deletePlaylist(String playlistId) async {
-    try {
-      final response = await _dio.post(
-        '/api/playlist/delete-playlist',
-        data: {'id': playlistId},
-      );
-      return response.data;
-    } catch (e) {
-      throw KikoeruApiException('Failed to delete playlist', e);
-    }
-  }
+  Future<Map<String, dynamic>> deletePlaylist(String playlistId) =>
+      _playlistPostAction('delete-playlist', playlistId, 'Failed to delete playlist');
 
-  /// 编辑播放列表元数据
   Future<Map<String, dynamic>> editPlaylistMetadata({
     required String id,
     required String name,
@@ -1739,7 +668,6 @@ class KikoeruApiService {
     }
   }
 
-  /// 添加作品到播放列表
   Future<Map<String, dynamic>> addWorksToPlaylist({
     required String playlistId,
     required List<String> works,
@@ -1758,7 +686,6 @@ class KikoeruApiService {
     }
   }
 
-  /// 从播放列表移除作品
   Future<Map<String, dynamic>> removeWorksFromPlaylist({
     required String playlistId,
     required List<int> works,
@@ -1777,7 +704,6 @@ class KikoeruApiService {
     }
   }
 
-  /// 获取播放列表元数据
   Future<Map<String, dynamic>> getPlaylistMetadata(String playlistId) async {
     try {
       final response = await _dio.get(
@@ -1790,7 +716,6 @@ class KikoeruApiService {
     }
   }
 
-  /// 获取播放列表中的作品
   Future<Map<String, dynamic>> getPlaylistWorks({
     required String playlistId,
     int page = 1,
@@ -1811,7 +736,8 @@ class KikoeruApiService {
     }
   }
 
-  // Progress API
+  // ── Progress ──
+
   Future<void> updateProgress(int workId, double progress) async {
     try {
       await _dio.put(
@@ -1832,7 +758,8 @@ class KikoeruApiService {
     }
   }
 
-  // Download API
+  // ── Download URLs ──
+
   String getDownloadUrl(String hash, String fileName) {
     return '$_host/api/media/download/$hash/$fileName';
   }
@@ -1845,7 +772,8 @@ class KikoeruApiService {
     return '$_host/api/cover/$workId';
   }
 
-  // Cleanup
+  // ── Cleanup ──
+
   void dispose() {
     _dio.close();
   }

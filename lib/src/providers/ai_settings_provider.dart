@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/log_service.dart';
 
 /// Persisted AI/Whisper model settings.
 class AISettings {
@@ -61,7 +63,9 @@ class AISettingsNotifier extends StateNotifier<AISettings> {
         transcriptionThreads: prefs.getInt(_threadsKey) ?? 4,
         splitOnWord: prefs.getBool(_splitOnWordKey) ?? false,
       );
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[AISettingsNotifier] error: $e', tag: 'AISettings');
+    }
   }
 
   Future<void> setSelectedModel(String model) async {
@@ -69,7 +73,9 @@ class AISettingsNotifier extends StateNotifier<AISettings> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_modelKey, model);
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[AISettingsNotifier] error: $e', tag: 'AISettings');
+    }
   }
 
   Future<void> setTranscriptionThreads(int threads) async {
@@ -77,7 +83,9 @@ class AISettingsNotifier extends StateNotifier<AISettings> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_threadsKey, threads);
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[AISettingsNotifier] error: $e', tag: 'AISettings');
+    }
   }
 
   Future<void> setSplitOnWord(bool value) async {
@@ -85,7 +93,9 @@ class AISettingsNotifier extends StateNotifier<AISettings> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_splitOnWordKey, value);
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[AISettingsNotifier] error: $e', tag: 'AISettings');
+    }
   }
 
   Future<void> markModelDownloaded(String path, int sizeBytes) async {
@@ -102,7 +112,9 @@ class AISettingsNotifier extends StateNotifier<AISettings> {
       await prefs.setBool(_downloadedKey, true);
       await prefs.setString(_pathKey, path);
       await prefs.setInt(_sizeKey, sizeBytes);
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[AISettingsNotifier] error: $e', tag: 'AISettings');
+    }
   }
 
   Future<void> markModelDeleted() async {
@@ -112,7 +124,9 @@ class AISettingsNotifier extends StateNotifier<AISettings> {
       await prefs.remove(_downloadedKey);
       await prefs.remove(_pathKey);
       await prefs.remove(_sizeKey);
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[AISettingsNotifier] error: $e', tag: 'AISettings');
+    }
   }
 }
 

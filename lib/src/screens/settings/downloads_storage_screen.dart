@@ -11,6 +11,7 @@ import '../download_path_settings_screen.dart';
 import '../../services/cache_service.dart';
 import '../../services/download_path_service.dart';
 import '../../services/audio_conversion_service.dart';
+import '../../services/log_service.dart';
 import '../../providers/settings_provider.dart';
 import '../../utils/snackbar_util.dart';
 
@@ -41,7 +42,7 @@ class _DownloadsStorageScreenState
       AudioConversionService.instance.checkAllEncoders().then((_) {
         if (mounted) setState(() {});
       }).catchError((Object e) {
-        debugPrint('[AudioConversion] Encoder check failed: $e');
+        LogService.instance.warning('[AudioConversion] Encoder check failed: $e', tag: 'AudioConversion');
       }),
     );
   }

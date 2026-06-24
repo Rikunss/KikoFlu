@@ -5,7 +5,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.hardware.usb.UsbConstants
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.os.Build
+import android.os.Bundle
 import android.service.quicksettings.TileService
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -30,6 +34,21 @@ class MainActivity : AudioServiceActivity() {
     private var widgetChannel: MethodChannel? = null
     private var appLockTileChannel: MethodChannel? = null
     private var tileReceiver: BroadcastReceiver? = null
+    private var usbReceiver: BroadcastReceiver? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Register runtime receiver for USB_DEVICE_ATTACHED (without the manifest
+        // intent-filter, which triggers the Android chooser dialog).
+        // The DAC is NOT claimed here — only when user enables routing in settings.
+        registerUsbReceiver()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Forward widget intents
+        handleWidgetIntent(intent)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -112,11 +131,6 @@ class MainActivity : AudioServiceActivity() {
         handleWidgetIntent(intent)
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        handleWidgetIntent(intent)
-    }
-
     /**
      * Requests the system to refresh the App Lock Quick Settings tile.
      * This triggers [AppLockTileService.onStartListening], which re-reads
@@ -151,6 +165,61 @@ class MainActivity : AudioServiceActivity() {
         }
     }
 
+    private fun registerUsbReceiver() {
+        usbReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val action = intent.action
+                val device = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE) ?: return
+
+                // Only handle USB Audio Class devices with an AudioStreaming interface
+                val isAudioDevice = (0 until device.interfaceCount).any { i ->
+                    val iface = device.getInterface(i)
+                    iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO &&
+                        iface.interfaceSubclass == 2
+                }
+                if (!isAudioDevice) return
+
+                when (action) {
+                    UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                        // Show the USB permission dialog so the user can grant access.
+                        // On grant, auto-enable UsbAudioSink routing so the next playback
+                        // goes through the USB DAC without requiring manual toggle in settings.
+                        val usbAudioDevice = com.decent.usbaudio.UsbAudioDevice.getInstance(context)
+                        usbAudioDevice.requestPermission(device) { granted ->
+                            if (granted) {
+                                android.util.Log.i("MainActivity",
+                                    "USB DAC permission granted for ${device.productName}")
+                                val plugin = this@MainActivity.hiResAudioPlugin
+                                if (plugin != null) {
+                                    plugin.autoRouteToUsbDac(device)
+                                }
+                            }
+                        }
+                    }
+                    UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                        android.util.Log.i("MainActivity",
+                            "USB DAC detached: ${device.productName}")
+                        // Invalidate the cached USB device connection so the next
+                        // openDevice() gets a fresh fd for the new physical session.
+                        com.decent.usbaudio.UsbAudioDevice.getInstance(context).closeDevice()
+                        val plugin = this@MainActivity.hiResAudioPlugin
+                        if (plugin != null) {
+                            plugin.onUsbDeviceDetached()
+                        }
+                    }
+                }
+            }
+        }
+        val filter = IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED).apply {
+            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(usbReceiver, filter)
+        }
+    }
+
     private fun handleWidgetIntent(intent: Intent) {
         val channel = widgetChannel ?: return
         when (intent.action) {
@@ -178,6 +247,7 @@ class MainActivity : AudioServiceActivity() {
         usbDacPlugin?.cleanup()
         screenStatePlugin?.cleanup()
         tileReceiver?.let { unregisterReceiver(it) }
+        usbReceiver?.let { unregisterReceiver(it) }
         super.onDestroy()
     }
 }

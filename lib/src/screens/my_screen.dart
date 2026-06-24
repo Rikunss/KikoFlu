@@ -110,13 +110,17 @@ class _MyScreenState extends ConsumerState<MyScreen>
           final activeCount = tasks.where((t) =>
               t.status == DownloadStatus.downloading ||
               t.status == DownloadStatus.pending).length;
-          return Badge(
-            isLabelVisible: activeCount > 0,
-            label: Text('$activeCount'),
-            child: FloatingActionButton(
-              onPressed: _navigateToDownloads,
-              tooltip: S.of(context).downloadTasks,
-              child: const Icon(Icons.download),
+          if (activeCount == 0) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Badge(
+              isLabelVisible: true,
+              label: Text('$activeCount'),
+              child: FloatingActionButton(
+                onPressed: _navigateToDownloads,
+                tooltip: S.of(context).downloadTasks,
+                child: const Icon(Icons.download),
+              ),
             ),
           );
         },
@@ -210,14 +214,16 @@ class _MyScreenState extends ConsumerState<MyScreen>
           child: SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: Row(
-                children: List.generate(tabs.length, (i) {
-                  final tab = tabs[i];
-                  final isSel = i == _currentTabIndex;
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: List.generate(tabs.length, (i) {
+                    final tab = tabs[i];
+                    final isSel = i == _currentTabIndex;
 
-                  return Expanded(
-                    child: Padding(
+                    return Padding(
                       padding: EdgeInsets.only(
                         right: i < tabs.length - 1 ? 6 : 0,
                       ),
@@ -228,7 +234,7 @@ class _MyScreenState extends ConsumerState<MyScreen>
                           duration: animDur,
                           curve: Curves.easeOutCubic,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 6),
+                              horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
                             color: isSel
                                 ? colorScheme.primaryContainer
@@ -260,29 +266,27 @@ class _MyScreenState extends ConsumerState<MyScreen>
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  tab.label,
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: isSel
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    color: isSel
-                                        ? colorScheme.onPrimaryContainer
-                                        : colorScheme.onSurfaceVariant,
-                                  ),
+                              Text(
+                                tab.label,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: isSel
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                  color: isSel
+                                      ? colorScheme.onPrimaryContainer
+                                      : colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  }),
+                ),
               ),
             ),
           ),

@@ -67,7 +67,21 @@ final activeUsbDacNameProvider = StreamProvider<String>((ref) {
 /// Tracks whether audio is currently routed to a USB DAC via the
 /// Hi-Res ExoPlayer pathway.
 final hiResUsbRoutingProvider = StreamProvider<UsbRoutingState>((ref) {
-  return HiResAudioService.instance.usbRoutingStream;
+  final hiRes = HiResAudioService.instance;
+  final controller = StreamController<UsbRoutingState>();
+  // Emit cached value first to avoid the "broadcast stream loses initial
+  // event" bug — the stream may have already emitted before this provider
+  // was first watched (e.g. DAC plugged before sheet opened).
+  controller.add(hiRes.lastUsbRoutingState);
+  // Forward live stream events.
+  final sub = hiRes.usbRoutingStream.listen((state) {
+    controller.add(state);
+  });
+  ref.onDispose(() {
+    sub.cancel();
+    controller.close();
+  });
+  return controller.stream;
 });
 
 /// Stream provider that emits the hi-res playback state (isPlaying) reactively.

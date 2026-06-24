@@ -3,8 +3,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/work.dart';
-import '../services/kikoeru_api_service.dart' hide kikoeruApiServiceProvider;
-import 'auth_provider.dart';
+import '../services/kikoeru_api_service.dart';
 
 class RecommendationState {
   final List<Work> recommendations;

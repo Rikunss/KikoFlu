@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'log_service.dart';
 
 /// Manages Android system notification for AI model download progress.
 ///
@@ -50,7 +52,9 @@ class AiDownloadNotificationService {
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.requestNotificationsPermission();
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[AiDownloadNotification] Permission request failed: $e', tag: 'AiDownload');
+    }
 
     _initialized = true;
   }

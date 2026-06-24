@@ -15,4 +15,19 @@ class ServerUtils {
     if (host == null || host.isEmpty) return false;
     return host.contains(officialHostKeyword);
   }
+
+  /// Normalizes a host string to include the protocol prefix.
+  /// Local addresses (localhost, 127.0.0.1, 192.168.x) get HTTP,
+  /// everything else gets HTTPS.
+  static String normalizeHost(String host) {
+    if (host.startsWith('http://') || host.startsWith('https://')) {
+      return host;
+    }
+    if (host.contains('localhost') ||
+        host.startsWith('127.0.0.1') ||
+        host.startsWith('192.168.')) {
+      return 'http://$host';
+    }
+    return 'https://$host';
+  }
 }

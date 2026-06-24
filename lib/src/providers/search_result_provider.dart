@@ -2,10 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:equatable/equatable.dart';
 
 import '../models/work.dart';
-import '../services/kikoeru_api_service.dart' hide kikoeruApiServiceProvider;
+import '../services/kikoeru_api_service.dart';
 import '../providers/works_provider.dart';
 import '../models/sort_options.dart';
-import 'auth_provider.dart';
 import 'settings_provider.dart';
 import 'subtitle_library_provider.dart';
 

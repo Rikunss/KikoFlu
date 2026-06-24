@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Matches any USB Audio Class device (class 1 = Audio).
+     This makes Android offer your app as a handler when a USB DAC is connected. -->
+<resources>
+    <usb-device class="1" />
+</resources>

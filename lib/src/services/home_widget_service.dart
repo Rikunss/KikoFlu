@@ -37,7 +37,7 @@ class HomeWidgetService {
 
       await HomeWidget.updateWidget(
         name: _widgetName,
-        androidName: _widgetName,
+        androidName: 'com.meteor.kikoeruflutter.$_widgetName',
       );
 
       _log.debug('[HomeWidget] Updated: "$title" - ${isPlaying ? "playing" : "paused"}');

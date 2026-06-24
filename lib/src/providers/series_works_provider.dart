@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/work.dart';
-import 'auth_provider.dart';
+import '../services/kikoeru_api_service.dart';
 
 /// State for works in the same circle/series as a given work.
 class SeriesWorksState {

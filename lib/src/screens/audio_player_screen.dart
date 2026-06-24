@@ -23,6 +23,7 @@ import '../widgets/player/playlist_dialog.dart';
 import '../widgets/work_bookmark_manager.dart';
 import '../widgets/player/audio_info_sheet.dart' show showAudioInfoSheet;
 import '../providers/exclusive_audio_provider.dart';
+import '../services/kikoeru_api_service.dart';
 import '../utils/audio_format_parser.dart' show AudioFormatInfo;
 import '../widgets/player/work_info_panel.dart' show showWorkInfoPanel;
 import '../utils/artwork_color_extractor.dart';
@@ -815,7 +816,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   void _handleSeekEnd(double value) {
     final dur = ref.read(durationProvider).value ?? Duration.zero;
     final newPosition = Duration(milliseconds: (value * dur.inMilliseconds).round());
-    debugPrint('[SEEKBAR SEEK] target=${newPosition.inMilliseconds}ms');
+    LogService.instance.debug('[SEEKBAR SEEK] target=${newPosition.inMilliseconds}ms', tag: 'AudioPlayer');
     setState(() => _seekingPosition = newPosition);
     ref.read(audioPlayerControllerProvider.notifier).seekAndPersist(newPosition);
 

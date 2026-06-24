@@ -11,6 +11,7 @@ import '../services/cache_service.dart';
 import '../services/download_service.dart';
 import '../services/log_service.dart';
 import '../services/storage_service.dart';
+import '../services/cookie_service.dart';
 
 /// Kelas yang menangani inisialisasi heavy app di background
 /// saat splash screen sedang ditampilkan.
@@ -31,6 +32,7 @@ class AppBootstrap {
       await Hive.initFlutter();
     }
     await StorageService.init();
+    await CookieService.ensureInitialized();
   }
 
   /// Jalankan inisialisasi non-essential setelah app berjalan
@@ -57,8 +59,8 @@ class AppBootstrap {
     await BlurHashService.instance.init();
 
     // Configure ImageCache untuk manajemen memori gambar yang optimal.
-    PaintingBinding.instance.imageCache.maximumSize = 500;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = 100 << 20; // 100 MB
+    PaintingBinding.instance.imageCache.maximumSize = 300;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 50 << 20; // 50 MB
   }
 
   /// Konfigurasi system UI overlay style dan orientasi.

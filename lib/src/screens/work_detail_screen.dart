@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 
 import '../models/work.dart';
 import '../providers/auth_provider.dart';
+import '../services/kikoeru_api_service.dart';
 import '../widgets/scrollable_appbar.dart';
 import '../services/storage_service.dart';
 import '../widgets/file_explorer_widget.dart';

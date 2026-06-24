@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/log_service.dart';
 
 /// Status of an AI model download.
 ///
@@ -181,7 +183,9 @@ class AiDownloadNotifier extends StateNotifier<AiDownloadState> {
       await prefs.setInt(_kReceived, state.receivedBytes);
       await prefs.setInt(_kTotal, state.totalBytes);
       await prefs.setString(_kStatus, state.status.name);
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[AiDownloadNotifier] error: $e', tag: 'AiDownload');
+    }
   }
 
   Future<void> _loadPersistedState() async {
@@ -206,7 +210,9 @@ class AiDownloadNotifier extends StateNotifier<AiDownloadState> {
           totalBytes: prefs.getInt(_kTotal) ?? 0,
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[AiDownloadNotifier] error: $e', tag: 'AiDownload');
+    }
   }
 
   Future<void> _clearPersisted() async {
@@ -217,7 +223,9 @@ class AiDownloadNotifier extends StateNotifier<AiDownloadState> {
       await prefs.remove(_kReceived);
       await prefs.remove(_kTotal);
       await prefs.remove(_kStatus);
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[AiDownloadNotifier] error: $e', tag: 'AiDownload');
+    }
   }
 }
 

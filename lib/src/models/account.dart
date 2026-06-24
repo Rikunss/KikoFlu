@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../utils/security_utils.dart';
 
 class Account extends Equatable {
   final int? id;
@@ -38,6 +39,43 @@ class Account extends Equatable {
     );
   }
 
+  /// Create Account from database map, decrypting the password.
+  static Future<Account> fromMapDecrypted(Map<String, dynamic> map) async {
+    final encryptedPassword = map['password'] as String;
+    final password = await SecurityUtils.decrypt(encryptedPassword);
+    return Account(
+      id: map['id'] as int?,
+      username: map['username'] as String,
+      password: password,
+      host: map['host'] as String,
+      isActive: (map['isActive'] as int) == 1,
+      serverCookie: map['serverCookie'] as String?,
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'] as String)
+          : null,
+      lastUsedAt: map['lastUsedAt'] != null
+          ? DateTime.parse(map['lastUsedAt'] as String)
+          : null,
+    );
+  }
+
+  /// Convert to database map, encrypting the password.
+  Future<Map<String, dynamic>> toMapEncrypted() async {
+    final encryptedPassword = await SecurityUtils.encrypt(password);
+    return {
+      'id': id,
+      'username': username,
+      'password': encryptedPassword,
+      'host': host,
+      'isActive': isActive ? 1 : 0,
+      'serverCookie': serverCookie,
+      'createdAt': createdAt?.toIso8601String(),
+      'lastUsedAt': lastUsedAt?.toIso8601String(),
+    };
+  }
+
+  /// WARNING: Returns plaintext password. Use [toMapEncrypted] for database writes.
+  /// Only safe for in-memory operations where password is already needed.
   Map<String, dynamic> toMap() {
     return {
       'id': id,

@@ -76,7 +76,6 @@ class User extends Equatable {
     return {
       'id': id,
       'name': name,
-      'password': password,
       'host': host,
       'token': token,
       'lastUpdateTime': lastUpdateTime?.toIso8601String(),

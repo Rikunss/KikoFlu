@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:ui' show ImageFilter;
 
@@ -16,87 +17,173 @@ import 'my_screen.dart';
 import 'settings_screen.dart';
 import '../providers/settings_provider.dart';
 
-/// Extracted widget that watches [authProvider] via a narrow `select()` and
-/// rebuilds only itself, not the surrounding IndexedStack.
-class _OfflineBanner extends ConsumerWidget {
-  const _OfflineBanner();
+/// Pop-up toast that appears when network is lost.
+/// Animates in with a scale bounce, stays 5 seconds,
+/// then shrinks upward and fades out.
+class _OfflineToast extends ConsumerStatefulWidget {
+  const _OfflineToast();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_OfflineToast> createState() => _OfflineToastState();
+}
+
+class _OfflineToastState extends ConsumerState<_OfflineToast>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  Timer? _dismissTimer;
+  bool _wasOffline = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.dismissed) {
+        _dismissTimer?.cancel();
+        _dismissTimer = null;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _dismissTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _show() {
+    _dismissTimer?.cancel();
+    _controller.forward();
+    _dismissTimer = Timer(const Duration(seconds: 5), () {
+      _controller.reverse();
+    });
+  }
+
+  void _hide() {
+    _dismissTimer?.cancel();
+    _dismissTimer = null;
+    _controller.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final isOfflineMode = ref.watch(authProvider.select(
       (s) => s.currentUser != null && !s.isLoggedIn && s.error != null,
     ));
 
-    if (!isOfflineMode) {
+    if (isOfflineMode && !_wasOffline) {
+      _wasOffline = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _show());
+    } else if (!isOfflineMode && _wasOffline) {
+      _wasOffline = false;
+      _hide();
+    }
+
+    if (_controller.status == AnimationStatus.dismissed && !isOfflineMode) {
       return const SizedBox.shrink();
     }
 
+    final cs = Theme.of(context).colorScheme;
     final topPadding = MediaQuery.of(context).padding.top;
+    final screenW = MediaQuery.of(context).size.width;
+
+    const double cardMaxW = 420;
+    final horizMargin = screenW > cardMaxW + 48
+        ? (screenW - cardMaxW) / 2
+        : 24.0;
 
     return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(12, topPadding + 4, 12, 4),
-        color: Colors.orange.shade800,
-        child: Row(
-          children: [
-            const Icon(Icons.cloud_off, size: 14, color: Colors.white),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                S.of(context).offlineModeMessage,
-                style: const TextStyle(fontSize: 11, color: Colors.white),
-              ),
-            ),
-            TextButton(
-              onPressed: () async {
-                final notifier = ref.read(authProvider.notifier);
-                await notifier.retryConnection();
-              },
-              style: TextButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Text(
-                S.of(context).retry,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+      top: topPadding + 80,
+      left: horizMargin,
+      right: horizMargin,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final value = _controller.value;
+          final isReversing = _controller.status == AnimationStatus.reverse;
+
+          final double scaleX;
+          final double scaleY;
+          final double opacity;
+          final double translateY;
+
+          if (isReversing) {
+            final p = Curves.easeInCubic.transform(1.0 - value);
+            scaleX = 1.0;
+            scaleY = 1.0 - p;
+            opacity = 1.0 - p;
+            translateY = -50 * p;
+          } else {
+            final p = Curves.easeOutBack.transform(value);
+            scaleX = p;
+            scaleY = p;
+            opacity = value;
+            translateY = 0;
+          }
+
+          return Opacity(
+            opacity: opacity.clamp(0.0, 1.0),
+            child: Transform(
+              transform: Matrix4.identity()
+                ..translateByDouble(0.0, translateY, 0.0, 1.0)
+                ..scaleByDouble(scaleX, scaleY, 1.0, 1.0),
+              alignment: Alignment.topCenter,
+              child: Material(
+                elevation: 10,
+                borderRadius: BorderRadius.circular(16),
+                shadowColor: Colors.black.withValues(alpha: 0.35),
+                color: cs.errorContainer,
+                surfaceTintColor: cs.error,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _hide,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: cs.onErrorContainer.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.wifi_off_rounded, size: 20,
+                            color: cs.onErrorContainer),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            S.of(context).offlineModeMessage,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: cs.onErrorContainer,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.close, size: 18,
+                          color: cs.onErrorContainer.withValues(alpha: 0.6)),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
 
-/// Extracted widget that provides top padding when offline mode is active.
-/// Uses a narrow `select()` so it doesn't rebuild the IndexedStack.
-class _OfflinePadding extends ConsumerWidget {
-  final Widget child;
 
-  const _OfflinePadding({required this.child});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isOfflineMode = ref.watch(authProvider.select(
-      (s) => s.currentUser != null && !s.isLoggedIn && s.error != null,
-    ));
-
-    return Padding(
-      padding: EdgeInsets.only(top: isOfflineMode ? 30 : 0),
-      child: child,
-    );
-  }
-}
 
 /// Extracted MiniPlayer area that floats above bottom navigation.
 ///
@@ -382,8 +469,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 if (!isFullscreenActive)
                   const VerticalDivider(thickness: 1, width: 1),
                 Expanded(
-                  child: _OfflinePadding(
-                    child: SafeArea(
+                  child: SafeArea(
                       top: false,
                       child: Column(
                         children: [
@@ -401,10 +487,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                       ),
                     ),
                   ),
-                ),
               ],
             ),
-            const _OfflineBanner(),
+            const _OfflineToast(),
           ],
         ),
       ),
@@ -425,8 +510,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       extendBody: true,
       body: Stack(
         children: [
-          _OfflinePadding(
-            child: SafeArea(
+          SafeArea(
               top: false,
               child: Column(
                 children: [
@@ -442,8 +526,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 ],
               ),
             ),
-          ),
-          const _OfflineBanner(),
+          const _OfflineToast(),
         ],
       ),
       bottomNavigationBar: Consumer(

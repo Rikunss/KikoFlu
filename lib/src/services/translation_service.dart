@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:translator/translator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'llm_translator.dart';
@@ -106,7 +107,8 @@ class TranslationService {
 
       // 特殊检查 LLM
       if (source == 'llm') {
-        final apiKey = prefs.getString('llm_settings_api_key') ?? '';
+        const secureStorage = FlutterSecureStorage();
+        final apiKey = await secureStorage.read(key: 'llm_api_key') ?? '';
         if (apiKey.isEmpty) continue;
       }
 

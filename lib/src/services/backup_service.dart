@@ -158,7 +158,7 @@ class BackupService {
       final manifestJson = await manifestFile.readAsString();
       final manifest =
           jsonDecode(manifestJson) as Map<String, dynamic>;
-      final version = manifest['version'] as String? ?? 'unknown';
+      final version = '${manifest['version'] ?? 'unknown'}';
       _log.info('[Backup] Restoring from backup created by v$version');
 
       // 3. Close all open connections
@@ -259,33 +259,41 @@ class BackupService {
     final data = <String, dynamic>{};
 
     for (final key in keys) {
-      // Try each type; SharedPreferences stores typed values,
-      // so only the correct getter returns non-null.
-      final stringVal = prefs.getString(key);
-      if (stringVal != null) {
-        data[key] = {'t': 's', 'v': stringVal};
-        continue;
-      }
-      final intVal = prefs.getInt(key);
-      if (intVal != null) {
-        data[key] = {'t': 'i', 'v': intVal};
-        continue;
-      }
-      final boolVal = prefs.getBool(key);
-      if (boolVal != null) {
-        data[key] = {'t': 'b', 'v': boolVal};
-        continue;
-      }
-      final doubleVal = prefs.getDouble(key);
-      if (doubleVal != null) {
-        data[key] = {'t': 'd', 'v': doubleVal};
-        continue;
-      }
-      final listVal = prefs.getStringList(key);
-      if (listVal != null) {
-        data[key] = {'t': 'l', 'v': listVal};
-        continue;
-      }
+      try {
+        final stringVal = prefs.getString(key);
+        if (stringVal != null) {
+          data[key] = {'t': 's', 'v': stringVal};
+          continue;
+        }
+      } catch (_) {}
+      try {
+        final intVal = prefs.getInt(key);
+        if (intVal != null) {
+          data[key] = {'t': 'i', 'v': intVal};
+          continue;
+        }
+      } catch (_) {}
+      try {
+        final boolVal = prefs.getBool(key);
+        if (boolVal != null) {
+          data[key] = {'t': 'b', 'v': boolVal};
+          continue;
+        }
+      } catch (_) {}
+      try {
+        final doubleVal = prefs.getDouble(key);
+        if (doubleVal != null) {
+          data[key] = {'t': 'd', 'v': doubleVal};
+          continue;
+        }
+      } catch (_) {}
+      try {
+        final listVal = prefs.getStringList(key);
+        if (listVal != null) {
+          data[key] = {'t': 'l', 'v': listVal};
+          continue;
+        }
+      } catch (_) {}
     }
 
     return const JsonEncoder.withIndent('  ').convert(data);

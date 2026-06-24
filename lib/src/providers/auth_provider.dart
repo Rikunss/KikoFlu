@@ -8,14 +8,10 @@ import '../models/user.dart';
 import '../models/account.dart';
 import '../services/kikoeru_api_service.dart';
 import '../services/storage_service.dart';
+import '../services/cookie_service.dart';
 import '../services/account_database.dart';
 import '../services/log_service.dart';
 import '../utils/server_utils.dart';
-
-// Kikoeru API Service Provider
-final kikoeruApiServiceProvider = Provider<KikoeruApiService>((ref) {
-  return KikoeruApiService();
-});
 
 // Auth state
 class AuthState extends Equatable {
@@ -93,7 +89,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       LogService.instance.debug('[Auth] Loading current user...', tag: 'Network');
 
       // First try to load from storage (faster)
-      final token = StorageService.getString('auth_token');
+      final token = await StorageService.getStringAsync('auth_token');
       final host = StorageService.getString('server_host');
       final userJson = StorageService.getMap('current_user');
 
@@ -243,11 +239,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: true, error: null);
     }
 
-    if (serverCookie != null && serverCookie.isNotEmpty) {
-      await StorageService.setString('server_cookie', serverCookie);
-    } else {
-      await StorageService.remove('server_cookie');
-    }
+    await CookieService.setCookie(serverCookie);
 
     try {
       LogService.instance.debug(
@@ -272,19 +264,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       LogService.instance.debug('[Auth] Login successful, received token', tag: 'Network');
 
       // Normalize host URL to include protocol
-      String normalizedHost;
-      if (host.startsWith('http://') || host.startsWith('https://')) {
-        normalizedHost = host;
-      } else {
-        // For remote hosts, use HTTPS; for localhost, use HTTP
-        if (host.contains('localhost') ||
-            host.startsWith('127.0.0.1') ||
-            host.startsWith('192.168.')) {
-          normalizedHost = 'http://$host';
-        } else {
-          normalizedHost = 'https://$host';
-        }
-      }
+      final normalizedHost = ServerUtils.normalizeHost(host);
 
       LogService.instance.debug('[Auth] Normalized host: $normalizedHost', tag: 'Network');
 
@@ -395,11 +375,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       [String? serverCookie]) async {
     state = state.copyWith(isLoading: true, error: null);
 
-    if (serverCookie != null && serverCookie.isNotEmpty) {
-      await StorageService.setString('server_cookie', serverCookie);
-    } else {
-      await StorageService.remove('server_cookie');
-    }
+    await CookieService.setCookie(serverCookie);
 
     try {
       // Initialize API service
@@ -414,19 +390,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       // Normalize host URL to include protocol
-      String normalizedHost;
-      if (host.startsWith('http://') || host.startsWith('https://')) {
-        normalizedHost = host;
-      } else {
-        // For remote hosts, use HTTPS; for localhost, use HTTP
-        if (host.contains('localhost') ||
-            host.startsWith('127.0.0.1') ||
-            host.startsWith('192.168.')) {
-          normalizedHost = 'http://$host';
-        } else {
-          normalizedHost = 'https://$host';
-        }
-      }
+      final normalizedHost = ServerUtils.normalizeHost(host);
 
       // Update API service with token and normalized host
       _apiService.init(token, normalizedHost);
@@ -506,7 +470,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 errorMessage = json['error'];
               }
             } catch (_) {
-              // Ignore json decode error
+              // JSON decode error — ignore, errorMessage already set from HTTP body
             }
           }
         }
@@ -544,27 +508,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> updateHost(String host) async {
     if (state.token != null) {
       // Normalize host URL to include protocol
-      String normalizedHost;
-      if (host.startsWith('http://') || host.startsWith('https://')) {
-        normalizedHost = host;
-      } else {
-        // For remote hosts, use HTTPS; for localhost, use HTTP
-        if (host.contains('localhost') ||
-            host.startsWith('127.0.0.1') ||
-            host.startsWith('192.168.')) {
-          normalizedHost = 'http://$host';
-        } else {
-          normalizedHost = 'https://$host';
-        }
-      }
+      final normalizedHost = ServerUtils.normalizeHost(host);
 
       // 更新host时同步serverCookie配置
       final cookie = state.currentUser?.serverCookie;
-      if (cookie != null && cookie.isNotEmpty) {
-        await StorageService.setString('server_cookie', cookie);
-      } else {
-        await StorageService.remove('server_cookie');
-      }
+      await CookieService.setCookie(cookie);
 
       _apiService.init(state.token!, normalizedHost);
       await StorageService.setString('server_host', normalizedHost);
@@ -599,7 +547,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await StorageService.remove('auth_token');
       await StorageService.remove('server_host');
       await StorageService.remove('current_user');
-      await StorageService.remove('server_cookie');
+      await CookieService.clearCookie();
     } catch (e) {
       LogService.instance.error('[Auth] Failed to clear storage: $e', tag: 'Network');
     }
@@ -615,11 +563,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (token != null && host != null) {
       LogService.instance.debug('[Auth] Switching user - username: ${user.name}, host: $host', tag: 'Network');
 
-      if (serverCookie != null && serverCookie.isNotEmpty) {
-        await StorageService.setString('server_cookie', serverCookie);
-      } else {
-        await StorageService.remove('server_cookie');
-      }
+      await CookieService.setCookie(serverCookie);
 
       _apiService.init(token, host);
       await StorageService.setString('auth_token', token);

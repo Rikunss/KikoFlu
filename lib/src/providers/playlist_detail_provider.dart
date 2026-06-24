@@ -2,8 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:equatable/equatable.dart';
 import '../models/playlist.dart';
 import '../models/work.dart';
-import '../services/kikoeru_api_service.dart' hide kikoeruApiServiceProvider;
-import 'auth_provider.dart' show kikoeruApiServiceProvider;
+import '../services/kikoeru_api_service.dart';
 import 'settings_provider.dart';
 
 /// 播放列表详情状态

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../providers/auth_provider.dart';
+import '../services/kikoeru_api_service.dart';
 import '../providers/my_reviews_provider.dart';
 import '../utils/snackbar_util.dart';
 import '../../l10n/app_localizations.dart';

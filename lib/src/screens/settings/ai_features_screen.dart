@@ -543,7 +543,7 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
 
                   // Model dropdown
                   DropdownButtonFormField<String>(
-                    value: _currentModel,
+                    initialValue: _currentModel,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -717,7 +717,7 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
                                   .read(aiDownloadProvider.notifier)
                                   .requestPause(),
                               icon: const Icon(Icons.pause_rounded),
-                              label: Text('Pause'),
+                              label: const Text('Pause'),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -727,7 +727,7 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
                               onPressed: _cancelDownload,
                               icon: const Icon(Icons.stop_rounded,
                                   color: Colors.red),
-                              label: Text('Stop',
+                              label: const Text('Stop',
                                   style: TextStyle(color: Colors.red)),
                             ),
                           ),
@@ -754,7 +754,7 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
                               onPressed: _cancelDownload,
                               icon: const Icon(Icons.cancel_outlined,
                                   color: Colors.red),
-                              label: Text('Cancel',
+                              label: const Text('Cancel',
                                   style: TextStyle(color: Colors.red)),
                             ),
                           ),
@@ -870,7 +870,7 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
         child: Row(
           children: [
             if (value == 'base')
-              Icon(Icons.star, size: 14, color: Colors.amber),
+              const Icon(Icons.star, size: 14, color: Colors.amber),
             if (value != 'base') const SizedBox(width: 14),
             const SizedBox(width: 6),
             Text(
@@ -1207,7 +1207,7 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
           ),
         ),
         Text(
-          '~${estimatedMinutes} min',
+          '~$estimatedMinutes min',
           style: theme.textTheme.bodySmall?.copyWith(
             fontWeight: FontWeight.w600,
             color: estimatedMinutes <= 3

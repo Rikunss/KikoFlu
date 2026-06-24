@@ -364,7 +364,9 @@ class AIModelService {
         try {
           await WakelockPlus.disable();
           _log.info('Wakelock released', tag: 'AI');
-        } catch (_) {}
+        } catch (e) {
+          _log.warning('Failed to release wakelock: $e', tag: 'AI');
+        }
       }
     }
   }

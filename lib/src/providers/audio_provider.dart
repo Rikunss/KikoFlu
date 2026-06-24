@@ -13,7 +13,7 @@ import '../services/home_widget_service.dart';
 import '../utils/audio_format_parser.dart';
 import 'settings_provider.dart';
 import 'history_provider.dart';
-import 'auth_provider.dart' show kikoeruApiServiceProvider;
+import '../services/kikoeru_api_service.dart';
 
 /// Provider that tracks whether the hi-res ExoPlayer path is currently active.
 /// Unlike [hiResPlaybackStateProvider] (which only reports `isPlaying`),
@@ -102,6 +102,19 @@ final audioFormatInfoProvider = StreamProvider<AudioFormatInfo?>((ref) {
 final isTrackLoadingProvider = StreamProvider<bool>((ref) {
   final service = ref.watch(audioPlayerServiceProvider);
   return service.trackLoadingStream;
+});
+
+/// Combined playback progress — position + duration in one provider.
+/// Widgets that need both values (slider, time labels) watch ONE provider
+/// instead of two, halving the listen count and reducing rebuilds.
+final playbackProgressProvider =
+    Provider<({Duration position, Duration? duration})>((ref) {
+  final position = ref.watch(positionProvider);
+  final duration = ref.watch(durationProvider);
+  return (
+    position: position.valueOrNull ?? Duration.zero,
+    duration: duration.valueOrNull,
+  );
 });
 
 // Progress Provider (convenience)
@@ -209,9 +222,10 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
     state = state.copyWith(crossfadeDuration: Duration(milliseconds: crossfadeMs));
 
     // Listen to player state changes
-    _playerStateSub = _service.playerStateStream.listen((playerState) {
-      // Force a state update to trigger UI rebuild
-      state = state.copyWith();
+    _playerStateSub = _service.playerStateStream.listen((_) {
+      // Stream subscription kept for side effects only.
+      // UI rebuilds are driven by individual StreamProviders
+      // (positionProvider, playerStateProvider, etc.)
     });
 
     // Listen for track changes to trigger progress sync + widget update

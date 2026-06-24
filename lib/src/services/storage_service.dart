@@ -1,5 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 import 'log_service.dart';
 
@@ -10,6 +11,10 @@ class StorageService {
   static late Box _userBox;
   static late Box _cacheBox;
   static late SharedPreferences _prefs;
+  static const _secureStorage = FlutterSecureStorage();
+
+  // Keys that should be stored in secure storage
+  static const _secureKeys = {'auth_token'};
 
   static Future<void> init() async {
     // Initialize Hive boxes
@@ -19,6 +24,20 @@ class StorageService {
 
     // Initialize SharedPreferences
     _prefs = await SharedPreferences.getInstance();
+
+    // Migrate auth_token from SharedPreferences to secure storage
+    await _migrateSecureKeys();
+  }
+
+  /// Migrate sensitive keys from SharedPreferences to FlutterSecureStorage.
+  static Future<void> _migrateSecureKeys() async {
+    for (final key in _secureKeys) {
+      final value = _prefs.getString(key);
+      if (value != null && value.isNotEmpty) {
+        await _secureStorage.write(key: key, value: value);
+        await _prefs.remove(key);
+      }
+    }
   }
 
   // Settings
@@ -68,12 +87,28 @@ class StorageService {
     await _cacheBox.clear();
   }
 
-  // SharedPreferences methods
+  // SharedPreferences methods (with secure storage override for sensitive keys)
   static Future<void> setString(String key, String value) async {
-    await _prefs.setString(key, value);
+    if (_secureKeys.contains(key)) {
+      await _secureStorage.write(key: key, value: value);
+    } else {
+      await _prefs.setString(key, value);
+    }
   }
 
   static String? getString(String key) {
+    if (_secureKeys.contains(key)) {
+      // Return null for sync access - use getStringAsync for secure keys
+      return null;
+    }
+    return _prefs.getString(key);
+  }
+
+  /// Async version that can read from secure storage.
+  static Future<String?> getStringAsync(String key) async {
+    if (_secureKeys.contains(key)) {
+      return await _secureStorage.read(key: key);
+    }
     return _prefs.getString(key);
   }
 
@@ -94,11 +129,16 @@ class StorageService {
   }
 
   static Future<void> remove(String key) async {
-    await _prefs.remove(key);
+    if (_secureKeys.contains(key)) {
+      await _secureStorage.delete(key: key);
+    } else {
+      await _prefs.remove(key);
+    }
   }
 
   static Future<void> clear() async {
     await _prefs.clear();
+    // Don't clear secure storage - it contains auth tokens
   }
 
   // Get SharedPreferences instance
@@ -132,7 +172,8 @@ class StorageService {
   }
 
   /// Returns HTTP headers with server cookie if configured.
-  /// Only includes the Cookie header when a non-empty value exists.
+  /// @deprecated Use [CookieService.serverCookieHeaders] instead.
+  /// Kept for backward compatibility during migration.
   static Map<String, String> get serverCookieHeaders {
     final cookie = getString('server_cookie');
     if (cookie != null && cookie.isNotEmpty) {

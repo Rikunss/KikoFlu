@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../utils/snackbar_util.dart';
 import '../services/storage_service.dart';
+import '../services/cookie_service.dart';
 import '../../l10n/app_localizations.dart';
 import 'cached_image_widget.dart';
 
@@ -120,7 +121,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
           imageUrl,
           options: Options(
             responseType: ResponseType.bytes,
-            headers: StorageService.serverCookieHeaders,
+            headers: CookieService.serverCookieHeaders,
           ),
         );
         imageBytes = response.data as List<int>;
