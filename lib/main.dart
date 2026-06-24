@@ -17,12 +17,9 @@ import 'src/utils/theme.dart';
 import 'src/utils/global_keys.dart';
 import 'src/utils/platform_utils.dart';
 import 'src/services/audio_player_service.dart';
-<<<<<<< HEAD
 import 'src/services/usb_dac_audio_manager.dart';
-=======
 import 'src/services/hi_res_audio_service.dart';
 import 'src/services/streaming_speed_tracker.dart';
->>>>>>> 96f3b38
 import 'src/services/ai_download_notification_service.dart';
 import 'src/services/log_service.dart';
 import 'src/services/batch_transcription_notification_service.dart';
