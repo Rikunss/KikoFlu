@@ -88,18 +88,6 @@ jobs:
         shell: pwsh
         continue-on-error: true
 
-      - name: Resolve plugin symlinks to real directories
-        shell: cmd
-        run: |
-          REM CMake's file(ARCHIVE_EXTRACT) fails on paths through directory junctions.
-          REM xcopy resolves junctions by copying target contents (unlike Copy-Item).
-          if exist windows\flutter\ephemeral\.plugin_symlinks (
-            xcopy /E /I /Y /Q windows\flutter\ephemeral\.plugin_symlinks windows\flutter\ephemeral\.plugin_symlinks_real\
-            rmdir /S /Q windows\flutter\ephemeral\.plugin_symlinks
-            move windows\flutter\ephemeral\.plugin_symlinks_real windows\flutter\ephemeral\.plugin_symlinks
-            echo Resolved all plugin junctions to real directories
-          )
-
       - name: Build Windows Release
         continue-on-error: true
         run: flutter build windows --release
