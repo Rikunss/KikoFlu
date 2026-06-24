@@ -76,13 +76,16 @@ xcodebuild \
   -archivePath "$XCODE_ARCHIVE" \
   -arch "$ARCH" \
   -parallelizeTargets \
+  -derivedDataPath "ios/build/DerivedData" \
   archive \
   CODE_SIGN_IDENTITY="" \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGN_ENTITLEMENTS="" \
   PROVISIONING_PROFILE="" \
-  ONLY_ACTIVE_ARCH=NO
+  ONLY_ACTIVE_ARCH=NO \
+  COMPILER_INDEX_STORE_ENABLE=NO \
+  COMPILER_PARALLELIZE_TARGETS=NO
 
 # ── Verify archive ──
 if [ ! -d "$XCODE_ARCHIVE" ]; then
