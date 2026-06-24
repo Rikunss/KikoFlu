@@ -96,18 +96,16 @@ jobs:
         continue-on-error: true
 
       - name: Resolve plugin symlinks to real directories
-        shell: pwsh
+        shell: cmd
         run: |
-          # CMake's file(ARCHIVE_EXTRACT) fails on paths through directory junctions.
-          # Copy .plugin_symlinks to resolve all junctions into real directories.
-          $symlinksDir = "windows/flutter/ephemeral/.plugin_symlinks"
-          $tempDir = "windows/flutter/ephemeral/.plugin_symlinks_real"
-          if (Test-Path $symlinksDir) {
-            Copy-Item -Path $symlinksDir -Destination $tempDir -Recurse -Force
-            Remove-Item -Path $symlinksDir -Recurse -Force
-            Move-Item -Path $tempDir -Destination $symlinksDir
-            Write-Host "Resolved all plugin junctions to real directories"
-          }
+          REM CMake's file(ARCHIVE_EXTRACT) fails on paths through directory junctions.
+          REM xcopy resolves junctions by copying target contents (unlike Copy-Item).
+          if exist windows\flutter\ephemeral\.plugin_symlinks (
+            xcopy /E /I /Y /Q windows\flutter\ephemeral\.plugin_symlinks windows\flutter\ephemeral\.plugin_symlinks_real\
+            rmdir /S /Q windows\flutter\ephemeral\.plugin_symlinks
+            move windows\flutter\ephemeral\.plugin_symlinks_real windows\flutter\ephemeral\.plugin_symlinks
+            echo Resolved all plugin junctions to real directories
+          )
 
       - name: Build Windows Release
         continue-on-error: true
