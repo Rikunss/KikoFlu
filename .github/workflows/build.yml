@@ -252,12 +252,8 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs:
-      - android
-      - windows
-      - macos
-      - linux
-      - linux-arm64
+    needs: [android, windows, macos, linux, linux-arm64]
+    if: always() && needs.android.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success' && needs.linux.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
