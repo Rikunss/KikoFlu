@@ -95,18 +95,25 @@ jobs:
           # ggml uses $<TARGET_FILE_DIR:...>/lib in install() which doesn't
           # evaluate correctly in cmake_install.cmake — replace with 'lib'.
           # GHA runners have writable pub cache, so Set-Content should work.
-          $file = "windows/flutter/ephemeral/.plugin_symlinks/whisper_ggml_plus/macos/Classes/whisper/ggml/CMakeLists.txt"
-          if (Test-Path $file) {
-            $content = Get-Content $file -Raw
-            $replaced = $content -replace '\$<TARGET_FILE_DIR:[^>]+>/lib', 'lib'
-            if ($content -ne $replaced) {
-              Set-Content -Path $file -Value $replaced
-              Write-Host "Patched ggml CMakeLists.txt — removed broken generator expression"
-            } else {
-              Write-Host "No generator expression found in ggml CMakeLists.txt (already patched?)"
+          # The broken install() with $<TARGET_FILE_DIR:...>/lib is in ggml/src/CMakeLists.txt
+          $files = @(
+            "windows/flutter/ephemeral/.plugin_symlinks/whisper_ggml_plus/macos/Classes/whisper/ggml/src/CMakeLists.txt",
+            "windows/flutter/ephemeral/.plugin_symlinks/whisper_ggml_plus/macos/Classes/whisper/ggml/CMakeLists.txt"
+          )
+          $patched = $false
+          foreach ($file in $files) {
+            if (Test-Path $file) {
+              $content = Get-Content $file -Raw
+              $replaced = $content -replace '\$<TARGET_FILE_DIR:[^>]+>/lib', 'lib'
+              if ($content -ne $replaced) {
+                Set-Content -Path $file -Value $replaced
+                Write-Host "Patched: $file"
+                $patched = $true
+              }
             }
-          } else {
-            Write-Host "ggml CMakeLists.txt not found at expected path — will try post-build cmake --install"
+          }
+          if (-not $patched) {
+            Write-Host "No generator expression found — already patched or using fallback cmake --install"
           }
 
       - name: Build Windows Release
