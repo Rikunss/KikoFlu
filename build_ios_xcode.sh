@@ -42,14 +42,10 @@ command -v flutter >/dev/null 2>&1 || { echo "ERROR: Flutter not found"; exit 1;
 command -v pod >/dev/null 2>&1     || { echo "ERROR: CocoaPods not found"; exit 1; }
 echo "  flutter, pod — OK"
 
-# ── Clean (local only) ──
-if [ "$CI_MODE" = false ]; then
-  title "Clean"
-  flutter clean
-  rm -rf ios/Pods ios/Podfile.lock
-else
-  echo "  (CI: skip clean — fresh environment)"
-fi
+# ── Clean ──
+title "Clean"
+flutter clean
+rm -rf ios/Pods ios/Podfile.lock
 
 # ── Flutter dependencies ──
 title "Flutter pub get"
