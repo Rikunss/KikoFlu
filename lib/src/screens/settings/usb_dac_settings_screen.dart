@@ -10,7 +10,6 @@ import '../../providers/settings_provider.dart';
 import '../../services/hi_res_audio_service.dart';
 import '../../services/exclusive_audio_service.dart';
 import '../../services/audio_player_service.dart';
-import '../../services/usb_dac_audio_manager.dart';
 import '../../services/log_service.dart';
 import '../../utils/snackbar_util.dart';
 
@@ -67,13 +66,9 @@ class _UsbDacSettingsScreenState
           // Use deviceName from HiResAudio (no "USB-Audio - " prefix)
           _autoTargetDevice = deviceName;
         });
-<<<<<<< HEAD
         if (!_exclusiveModeEnabled) {
           _toggleExclusiveMode(true);
         }
-=======
-        _autoRouteToUsb();
->>>>>>> 96f3b38
       } else if (!hasDac && _usbDacConnected) {
         _log.info('USB DAC disconnected', tag: 'USB');
         setState(() {
@@ -94,13 +89,9 @@ class _UsbDacSettingsScreenState
           _autoTargetDevice = cleanName;
           _usbDacConnected = true;
         });
-<<<<<<< HEAD
         if (!_exclusiveModeEnabled) {
           _toggleExclusiveMode(true);
         }
-=======
-        _autoRouteToUsb();
->>>>>>> 96f3b38
       }
     });
     _usbDetachedSub = _exclusive.usbDetachedStream.listen((_) {
@@ -383,268 +374,8 @@ class _UsbDacSettingsScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-<<<<<<< HEAD
-          // ── Header ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                Icon(Icons.monitor_heart, size: 18, color: colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Device Status',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.primary,
-                  ),
-                ),
-                const Spacer(),
-                // Connection LED
-                _StatusDot(
-                  color: _usbDacConnected
-                      ? (_aaudioExclusive ? Colors.green : const Color(0xFFFFA000))
-                      : colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                  label: _usbDacConnected
-                      ? (_aaudioExclusive ? 'Active' : 'Connected')
-                      : 'Disconnected',
-                  textTheme: theme.textTheme,
-                  colorScheme: colorScheme,
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-
-          // ── USB DAC Device Info ──
-          if (_usbDacConnected) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Row(
-                children: [
-                  Icon(Icons.usb, size: 16, color: colorScheme.primary.withValues(alpha: 0.7)),
-                  const SizedBox(width: 8),
-                  Text('Device',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant)),
-                  const SizedBox(width: 8),
-                  // Device picker (dropdown if multiple devices)
-                  Expanded(
-                    child: _DevicePicker(
-                      currentName: _autoTargetDevice,
-                      onChanged: (name) {
-                        setState(() => _autoTargetDevice = name);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 4),
-          ],
-
-          // ── Status Rows with Dots ──
-          _StatusDotRow(
-            label: 'Exclusive Mode',
-            dotColor: _exclusiveModeEnabled ? colorScheme.primary : colorScheme.onSurfaceVariant.withValues(alpha: 0.25),
-            value: _exclusiveModeEnabled ? 'Active (Vol Locked)' : 'Off',
-            textTheme: theme.textTheme,
-            colorScheme: colorScheme,
-          ),
-          _StatusDotRow(
-            label: 'Volume Lock',
-            dotColor: _volumeLocked ? Colors.green : colorScheme.onSurfaceVariant.withValues(alpha: 0.25),
-            value: _volumeLocked ? 'Active' : 'Inactive',
-            textTheme: theme.textTheme,
-            colorScheme: colorScheme,
-          ),
-          _StatusDotRow(
-            label: 'AAudio',
-            dotColor: _aaudioExclusive
-                ? Colors.green
-                : _aaudioActive
-                    ? Colors.orange
-                    : _aaudioAvailable
-                        ? colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
-                        : colorScheme.onSurfaceVariant.withValues(alpha: 0.25),
-            value: _aaudioExclusive
-                ? 'Exclusive (mixer bypassed)'
-                : _aaudioActive
-                    ? 'Shared'
-                    : _aaudioAvailable
-                        ? 'Available'
-                        : 'Unavailable',
-            textTheme: theme.textTheme,
-            colorScheme: colorScheme,
-          ),
-          _StatusDotRow(
-            label: 'Android Mixer',
-            dotColor: _aaudioExclusive ? Colors.green : colorScheme.onSurfaceVariant.withValues(alpha: 0.25),
-            value: _aaudioExclusive ? 'Bypassed (AAudio)' : 'Active',
-            textTheme: theme.textTheme,
-            colorScheme: colorScheme,
-          ),
-          _StatusDotRow(
-            label: 'Bit-Perfect',
-            dotColor: _aaudioExclusive
-                ? Colors.green
-                : _aaudioActive
-                    ? Colors.orange
-                    : colorScheme.onSurfaceVariant.withValues(alpha: 0.25),
-            value: _aaudioExclusive
-                ? 'YES — Exclusive'
-                : _aaudioActive
-                    ? 'NO — Shared mode'
-                    : _exclusiveModeEnabled
-                        ? 'NO — Vol Lock only'
-                        : 'NO — Android Mixer',
-            textTheme: theme.textTheme,
-            colorScheme: colorScheme,
-          ),
-          _StatusDotRow(
-            label: 'DSP Bypass',
-            dotColor: _exclusiveModeEnabled ? Colors.green : colorScheme.onSurfaceVariant.withValues(alpha: 0.25),
-            value: _exclusiveModeEnabled ? 'Active' : 'Inactive',
-            textTheme: theme.textTheme,
-            colorScheme: colorScheme,
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-
-  // ──────────────────────────────────────────────
-  // AAudio Exclusive Mode Card
-  // ──────────────────────────────────────────────
-
-  Widget _buildAaudioExclusiveCard(BuildContext context, WidgetRef ref, S s) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Card(
-      elevation: 0,
-      color: colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          SwitchListTile(
-            secondary: CircleAvatar(
-              backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
-              child: Icon(Icons.high_quality, color: colorScheme.primary, size: 22),
-            ),
-            title: Row(
-              children: [
-                const Expanded(child: Text('AAudio Exclusive Mode')),
-                IconButton(
-                  icon: const Icon(Icons.info_outline, size: 18),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                  onPressed: () => _showAaudioInfoDialog(context, s),
-                  tooltip: 'Info',
-                ),
-              ],
-            ),              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _exclusiveModeEnabled
-                        ? _aaudioExclusive
-                            ? 'Bit-perfect active — mixer bypassed'
-                            : _aaudioActive
-                                ? 'AAudio shared mode (exclusive not granted)'
-                                : 'Volume locked (no AAudio stream)'
-                        : 'Android AudioTrack (mixer active)',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: _exclusiveModeEnabled
-                          ? colorScheme.primary.withValues(alpha: 0.8)
-                          : colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  if (_exclusiveModeEnabled)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.check_circle, size: 12,
-                              color: Color(0xFF4CAF50)),
-                          const SizedBox(width: 4),
-                          Text(
-                            'DSP bypassed · Pure PCM',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: const Color(0xFF4CAF50),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            // Disable toggle when no USB DAC connected
-            value: _exclusiveModeEnabled,
-            onChanged: (!_usbDacConnected && !_exclusiveModeEnabled)
-                ? null
-                : (value) async {
-              HapticFeedback.lightImpact();
-              if (value) {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('AAudio Exclusive Mode'),
-                    content: const Text(
-                      'When enabled:\n'
-                      '• System volume locked at max\n'
-                      '• Volume controlled only via app slider\n'
-                      '• AAudio exclusive stream requested\n'
-                      '• Android mixer bypassed (if exclusive granted)\n'
-                      '• True bit-perfect output\n\n'
-                      '⚠️ May not work on all devices.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: Text(s.cancel),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: Text(s.enable),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed != true) return;
-              }
-
-              await _toggleExclusiveMode(value);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAaudioInfoDialog(BuildContext context, S s) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-=======
           Row(
->>>>>>> 96f3b38
+
             children: [
               Icon(Icons.route, size: 16, color: cs.primary),
               const SizedBox(width: 8),
@@ -843,23 +574,9 @@ class _UsbDacSettingsScreenState
                 await _hiRes.setUseLibusbSink(false);
                 await _hiRes.release();
               }
-<<<<<<< HEAD
-
-              ref.read(bitPerfectPlaybackProvider.notifier).toggle(value);
-              // Sync with libusb USB DAC manager
-              UsbDacAudioManager.instance.setAutoDacEnabled(value);
-              if (context.mounted) {
-                SnackBarUtil.showInfo(
-                  context,
-                  value
-                      ? s.bitPerfectPlaybackEnabled
-                      : s.bitPerfectPlaybackDisabled,
-                );
-=======
               ref.read(bitPerfectPlaybackProvider.notifier).toggle(v);
               if (v && _exclusiveModeEnabled) {
                 await _toggleExclusiveMode(false, silent: true);
->>>>>>> 96f3b38
               }
               if (!mounted) return;
               SnackBarUtil.showInfo(
@@ -900,129 +617,6 @@ class _UsbDacSettingsScreenState
     );
   }
 
-<<<<<<< HEAD
-
-
-  /// Toggle exclusive mode on/off, handling the full flow.
-  ///
-  /// If [silent] is true, skips the confirmation snackbar (used by Quick Test).
-  Future<void> _toggleExclusiveMode(bool enable, {bool silent = false}) async {
-    await _audioService.setExclusiveMode(enable);
-    if (!mounted) return;
-    setState(() {
-      _exclusiveModeEnabled = enable;
-      _volumeLocked = enable;
-    });
-
-    if (enable) {
-      final status = await _exclusive.getStatus();
-      if (mounted) {
-        setState(() {
-          _aaudioActive = status.aaudioActive;
-          _aaudioExclusive = status.aaudioExclusive;
-          _volumeLocked = status.volumeLocked;
-        });
-      }
-    } else {
-      setState(() {
-        _aaudioActive = false;
-        _aaudioExclusive = false;
-        _volumeLocked = false;
-      });
-    }
-
-    final restartNeeded = enable && _audioService.playing;
-    if (restartNeeded) {
-      _log.info('Exclusive mode toggled while playing — restart playback for AAudio', tag: 'USB');
-    }
-
-    if (!silent && mounted) {
-      final message = enable
-          ? (_aaudioExclusive
-              ? 'AAudio Exclusive: bit-perfect active'
-              : 'Exclusive mode: volume locked')
-          : 'Exclusive mode disabled';
-      SnackBarUtil.showInfo(
-        context,
-        restartNeeded ? '$message — restart playback to apply' : message,
-      );
-    }
-  }
-
-  void _showUsbDacInfoDialog(BuildContext context, S s) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 32,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Icon(Icons.usb, size: 24, color: colorScheme.primary),
-                  const SizedBox(width: 12),
-                  Text(
-                    'USB DAC Routing',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'USB DAC Routing sends audio to an external USB DAC '
-                'via Android\'s AudioManager API. This allows you to:\n\n'
-                '• Use an external DAC for better audio quality\n'
-                '• Automatically detect connected USB audio devices\n'
-                '• Select which device to route audio to\n\n'
-                'Note: This uses Android\'s built-in audio routing and DOES NOT '
-                'bypass the Android mixer. For true bit-perfect (mixer bypass), '
-                'use the AAudio Exclusive Mode toggle above.\n\n'
-                'Use both together: USB DAC Routing + AAudio Exclusive Mode '
-                'for the best audio quality.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  height: 1.6,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  icon: const Icon(Icons.check, size: 18),
-                  label: Text(s.gotIt),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-=======
->>>>>>> 96f3b38
   // ──────────────────────────────────────────────
   // Test Section
   // ──────────────────────────────────────────────
@@ -1235,142 +829,7 @@ class _UsbDacSettingsScreenState
   // Actions
   // ──────────────────────────────────────────────
 
-<<<<<<< HEAD
-  const _StatusDotRow({
-    required this.label,
-    required this.dotColor,
-    required this.value,
-    required this.textTheme,
-    required this.colorScheme,
-  });
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          // LED dot
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: dotColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: dotColor.withValues(alpha: 0.3),
-                  blurRadius: 3,
-                  spreadRadius: 0.5,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: dotColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A dropdown picker for selecting from available USB DAC devices.
-/// Reactively updates when USB devices are plugged/unplugged.
-class _DevicePicker extends StatefulWidget {
-  final String currentName;
-  final ValueChanged<String> onChanged;
-
-  const _DevicePicker({
-    required this.currentName,
-    required this.onChanged,
-  });
-
-  @override
-  State<_DevicePicker> createState() => _DevicePickerState();
-}
-
-class _DevicePickerState extends State<_DevicePicker> {
-  List<UsbAudioDevice> _devices = [];
-  int? _selectedDeviceId;
-  StreamSubscription? _devicesSub;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadDevices();
-    // Listen for device changes so the dropdown stays up-to-date
-    _devicesSub = HiResAudioService.instance.usbDevicesStream.listen((devices) {
-      if (mounted) _updateDevices(devices);
-    });
-  }
-
-  @override
-  void dispose() {
-    _devicesSub?.cancel();
-    super.dispose();
-  }
-
-  /// Update device list, deduplicating by ID, and sync selected device.
-  void _updateDevices(List<UsbAudioDevice> devices) {
-    // Deduplicate by ID (keep first occurrence)
-    final seen = <int>{};
-    final unique = <UsbAudioDevice>[];
-    for (final d in devices) {
-      if (seen.add(d.id)) {
-        unique.add(d);
-      }
-    }
-    setState(() {
-      _devices = unique;
-      // If current device name matches one of our devices, select it
-      if (widget.currentName.isNotEmpty) {
-        final match =
-            unique.cast<UsbAudioDevice?>().firstWhere(
-              (d) => d!.productName == widget.currentName,
-              orElse: () => null,
-            );
-        if (match != null) {
-          _selectedDeviceId = match.id;
-        }
-      }
-    });
-  }
-
-  Future<void> _loadDevices() async {
-    final devices = await HiResAudioService.instance.getUsbAudioDevices();
-    if (mounted) {
-      _updateDevices(devices);
-=======
-  Future<void> _autoRouteToUsb() async {
-    _log.info('Auto-routing to USB DAC via UsbAudioSink...', tag: 'USB');
-    await _hiRes.requestUsbPermission();
-    final devices = await _hiRes.getUsbAudioDevices();
-    if (devices.isNotEmpty) {
-      final firstDevice = devices.first;
-      await _hiRes.setUseLibusbSink(true);
-      await _hiRes.release();
-      ref.read(bitPerfectPlaybackProvider.notifier).setPreferredDevice(firstDevice.id);
-      ref.read(bitPerfectPlaybackProvider.notifier).toggle(true);
-      if (mounted) setState(() => _autoTargetDevice = firstDevice.productName);
->>>>>>> 96f3b38
-    }
-  }
 
   Future<void> _toggleExclusiveMode(bool enable, {bool silent = false}) async {
     await _audioService.setExclusiveMode(enable);
@@ -1399,46 +858,11 @@ class _DevicePickerState extends State<_DevicePicker> {
     }
   }
 
-<<<<<<< HEAD
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<int>(
-        value: _devices.any((d) => d.id == _selectedDeviceId)
-            ? _selectedDeviceId
-            : null,
-        isDense: true,
-        hint: Text('Select device', style: theme.textTheme.bodySmall),
-        items: _devices.map((d) {
-          return DropdownMenuItem<int>(
-            value: d.id,
-            child: Text(
-              d.productName,
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          );
-        }).toList(),
-        onChanged: (deviceId) {
-          if (deviceId == null) return;
-          setState(() => _selectedDeviceId = deviceId);
-          // Find the device name and call back
-          final match = _devices.cast<UsbAudioDevice?>().firstWhere(
-            (d) => d!.id == deviceId,
-            orElse: () => null,
-          );
-          if (match != null) {
-            widget.onChanged(match.productName);
-          }
-        },
-      ),
-=======
   Future<void> _testAaudioExclusive() async {
     if (!mounted) return;
     final wasEnabled = _exclusiveModeEnabled;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Testing AAudio exclusive mode...'), duration: Duration(seconds: 1)),
->>>>>>> 96f3b38
     );
     await _toggleExclusiveMode(true, silent: true);
     await Future.delayed(const Duration(milliseconds: 500));

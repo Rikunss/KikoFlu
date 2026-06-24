@@ -731,12 +731,6 @@ class _ChainFlowSection extends ConsumerWidget {
       error: (_, __) => '',
     );
     // libusb USB DAC state
-    final libusbStateAsync = ref.watch(usbDacManagerStateProvider);
-    final libusbState = libusbStateAsync.when(
-      data: (s) => s,
-      loading: () => const UsbDacManagerState(),
-      error: (_, __) => const UsbDacManagerState(),
-    );
     final routingAsync = ref.watch(hiResUsbRoutingProvider);
     final hiResRouting = routingAsync.when(
       data: (r) => r,
@@ -831,85 +825,6 @@ class _ChainFlowSection extends ConsumerWidget {
       deviceName = 'Default Output';
     }
 
-<<<<<<< HEAD
-    return _SectionCard(
-      icon: Icons.speaker,
-      title: 'Audio Chain',
-      cs: cs,
-      tt: tt,
-      children: [
-        _FlowRow(
-          icon: Icons.memory, label: 'Engine', value: decoder,
-          cs: cs, tt: tt,
-        ),
-        _FlowArrow(cs: cs),
-        _FlowRow(
-          icon: Icons.router, label: 'Path', value: output,
-          cs: cs, tt: tt,
-        ),
-        _FlowArrow(cs: cs),
-        _FlowRow(
-          icon: Icons.speaker_group, label: 'Device', value: deviceName ?? '—',
-          cs: cs, tt: tt,
-        ),
-        const SizedBox(height: 4),
-        if (usbDacNameValue.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-            child: Row(
-              children: [
-                Icon(Icons.usb, size: 13, color: cs.onSurfaceVariant),
-                const SizedBox(width: 6),
-                Text('USB DAC', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                const SizedBox(width: 6),
-                hiResRouting.routed
-                    ? _MiniChip(usbDacNameValue, cs.primaryContainer, cs.onPrimaryContainer)
-                    : _MiniChip('$usbDacNameValue (not routed)', cs.surfaceContainerHighest, cs.onSurfaceVariant),
-              ],
-            ),
-          ),
-        // libusb USB DAC status row
-        if (libusbState.initialized)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-            child: Row(
-              children: [
-                Icon(Icons.usb, size: 13,
-                    color: libusbState.dacActive
-                        ? const Color(0xFF4CAF50)
-                        : cs.onSurfaceVariant),
-                const SizedBox(width: 6),
-                Text('libusb DAC', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                const SizedBox(width: 6),
-                libusbState.dacActive
-                    ? _MiniChip('${libusbState.deviceName} (bit-perfect)',
-                        const Color(0xFF4CAF50).withValues(alpha: 0.15),
-                        const Color(0xFF4CAF50))
-                    : libusbState.dacConnected
-                        ? _MiniChip('Connected (idle)',
-                            cs.surfaceContainerHighest, cs.onSurfaceVariant)
-                        : _MiniChip('Not connected',
-                            cs.surfaceContainerHighest, cs.onSurfaceVariant),
-              ],
-            ),
-          ),
-        const SizedBox(height: 2),
-        _InfoRow(
-          label: 'Audio Mode',
-          value: aaudioFormatDesc,
-          cs: cs, tt: tt,
-          valueColor: exclusiveState.aaudioExclusive
-              ? const Color(0xFF4CAF50)
-              : aaudioFormatDesc.contains('Exclusive')
-                  ? cs.primary
-                  : null,
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
-          child: _BitPerfectIndicator(cs: cs, tt: tt),
-        ),
-      ],
-=======
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 4),
       child: _ChainFlowVisual(
@@ -921,7 +836,6 @@ class _ChainFlowSection extends ConsumerWidget {
         cs: cs,
         tt: tt,
       ),
->>>>>>> 96f3b38
     );
   }
 }
@@ -1735,22 +1649,6 @@ class _BitPerfectIndicator extends ConsumerWidget {
     String bitPerfectLabel;
     bool active;
     if (Platform.isAndroid) {
-<<<<<<< HEAD
-      // Check if libusb USB DAC is active first (higher priority)
-      final dacActive = ref.watch(isLibusbActiveProvider);
-      if (dacActive) {
-        active = true;
-        bitPerfectLabel = 'YES · libusb USB DAC';
-      } else {
-        active = state.aaudioExclusive;
-        bitPerfectLabel = state.aaudioExclusive
-            ? 'YES · AAudio Exclusive'
-            : state.aaudioActive
-                ? 'NO · AAudio Shared'
-                : state.enabled
-                    ? 'NO · Vol Lock only'
-                    : 'NO · Android Mixer';
-=======
       if (isUsbAudioSinkActive) {
         active = true;
         bitPerfectLabel = 'YES · USB Native (UsbAudioSink)';
@@ -1764,7 +1662,6 @@ class _BitPerfectIndicator extends ConsumerWidget {
             : state.enabled
                 ? 'NO · Vol Lock only'
                 : 'NO · Android Mixer';
->>>>>>> 96f3b38
       }
     } else if (Platform.isWindows) {
       active = state.enabled;

@@ -521,22 +521,6 @@ class HiResAudioService {
     }
   }
 
-  /// Enable or disable the libusb AudioSink for direct USB DAC output.
-  ///
-  /// When enabled, ExoPlayer will route decoded PCM audio directly to the
-  /// USB DAC via libusb, bypassing the Android audio mixer entirely for
-  /// true bit-perfect output. Has priority over [setUseAaudioSink].
-  ///
-  /// NOTE: A USB DAC must be connected and initialized via [UsbDacService]
-  /// for this to produce sound. If no USB DAC is connected, audio is silent.
-  Future<void> setUseLibusbSink(bool enabled) async {
-    try {
-      await _channel.invokeMethod('setUseLibusbSink', {'enabled': enabled});
-    } catch (e) {
-      _log.error('setUseLibusbSink error: $e', tag: 'HiResAudio');
-    }
-  }
-
   /// Enable or disable the AAudio exclusive AudioSink for true bit-perfect playback.
   /// When enabled, ExoPlayer will route decoded PCM audio to the AAudio
   /// exclusive stream instead of the default Android AudioTrack.
