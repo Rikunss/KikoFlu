@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/icons/app_icon_opaque.png" alt="KikoFlu" width="120" height="120">
 
-  # KikoFlu
+  # KikoFlu Edge
 
   A cross-platform doujin voice client for self-hosted Kikoeru servers and online services.
   Built with Flutter — supports Android, Windows, macOS, Linux, iOS.
@@ -19,7 +19,7 @@
 ## Features
 
 - 🎵 **Media Playback** — Background play, queue management, fullscreen player, speed control, loop/shuffle
-- 🔊 **Hi-Res & USB DAC** — Bit-perfect audio output via AAudio exclusive mode & libusb (decent-player)
+- 🔊 **Hi-Res & USB DAC** — Bit-perfect audio output via AAudio exclusive mode & libusb (decent-player) *beta-test
 - 🎛️ **Equalizer & Replay Gain** — Built-in EQ with presets, automatic volume normalization
 - 🤖 **AI Transcription** — On-device Whisper.cpp, batch transcription, auto LRC generation
 - 📝 **Subtitle System** — Import, edit, sync, real-time translation with LLM support
@@ -29,7 +29,7 @@
 - 🔍 **Advanced Search** — Multi-tag/exclude-tag filtering with multi-dimensional sorting
 - 📁 **Custom File Picker** — Built-in file manager with breadcrumb nav, search, hidden files toggle
 - 🌐 **i18n** — 简体中文 / 繁體中文 / English / 日本語 / Русский
-- 📱 **Android** — Floating lyrics, home screen widget, keep-screen-on, progress sync
+- 📱 **Android** — Floating lyrics, keep-screen-on, progress sync *all feature working perfectly fine except usb dac still got some minor bugs maybe lol
 
 ## Download
 
