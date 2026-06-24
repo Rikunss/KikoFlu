@@ -68,7 +68,6 @@ cd ..
 
 # ── Xcode build ──
 title "Building unsigned archive"
-cd ios
 xcodebuild \
   -workspace "$XCODE_WORKSPACE" \
   -scheme "$XCODE_SCHEME" \
@@ -84,7 +83,6 @@ xcodebuild \
   CODE_SIGN_ENTITLEMENTS="" \
   PROVISIONING_PROFILE="" \
   ONLY_ACTIVE_ARCH=NO
-cd ..
 
 # ── Verify archive ──
 if [ ! -d "$XCODE_ARCHIVE" ]; then
