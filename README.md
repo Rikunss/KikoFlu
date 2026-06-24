@@ -12,6 +12,10 @@
 
 </div>
 
+<div align="center">
+  <img src="screenshots/1.png" width="950" alt="KikoFlu Screenshot">
+</div>
+
 ## Features
 
 - 🎵 **Media Playback** — Background play, queue management, fullscreen player, speed control, loop/shuffle
