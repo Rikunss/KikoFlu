@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'log_service.dart';
 import 'storage_service.dart';
+import 'cookie_service.dart';
 import 'download_service.dart';
 import '../models/download_task.dart';
 import '../utils/encoding_utils.dart';
@@ -217,7 +218,7 @@ class CacheService {
       LogService.instance.info('[Cache] 下载音频文件: $hash');
 
       // 配置服务器Cookie（如果存在）
-      dio.options.headers.addAll(StorageService.serverCookieHeaders);
+      dio.options.headers.addAll(CookieService.serverCookieHeaders);
       await dio.download(url, tempFile.path);
 
       // 下载完成后重命名为最终文件并写入 meta
@@ -325,7 +326,7 @@ class CacheService {
 
       // 下载文件
       // 配置服务器Cookie（如果存在）
-      dio.options.headers.addAll(StorageService.serverCookieHeaders);
+      dio.options.headers.addAll(CookieService.serverCookieHeaders);
 
       await dio.download(url, filePath);
 

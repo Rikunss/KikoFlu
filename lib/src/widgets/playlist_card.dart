@@ -5,6 +5,7 @@ import '../models/playlist.dart';
 import '../../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import '../services/storage_service.dart';
+import '../services/cookie_service.dart';
 import 'privacy_blur_cover.dart';
 
 class PlaylistCard extends ConsumerWidget {
@@ -52,7 +53,7 @@ class PlaylistCard extends ConsumerWidget {
     final colorScheme = theme.colorScheme;
     final s = S.of(context);
 
-    final httpHeaders = StorageService.serverCookieHeaders;
+    final httpHeaders = CookieService.serverCookieHeaders;
     final isSystem = playlist.isSystemPlaylist;
     final relativeTime = _relativeTime(context, playlist.updatedAt.isNotEmpty ? playlist.updatedAt : playlist.createdAt);
     final privacyIcon = _privacyIcon(playlist.privacy);

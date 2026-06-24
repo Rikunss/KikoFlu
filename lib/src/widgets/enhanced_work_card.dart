@@ -5,11 +5,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'blur_hash_widget.dart';
 import '../models/work.dart';
 import '../providers/auth_provider.dart';
+import '../services/kikoeru_api_service.dart';
 import '../providers/work_card_display_provider.dart';
 import '../providers/subtitle_library_provider.dart';
 
 import '../services/log_service.dart';
 import '../services/storage_service.dart';
+import '../services/cookie_service.dart';
 import '../services/blurhash_service.dart';
 import '../screens/work_detail_screen.dart';
 import '../utils/snackbar_util.dart';
@@ -825,7 +827,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
       targetWidth = (80 * devicePixelRatio).round(); // 列表模式封面固定宽度
     }
 
-    final httpHeaders = StorageService.serverCookieHeaders;
+    final httpHeaders = CookieService.serverCookieHeaders;
 
     // Gunakan blurhash dari server API, fallback ke hasil generate lokal
     final blurHash = widget.work.blurHash ??

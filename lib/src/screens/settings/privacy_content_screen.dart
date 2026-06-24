@@ -7,6 +7,7 @@ import '../blocked_items_screen.dart';
 import '../lock_screen_setup_sheet.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/app_lock_service.dart';
+import '../../services/log_service.dart';
 import '../../utils/snackbar_util.dart';
 
 /// Auto-lock timeout options.
@@ -536,7 +537,7 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
                     }
                   }
                 } catch (e, stack) {
-                  debugPrint('[BiometricToggle] UNCAUGHT ERROR: $e\n$stack');
+                  LogService.instance.error('[BiometricToggle] UNCAUGHT ERROR: $e\n$stack', tag: 'BiometricToggle');
                 }
               },
             ),

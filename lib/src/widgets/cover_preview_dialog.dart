@@ -9,6 +9,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../utils/snackbar_util.dart';
 import '../services/storage_service.dart';
+import '../services/cookie_service.dart';
 import '../../l10n/app_localizations.dart';
 
 /// 封面预览对话框，支持放大查看和保存图片
@@ -112,7 +113,7 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
           widget.imageUrl!,
           options: Options(
             responseType: ResponseType.bytes,
-            headers: StorageService.serverCookieHeaders,
+            headers: CookieService.serverCookieHeaders,
           ),
         );
         imageBytes = Uint8List.fromList(response.data!);

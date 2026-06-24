@@ -14,6 +14,7 @@ import '../services/log_service.dart';
 import '../utils/encoding_utils.dart';
 import '../services/translation_service.dart';
 import '../services/storage_service.dart';
+import '../services/cookie_service.dart';
 import 'auth_provider.dart';
 import 'audio_provider.dart';
 import 'settings_provider.dart';
@@ -301,7 +302,7 @@ class LyricController extends StateNotifier<LyricState> {
             options: Options(
               responseType: ResponseType.bytes,
               receiveTimeout: const Duration(seconds: 30),
-              headers: StorageService.serverCookieHeaders,
+              headers: CookieService.serverCookieHeaders,
             ),
           );
           if (_isStale(myGen)) {
@@ -525,7 +526,6 @@ class LyricController extends StateNotifier<LyricState> {
     }
 
     audioParentPath = findAudioPath(allFiles, '');
-    // debugPrint('[Lyric] 音频文件路径: $audioParentPath');
 
     dynamic bestMatchFile;
     double bestScore = 0.0;
@@ -1027,7 +1027,7 @@ class LyricController extends StateNotifier<LyricState> {
           options: Options(
             responseType: ResponseType.bytes,
             receiveTimeout: const Duration(seconds: 30),
-            headers: StorageService.serverCookieHeaders,
+            headers: CookieService.serverCookieHeaders,
           ),
         );
 

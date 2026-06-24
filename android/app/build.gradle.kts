@@ -35,7 +35,7 @@ android {
         applicationId = "com.meteor.kikoeruflutter"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 29
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -85,6 +85,10 @@ android {
     // which can cause "Bad JNI version" errors in some older native libraries
     // (e.g. ffmpegkit_abidetect.so). Forcing legacy extraction fixes this.
     packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+        }
         jniLibs {
             useLegacyPackaging = true
         }
@@ -97,7 +101,6 @@ flutter {
 
 dependencies {
     // AndroidX Media3 (ExoPlayer) for hi-res audio playback
-    // FLAC decoding is natively supported by media3-exoplayer
     implementation("androidx.media3:media3-exoplayer:1.5.1")
 
     // ExoPlayer FFmpeg extension — provides libffmpegJNI.so for software ALAC/FLAC/etc decoding
@@ -109,4 +112,9 @@ dependencies {
 
     // Core library desugaring (required by flutter_local_notifications)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // ── decent-player: Bit-perfect USB Audio libraries ──
+    implementation(project(":decent-usb-audio-driver"))
+    implementation(project(":decent-usb-audio-wrapper-media3"))
+    implementation(project(":decent-media3-decoder-flac"))
 }

@@ -326,15 +326,17 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
         .where((s) => s.isNotEmpty)
         .toList();
     final crumbs = <_BreadcrumbInfo>[];
-    String accumulated = '';
     for (int i = 0; i < segments.length; i++) {
-      accumulated += (i == 0 ? '' : '/') + segments[i];
       // On Android, fix the leading slash
       String label = segments[i];
       if (Platform.isAndroid && i == 0) {
-        if (segments[i] == 'storage') label = 'Storage';
-        else if (segments[i] == 'sdcard') label = 'SD Card';
-        else if (segments[i] == 'emulated') label = 'Internal';
+        if (segments[i] == 'storage') {
+          label = 'Storage';
+        } else if (segments[i] == 'sdcard') {
+          label = 'SD Card';
+        } else if (segments[i] == 'emulated') {
+          label = 'Internal';
+        }
       }
       crumbs.add(_BreadcrumbInfo(
         label: label,
@@ -346,30 +348,30 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
 
   /// Quick-access locations for Android.
   List<_QuickAccessLocation> _getQuickAccess() {
-    final storageRoot = '/storage/emulated/0';
+    const storageRoot = '/storage/emulated/0';
     if (!Directory(storageRoot).existsSync()) return [];
     return [
-      _QuickAccessLocation(
+      const _QuickAccessLocation(
         label: 'Internal Storage',
         icon: Icons.phone_android_rounded,
         path: storageRoot,
       ),
-      _QuickAccessLocation(
+      const _QuickAccessLocation(
         label: 'Downloads',
         icon: Icons.download_rounded,
         path: '$storageRoot/Download',
       ),
-      _QuickAccessLocation(
+      const _QuickAccessLocation(
         label: 'DCIM',
         icon: Icons.camera_alt_rounded,
         path: '$storageRoot/DCIM',
       ),
-      _QuickAccessLocation(
+      const _QuickAccessLocation(
         label: 'Documents',
         icon: Icons.description_rounded,
         path: '$storageRoot/Documents',
       ),
-      _QuickAccessLocation(
+      const _QuickAccessLocation(
         label: 'Music',
         icon: Icons.music_note_rounded,
         path: '$storageRoot/Music',
@@ -455,7 +457,7 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
 
     return PopScope(
       canPop: !_canGoBack,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, _) {
         if (!didPop && _canGoBack) {
           _goBack();
         }

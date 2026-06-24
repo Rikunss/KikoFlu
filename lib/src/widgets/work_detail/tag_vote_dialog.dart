@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/work.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/kikoeru_api_service.dart';
 import '../../providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../responsive_dialog.dart';

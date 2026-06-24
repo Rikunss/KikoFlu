@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -84,17 +85,21 @@ class LogService {
 
   LogService._();
 
-  final List<LogEntry> _logs = [];
+  final Queue<LogEntry> _logs = Queue<LogEntry>();
   static const int _maxLogs = 1000;
   static const int _maxMessageLength = 500;
   static const int _maxFileSize = 5 * 1024 * 1024; // 5MB
+  static const int _bufferSize = 10; // Flush after this many entries
+  static const Duration _flushInterval = Duration(seconds: 2); // Or every 2s
   final _controller = StreamController<LogEntry>.broadcast();
 
   Stream<LogEntry> get logStream => _controller.stream;
-  List<LogEntry> get logs => List.unmodifiable(_logs);
+  List<LogEntry> get logs => _logs.toList();
 
   bool _initialized = false;
   File? _logFile;
+  final Queue<LogEntry> _writeBuffer = Queue<LogEntry>();
+  Timer? _flushTimer;
 
   /// Initialize log system, start file logging.
   Future<void> initialize() async {
@@ -124,6 +129,9 @@ class LogService {
       // any failures during log initialization are non-critical.
       debugPrint('[LogService] Init error: $e');
     }
+
+    // Start periodic flush timer
+    _flushTimer = Timer.periodic(_flushInterval, (_) => _flushBuffer());
   }
 
   void _addEntry(LogEntry entry) {
@@ -139,20 +147,30 @@ class LogService {
 
     _logs.add(truncated);
     if (_logs.length > _maxLogs) {
-      _logs.removeAt(0);
+      _logs.removeFirst();
     }
 
-    // Write to file
-    _appendToFile(truncated);
+    // Buffer for batch file write
+    _writeBuffer.add(truncated);
+    if (_writeBuffer.length >= _bufferSize) {
+      _flushBuffer();
+    }
 
     _controller.add(truncated);
   }
 
-  Future<void> _appendToFile(LogEntry entry) async {
+  /// Flush buffered log entries to file.
+  Future<void> _flushBuffer() async {
+    if (_writeBuffer.isEmpty) return;
+
+    final file = _logFile;
+    if (file == null) {
+      _writeBuffer.clear();
+      return;
+    }
+
     try {
-      final file = _logFile;
-      if (file == null) return;
-      // Rotate if file is too large (check before writing)
+      // Rotate if file is too large
       if (await file.exists()) {
         final length = await file.length();
         if (length > _maxFileSize) {
@@ -162,7 +180,13 @@ class LogService {
           _logFile = File(p.join(dir.path, 'app.log'));
         }
       }
-      await file.writeAsString('${entry.format()}\n', mode: FileMode.append);
+
+      // Batch write all buffered entries
+      final buffer = StringBuffer();
+      while (_writeBuffer.isNotEmpty) {
+        buffer.writeln(_writeBuffer.removeFirst().format());
+      }
+      await file.writeAsString(buffer.toString(), mode: FileMode.append);
     } catch (e) {
       // Avoid LogService recursion — use debugPrint for internal failures.
       debugPrint('[LogService] File write error: $e');
@@ -237,6 +261,13 @@ class LogService {
 
   void clear() {
     _logs.clear();
+  }
+
+  /// Flush any remaining buffered log entries to file.
+  /// Call this before app exit to ensure all logs are persisted.
+  Future<void> flush() async {
+    _flushTimer?.cancel();
+    await _flushBuffer();
   }
 
   /// Get logs filtered by optional tag and level.

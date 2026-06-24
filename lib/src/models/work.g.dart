@@ -154,7 +154,7 @@ AudioFile _$AudioFileFromJson(Map<String, dynamic> json) => AudioFile(
           .toList(),
       mediaDownloadUrl: json['mediaDownloadUrl'] as String?,
       size: (json['size'] as num?)?.toInt(),
-      duration: json['duration'],
+      duration: (json['duration'] as num?)?.toDouble(),
     );
 
 Map<String, dynamic> _$AudioFileToJson(AudioFile instance) => <String, dynamic>{

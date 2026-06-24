@@ -534,22 +534,72 @@ class AppTheme {
     onSurfaceVariant: Color(0xFFCFC6B7),
   );
 
-  /// True Black (OLED) Dark Theme — overrides surface to pure black.
-  /// Starting from the regular dark theme, then override surfaces to #000000
-  /// so OLED pixels turn off entirely, saving battery and delivering deeper blacks.
+  /// True Black (OLED) Dark Theme — overrides ALL surface colors to pure black.
+  ///
+  /// Material 3 auto-generates surface container tones (surfaceContainerLow,
+  /// surfaceContainerHigh, etc.) that remain dark gray when only `surface`
+  /// is overridden. This method explicitly sets every surface-adjacent color
+  /// to `#000000` so OLED pixels turn off entirely, saving battery and
+  /// delivering consistent deep blacks across all surfaces.
   static ThemeData trueBlackDarkTheme(ColorScheme? darkDynamic,
       [ColorSchemeType? themeType]) {
+    const trueBlack = Color(0xFF000000);
     final theme = darkTheme(darkDynamic, themeType);
     return theme.copyWith(
-      scaffoldBackgroundColor: const Color(0xFF000000),
+      scaffoldBackgroundColor: trueBlack,
       colorScheme: theme.colorScheme.copyWith(
-        surface: const Color(0xFF000000),
+        surface: trueBlack,
+        surfaceContainerLowest: trueBlack,
+        surfaceContainerLow: trueBlack,
+        surfaceContainerHigh: trueBlack,
+        surfaceContainerHighest: trueBlack,
+        surfaceDim: trueBlack,
+        surfaceBright: trueBlack,
+        // surfaceVariant is intentionally excluded — it's a deprecated alias
+        // for surfaceContainerHighest (already set above). Using it would be
+        // redundant and trigger a deprecation warning.
       ),
       appBarTheme: theme.appBarTheme.copyWith(
-        backgroundColor: const Color(0xFF000000),
+        backgroundColor: trueBlack,
       ),
       navigationBarTheme: theme.navigationBarTheme.copyWith(
-        backgroundColor: const Color(0xFF000000),
+        backgroundColor: trueBlack,
+      ),
+      // ── Additional surface-level overrides for full AMOLED consistency ──
+      bottomSheetTheme: theme.bottomSheetTheme.copyWith(
+        backgroundColor: trueBlack,
+      ),
+      dialogTheme: theme.dialogTheme.copyWith(
+        backgroundColor: trueBlack,
+      ),
+      cardTheme: theme.cardTheme.copyWith(
+        color: trueBlack,
+        // Prevent M3 from applying a subtle primary-color tint to elevated
+        // cards, which would make them appear slightly non-black.
+        surfaceTintColor: Colors.transparent,
+      ),
+      popupMenuTheme: theme.popupMenuTheme.copyWith(
+        color: trueBlack,
+      ),
+      snackBarTheme: theme.snackBarTheme.copyWith(
+        backgroundColor: trueBlack,
+      ),
+      expansionTileTheme: theme.expansionTileTheme.copyWith(
+        backgroundColor: trueBlack,
+        collapsedBackgroundColor: trueBlack,
+      ),
+      searchViewTheme: theme.searchViewTheme.copyWith(
+        backgroundColor: trueBlack,
+      ),
+      searchBarTheme: theme.searchBarTheme.copyWith(
+        backgroundColor: WidgetStateProperty.all(trueBlack),
+      ),
+      // MenuThemeData does not have a copyWith() method in the current
+      // Flutter version, so we construct a new MenuThemeData directly.
+      menuTheme: const MenuThemeData(
+        style: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll<Color>(Color(0xFF000000)),
+        ),
       ),
     );
   }

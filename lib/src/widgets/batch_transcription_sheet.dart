@@ -145,7 +145,7 @@ class _BatchTranscriptionSheetState
                         Icon(Icons.list, size: 16, color: cs.onSurfaceVariant),
                         const SizedBox(width: 6),
                         Text(
-                          '${S.of(context).nFiles(state.totalFiles)}',
+                          S.of(context).nFiles(state.totalFiles),
                           style: tt.labelMedium?.copyWith(
                             color: cs.onSurfaceVariant,
                             fontWeight: FontWeight.w600,

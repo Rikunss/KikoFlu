@@ -6,6 +6,7 @@ import '../services/log_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../models/search_type.dart';
 import '../providers/auth_provider.dart';
+import '../services/kikoeru_api_service.dart';
 import '../providers/search_history_provider.dart';
 import '../utils/l10n_extensions.dart';
 import '../utils/server_utils.dart';

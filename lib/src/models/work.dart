@@ -374,7 +374,7 @@ class AudioFile extends Equatable {
   final String? mediaDownloadUrl;
 
   final int? size;
-  final dynamic duration; // 时长（秒），可能是 int 或 double
+  final double? duration;
 
   const AudioFile({
     required this.title,

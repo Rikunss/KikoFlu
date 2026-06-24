@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../l10n/app_localizations.dart';
 import '../services/app_lock_service.dart';
+import '../services/log_service.dart';
 
 /// Bottom sheet for setting up or changing the app lock PIN.
 ///
@@ -175,7 +176,7 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
         Navigator.pop(context, true);
       }
     } catch (e, stack) {
-      debugPrint('[AppLockService] _saveAndFinish ERROR: $e\n$stack');
+      LogService.instance.error('[AppLockService] _saveAndFinish ERROR: $e\n$stack', tag: 'AppLock');
       if (mounted) {
         setState(() => _error = e.toString());
       }

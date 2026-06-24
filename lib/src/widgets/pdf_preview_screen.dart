@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/log_service.dart';
 import '../services/cache_service.dart';
 import '../services/storage_service.dart';
+import '../services/cookie_service.dart';
 import '../../l10n/app_localizations.dart';
 import 'scrollable_appbar.dart';
 
@@ -120,7 +121,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
         }
 
         final dio = Dio();
-        dio.options.headers.addAll(StorageService.serverCookieHeaders);
+        dio.options.headers.addAll(CookieService.serverCookieHeaders);
 
         final newCachedPath = await CacheService.cacheFileResource(
           workId: widget.workId!,
@@ -160,7 +161,7 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
         filePath,
         options: Options(
           receiveTimeout: const Duration(seconds: 60),
-          headers: StorageService.serverCookieHeaders,
+          headers: CookieService.serverCookieHeaders,
         ),
         onReceiveProgress: (received, total) {
           if (total != -1) {

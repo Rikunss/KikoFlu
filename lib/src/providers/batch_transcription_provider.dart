@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:whisper_ggml_plus/whisper_ggml_plus.dart';
@@ -188,7 +189,9 @@ class BatchTranscriptionNotifier
           totalFiles: state.totalFiles,
           currentFile: batchFile.displayName,
         );
-      } catch (_) {}
+      } catch (e) {
+        LogService.instance.warning('[BatchTranscriptionNotifier] error: $e', tag: 'BatchTranscription');
+      }
 
       // Transcribe
       final aiService = _ref.read(aiModelServiceProvider);
@@ -236,7 +239,9 @@ class BatchTranscriptionNotifier
               fileName: batchFile.displayName,
               error: 'Transcription returned null',
             );
-          } catch (_) {}
+          } catch (e) {
+            LogService.instance.warning('[BatchTranscriptionNotifier] error: $e', tag: 'BatchTranscription');
+          }
         }
       } catch (e) {
         if (_cancelled) break;
@@ -256,18 +261,22 @@ class BatchTranscriptionNotifier
 
         // Show file error notification
         try {
-          await BatchTranscriptionNotificationService.instance.showFileFailed(
-            fileName: batchFile.displayName,
-            error: e.toString(),
-          );
-        } catch (_) {}
+            await BatchTranscriptionNotificationService.instance.showFileFailed(
+              fileName: batchFile.displayName,
+              error: e.toString(),
+            );
+          } catch (e) {
+            LogService.instance.warning('[BatchTranscriptionNotifier] error: $e', tag: 'BatchTranscription');
+          }
       }
     }
 
     // Release wakelock
     try {
       await WakelockPlus.disable();
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[BatchTranscriptionNotifier] error: $e', tag: 'BatchTranscription');
+    }
 
     // Complete
     if (_cancelled) {
@@ -277,7 +286,9 @@ class BatchTranscriptionNotifier
       );
       try {
         await BatchTranscriptionNotificationService.instance.showCancelled();
-      } catch (_) {}
+      } catch (e) {
+        LogService.instance.warning('[BatchTranscriptionNotifier] error: $e', tag: 'BatchTranscription');
+      }
     } else {
       state = state.copyWith(
         status: BatchJobStatus.completed,
@@ -288,7 +299,9 @@ class BatchTranscriptionNotifier
           totalFiles: state.totalFiles,
           failedFiles: state.failedCount,
         );
-      } catch (_) {}
+      } catch (e) {
+        LogService.instance.warning('[BatchTranscriptionNotifier] error: $e', tag: 'BatchTranscription');
+      }
     }
 
     if (!_batchCompleter!.isCompleted) {
@@ -358,7 +371,9 @@ class BatchTranscriptionHelper {
     for (final file in files) {
       try {
         if (await File(file.path).exists()) return true;
-      } catch (_) {}
+      } catch (e) {
+        LogService.instance.warning('[BatchTranscriptionHelper] error: $e', tag: 'BatchTranscription');
+      }
     }
     return false;
   }

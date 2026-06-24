@@ -1,5 +1,7 @@
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'log_service.dart';
 
 /// Manages Android system notification for batch AI transcription progress.
 ///
@@ -47,7 +49,9 @@ class BatchTranscriptionNotificationService {
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.requestNotificationsPermission();
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[BatchTranscriptionNotification] Permission request failed: $e', tag: 'BatchTranscription');
+    }
 
     _initialized = true;
   }

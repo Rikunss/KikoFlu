@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/sort_options.dart';
 import '../services/audio_conversion_service.dart';
+import '../services/log_service.dart';
 import '../services/progress_sync_service.dart';
 
 /// Triggers when Settings screen should refresh cache-related information.
@@ -129,6 +132,8 @@ class LLMSettings {
 
 class LLMSettingsNotifier extends StateNotifier<LLMSettings> {
   static const String _prefix = 'llm_settings_';
+  static const String _secureApiKeyKey = 'llm_api_key';
+  static const _secureStorage = FlutterSecureStorage();
 
   LLMSettingsNotifier() : super(const LLMSettings()) {
     _loadSettings();
@@ -137,15 +142,25 @@ class LLMSettingsNotifier extends StateNotifier<LLMSettings> {
   Future<void> _loadSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      // Read API key from secure storage, with migration from SharedPreferences
+      String apiKey = await _secureStorage.read(key: _secureApiKeyKey) ?? '';
+      if (apiKey.isEmpty) {
+        final legacyKey = prefs.getString('${_prefix}api_key');
+        if (legacyKey != null && legacyKey.isNotEmpty) {
+          apiKey = legacyKey;
+          await _secureStorage.write(key: _secureApiKeyKey, value: apiKey);
+          await prefs.remove('${_prefix}api_key');
+        }
+      }
       state = LLMSettings(
         apiUrl: prefs.getString('${_prefix}api_url') ?? state.apiUrl,
-        apiKey: prefs.getString('${_prefix}api_key') ?? state.apiKey,
+        apiKey: apiKey,
         model: prefs.getString('${_prefix}model') ?? state.model,
         prompt: prefs.getString('${_prefix}prompt') ?? state.prompt,
         concurrency: prefs.getInt('${_prefix}concurrency') ?? state.concurrency,
       );
     } catch (e) {
-      // ignore
+      LogService.instance.warning('[LLMSettingsNotifier] Failed to load settings: $e', tag: 'LLMSettings');
     }
   }
 
@@ -154,12 +169,12 @@ class LLMSettingsNotifier extends StateNotifier<LLMSettings> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('${_prefix}api_url', settings.apiUrl);
-      await prefs.setString('${_prefix}api_key', settings.apiKey);
+      await _secureStorage.write(key: _secureApiKeyKey, value: settings.apiKey);
       await prefs.setString('${_prefix}model', settings.model);
       await prefs.setString('${_prefix}prompt', settings.prompt);
       await prefs.setInt('${_prefix}concurrency', settings.concurrency);
     } catch (e) {
-      // ignore
+      LogService.instance.warning('[LLMSettingsNotifier] Failed to save settings: $e', tag: 'LLMSettings');
     }
   }
 }
@@ -199,8 +214,7 @@ class TranslationSourceNotifier extends StateNotifier<TranslationSource> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_preferenceKey, state.value);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 }
@@ -431,8 +445,7 @@ class PageSizeNotifier extends StateNotifier<int> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_preferenceKey, size);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 }
@@ -475,8 +488,7 @@ class AudioPassthroughNotifier extends StateNotifier<bool> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_preferenceKey, enabled);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 }
@@ -519,8 +531,7 @@ class DefaultSortNotifier extends StateNotifier<DefaultSortState> {
       }
 
       state = DefaultSortState(order: order, direction: direction);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 
@@ -531,8 +542,7 @@ class DefaultSortNotifier extends StateNotifier<DefaultSortState> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_orderKey, order.value);
       await prefs.setString(_directionKey, direction.value);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 }
@@ -585,8 +595,7 @@ class BlockedItemsNotifier extends StateNotifier<BlockedItemsState> {
       final cvs = prefs.getStringList(_cvsKey) ?? [];
       final circles = prefs.getStringList(_circlesKey) ?? [];
       state = BlockedItemsState(tags: tags, cvs: cvs, circles: circles);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 
@@ -596,8 +605,7 @@ class BlockedItemsNotifier extends StateNotifier<BlockedItemsState> {
       await prefs.setStringList(_tagsKey, state.tags);
       await prefs.setStringList(_cvsKey, state.cvs);
       await prefs.setStringList(_circlesKey, state.circles);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 
@@ -688,8 +696,7 @@ class PreferredSampleRateNotifier extends StateNotifier<PreferredSampleRate> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_preferenceKey, rate.value);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 }
@@ -725,8 +732,7 @@ class CrossfadeDurationNotifier extends StateNotifier<int> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_preferenceKey, state);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 }
@@ -904,8 +910,7 @@ class BitPerfectPlaybackNotifier extends StateNotifier<BitPerfectPlaybackSetting
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_enabledKey, enabled);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 
@@ -918,8 +923,7 @@ class BitPerfectPlaybackNotifier extends StateNotifier<BitPerfectPlaybackSetting
       } else {
         await prefs.remove(_deviceIdKey);
       }
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 }
@@ -953,8 +957,7 @@ class ProgressSyncNotifier extends StateNotifier<bool> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_preferenceKey, enabled);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 }
@@ -987,8 +990,7 @@ class AutoTranslateLyricsNotifier extends StateNotifier<bool> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_preferenceKey, enabled);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 }
@@ -1045,8 +1047,7 @@ class WavConversionFormatNotifier extends StateNotifier<WavConversionFormat> {
       if (prefs.containsKey(_preferenceKeyOld)) {
         await prefs.remove(_preferenceKeyOld);
       }
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 }
@@ -1078,8 +1079,7 @@ class FpsOverlayNotifier extends StateNotifier<bool> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_preferenceKey, enabled);
-    } catch (e) {
-      // ignore
+    } catch (e) { LogService.instance.warning('[Settings] error: $e', tag: 'Settings');
     }
   }
 }

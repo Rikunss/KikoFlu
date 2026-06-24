@@ -22,6 +22,8 @@ import 'responsive_dialog.dart';
 import 'image_gallery_screen.dart';
 import 'text_preview_screen.dart';
 import 'pdf_preview_screen.dart';
+import 'explorer/explorer_helpers.dart';
+import 'explorer/explorer_file_tree.dart';
 import '../../l10n/app_localizations.dart';
 
 /// 离线文件浏览器 - 显示已下载的文件
@@ -260,77 +262,13 @@ class _OfflineFileExplorerWidgetState
 
   // 检查字幕库中哪些音频文件有匹配的字幕
   Future<void> _checkLibrarySubtitles() async {
-    try {
-      final libraryDir =
-          await SubtitleLibraryService.getSubtitleLibraryDirectory();
-      if (!await libraryDir.exists()) {
-        return;
-      }
-
-      _audioWithLibrarySubtitles.clear();
-      final workId = widget.work.id;
-      final parsedFolderPath = '${libraryDir.path}/${SubtitleLibraryService.parsedFolderName}';
-
-      // 生成可能的文件夹名称列表（支持带前导零的格式）
-      final possibleFolderNames = [
-        'RJ$workId',
-        'RJ0$workId',
-        'BJ$workId',
-        'BJ0$workId',
-        'VJ$workId',
-        'VJ0$workId',
-      ];
-
-      // 收集所有音频文件名
-      final audioFiles = <String>[];
-      void collectAudioFiles(List<dynamic> items) {
-        for (final item in items) {
-          final title = _getProperty(item, 'title', defaultValue: '');
-
-          // 检查是否是音频文件（通过类型或文件名后缀）
-          // 修复：wav等格式可能没有被正确标记为audio类型
-          if (item is Map<String, dynamic> && FileIconUtils.isAudioFile(item)) {
-            if (title.isNotEmpty) {
-              audioFiles.add(title);
-            }
-          }
-          final children = _getProperty(item, 'children') as List<dynamic>?;
-          if (children != null) {
-            collectAudioFiles(children);
-          }
-        }
-      }
-
-      collectAudioFiles(_localFiles);
-
-      // 检查每个可能的文件夹
-      for (final folderName in possibleFolderNames) {
-        final folderPath = '$parsedFolderPath/$folderName';
-        final folder = Directory(folderPath);
-        if (!await folder.exists()) continue;
-
-        // 遍历字幕库文件夹，查找匹配的字幕
-        await for (final entity in folder.list(recursive: true)) {
-          if (entity is File) {
-            final fileName = entity.path.split(Platform.pathSeparator).last;
-
-            // 检查是否有音频文件匹配这个字幕
-            for (final audioFile in audioFiles) {
-              if (SubtitleLibraryService.isSubtitleForAudio(
-                  fileName, audioFile)) {
-                _audioWithLibrarySubtitles.add(audioFile);
-                // 不要 break，因为一个字幕文件可能对应多个音频文件（如 mp3 和 wav 版本）
-              }
-            }
-          }
-        }
-      }
-
-      LogService.instance.debug(
-          '[OfflineFileExplorer] 字幕库匹配: ${_audioWithLibrarySubtitles.length} 个音频文件有字幕', tag: 'UI');
-    } catch (e) {
-      LogService.instance.warning('[OfflineFileExplorer] 检查字幕库失败: $e', tag: 'UI');
-    }
+    final items = _localFiles.whereType<Map<String, dynamic>>().toList();
+    _audioWithLibrarySubtitles.addAll(await checkLibrarySubtitles(
+      workId: widget.work.id,
+      items: items,
+      getTitle: (item) => item['title'] as String? ?? item['name'] as String? ?? '',
+    ));
+    if (mounted) setState(() {});
   }
 
   // 识别主文件夹：音频数量最多的目录，如果有多个则选择文本文件最多的
@@ -639,7 +577,9 @@ class _OfflineFileExplorerWidgetState
               coverUrl = 'file://${coverFile.path}';
             }
           }
-        } catch (_) {}
+        } catch (e) {
+          LogService.instance.warning('[OfflineFileExplorer] Failed to find cover image: $e', tag: 'OfflineFileExplorer');
+        }
       }
 
       // Priority 2: Fallback to cover.jpg
@@ -669,7 +609,9 @@ class _OfflineFileExplorerWidgetState
             final lower = entry.path.toLowerCase();
             // Skip work_metadata.json and .downloading temp files
             if (lower.endsWith('.downloading') ||
-                lower.endsWith('work_metadata.json')) continue;
+                lower.endsWith('work_metadata.json')) {
+              continue;
+            }
             if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') ||
                 lower.endsWith('.png') || lower.endsWith('.webp') ||
                 lower.endsWith('.bmp')) {
@@ -1267,6 +1209,7 @@ class _OfflineFileExplorerWidgetState
       );
     }
 
+    final rootItems = _localFiles.whereType<Map<String, dynamic>>().toList();
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1343,193 +1286,38 @@ class _OfflineFileExplorerWidgetState
               ],
             ),
           ),
-          // 文件树列表
-          ..._buildFileTree(_localFiles, ''),
+          // 文件树列表 (shared ExplorerFileTree)
+          ExplorerFileTree(
+            items: rootItems,
+            expandedFolders: _expandedFolders,
+            audioWithLibrarySubtitles: _audioWithLibrarySubtitles,
+            displayNameTransform: (name) => _getDisplayName(name),
+            getTitle: (item) => _getProperty(item, 'title', defaultValue: S.of(context).unknown)!,
+            onToggle: (path) => setState(() => toggleFolder(_expandedFolders, path)),
+            onTapFile: (item, parentPath) => _handleFileTap(item, _getDisplayName(item['title'] as String? ?? item['name'] as String? ?? S.of(context).unknown), parentPath),
+            onPlayAudio: (item, parentPath) => _playAudioFile(item, parentPath),
+            onPlayVideo: (item, parentPath) => _playVideoWithSystemPlayer(item),
+            onPreviewImage: (item) => _previewImageFile(item),
+            onPreviewText: (item) => _previewTextFile(item),
+            onPreviewPdf: (item) => _previewPdfFile(item),
+            onLoadSubtitle: (item) => _loadLyricManually(item),
+            onDelete: (item, parentPath) => _deleteFile(item, parentPath),
+            onItemRendered: (name) {
+              if (_showTranslation &&
+                  !_translationCache.containsKey(name) &&
+                  !_translatingItems.contains(name)) {
+                _translateItem(name);
+              }
+            },
+            fileSizeFuture: (item, parentPath) => _getFileSize(item, parentPath),
+          ),
         ],
       ),
     );
   }
 
-  // 递归构建文件树
-  List<Widget> _buildFileTree(List<dynamic> items, String parentPath,
-      {int level = 0}) {
-    final List<Widget> widgets = [];
-
-    for (final item in items) {
-      final type = _getProperty(item, 'type', defaultValue: '');
-      final originalTitle = _getProperty(item, 'title', defaultValue: S.of(context).unknown);
-      final title = _getDisplayName(originalTitle); // 使用翻译后的名称
-      final isFolder = type == 'folder';
-      final children = _getProperty(item, 'children') as List<dynamic>?;
-      final itemPath = _getItemPath(parentPath, item);
-      final isExpanded = _expandedFolders.contains(itemPath);
-      final isTranslating = _translatingItems.contains(originalTitle);
-
-      // 如果启用翻译且该项未翻译，自动翻译
-      if (_showTranslation &&
-          !_translationCache.containsKey(originalTitle) &&
-          !isTranslating) {
-        _translateItem(originalTitle);
-      }
-
-      // 文件/文件夹项
-      widgets.add(
-        InkWell(
-          onTap: () {
-            if (isFolder) {
-              _toggleFolder(itemPath);
-            } else {
-              _handleFileTap(item, title, parentPath);
-            }
-          },
-          onLongPress: () {
-            Clipboard.setData(ClipboardData(text: title));
-            SnackBarUtil.showSuccess(context, S.of(context).copiedName(title));
-          },
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 8.0 + (level * 20.0),
-              right: 8.0,
-              top: 8.0,
-              bottom: 8.0,
-            ),
-            child: Row(
-              children: [
-                // 展开/折叠图标（仅文件夹）
-                if (isFolder)
-                  Icon(
-                    isExpanded
-                        ? Icons.keyboard_arrow_down
-                        : Icons.keyboard_arrow_right,
-                    size: 20,
-                  )
-                else
-                  const SizedBox(width: 20),
-                const SizedBox(width: 8),
-                // 文件图标（带字幕库匹配标记）
-                SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Stack(
-                    children: [
-                      Icon(
-                        FileIconUtils.getFileIconFromMap(item),
-                        color: FileIconUtils.getFileIconColorFromMap(item),
-                        size: 24,
-                      ),
-                      // 字幕库匹配标记（音频文件）
-                      if (item is Map<String, dynamic> &&
-                          FileIconUtils.isAudioFile(item) &&
-                          _audioWithLibrarySubtitles.contains(originalTitle))
-                        Positioned(
-                          left: 0,
-                          top: 0,
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.subtitles,
-                              color: Colors.blue[600],
-                              size: 13,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // 文件名 + 时长 + 文件大小
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      // 显示文件大小
-                      if (!isFolder)
-                        FutureBuilder<int?>(
-                          future: _getFileSize(item, parentPath),
-                          builder: (context, snapshot) {
-                            // 获取文件大小
-                            final fileSize = snapshot.hasData
-                                ? _formatFileSize(snapshot.data)
-                                : '';
-
-                            if (fileSize.isEmpty) {
-                              return const SizedBox.shrink();
-                            }
-
-                            return Text(
-                              fileSize,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            );
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-                // 操作按钮
-                if (FileIconUtils.isAudioFile(item) ||
-                    FileIconUtils.isVideoFile(item) ||
-                    FileIconUtils.isImageFile(item) ||
-                    FileIconUtils.isTextFile(item) ||
-                    FileIconUtils.isPdfFile(item) ||
-                    !isFolder)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 字幕加载按钮（仅字幕文件显示）
-                      if (FileIconUtils.isTextFile(item) &&
-                          FileIconUtils.isLyricFile(originalTitle))
-                        IconButton(
-                          onPressed: () => _loadLyricManually(item),
-                          icon: const Icon(Icons.subtitles),
-                          color: Colors.orange,
-                          tooltip: S.of(context).loadAsSubtitle,
-                          iconSize: 20,
-                        ),
-                      // 删除按钮
-                      IconButton(
-                        onPressed: () => _deleteFile(item, parentPath),
-                        icon: const Icon(Icons.delete_outline),
-                        color: Colors.red.shade400,
-                        tooltip: S.of(context).delete,
-                        iconSize: 20,
-                      ),
-                    ],
-                  )
-                else if (isFolder && children != null)
-                  Text(
-                    S.of(context).nItems(children.length),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      );
-
-      // 如果是展开的文件夹，递归显示子项
-      if (isFolder && isExpanded && children != null && children.isNotEmpty) {
-        widgets.addAll(_buildFileTree(children, itemPath, level: level + 1));
-      }
-    }
-
-    return widgets;
-  }
+  // Deleted: _buildFileTree — replaced by shared ExplorerFileTree widget
+  // See explorer/explorer_file_tree.dart
 
   // 获取显示的名称（根据翻译状态）
   String _getDisplayName(String originalName) {

@@ -6,6 +6,7 @@ import 'package:blurhash_dart/blurhash_dart.dart';
 import 'package:image/image.dart' as img;
 import 'log_service.dart';
 import 'storage_service.dart';
+import 'cookie_service.dart';
 
 final _log = LogService.instance;
 
@@ -109,7 +110,7 @@ class BlurHashService {
       final request = await httpClient.getUrl(uri);
 
       // Include server cookie if configured
-      final cookie = StorageService.getString('server_cookie');
+      final cookie = await CookieService.getCookie();
       if (cookie != null && cookie.isNotEmpty) {
         request.headers.set('Cookie', cookie);
       }

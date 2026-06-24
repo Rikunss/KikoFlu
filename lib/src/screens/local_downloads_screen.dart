@@ -13,7 +13,7 @@ import '../models/download_task.dart';
 import '../models/sort_options.dart';
 import '../models/work.dart';
 import '../services/download_service.dart';
-import '../services/storage_service.dart';
+import '../services/cookie_service.dart';
 import '../utils/string_utils.dart';
 import '../utils/responsive_grid_helper.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -243,13 +243,14 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     if (!mounted) return;
     try {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(snackBar);
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[_LocalDownloadListState] error: $e', tag: 'LocalDownloads');
+    }
   }
 
   Future<void> _deleteSelectedWorks(
       Map<int, List<DownloadTask>> groupedTasks) async {
     if (_selectedWorkIds.isEmpty) return;
-    final s = S.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -267,6 +268,7 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     );
     if (confirmed != true || !mounted) return;
 
+    final s = S.of(context);
     int success = 0, total = 0;
     String? errorMsg;
     for (final workId in _selectedWorkIds) {
@@ -465,16 +467,19 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
   }
 
   void _openWorkDetail(int workId, DownloadTask task) async {
+    final s = S.of(context);
     Map<String, dynamic>? metadata = task.workMetadata;
     if (metadata == null) {
       // Try loading from disk — useful before syncWithDiskAfterInit completes
       try {
         metadata = await DownloadService.instance.getWorkMetadata(workId);
-      } catch (_) {}
+      } catch (e) {
+        LogService.instance.warning('[_LocalDownloadListState] error: $e', tag: 'LocalDownloads');
+      }
     }
     if (metadata == null) {
       _showSnackBarSafe(SnackBar(
-        content: Text(S.of(context).noWorkMetadataForOffline),
+        content: Text(s.noWorkMetadataForOffline),
         duration: const Duration(seconds: 2),
       ));
       return;
@@ -622,11 +627,11 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
 
   /// Import multiple subfolders — each becomes one work.
   Future<void> _importMultipleFolders() async {
-    final dialogContext = context;
-    final s = S.of(dialogContext);
+    if (!mounted) return;
+    final s = S.of(context);
 
     final parentPath = await CustomFilePicker.pickDirectory(
-      context: dialogContext,
+      context: context,
       title: s.selectImportFolderMultiple,
     );
     if (parentPath == null || !mounted) return;
@@ -649,14 +654,14 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       return;
     }
 
-    if (!dialogContext.mounted) return;
+    if (!mounted) return;
 
     final progressNotifier = ValueNotifier<_ImportProgress>(
       _ImportProgress(completed: 0, total: totalSubfolders, currentFolder: ''),
     );
 
     final dialogFuture = showDialog<void>(
-      context: dialogContext,
+      context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: Row(children: [
@@ -719,9 +724,8 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       );
 
       if (!mounted) return;
-      if (dialogContext.mounted) {
-        // ignore: use_build_context_synchronously
-        Navigator.of(dialogContext, rootNavigator: true).pop();
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
       }
       await dialogFuture;
 
@@ -742,9 +746,8 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       ));
     } catch (e) {
       if (!mounted) return;
-      if (dialogContext.mounted) {
-        // ignore: use_build_context_synchronously
-        Navigator.of(dialogContext, rootNavigator: true).pop();
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
       }
       await dialogFuture;
       _showSnackBarSafe(SnackBar(
@@ -781,7 +784,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
 
     final (downloadedCount, importedCount) =
         _countBySource(allGrouped);
-    final allCount = allGrouped.length;
 
     // Grid layout — responsive masonry, matching main menu's big-grid style
     final size = MediaQuery.sizeOf(context);
@@ -841,24 +843,17 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     }
 
     return Column(children: [
-      _DownloadTopBar(
-        isSelectionMode: _isSelectionMode,
-        selectedCount: _selectedWorkIds.length,
-        totalWorkCount: allGrouped.length,
-        isSearchVisible: _isSearchVisible,
-        onToggleSelectionMode: _toggleSelectionMode,
-        onSelectAll: () => _selectAll(allGrouped),
-        onDeselectAll: _deselectAll,
-        onDeleteSelected: () => _deleteSelectedWorks(allGrouped),
-        onRefresh: _refreshMetadata,
-        onOpenFolder: _openDownloadFolder,
-        onToggleSearch: _toggleSearch,
-        onShowSort: _showSortDialog,
-      ),
-      _buildImportBar(),
+      if (_isSelectionMode)
+        _DownloadTopBar(
+          selectedCount: _selectedWorkIds.length,
+          totalWorkCount: allGrouped.length,
+          onToggleSelectionMode: _toggleSelectionMode,
+          onSelectAll: () => _selectAll(allGrouped),
+          onDeselectAll: _deselectAll,
+          onDeleteSelected: () => _deleteSelectedWorks(allGrouped),
+        ),
       _buildSourceTabs(downloadedCount: downloadedCount, importedCount: importedCount),
-      _buildInfoBar(allCount, downloadedCount, importedCount),
-      _buildFilterBar(allGrouped),
+      _buildFilterButton(allGrouped),
       if (_isSearchVisible) _buildSearchBar(),
       Expanded(
         child: emptyWidget ?? AnimatedSwitcher(
@@ -950,9 +945,9 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
   }
 
   /// Source tabs — segmented pill control: All | Downloaded | Imported
+  /// Action buttons (More, Search, Sort) are trailing, always visible.
   Widget _buildSourceTabs({required int downloadedCount, required int importedCount}) {
     final cs = Theme.of(context).colorScheme;
-    final s = S.of(context);
     const tabs = _SourceFilter.values;
 
     return Container(
@@ -962,69 +957,94 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
           bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
         ),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: List.generate(tabs.length, (i) {
-            final filter = tabs[i];
-            final isSel = _sourceFilter == filter;
+      child: Row(
+        children: [
+          // Scrollable source tabs
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: List.generate(tabs.length, (i) {
+                  final filter = tabs[i];
+                  final isSel = _sourceFilter == filter;
 
-            return Padding(
-              padding: EdgeInsets.only(right: i < tabs.length - 1 ? 6 : 0),
-              child: GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  setState(() {
-                    _sourceFilter = filter;
-                    _currentPage = 1;
-                    _workCache.clear();
-                  });
-                },
-                behavior: HitTestBehavior.opaque,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOutCubic,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: isSel
-                        ? cs.primaryContainer
-                        : cs.surfaceContainerHighest.withAlpha(150),
-                    borderRadius: BorderRadius.circular(12),
-                    border: isSel
-                        ? Border.all(color: cs.primary.withAlpha(60), width: 1)
-                        : null,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _sourceIcon(filter),
-                        size: 16,
-                        color: isSel ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        _sourceLabel(s, filter),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSel ? FontWeight.w600 : FontWeight.w500,
-                          color: isSel ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                  return Padding(
+                    padding: EdgeInsets.only(right: i < tabs.length - 1 ? 6 : 0),
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() {
+                          _sourceFilter = filter;
+                          _currentPage = 1;
+                          _workCache.clear();
+                        });
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: isSel
+                              ? cs.primaryContainer
+                              : cs.surfaceContainerHighest.withAlpha(150),
+                          borderRadius: BorderRadius.circular(12),
+                          border: isSel
+                              ? Border.all(color: cs.primary.withAlpha(60), width: 1)
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _sourceIcon(filter),
+                              size: 16,
+                              color: isSel ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              _sourceLabel(S.of(context), filter),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isSel ? FontWeight.w600 : FontWeight.w500,
+                                color: isSel ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            // Count badge
+                            _SourceCountBadge(
+                              count: _countForFilter(filter, downloadedCount, importedCount),
+                              isSelected: isSel,
+                              colorScheme: cs,
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      // Count badge
-                      _SourceCountBadge(
-                        count: _countForFilter(filter, downloadedCount, importedCount),
-                        isSelected: isSel,
-                        colorScheme: cs,
-                      ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                }),
               ),
-            );
-          }),
-        ),
+            ),
+          ),
+          // Trailing action buttons (always visible, never scroll)
+          const SizedBox(width: 4),
+          _CompactIconButton(
+            icon: Icons.more_vert_rounded,
+            tooltip: 'More',
+            onPressed: () => _showOverflowMenu(context),
+          ),
+          const SizedBox(width: 2),
+          _CompactIconButton(
+            icon: _isSearchVisible ? Icons.search_off : Icons.search,
+            tooltip: S.of(context).search,
+            onPressed: _toggleSearch,
+          ),
+          _CompactIconButton(
+            icon: Icons.sort,
+            tooltip: S.of(context).sortOptions,
+            onPressed: _showSortDialog,
+          ),
+        ],
       ),
     );
   }
@@ -1062,133 +1082,92 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     }
   }
 
-  /// Info bar — summary counts below source tabs.
-  Widget _buildInfoBar(int allCount, int downloadedCount, int importedCount) {
-    final cs = Theme.of(context).colorScheme;
-    if (allCount == 0) return const SizedBox.shrink();
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: cs.outlineVariant, width: 0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline_rounded, size: 12,
-            color: cs.onSurfaceVariant.withAlpha(100)),
-          const SizedBox(width: 6),
-          Text(
-            '$allCount works',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500,
-              color: cs.onSurfaceVariant),
-          ),
-          if (downloadedCount > 0) ...[
-            const SizedBox(width: 4),
-            Text('·', style: TextStyle(fontSize: 11, color: cs.outline)),
-            const SizedBox(width: 4),
-            Icon(Icons.cloud_download_rounded, size: 11,
-              color: cs.primary),
-            const SizedBox(width: 3),
-            Text('$downloadedCount',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500,
-                color: cs.primary)),
-          ],
-          if (importedCount > 0) ...[
-            const SizedBox(width: 4),
-            Text('·', style: TextStyle(fontSize: 11, color: cs.outline)),
-            const SizedBox(width: 4),
-            Icon(Icons.folder_rounded, size: 11,
-              color: Colors.orange.shade400),
-            const SizedBox(width: 3),
-            Text('$importedCount',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500,
-                color: Colors.orange.shade400)),
-          ],
-        ],
-      ),
-    );
-  }
 
-  /// Import bar — sits between the top toolbar and the filter bar.
-  Widget _buildImportBar() {
-    final cs = Theme.of(context).colorScheme;
+
+
+  /// Show overflow menu (Select, Reload, Import, Browse, etc.)
+  void _showOverflowMenu(BuildContext context) {
     final s = S.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.folder_rounded, size: 16, color: cs.onSurfaceVariant.withAlpha(120)),
-          const SizedBox(width: 8),
-          Text(
-            s.importWork,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: cs.onSurfaceVariant,
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.checklist),
+              title: Text(s.select),
+              onTap: () {
+                Navigator.pop(ctx);
+                _toggleSelectionMode();
+              },
             ),
-          ),
-          const Spacer(),
-          PopupMenuButton<_ImportAction>(
-            tooltip: s.importWork,
-            icon: Icon(Icons.add_circle_outline_rounded, size: 22, color: cs.primary),
-            padding: const EdgeInsets.all(6),
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            onSelected: (action) {
-              HapticFeedback.lightImpact();
-              switch (action) {
-                case _ImportAction.singleFolder:
-                  _importSingleFolder();
-                case _ImportAction.multipleFolders:
-                  _importMultipleFolders();
-              }
-            },
-            itemBuilder: (ctx) => [
-              PopupMenuItem(
-                value: _ImportAction.singleFolder,
-                child: ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.create_new_folder_rounded, size: 20),
-                  title: Text(s.importSingleFolder),
-                  subtitle: Text(s.importSingleFolderDesc, style: const TextStyle(fontSize: 11)),
-                  contentPadding: EdgeInsets.zero,
-                ),
+            ListTile(
+              leading: const Icon(Icons.refresh_rounded),
+              title: Text(s.reload),
+              onTap: () {
+                Navigator.pop(ctx);
+                _refreshMetadata();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.create_new_folder_rounded),
+              title: Text(s.importSingleFolder),
+              subtitle: Text(s.importSingleFolderDesc, style: const TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _importSingleFolder();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_copy_rounded),
+              title: Text(s.importMultipleFolders),
+              subtitle: Text(s.importMultipleFoldersDesc, style: const TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _importMultipleFolders();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_rounded),
+              title: Text(s.browseFiles),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const LocalFileBrowserScreen(),
+                  ),
+                );
+              },
+            ),
+            if (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
+              ListTile(
+                leading: const Icon(Icons.folder_open),
+                title: Text(s.openFolder),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openDownloadFolder();
+                },
               ),
-              PopupMenuItem(
-                value: _ImportAction.multipleFolders,
-                child: ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.folder_copy_rounded, size: 20),
-                  title: Text(s.importMultipleFolders),
-                  subtitle: Text(s.importMultipleFoldersDesc, style: const TextStyle(fontSize: 11)),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  /// Filter bar — chips for Circle / VA / Tag filtering.
-  Widget _buildFilterBar(Map<int, List<DownloadTask>> grouped) {
+  /// Filter button — opens bottom sheet with Circle / VA / Tag filters.
+  Widget _buildFilterButton(Map<int, List<DownloadTask>> grouped) {
     final cs = Theme.of(context).colorScheme;
     final options = _extractFilterOptions(grouped);
     final hasActiveFilter = _filterType != _FilterType.all;
 
-    // Only show if there are filterable options or an active filter
     final hasOptions = options.values.any((list) => list.isNotEmpty);
     if (!hasOptions && !hasActiveFilter) return const SizedBox.shrink();
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
@@ -1211,153 +1190,234 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
               cs: cs,
             ),
             const SizedBox(width: 6),
-
-            // Circle filter chip
-            if (options['circles']!.isNotEmpty)
-              _buildFilterChip(
-                label: 'Circle',
-                icon: Icons.business_rounded,
-                type: _FilterType.circle,
-                options: options['circles']!,
-                cs: cs,
-              ),
-
-            // VA filter chip
-            if (options['vas']!.isNotEmpty)
-              _buildFilterChip(
-                label: 'VA',
-                icon: Icons.mic_rounded,
-                type: _FilterType.va,
-                options: options['vas']!,
-                cs: cs,
-              ),
-
-            // Tag filter chip
-            if (options['tags']!.isNotEmpty)
-              _buildFilterChip(
-                label: 'Tag',
-                icon: Icons.label_rounded,
-                type: _FilterType.tag,
-                options: options['tags']!,
-                cs: cs,
-              ),
-
-            // Active filter badge
-            if (hasActiveFilter) ...[
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: cs.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _filterValue,
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.onPrimaryContainer),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+      // Filter button
+      _buildCategoryFilterButton(Theme.of(context).colorScheme, options, hasActiveFilter),
           ],
         ),
       ),
     );
   }
 
-  /// Build a single filter chip group (Circle / VA / Tag).
-  /// Tapping the chip opens a bottom sheet to pick a value.
-  Widget _buildFilterChip({
-    required String label,
-    required IconData icon,
-    required _FilterType type,
-    required List<String> options,
-    required ColorScheme cs,
-  }) {
-    final isActive = _filterType == type;
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: ActionChip(
-        avatar: Icon(icon, size: 14,
-          color: isActive ? cs.onPrimaryContainer : cs.onSurfaceVariant),
-        label: Text(
-          isActive ? _filterValue : label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-            color: isActive ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+  /// Category filter button — shows active filter badge, opens bottom sheet.
+  Widget _buildCategoryFilterButton(
+    ColorScheme cs,
+    Map<String, List<String>> options,
+    bool hasActiveFilter,
+  ) {
+    final filterCount = hasActiveFilter ? 1 : 0;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => _showAggregatedFilterSheet(options),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: hasActiveFilter
+                ? cs.primaryContainer.withAlpha(100)
+                : cs.surfaceContainerHighest.withAlpha(80),
+            borderRadius: BorderRadius.circular(20),
+            border: hasActiveFilter
+                ? Border.all(color: cs.primary.withAlpha(60))
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.filter_list_rounded, size: 16,
+                color: hasActiveFilter ? cs.onPrimaryContainer : cs.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text('Category', style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w600,
+                color: hasActiveFilter ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+              )),
+              if (hasActiveFilter) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: cs.primary.withAlpha(40),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('$filterCount', style: TextStyle(
+                    fontSize: 10, fontWeight: FontWeight.w700, color: cs.primary)),
+                ),
+              ],
+            ],
           ),
         ),
-        side: isActive
-            ? BorderSide(color: cs.primary, width: 1)
-            : BorderSide(color: cs.outlineVariant.withAlpha(80)),
-        backgroundColor: isActive ? cs.primaryContainer : cs.surfaceContainerHighest.withAlpha(120),
-        onPressed: () => _showFilterPicker(type, options, label),
       ),
     );
   }
 
-  /// Show a bottom sheet to pick a filter value.
-  void _showFilterPicker(_FilterType type, List<String> options, String label) {
-    final s = S.of(context);
+  /// Bottom sheet with Circle / VA / Tag filter options.
+  void _showAggregatedFilterSheet(Map<String, List<String>> options) {
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            Container(
+            Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(children: [
-                Text('Filter by $label',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-                const Spacer(),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text(s.cancel),
-                ),
-              ]),
-            ),
-            const Divider(height: 1),
-            // Options list
-            SizedBox(
-              height: (options.length * 52 + 16).clamp(100, 360).toDouble(),
-              child: ListView.builder(
-                itemCount: options.length,
-                itemBuilder: (ctx, i) {
-                  final value = options[i];
-                  final isSelected = _filterType == type && _filterValue == value;
-                  return ListTile(
-                    dense: true,
-                    leading: Icon(
-                      isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                      color: isSelected ? Theme.of(ctx).colorScheme.primary : null,
-                      size: 20,
-                    ),
-                    title: Text(value, style: const TextStyle(fontSize: 14)),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle, color: Theme.of(ctx).colorScheme.primary, size: 20)
-                        : null,
-                    selected: isSelected,
-                    onTap: () {
-                      Navigator.pop(ctx);
+              child: Row(
+                children: [
+                  Text(
+                    'Filter by Category',
+                    style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: const Text('Reset'),
+                    onPressed: () {
                       setState(() {
-                        _filterType = type;
-                        _filterValue = value;
+                        _filterType = _FilterType.all;
+                        _filterValue = '';
                         _currentPage = 1;
                       });
+                      Navigator.pop(ctx);
                     },
-                  );
-                },
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
+            const Divider(height: 1),
+            const SizedBox(height: 4),
+
+            // Circle options
+            if (options['circles']!.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Text('Circle', style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700,
+                  color: Theme.of(ctx).colorScheme.onSurfaceVariant, letterSpacing: 0.5,
+                )),
+              ),
+              SizedBox(
+                height: (options['circles']!.length * 48 + 8).clamp(48, 240).toDouble(),
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  itemCount: options['circles']!.length,
+                  itemBuilder: (ctx, i) {
+                    final value = options['circles']![i];
+                    final isSelected = _filterType == _FilterType.circle && _filterValue == value;
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(
+                        isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                        color: isSelected ? Theme.of(ctx).colorScheme.primary : null,
+                        size: 20,
+                      ),
+                      title: Text(value, style: const TextStyle(fontSize: 14)),
+                      selected: isSelected,
+                      onTap: () {
+                        setState(() {
+                          _filterType = _FilterType.circle;
+                          _filterValue = value;
+                          _currentPage = 1;
+                        });
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+
+            // VA options
+            if (options['vas']!.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Text('VA', style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700,
+                  color: Theme.of(ctx).colorScheme.onSurfaceVariant, letterSpacing: 0.5,
+                )),
+              ),
+              SizedBox(
+                height: (options['vas']!.length * 48 + 8).clamp(48, 240).toDouble(),
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  itemCount: options['vas']!.length,
+                  itemBuilder: (ctx, i) {
+                    final value = options['vas']![i];
+                    final isSelected = _filterType == _FilterType.va && _filterValue == value;
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(
+                        isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                        color: isSelected ? Theme.of(ctx).colorScheme.primary : null,
+                        size: 20,
+                      ),
+                      title: Text(value, style: const TextStyle(fontSize: 14)),
+                      selected: isSelected,
+                      onTap: () {
+                        setState(() {
+                          _filterType = _FilterType.va;
+                          _filterValue = value;
+                          _currentPage = 1;
+                        });
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+
+            // Tag options
+            if (options['tags']!.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Text('Tag', style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700,
+                  color: Theme.of(ctx).colorScheme.onSurfaceVariant, letterSpacing: 0.5,
+                )),
+              ),
+              SizedBox(
+                height: (options['tags']!.length * 48 + 8).clamp(48, 240).toDouble(),
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  itemCount: options['tags']!.length,
+                  itemBuilder: (ctx, i) {
+                    final value = options['tags']![i];
+                    final isSelected = _filterType == _FilterType.tag && _filterValue == value;
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(
+                        isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                        color: isSelected ? Theme.of(ctx).colorScheme.primary : null,
+                        size: 20,
+                      ),
+                      title: Text(value, style: const TextStyle(fontSize: 14)),
+                      selected: isSelected,
+                      onTap: () {
+                        setState(() {
+                          _filterType = _FilterType.tag;
+                          _filterValue = value;
+                          _currentPage = 1;
+                        });
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 16),
           ],
+        ),
         ),
       ),
     );
   }
+
+
 
   Widget _buildSearchBar() {
     final colorScheme = Theme.of(context).colorScheme;
@@ -1460,8 +1520,6 @@ class _ImportProgress {
   });
 }
 
-enum _ImportAction { singleFolder, multipleFolders }
-
 /// Filter type for the downloads filter bar.
 enum _FilterType { all, circle, va, tag }
 
@@ -1506,32 +1564,20 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _DownloadTopBar extends StatelessWidget {
-  final bool isSelectionMode;
   final int selectedCount;
   final int totalWorkCount;
-  final bool isSearchVisible;
   final VoidCallback onToggleSelectionMode;
   final VoidCallback onSelectAll;
   final VoidCallback onDeselectAll;
   final VoidCallback onDeleteSelected;
-  final VoidCallback onRefresh;
-  final VoidCallback onOpenFolder;
-  final VoidCallback onToggleSearch;
-  final VoidCallback onShowSort;
 
   const _DownloadTopBar({
-    required this.isSelectionMode,
     required this.selectedCount,
     required this.totalWorkCount,
-    required this.isSearchVisible,
     required this.onToggleSelectionMode,
     required this.onSelectAll,
     required this.onDeselectAll,
     required this.onDeleteSelected,
-    required this.onRefresh,
-    required this.onOpenFolder,
-    required this.onToggleSearch,
-    required this.onShowSort,
   });
 
   @override
@@ -1544,113 +1590,39 @@ class _DownloadTopBar extends StatelessWidget {
       height: 56,
       padding: const EdgeInsets.symmetric(vertical: 4),
       color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-      child: isSelectionMode ? _buildSelectionBar(context, hPad, cs) : _buildActionBar(context, hPad),
-    );
-  }
-
-  Widget _buildSelectionBar(BuildContext context, double hPad, ColorScheme cs) {
-    return Row(children: [
-      Padding(
-        padding: EdgeInsets.only(left: hPad - 8),
-        child: IconButton(
-          icon: const Icon(Icons.close), iconSize: 22,
-          padding: const EdgeInsets.all(8),
-          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-          onPressed: onToggleSelectionMode,
-          tooltip: S.of(context).exitSelection,
+      child: Row(children: [
+        Padding(
+          padding: EdgeInsets.only(left: hPad - 8),
+          child: IconButton(
+            icon: const Icon(Icons.close), iconSize: 22,
+            padding: const EdgeInsets.all(8),
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            onPressed: onToggleSelectionMode,
+            tooltip: S.of(context).exitSelection,
+          ),
         ),
-      ),
-      Text(S.of(context).selectedCount(selectedCount),
-          style: Theme.of(context).textTheme.titleSmall),
-      const Spacer(),
-      IconButton(
-        icon: Icon(selectedCount == totalWorkCount ? Icons.deselect : Icons.select_all),
-        iconSize: 22, padding: const EdgeInsets.all(8),
-        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-        onPressed: selectedCount == totalWorkCount ? onDeselectAll : onSelectAll,
-        tooltip: selectedCount == totalWorkCount
-            ? S.of(context).deselectAll : S.of(context).selectAll,
-      ),
-      if (selectedCount > 0)
+        Text(S.of(context).selectedCount(selectedCount),
+            style: Theme.of(context).textTheme.titleSmall),
+        const Spacer(),
         IconButton(
-          icon: const Icon(Icons.delete), iconSize: 22,
-          padding: const EdgeInsets.all(8),
+          icon: Icon(selectedCount == totalWorkCount ? Icons.deselect : Icons.select_all),
+          iconSize: 22, padding: const EdgeInsets.all(8),
           constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-          onPressed: onDeleteSelected,
-          tooltip: '${S.of(context).delete} ($selectedCount)',
-          color: cs.error,
+          onPressed: selectedCount == totalWorkCount ? onDeselectAll : onSelectAll,
+          tooltip: selectedCount == totalWorkCount
+              ? S.of(context).deselectAll : S.of(context).selectAll,
         ),
-      SizedBox(width: hPad - 8),
-    ]);
-  }
-
-  Widget _buildActionBar(BuildContext context, double hPad) {
-    final s = S.of(context);
-    final cs = Theme.of(context).colorScheme;
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          // Select (primary action — keep prominent)
-          Padding(
-            padding: const EdgeInsets.only(left: 16, right: 4),
-            child: FilledButton.tonalIcon(
-              icon: const Icon(Icons.checklist, size: 18),
-              label: Text(s.select),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              ),
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                onToggleSelectionMode();
-              },
-            ),
+        if (selectedCount > 0)
+          IconButton(
+            icon: const Icon(Icons.delete), iconSize: 22,
+            padding: const EdgeInsets.all(8),
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            onPressed: onDeleteSelected,
+            tooltip: '${S.of(context).delete} ($selectedCount)',
+            color: cs.error,
           ),
-          // Reload — icon only
-          _CompactIconButton(
-            icon: Icons.refresh_rounded,
-            tooltip: s.reload,
-            onPressed: onRefresh,
-          ),
-          // Browse Files — icon only
-          _CompactIconButton(
-            icon: Icons.folder_rounded,
-            tooltip: s.browseFiles,
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const LocalFileBrowserScreen(),
-                ),
-              );
-            },
-          ),
-          // Open Folder — icon only (desktop only)
-          if (Platform.isWindows || Platform.isMacOS || Platform.isLinux)
-            _CompactIconButton(
-              icon: Icons.folder_open,
-              tooltip: s.openFolder,
-              onPressed: onOpenFolder,
-            ),
-          // Separator
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: Icon(Icons.more_horiz, size: 16, color: cs.outlineVariant),
-          ),
-          // Search
-          _CompactIconButton(
-            icon: isSearchVisible ? Icons.search_off : Icons.search,
-            tooltip: s.search,
-            onPressed: onToggleSearch,
-          ),
-          // Sort
-          _CompactIconButton(
-            icon: Icons.sort,
-            tooltip: s.sortOptions,
-            onPressed: onShowSort,
-          ),
-        ]),
-      ),
+        SizedBox(width: hPad - 8),
+      ]),
     );
   }
 }
@@ -1754,7 +1726,7 @@ class _DownloadWorkCard extends StatelessWidget {
               aspectRatio: 1.3,
               child: Stack(
                 children: [
-                  _WorkCardCover(workId: workId, work: work, firstTask: firstTask, cardWidth: cardWidth),
+                  _WorkCardCover(workId: workId, work: work, firstTask: firstTask, cardWidth: cardWidth, fileCount: workTasks.length),
                   // RJ tag (top-left) — matches EnhancedWorkCard style
                   Positioned(
                     top: 6,
@@ -1984,12 +1956,14 @@ class _WorkCardCover extends ConsumerStatefulWidget {
   final Work? work;
   final DownloadTask firstTask;
   final double cardWidth;
+  final int fileCount;
 
   const _WorkCardCover({
     required this.workId,
     this.work,
     required this.firstTask,
     required this.cardWidth,
+    this.fileCount = 0,
   });
 
   @override
@@ -2057,7 +2031,9 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
         if (mounted) setState(() => _coverPath = path);
         return;
       }
-    } catch (_) {}
+    } catch (e) {
+      LogService.instance.warning('[_WorkCardCover] error: $e', tag: 'LocalDownloads');
+    }
     if (mounted) setState(() => _resolved = true);
   }
 
@@ -2118,7 +2094,7 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
               child: CachedNetworkImage(
                 imageUrl: widget.work!.getCoverImageUrl(host),
                 cacheKey: 'work_cover_${widget.work!.id}',
-                httpHeaders: StorageService.serverCookieHeaders,
+                httpHeaders: CookieService.serverCookieHeaders,
                 fit: BoxFit.cover,
                 memCacheWidth: cacheWidth,
                 errorWidget: (_, __, ___) => _buildPlaceholder(context),
@@ -2194,10 +2170,10 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
         children: [
           coverWidget,
           // Subtitle tag (bottom-left) — matching EnhancedWorkCard style
-          Positioned(
+          const Positioned(
             bottom: 6,
             left: 6,
-            child: const _SubtitleTag(isLocal: true),
+            child: _SubtitleTag(isLocal: true),
           ),
         ],
       );
@@ -2208,11 +2184,62 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
 
   Widget _buildPlaceholder(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isImported = widget.firstTask.workMetadata?['local_import_path'] != null;
+    final fileCount = widget.fileCount;
+
+    if (isImported) {
+      return Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.orange.shade800.withValues(alpha: 0.6),
+              Colors.orange.shade600.withValues(alpha: 0.3),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.folder_rounded, size: 36,
+              color: Colors.white.withValues(alpha: 0.8)),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$fileCount files',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       width: double.infinity,
-      color: cs.surfaceContainerHighest,
-      child: Icon(Icons.image_not_supported, size: 48,
-        color: cs.outline),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            cs.primary.withValues(alpha: 0.3),
+            cs.secondary.withValues(alpha: 0.15),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Icon(Icons.audiotrack_rounded, size: 40,
+        color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
     );
   }
 

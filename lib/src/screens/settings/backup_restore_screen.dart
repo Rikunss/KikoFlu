@@ -1,12 +1,12 @@
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
-import 'package:kikoeru_flutter/l10n/app_localizations.dart';
+import 'package:kikoeru_flutter/l10n/localizations_ext.dart';
 import '../../services/backup_service.dart';
 import '../../services/log_service.dart';
+import '../../widgets/custom_file_picker.dart';
 
 final _log = LogService.instance;
 
@@ -23,7 +23,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   bool _isImporting = false;
 
   Future<void> _exportBackup() async {
-    final s = S.of(context);
+    final s = sLoc(context);
 
     // Pick destination directory
     String? outputDir = await _pickDirectory(
@@ -64,19 +64,15 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   }
 
   Future<void> _importBackup() async {
-    final s = S.of(context);
+    final s = sLoc(context);
 
-    // Pick backup file
-    final result = await FilePicker.pickFiles(
-      dialogTitle: s.backupSelectImportFile,
-      type: FileType.custom,
-      allowedExtensions: ['zip'],
-      allowMultiple: false,
+    // Pick backup file using custom file picker
+    final filePath = await CustomFilePicker.pickFile(
+      context: context,
+      title: s.backupSelectImportFile,
+      allowedExtensions: ['.zip'],
     );
-    if (result == null || result.files.isEmpty || !mounted) return;
-
-    final filePath = result.files.single.path;
-    if (filePath == null) return;
+    if (filePath == null || !mounted) return;
 
     // Confirm restore
     final confirm = await showDialog<bool>(
@@ -129,10 +125,10 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   }
 
   Future<String?> _pickDirectory({required String dialogTitle}) async {
-    final result = await FilePicker.getDirectoryPath(
-      dialogTitle: dialogTitle,
+    return CustomFilePicker.pickDirectory(
+      context: context,
+      title: dialogTitle,
     );
-    return result;
   }
 
   void _showSuccessDialog({
@@ -140,7 +136,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     required String message,
     String? dismissLabel,
   }) {
-    final s = S.of(context);
+    final s = sLoc(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -166,7 +162,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   }
 
   void _showErrorDialog(String message) {
-    final s = S.of(context);
+    final s = sLoc(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -184,7 +180,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   }
 
   void _showRestartPrompt() {
-    final s = S.of(context);
+    final s = sLoc(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -213,7 +209,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final s = S.of(context);
+    final s = sLoc(context);
 
     return Scaffold(
       appBar: AppBar(

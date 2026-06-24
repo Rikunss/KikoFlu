@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'log_service.dart';
 import 'storage_service.dart';
 
 /// Service for managing app lock (biometric + PIN).
@@ -70,10 +70,10 @@ class AppLockService {
           .timeout(const Duration(seconds: 3));
       return enrolled;
     } on TimeoutException {
-      debugPrint('[AppLockService] canUseBiometric timed out — device may not respond');
+      LogService.instance.warning('[AppLockService] canUseBiometric timed out — device may not respond', tag: 'AppLock');
       return false;
     } catch (e) {
-      debugPrint('[AppLockService] canUseBiometric error: $e');
+      LogService.instance.warning('[AppLockService] canUseBiometric error: $e', tag: 'AppLock');
       return false;
     }
   }
@@ -101,7 +101,7 @@ class AppLockService {
         persistAcrossBackgrounding: useBiometricOnly, // Android only, ignored elsewhere
       );
     } catch (e) {
-      debugPrint('[AppLockService] authenticateBiometric error: $e');
+      LogService.instance.warning('[AppLockService] authenticateBiometric error: $e', tag: 'AppLock');
       return false;
     }
   }

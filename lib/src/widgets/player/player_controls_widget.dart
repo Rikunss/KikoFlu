@@ -83,14 +83,14 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
   /// The time labels use leaf ConsumerWidgets so only the position text
   /// rebuilds on every 200ms tick — the Row wrapper stays stable.
   Widget _buildSeekSection(BuildContext context) {
-    final isPlaying = ref.watch(isPlayingProvider);
-
     return Column(children: [
       // Progress slider
       Consumer(
         builder: (context, ref, child) {
-          final pos = ref.watch(positionProvider).value ?? Duration.zero;
-          final dur = ref.watch(durationProvider).value ?? Duration.zero;
+          final progress = ref.watch(playbackProgressProvider);
+          final pos = progress.position;
+          final dur = progress.duration ?? Duration.zero;
+          final isPlaying = ref.watch(isPlayingProvider);
 
           final seekValue = (widget.isSeekingManually
                   ? widget.seekValue
@@ -743,7 +743,6 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
     final iconSize = widget.isLandscape ? 24.0 : 48.0;
     final playButtonSize = widget.isLandscape ? 64.0 : 72.0;
     final playIconSize = widget.isLandscape ? 32.0 : 36.0;
-    final isPlaying = ref.watch(isPlayingProvider);
 
     return Column(
       children: [
@@ -773,26 +772,32 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               icon: const Icon(Icons.replay_10),
               iconSize: widget.isLandscape ? 22 : iconSize * 0.7,
             ),
-            Container(
-              width: playButtonSize,
-              height: playButtonSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: colorScheme.primary,
-              ),                child: IconButton(
-                onPressed: () {
-                  if (isPlaying) {
-                    ref.read(audioPlayerControllerProvider.notifier).pause();
-                  } else {
-                    ref.read(audioPlayerControllerProvider.notifier).play();
-                  }
-                },
-                icon: Icon(
-                  isPlaying ? Icons.pause : Icons.play_arrow,
-                  color: colorScheme.onPrimary,
-                ),
-                iconSize: playIconSize,
-              ),
+            Consumer(
+              builder: (context, ref, child) {
+                final isPlaying = ref.watch(isPlayingProvider);
+                return Container(
+                  width: playButtonSize,
+                  height: playButtonSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: colorScheme.primary,
+                  ),
+                  child: IconButton(
+                    onPressed: () {
+                      if (isPlaying) {
+                        ref.read(audioPlayerControllerProvider.notifier).pause();
+                      } else {
+                        ref.read(audioPlayerControllerProvider.notifier).play();
+                      }
+                    },
+                    icon: Icon(
+                      isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: colorScheme.onPrimary,
+                    ),
+                    iconSize: playIconSize,
+                  ),
+                );
+              },
             ),
             // +10s seek button (always visible)
             IconButton(
@@ -924,8 +929,9 @@ class _PositionText extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pos = ref.watch(positionProvider).value ?? Duration.zero;
-    final dur = ref.watch(durationProvider).value ?? Duration.zero;
+    final progress = ref.watch(playbackProgressProvider);
+    final pos = progress.position;
+    final dur = progress.duration ?? Duration.zero;
     final displayPos = isSeekingManually
         ? Duration(milliseconds: (seekValue * dur.inMilliseconds).round())
         : pos;

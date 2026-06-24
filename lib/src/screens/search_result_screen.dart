@@ -7,7 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../src/services/log_service.dart';
 import '../models/sort_options.dart';
 import '../providers/search_result_provider.dart';
-import '../providers/auth_provider.dart';
+import '../services/kikoeru_api_service.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/works_grid_view.dart';
 import '../widgets/sort_dialog.dart';

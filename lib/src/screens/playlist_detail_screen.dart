@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../providers/works_provider.dart';
 import '../models/work.dart';
 import '../services/storage_service.dart';
+import '../services/cookie_service.dart';
 import '../widgets/pagination_bar.dart';
 import '../widgets/scrollable_appbar.dart';
 import '../utils/snackbar_util.dart';
@@ -1445,7 +1446,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     final colorScheme = theme.colorScheme;
     final s = S.of(context);
 
-    final httpHeaders = StorageService.serverCookieHeaders;
+    final httpHeaders = CookieService.serverCookieHeaders;
 
     // Extract audio formats from work children
     final formats = work.children != null ? extractAudioFormats(work.children) : <String>{};
