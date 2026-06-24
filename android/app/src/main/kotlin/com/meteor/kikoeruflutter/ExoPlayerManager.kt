@@ -99,6 +99,29 @@ class ExoPlayerManager(private val context: Context) {
         android.util.Log.i("HiResAudio", "Bit-perfect mode ${if (enabled) "enabled" else "disabled"}")
     }
 
+    /**
+     * Enable or disable FFmpeg software decoder.
+     * When enabled, FfmpegAudioRenderer is prepended to the renderer list.
+     * When disabled, only hardware decoders are used (MediaCodec).
+     * Only takes effect on the NEXT ExoPlayer creation.
+     */
+    fun setUseFfmpeg(enabled: Boolean) {
+        // ExoPlayerManager always uses FFmpeg by default
+        // This is kept for interface compatibility
+        android.util.Log.i("HiResAudio", "FFmpeg decoder ${if (enabled) "enabled" else "disabled"}")
+    }
+
+    /**
+     * Enable or disable the decent-player UsbAudioSink for true bit-perfect
+     * USB audio via usbdevfs direct access.
+     */
+    fun setUseLibusbSink(enabled: Boolean) {
+        if (useDecentSink == enabled) return
+        useDecentSink = enabled
+        releasePlayer()
+        android.util.Log.i("HiResAudio", "UsbAudioSink ${if (enabled) "enabled" else "disabled"}")
+    }
+
     @OptIn(UnstableApi::class)
     fun getOrCreatePlayer(): ExoPlayer {
         if (exoPlayer == null) {

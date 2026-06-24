@@ -71,6 +71,14 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
         playerManager.updateBitPerfectMode(enabled)
     }
 
+    fun setUseFfmpeg(enabled: Boolean) {
+        playerManager.setUseFfmpeg(enabled)
+    }
+
+    fun setUseLibusbSink(enabled: Boolean) {
+        playerManager.setUseLibusbSink(enabled)
+    }
+
     // ── Player event callbacks — forward to MethodChannel ──
 
     private fun setupPlayerCallbacks() {
