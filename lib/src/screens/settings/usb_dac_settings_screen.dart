@@ -66,9 +66,6 @@ class _UsbDacSettingsScreenState
           // Use deviceName from HiResAudio (no "USB-Audio - " prefix)
           _autoTargetDevice = deviceName;
         });
-        if (!_exclusiveModeEnabled) {
-          _toggleExclusiveMode(true);
-        }
       } else if (!hasDac && _usbDacConnected) {
         _log.info('USB DAC disconnected', tag: 'USB');
         setState(() {
@@ -89,9 +86,6 @@ class _UsbDacSettingsScreenState
           _autoTargetDevice = cleanName;
           _usbDacConnected = true;
         });
-        if (!_exclusiveModeEnabled) {
-          _toggleExclusiveMode(true);
-        }
       }
     });
     _usbDetachedSub = _exclusive.usbDetachedStream.listen((_) {
@@ -578,6 +572,11 @@ class _UsbDacSettingsScreenState
               if (v && _exclusiveModeEnabled) {
                 await _toggleExclusiveMode(false, silent: true);
               }
+
+              // Inisialisasi/hentikan libusb USB DAC driver
+              // requestPermission() → connect() → start() (atau disconnect)
+              await _audioService.usbDacManager.setAutoDacEnabled(v);
+
               if (!mounted) return;
               SnackBarUtil.showInfo(
                 context,

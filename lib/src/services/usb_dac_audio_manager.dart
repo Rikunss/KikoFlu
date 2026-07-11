@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:math' show min;
 import 'dart:typed_data';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/settings_provider.dart';
 import 'usb_dac_service.dart';
@@ -122,13 +123,35 @@ class UsbDacAudioManager {
       _log.error('UsbDacAudioManager: $error', tag: 'UsbDacMgr');
     });
 
-    // Do initial device scan
-    final devices = await _usbDac.getDevices();
-    if (devices.isNotEmpty) {
-      _onDevicesChanged(devices);
+    // Set _initialized = true dulu agar setAutoDacEnabled() bisa jalan
+    _initialized = true;
+
+    // Cek apakah USB DAC Routing aktif di sesi sebelumnya (SharedPreferences).
+    // Jika iya, panggil setAutoDacEnabled(true) → getDevices() →
+    // requestPermission() → system dialog izin USB muncul (via libusb path).
+    //
+    // Ini menangani skenario: user colok USB DAC SEBELUM buka aplikasi.
+    // Tanpa ini, tidak ada broadcast ACTION_USB_DEVICE_ATTACHED yang terkirim,
+    // jadi UsbDacPlugin tidak tahu ada DAC yang perlu di-initialize.
+    //
+    // Key: 'bit_perfect_playback_enabled' (dari BitPerfectPlaybackNotifier)
+    final prefs = await SharedPreferences.getInstance();
+    final wasEnabled = prefs.getBool('bit_perfect_playback_enabled') ?? false;
+    if (wasEnabled) {
+      _log.info('UsbDacAudioManager: routing enabled — starting USB DAC init via libusb',
+          tag: 'UsbDacMgr');
+      // Ini akan memicu system dialog USB permission (jika belum pernah di-grant)
+      // dan init driver libusb (connect + start).
+      // _activeDeviceName di-set oleh _connectToDac().
+      await setAutoDacEnabled(true);
+    } else {
+      // Routing OFF — initial scan tanpa auto-connect
+      final devices = await _usbDac.getDevices();
+      if (devices.isNotEmpty) {
+        _onDevicesChanged(devices);
+      }
     }
 
-    _initialized = true;
     _log.info('UsbDacAudioManager: initialized', tag: 'UsbDacMgr');
   }
 
@@ -162,7 +185,7 @@ class UsbDacAudioManager {
   }) async {
     if (!_initialized) return false;
 
-    // First request permission
+    // First request USB permission from Android system
     final permissionGranted = await _usbDac.requestPermission(deviceId);
     if (!permissionGranted) {
       _log.error('Permission denied for USB device #$deviceId',
@@ -170,27 +193,29 @@ class UsbDacAudioManager {
       return false;
     }
 
-    // Connect
-    final connected = await _usbDac.connect(deviceId,
-        sampleRate: sampleRate, channels: channels, bitDepth: bitDepth);
-    if (!connected) {
-      _log.error('Failed to connect to USB device #$deviceId',
-          tag: 'UsbDacMgr');
-      return false;
-    }
+    // Permission granted! Jangan panggil _usbDac.connect() + _usbDac.start()
+    // karena itu akan meng-claim USB interface via libusb driver, yang mencegah
+    // decent-player UsbAudioSink mengakses device yang sama.
+    //
+    // Sebaliknya, langsung update state → trigger _libusbStateSub
+    // → setUseLibusbSink(true) → ExoPlayer recreate dengan decent-player sink
+    // → decent-player UsbAudioSink handle USB connection sendiri.
 
-    // Start streaming
-    final started = await _usbDac.start();
-    if (!started) {
-      _log.error('Failed to start USB DAC streaming', tag: 'UsbDacMgr');
-      return false;
-    }
-
-    _log.info('USB DAC streaming started: device #$deviceId', tag: 'UsbDacMgr');
+    _log.info('USB DAC permission granted — triggering ExoPlayer recreation via decent-player UsbAudioSink',
+        tag: 'UsbDacMgr');
 
     // Update state for reconnection tracking
     _activeDeviceId = deviceId;
     _usbDac.setLastDeviceId(deviceId);
+    // Set connected+active state to trigger _libusbStateSub
+    _currentDacState = UsbDacState(
+      connected: true,
+      active: true,
+      deviceName: _activeDeviceName,
+      sampleRate: sampleRate,
+      channelCount: channels,
+      bitDepth: bitDepth,
+    );
     _emitState();
     return true;
   }
@@ -281,6 +306,7 @@ class UsbDacAudioManager {
   Future<void> _connectToDac(UsbDacDevice device) async {
     _log.info('Auto-connecting to USB DAC: ${device.productName}',
         tag: 'UsbDacMgr');
+    _activeDeviceName = device.productName;
     await connectToDevice(
       device.deviceId,
       sampleRate: 48000,
@@ -369,27 +395,18 @@ class UsbDacAudioManager {
           return;
         }
 
-        // Connect
-        final connected = await _usbDac.connect(
-          targetDevice.deviceId,
-          sampleRate: 48000, channels: 2, bitDepth: 16,
-        );
-        if (!connected) {
-          _log.warning('Reconnect: connect failed for ${targetDevice.productName}', tag: 'UsbDacMgr');
-          _scheduleReconnect();
-          return;
-        }
-
-        // Start streaming
-        final started = await _usbDac.start();
-        if (!started) {
-          _log.warning('Reconnect: start failed for ${targetDevice.productName}', tag: 'UsbDacMgr');
-          _scheduleReconnect();
-          return;
-        }
-
-        // Success! 🎉
+        // Permission granted! Skip libusb connect/start — decent-player handles USB.
         _log.info('USB DAC auto-reconnected: ${targetDevice.productName}', tag: 'UsbDacMgr');
+        _activeDeviceId = targetDevice.deviceId;
+        _usbDac.setLastDeviceId(targetDevice.deviceId);
+        _currentDacState = UsbDacState(
+          connected: true,
+          active: true,
+          deviceName: _activeDeviceName,
+          sampleRate: 48000,
+          channelCount: 2,
+          bitDepth: 16,
+        );
         _cancelReconnect();
         _emitState();
       } else {

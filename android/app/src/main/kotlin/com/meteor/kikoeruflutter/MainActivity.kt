@@ -129,6 +129,12 @@ class MainActivity : AudioServiceActivity() {
 
         // Forward pending widget intents
         handleWidgetIntent(intent)
+
+        // ── Check for already-connected USB DAC on startup ──
+        // Jika user sudah mencolok USB DAC sebelum membuka aplikasi,
+        // langsung minta permission (muncul system dialog) tanpa perlu
+        // colok-cabut ulang. Lihat [checkForExistingUsbDacOnStartup].
+        checkForExistingUsbDacOnStartup()
     }
 
     /**
@@ -165,6 +171,89 @@ class MainActivity : AudioServiceActivity() {
         }
     }
 
+    /**
+     * Check for already-connected USB DAC devices on app startup.
+     *
+     * Jika ada USB Audio Class device yang sudah tercolok sebelum app
+     * di-launch, dan USB DAC routing sedang ENABLED, maka langsung
+     * minta USB permission via system dialog.
+     *
+     * Jika permission sudah pernah di-grant → auto-route langsung
+     * (terlepas dari status routing, agar user bisa toggle kapan saja).
+     *
+     * Jika routing OFF → skip (tidak muncul dialog), hanya log.
+     *
+     * Flow:
+     * 1. Scan semua USB device yang terhubung
+     * 2. Filter yang punya AudioStreaming interface (class=audio, subclass=2)
+     * 3. Cek apakah USB DAC routing sedang enabled di settings
+     * 4. Kalau routing OFF → skip (tidak minta permission)
+     * 5. Kalau routing ON:
+     *    a. Permission sudah di-grant → auto-route langsung
+     *    b. Permission belum di-grant → request permission (muncul system dialog)
+     *       → on grant, auto-route ke decent-player UsbAudioSink
+     *
+     * NOTE: Hanya device audio PERTAMA yang diproses.
+     */
+    private fun checkForExistingUsbDacOnStartup() {
+        val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+
+        val devices = usbManager.deviceList?.values ?: emptyList()
+        for (device in devices) {
+            val isAudioDevice = (0 until device.interfaceCount).any { i ->
+                val iface = device.getInterface(i)
+                iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO &&
+                    iface.interfaceSubclass == 2
+            }
+            if (!isAudioDevice) continue
+
+            val hasPermission = usbManager.hasPermission(device)
+            val routingEnabled = hiResAudioPlugin?.isLibusbRoutingEnabled() ?: false
+
+            android.util.Log.i("MainActivity",
+                "[USB] Found existing USB DAC on startup: ${device.productName} " +
+                "(VID=0x${device.vendorId.toString(16)}, PID=0x${device.productId.toString(16)}, " +
+                "hasPermission=$hasPermission, routingEnabled=$routingEnabled)")
+
+            if (hasPermission) {
+                // Izin sudah pernah diberikan — auto-route langsung
+                // (dilakukan meski routing OFF, agar begitu user toggle ON
+                //  tidak perlu colok-cabut ulang)
+                android.util.Log.i("MainActivity",
+                    "[USB] Permission already granted — auto-routing to ${device.productName}")
+                val plugin = this.hiResAudioPlugin
+                if (plugin != null) {
+                    plugin.autoRouteToUsbDac(device)
+                }
+            } else if (routingEnabled) {
+                // Routing ON, permission belum di-grant → minta via dialog
+                android.util.Log.i("MainActivity",
+                    "[USB] Routing enabled — requesting permission for ${device.productName}")
+                val usbAudioDevice = com.decent.usbaudio.UsbAudioDevice.getInstance(this)
+                usbAudioDevice.requestPermission(device) { granted ->
+                    if (granted) {
+                        android.util.Log.i("MainActivity",
+                            "[USB] Permission GRANTED (startup) for ${device.productName}")
+                        val plugin = this@MainActivity.hiResAudioPlugin
+                        if (plugin != null) {
+                            plugin.autoRouteToUsbDac(device)
+                        }
+                    } else {
+                        android.util.Log.w("MainActivity",
+                            "[USB] Permission DENIED (startup) for ${device.productName}")
+                    }
+                }
+            } else {
+                // Routing OFF dan permission belum di-grant — skip
+                android.util.Log.i("MainActivity",
+                    "[USB] USB DAC routing is OFF — skipping permission request for ${device.productName}")
+            }
+
+            // Hanya proses device audio pertama yang ditemukan
+            break
+        }
+    }
+
     private fun registerUsbReceiver() {
         usbReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -181,19 +270,42 @@ class MainActivity : AudioServiceActivity() {
 
                 when (action) {
                     UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
-                        // Show the USB permission dialog so the user can grant access.
-                        // On grant, auto-enable UsbAudioSink routing so the next playback
-                        // goes through the USB DAC without requiring manual toggle in settings.
-                        val usbAudioDevice = com.decent.usbaudio.UsbAudioDevice.getInstance(context)
-                        usbAudioDevice.requestPermission(device) { granted ->
-                            if (granted) {
-                                android.util.Log.i("MainActivity",
-                                    "USB DAC permission granted for ${device.productName}")
-                                val plugin = this@MainActivity.hiResAudioPlugin
-                                if (plugin != null) {
-                                    plugin.autoRouteToUsbDac(device)
+                        val usbMgr = context.getSystemService(Context.USB_SERVICE) as UsbManager
+                        val hasPermission = usbMgr.hasPermission(device)
+                        val plugin = this@MainActivity.hiResAudioPlugin
+                        val routingEnabled = plugin?.isLibusbRoutingEnabled() ?: false
+
+                        android.util.Log.i("MainActivity",
+                            "[USB] Device attached: ${device.productName} " +
+                            "(hasPermission=$hasPermission, routingEnabled=$routingEnabled)")
+
+                        if (hasPermission) {
+                            // Permission already granted — auto-route immediately
+                            // (regardless of routing toggle, so it's ready to use)
+                            android.util.Log.i("MainActivity",
+                                "[USB] Permission already granted — auto-routing to ${device.productName}")
+                            if (plugin != null) {
+                                plugin.autoRouteToUsbDac(device)
+                            }
+                        } else if (routingEnabled) {
+                            // Routing ON + permission not yet granted → show dialog
+                            android.util.Log.i("MainActivity",
+                                "[USB] Routing enabled — requesting permission for ${device.productName}")
+                            val usbAudioDevice = com.decent.usbaudio.UsbAudioDevice.getInstance(context)
+                            usbAudioDevice.requestPermission(device) { granted ->
+                                if (granted) {
+                                    android.util.Log.i("MainActivity",
+                                        "USB DAC permission granted for ${device.productName}")
+                                    val p = this@MainActivity.hiResAudioPlugin
+                                    if (p != null) {
+                                        p.autoRouteToUsbDac(device)
+                                    }
                                 }
                             }
+                        } else {
+                            // Routing OFF + no prior permission — skip silently
+                            android.util.Log.i("MainActivity",
+                                "[USB] USB DAC routing is OFF — skipping permission request for ${device.productName}")
                         }
                     }
                     UsbManager.ACTION_USB_DEVICE_DETACHED -> {

@@ -54,6 +54,7 @@ class KikoeruApiService {
             options.headers['User-Agent'] = 'KikoFlu';
           }
           options.headers['Accept-Encoding'] = 'gzip';
+          options.headers['Accept-Language'] = 'zh-CN,zh;q=0.9';
           options.headers.addAll(CookieService.serverCookieHeaders);
 
           // Add Authorization header if token exists.

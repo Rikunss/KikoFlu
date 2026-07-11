@@ -1,6 +1,10 @@
 package com.meteor.kikoeruflutter
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioManager
 import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -15,8 +19,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.RenderersFactory
 import androidx.media3.exoplayer.audio.AudioRendererEventListener
-import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.AudioCapabilities
+import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.metadata.MetadataOutput
 import androidx.media3.exoplayer.text.TextOutput
@@ -66,6 +70,21 @@ class ExoPlayerManager(private val context: Context) {
     /** Callback for AAudio exclusive mode status changes. The map contains
      *  the full status payload (enabled, volumeLocked, aaudioAvailable, etc.). */
     var onExclusiveStatusChanged: ((status: Map<String, Any?>) -> Unit)? = null
+
+    /** Custom BroadcastReceiver for ACTION_AUDIO_BECOMING_NOISY.
+     *  Unlike ExoPlayer's built-in handler which always pauses on any
+     *  ACTION_AUDIO_BECOMING_NOISY broadcast, this receiver
+     *  CONDITIONALLY ignores the broadcast when USB DAC (useDecentSink)
+     *  or AAudio exclusive sink (useAaudioSink) is active.
+     *
+     *  Why: When the app goes to background on some Android devices,
+     *  the system may temporarily re-evaluate USB audio routing and send
+     *  a spurious ACTION_AUDIO_BECOMING_NOISY. With ExoPlayer's default
+     *  handler, this causes an unwanted auto-pause. Our custom handler
+     *  only pauses for genuine headphone/BT unplug events (when USB DAC
+     *  and AAudio sink are NOT in use).
+     */
+    private var audioBecomingNoisyReceiver: BroadcastReceiver? = null
 
     init {
         // Detect libFLAC at runtime — decent-media3-decoder-flac provides this
@@ -131,9 +150,9 @@ class ExoPlayerManager(private val context: Context) {
                 .build()
 
             val baseFactory: DefaultRenderersFactory = when {
-                // Priority 1: decent-player UsbAudioSink (true bit-perfect via usbdevfs)
+                // Priority 1: decent-player UsbAudioSink (bit-perfect via usbdevfs)
                 useDecentSink -> {
-                    android.util.Log.i("HiResAudio", "Creating ExoPlayer with decent-player UsbAudioSink + FFmpeg")
+                    android.util.Log.i("HiResAudio", "Creating ExoPlayer with UsbAudioSink + FFmpeg")
 
                     object : DefaultRenderersFactory(context) {
                         override fun buildAudioSink(
@@ -141,21 +160,16 @@ class ExoPlayerManager(private val context: Context) {
                             enableFloatOutput: Boolean,
                             enableAudioTrackPlaybackParams: Boolean
                         ): AudioSink? {
-                            val useFloat = !libflacAvailable
-
-                            val delegate = DefaultAudioSink.Builder(ctx)
-                                .setEnableFloatOutput(useFloat)
-                                .setAudioCapabilities(AudioCapabilities.getCapabilities(ctx))
-                                .build()
-
                             val config = UsbAudioSinkConfig(
                                 bitPerfectEnabled = true,
                                 forceRouteToSpeaker = true
                             )
-
+                            val delegate = DefaultAudioSink.Builder(ctx)
+                                .setAudioCapabilities(AudioCapabilities.getCapabilities(ctx))
+                                .build()
                             return UsbAudioSink(delegate, ctx, config).also {
                                 currentUsbSink = it
-                                android.util.Log.i("HiResAudio", "UsbAudioSink created (libFLAC=${libflacAvailable}, float=${useFloat})")
+                                android.util.Log.i("HiResAudio", "UsbAudioSink created (delegate=${delegate::class.simpleName})")
                             }
                         }
                     }
@@ -232,25 +246,33 @@ class ExoPlayerManager(private val context: Context) {
                     }
                 )
                 android.util.Log.i("HiResAudio", "Base factory returned ${baseRenderers.size} renderers")
-                // Use the same UsbAudioSink that base factory renderers got from
-                // buildAudioSink(), so the prepended FfmpegAudioRenderer also routes
+                // Use the same decent-player UsbAudioSink that base factory renderers got
+                // from buildAudioSink(), so the prepended FfmpegAudioRenderer also routes
                 // through the USB DAC instead of creating its own DefaultAudioSink.
                 val ffmpegSink = currentUsbSink ?: DefaultAudioSink.Builder(context).build()
                 val ffmpeg = FfmpegAudioRenderer(handler, audioListener, ffmpegSink)
-                android.util.Log.i("HiResAudio", "FfmpegAudioRenderer created (sink=${ffmpegSink::class.simpleName}), prepending at position 0")
+                android.util.Log.i("HiResAudio", "FfmpegAudioRenderer created (sink=UsbAudioSink), prepending at position 0")
                 arrayOf<Renderer>(ffmpeg) + baseRenderers
             }
 
             exoPlayer = ExoPlayer.Builder(context, renderersFactory)
                 .setAudioAttributes(audioAttributes, true)
-                .setHandleAudioBecomingNoisy(true)
+                // NOTE: We do NOT use setHandleAudioBecomingNoisy(true) here
+                // because ExoPlayer's built-in handler pauses on ALL
+                // ACTION_AUDIO_BECOMING_NOISY broadcasts indiscriminately.
+                // With USB DAC / AAudio exclusive sink, Android sometimes
+                // sends spurious noisy broadcasts when the app goes to
+                // background (false positive).
+                // Instead, we register our own conditional receiver below.
                 .build()
 
-            // Attach UsbAudioSink to player if decent-player sink is active
-            currentUsbSink?.let { sink ->
-                sink.attachToPlayer(exoPlayer!!)
-                android.util.Log.i("HiResAudio", "UsbAudioSink attached to ExoPlayer")
+            // Attach the decent-player UsbAudioSink to the player for USB DAC routing
+            if (currentUsbSink is UsbAudioSink) {
+                (currentUsbSink as UsbAudioSink).attachToPlayer(exoPlayer!!)
             }
+
+            // Register conditional ACTION_AUDIO_BECOMING_NOISY receiver
+            registerAudioBecomingNoisyReceiver()
 
             exoPlayer?.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -298,6 +320,7 @@ class ExoPlayerManager(private val context: Context) {
      * Release the ExoPlayer instance and save the current playback position.
      */
     fun releasePlayer(): Long {
+        unregisterAudioBecomingNoisyReceiver()
         val pos = exoPlayer?.currentPosition ?: 0L
         try {
             exoPlayer?.stop()
@@ -306,5 +329,71 @@ class ExoPlayerManager(private val context: Context) {
         exoPlayer = null
         isPlaying = false
         return pos
+    }
+
+    // ── Conditional ACTION_AUDIO_BECOMING_NOISY handler ──
+
+    /**
+     * Register a BroadcastReceiver for [AudioManager.ACTION_AUDIO_BECOMING_NOISY]
+     * that only pauses ExoPlayer when NO bit-perfect audio path is active.
+     *
+     * When [useDecentSink] (libusb USB DAC) or [useAaudioSink] (AAudio exclusive)
+     * is true, the broadcast is IGNORED to prevent false-positive auto-pause
+     * when the app goes to background.
+     */
+    private fun registerAudioBecomingNoisyReceiver() {
+        if (audioBecomingNoisyReceiver != null) return // already registered
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                if (intent.action != AudioManager.ACTION_AUDIO_BECOMING_NOISY) return
+
+                // ── USB DAC / AAudio exclusive sink active? → Ignore ──
+                // These audio paths bypass the Android mixer, so
+                // ACTION_AUDIO_BECOMING_NOISY is likely a false positive
+                // triggered by system re-routing when app goes to background.
+                if (useDecentSink || useAaudioSink) {
+                    android.util.Log.i("HiResAudio",
+                        "ACTION_AUDIO_BECOMING_NOISY IGNORED — " +
+                        "USB DAC (useDecentSink=$useDecentSink) or " +
+                        "AAudio (useAaudioSink=$useAaudioSink) is active")
+                    return
+                }
+
+                // ── Normal audio path → Pause (genuine headphone unplug) ──
+                android.util.Log.i("HiResAudio",
+                    "ACTION_AUDIO_BECOMING_NOISY — pausing ExoPlayer " +
+                    "(normal audio path, no USB DAC/AAudio)")
+                exoPlayer?.pause()
+            }
+        }
+
+        try {
+            val filter = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+            context.registerReceiver(receiver, filter)
+            audioBecomingNoisyReceiver = receiver
+            android.util.Log.i("HiResAudio",
+                "Conditional ACTION_AUDIO_BECOMING_NOISY receiver registered")
+        } catch (e: Exception) {
+            android.util.Log.w("HiResAudio",
+                "Failed to register ACTION_AUDIO_BECOMING_NOISY receiver: ${e.message}")
+        }
+    }
+
+    /**
+     * Unregister the ACTION_AUDIO_BECOMING_NOISY receiver.
+     * Called from [releasePlayer] and from cleanup path.
+     */
+    private fun unregisterAudioBecomingNoisyReceiver() {
+        val receiver = audioBecomingNoisyReceiver ?: return
+        audioBecomingNoisyReceiver = null
+        try {
+            context.unregisterReceiver(receiver)
+            android.util.Log.i("HiResAudio",
+                "ACTION_AUDIO_BECOMING_NOISY receiver unregistered")
+        } catch (e: Exception) {
+            android.util.Log.w("HiResAudio",
+                "Failed to unregister ACTION_AUDIO_BECOMING_NOISY receiver: ${e.message}")
+        }
     }
 }

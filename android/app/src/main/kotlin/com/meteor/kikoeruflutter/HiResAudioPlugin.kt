@@ -1,6 +1,7 @@
 package com.meteor.kikoeruflutter
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -42,6 +43,13 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
     private var lastPlayUrl: String? = null
     private var lastPlayPositionMs: Long = 0L
 
+    // ── SharedPreferences for persisting USB routing state ──
+    private val prefs: SharedPreferences = context.getSharedPreferences(
+        "kikoeru_hires_prefs",
+        Context.MODE_PRIVATE
+    )
+    private val KEY_USB_LIBUSB_ROUTING = "usb_libusb_routing_enabled"
+
     init {
         positionPusher.attachPlayer { playerManager.exoPlayer }
     }
@@ -77,6 +85,20 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
 
     fun setUseLibusbSink(enabled: Boolean) {
         playerManager.setUseLibusbSink(enabled)
+        // Persist the user's preference so MainActivity can check
+        // before showing USB permission dialog on device attach/startup.
+        prefs.edit().putBoolean(KEY_USB_LIBUSB_ROUTING, enabled).apply()
+        android.util.Log.i("HiResAudio",
+            "USB libusb routing preference saved: $enabled")
+    }
+
+    /**
+     * Whether the user has enabled USB DAC (libusb) routing in settings.
+     * Read from SharedPreferences so [MainActivity] can decide whether
+     * to show the USB permission dialog on device attach/startup.
+     */
+    fun isLibusbRoutingEnabled(): Boolean {
+        return prefs.getBoolean(KEY_USB_LIBUSB_ROUTING, false)
     }
 
     // ── Player event callbacks — forward to MethodChannel ──

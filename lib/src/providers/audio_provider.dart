@@ -202,8 +202,17 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
   }
 
   Future<void> initialize() async {
-    // Request notification permission for Android 13+
-    await Permission.notification.request();
+    // Request notification permission for Android 13+ (fire-and-forget).
+    // JANGAN await — pada Android 13+ fresh install, ini memunculkan
+    // system dialog yang BLOCK eksekusi. Akibatnya _setupPlayerListeners()
+    // di AudioPlayerService.initialize() tidak sempat jalan, stream
+    // player state ke UI tidak tersambung, dan walaupun audio keluar
+    // (just_audio independen), UI player mati total.
+    //
+    // Dengan fire-and-forget, _service.initialize() jalan langsung
+    // tanpa peduli dialog permission. Jika permission ditolak, notifikasi
+    // tidak muncul tapi player tetap berfungsi normal.
+    unawaited(Permission.notification.request());
 
     await _service.initialize();
 

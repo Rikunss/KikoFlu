@@ -112,53 +112,69 @@ class _TranslateButton extends ConsumerWidget {
 }
 
 /// ===================================================================
-/// Extracted widget: lyric hint banner — watches lyricControllerProvider
+/// Extracted widget: lyric hint chip — overlays on cover art corner
 /// ===================================================================
-class _LyricHintBanner extends ConsumerWidget {
+class _LyricHintChip extends ConsumerWidget {
   final VoidCallback onDismiss;
+  final VoidCallback onTap;
 
-  const _LyricHintBanner({required this.onDismiss});
+  const _LyricHintChip({
+    required this.onDismiss,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lyricState = ref.watch(lyricControllerProvider);
     if (lyricState.lyrics.isEmpty) return const SizedBox.shrink();
 
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final tt = theme.textTheme;
-
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: cs.primaryContainer,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOutCubic,
+      builder: (context, opacity, child) {
+        return Opacity(
+          opacity: opacity,
+          child: child,
+        );
+      },
+      child: GestureDetector(
+        onTap: () {
+          onTap();
+          onDismiss();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.15),
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline, size: 18,
-              color: cs.onPrimaryContainer),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(S.of(context).lyricHintTapCover,
-                style: tt.bodySmall?.copyWith(
-                  color: cs.onPrimaryContainer)),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lyrics_outlined, size: 14,
+                    color: Colors.white.withValues(alpha: 0.9)),
+                  const SizedBox(width: 6),
+                  Text(
+                    S.of(context).lyricHintTapCover,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            IconButton(
-              onPressed: onDismiss,
-              icon: Icon(Icons.close, size: 18,
-                color: cs.onPrimaryContainer),
-              padding: EdgeInsets.zero, constraints: const BoxConstraints(),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -547,7 +563,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     if (!hasShown) {
       setState(() => _showLyricHint = true);
       await prefs.setBool('lyric_hint_has_shown', true);
-      Future.delayed(const Duration(seconds: 8), () {
+      Future.delayed(const Duration(seconds: 6), () {
         if (mounted) setState(() => _showLyricHint = false);
       });
     }
@@ -964,10 +980,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     : _buildPortraitLayout(context, currentTrack, theme, cs),
               ),
 
-              if (_showLyricHint && !isLandscape && !_showLyricView)
-                Positioned(top: 0, left: 0, right: 0,
-                  child: _LyricHintBanner(onDismiss: () => setState(() => _showLyricHint = false)),
-                ),
+
 
             ]),
           ),
@@ -1448,24 +1461,38 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
           final hasLyrics = ref.watch(
             lyricControllerProvider.select((s) => s.lyrics.isNotEmpty),
           );
-          return PlayerCoverWidget(
-            track: track,
-            workCoverUrl: workCoverUrl,
-            onTap: hasLyrics
-                ? () => setState(() => _showLyricView = true)
-                : null,
-            onSwipeLeft: () {
-              HapticFeedback.lightImpact();
-              ref
-                  .read(audioPlayerControllerProvider.notifier)
-                  .skipToNext();
-            },
-            onSwipeRight: () {
-              HapticFeedback.lightImpact();
-              ref
-                  .read(audioPlayerControllerProvider.notifier)
-                  .skipToPrevious();
-            },
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              PlayerCoverWidget(
+                track: track,
+                workCoverUrl: workCoverUrl,
+                onTap: hasLyrics
+                    ? () => setState(() => _showLyricView = true)
+                    : null,
+                onSwipeLeft: () {
+                  HapticFeedback.lightImpact();
+                  ref
+                      .read(audioPlayerControllerProvider.notifier)
+                      .skipToNext();
+                },
+                onSwipeRight: () {
+                  HapticFeedback.lightImpact();
+                  ref
+                      .read(audioPlayerControllerProvider.notifier)
+                      .skipToPrevious();
+                },
+              ),
+              if (_showLyricHint && hasLyrics)
+                Positioned(
+                  right: 8,
+                  bottom: 8,
+                  child: _LyricHintChip(
+                    onDismiss: () => setState(() => _showLyricHint = false),
+                    onTap: () => setState(() => _showLyricView = true),
+                  ),
+                ),
+            ],
           );
         }),
       ),

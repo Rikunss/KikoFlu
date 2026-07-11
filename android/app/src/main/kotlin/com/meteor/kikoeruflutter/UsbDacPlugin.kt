@@ -205,13 +205,10 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
 
                 if (granted) {
                     Log.i(TAG, "[USB] Permission GRANTED for: $deviceName")
-                    connectToDevice(receivedDevice, bitsPerSample = 16)
-                    if (nativeDriverPtr != 0L) {
-                        Log.i(TAG, "[USB-STREAM] nativeStartDriver called (from broadcast receiver)")
-                        val started = nativeStartDriver(nativeDriverPtr)
-                        Log.i(TAG, "[USB-STREAM] nativeStartDriver result=$started (from broadcast receiver)")
-                        Log.i(TAG, "[USB-STREAM] nativeIsActive after start=${nativeIsActive(nativeDriverPtr)}")
-                    }
+                    // IMPORTANT: Jangan panggil connectToDevice() + nativeStartDriver() di sini!
+                    // libusb driver akan meng-claim USB interface, yang mencegah
+                    // decent-player UsbAudioSink mengakses device yang sama.
+                    // Cukup resolve permission — biarkan decent-player yang handle koneksi USB.
                     channel?.invokeMethod("onPermissionResult", mapOf(
                         "deviceId" to receivedDevice.deviceId,
                         "deviceName" to deviceName,
@@ -249,8 +246,8 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
                         Log.i(TAG, "[USB]   Fallback device found: ${fallbackDevice.productName} (deviceId=${fallbackDevice.deviceId})")
                         if (granted) {
                             Log.i(TAG, "[USB]   Fallback: treating as GRANTED")
-                            connectToDevice(fallbackDevice, bitsPerSample = 16)
-                            nativeStartDriver(nativeDriverPtr)
+                            // Jangan panggil connectToDevice() + nativeStartDriver() —
+                            // decent-player UsbAudioSink yang akan handle USB connection.
                             channel?.invokeMethod("onPermissionResult", mapOf(
                                 "deviceId" to fallbackDevice.deviceId,
                                 "deviceName" to (fallbackDevice.productName ?: "USB DAC"),
@@ -670,16 +667,9 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
 
                     if (hasPerm) {
                         // Permission already granted — resolve immediately without dialog
-                        Log.i(TAG, "[USB]   Permission already granted — resolving immediately")
-                        connectToDevice(targetDevice, bitsPerSample = 16)
-                        if (nativeDriverPtr != 0L) {
-                            if (!nativeIsActive(nativeDriverPtr)) {
-                                Log.i(TAG, "[USB-STREAM] nativeStartDriver called (from requestPermission already-granted)")
-                                nativeStartDriver(nativeDriverPtr)
-                                Log.i(TAG, "[USB-STREAM] nativeStartDriver result=true (from requestPermission already-granted)")
-                                Log.i(TAG, "[USB-STREAM] nativeIsActive after start=${nativeIsActive(nativeDriverPtr)}")
-                            }
-                        }
+                        // JANGAN panggil connectToDevice() + nativeStartDriver()!
+                        // Biarkan decent-player UsbAudioSink yang handle USB connection.
+                        Log.i(TAG, "[USB]   Permission already granted — resolving immediately (skipping libusb connect)")
                         refreshDeviceList()
                         result.success(true)
                     } else {
@@ -754,13 +744,22 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
             "start" -> {
                 Log.i(TAG, "[USB-STREAM] nativeStart() called from method channel 'start'")
                 if (nativeDriverPtr != 0L) {
-                    Log.i(TAG, "[USB-STREAM] nativeStartDriver called (from method channel 'start')")
-                    val started = nativeStartDriver(nativeDriverPtr)
-                    Log.i(TAG, "[USB-STREAM] nativeStartDriver result=$started (from 'start' channel)")
-                    if (!started) {
-                        Log.e(TAG, "start: nativeStartDriver returned false")
+                    // Check if already streaming — the broadcast receiver may have already
+                    // started the driver after the user granted USB permission.
+                    // nativeStartDriver() returns false if called on an already-running driver,
+                    // which would make Dart think startup failed and never route audio to libusb.
+                    if (nativeIsActive(nativeDriverPtr)) {
+                        Log.i(TAG, "[USB-STREAM] nativeStart called but already active — returning true")
+                        result.success(true)
+                    } else {
+                        Log.i(TAG, "[USB-STREAM] nativeStartDriver called (from method channel 'start')")
+                        val started = nativeStartDriver(nativeDriverPtr)
+                        Log.i(TAG, "[USB-STREAM] nativeStartDriver result=$started (from 'start' channel)")
+                        if (!started) {
+                            Log.e(TAG, "start: nativeStartDriver returned false")
+                        }
+                        result.success(started)
                     }
-                    result.success(started)
                 } else {
                     result.error("NOT_CONNECTED", "USB DAC not connected", null)
                 }
