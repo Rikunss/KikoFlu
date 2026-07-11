@@ -74,7 +74,7 @@ class ScrollThrottler {
   double _lastPosition = 0;
 
   ScrollThrottler({
-    this.interval = const Duration(milliseconds: 32), // ~2帧@60fps / ~4帧@120fps
+    this.interval = const Duration(milliseconds: 32),
     this.positionThreshold = 0,
   });
 

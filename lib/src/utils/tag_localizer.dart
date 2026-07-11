@@ -23,9 +23,8 @@ class TagLocalizer {
   /// Get the localized name for a tag, looking up by original name if ID is unknown.
   static String localizeByName(String name, Locale locale) {
     final key = _localeKey(locale);
-    if (key == 'zh') return name; // Already in Simplified Chinese, no lookup needed
+    if (key == 'zh') return name;
 
-    // Find tag ID by name
     final id = tagNameToId[name.toLowerCase()];
     if (id == null) return name;
 
@@ -52,7 +51,6 @@ class TagLocalizer {
         }
         return 'zh';
       default:
-        // Other languages: prefer English, fall back to zh
         return 'en';
     }
   }

@@ -132,28 +132,23 @@ class PlayerButtonsConfigController extends StateNotifier<PlayerButtonsConfig> {
                 ))
             .toList();
 
-        // 获取默认配置，用于合并新按钮
         final defaultOrder = _isDesktop
             ? PlayerButtonsConfig.defaultDesktop.buttonOrder
             : PlayerButtonsConfig.defaultMobile.buttonOrder;
 
-        // 找出新添加的按钮（在默认配置中存在但保存的配置中不存在）
         final newButtons = defaultOrder
             .where((button) => !savedOrder.contains(button))
             .toList();
 
-        // 将新按钮添加到末尾
         final mergedOrder = [...savedOrder, ...newButtons];
 
         state = PlayerButtonsConfig(buttonOrder: mergedOrder);
 
-        // 如果有新按钮被添加，保存更新后的配置
         if (newButtons.isNotEmpty) {
           await _saveConfig();
         }
       }
     } catch (e) {
-      // 如果加载失败，使用默认配置
       state = _isDesktop
           ? PlayerButtonsConfig.defaultDesktop
           : PlayerButtonsConfig.defaultMobile;
@@ -172,7 +167,6 @@ class PlayerButtonsConfigController extends StateNotifier<PlayerButtonsConfig> {
       final orderString = state.buttonOrder.map((type) => type.key).join(',');
       await prefs.setString(key, orderString);
     } catch (e) {
-      // 保存失败时静默处理
     }
   }
 

@@ -21,7 +21,6 @@ class _AudioFormatSettingsScreenState
   @override
   void initState() {
     super.initState();
-    // 延迟初始化以确保provider已经加载
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final preference = ref.read(audioFormatPreferenceProvider);
       if (mounted) {
@@ -50,7 +49,6 @@ class _AudioFormatSettingsScreenState
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Info card skeleton
         TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.3, end: 0.7),
           duration: const Duration(milliseconds: 1000),
@@ -91,7 +89,6 @@ class _AudioFormatSettingsScreenState
             );
           },
         ),
-        // Format card skeletons
         ...List.generate(4, (i) => Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: TweenAnimationBuilder<double>(
@@ -222,7 +219,6 @@ class _AudioFormatSettingsScreenState
           ? _buildLoadingSkeleton(context)
           : Column(
               children: [
-                // 说明卡片
                 Card(
                   elevation: 0,
                   color: cs.surfaceContainerLow,
@@ -272,7 +268,6 @@ class _AudioFormatSettingsScreenState
                   ),
                 ),
 
-                // 格式列表
                 Expanded(
                   child: ReorderableListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -302,7 +297,6 @@ class _AudioFormatSettingsScreenState
                               horizontal: 12, vertical: 10),
                           child: Row(
                             children: [
-                              // Rank container
                               Container(
                                 width: 40,
                                 height: 40,
@@ -322,7 +316,6 @@ class _AudioFormatSettingsScreenState
                                 ),
                               ),
                               const SizedBox(width: 14),
-                              // Format info
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment:
@@ -347,7 +340,6 @@ class _AudioFormatSettingsScreenState
                                   ],
                                 ),
                               ),
-                              // Drag handle
                               ReorderableDragStartListener(
                                 index: index,
                                 child: Container(
@@ -372,7 +364,6 @@ class _AudioFormatSettingsScreenState
                   ),
                 ),
 
-                // 保存按钮
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.all(16),

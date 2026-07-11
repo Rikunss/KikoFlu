@@ -44,8 +44,6 @@ class _LockScreenState extends ConsumerState<LockScreen>
       duration: const Duration(milliseconds: 2500),
     )..repeat(reverse: true);
 
-    // Defer biometric prompt to after first frame to avoid
-    // "Called after onSaveInstanceState()" on Android.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tryBiometric();
     });
@@ -103,7 +101,6 @@ class _LockScreenState extends ConsumerState<LockScreen>
 
   void _onPinDigitChanged(int index, String value) {
     if (value.length > 1) {
-      // Handle paste — fill all digits at once
       final digits = value.replaceAll(RegExp(r'\D'), '').split('').take(_pinLength).toList();
       for (var i = 0; i < _pinLength; i++) {
         if (i < digits.length) {
@@ -116,7 +113,6 @@ class _LockScreenState extends ConsumerState<LockScreen>
       }
       setState(() => _showError = false);
 
-      // Check if all digits are filled
       if (digits.length >= _pinLength) {
         _verifyPin();
       } else {
@@ -142,7 +138,6 @@ class _LockScreenState extends ConsumerState<LockScreen>
       _pinFocusNodes[index + 1].requestFocus();
     }
 
-    // Auto-submit when last digit is entered
     if (index == _pinLength - 1 && value.isNotEmpty) {
       _verifyPin();
     }
@@ -159,14 +154,12 @@ class _LockScreenState extends ConsumerState<LockScreen>
       return;
     }
 
-    // Wrong PIN — shake and clear
     HapticFeedback.heavyImpact();
     setState(() {
       _showError = true;
       _errorMessage = S.of(context).appLockWrongPin;
     });
 
-    // Clear after delay
     Future.delayed(const Duration(milliseconds: 300), () {
       if (!mounted) return;
       for (var i = 0; i < _pinLength; i++) {
@@ -181,8 +174,6 @@ class _LockScreenState extends ConsumerState<LockScreen>
     setState(() => _isLoading = true);
     await _tryBiometric();
   }
-
-  // ── Logo widget (same style as login screen) ──
 
   Widget _buildLogo(ColorScheme cs, {double size = 100}) {
     return AnimatedBuilder(
@@ -347,12 +338,10 @@ class _LockScreenState extends ConsumerState<LockScreen>
                       children: [
                         const SizedBox(height: 40),
 
-                        // ── Logo ──
                         _buildLogo(cs),
 
                         const SizedBox(height: 24),
 
-                        // ── Title ──
                         Text(
                           s.appLockTitle,
                           style: tt.headlineMedium?.copyWith(
@@ -375,13 +364,10 @@ class _LockScreenState extends ConsumerState<LockScreen>
 
                         const SizedBox(height: 40),
 
-                        // ── Loading state ──
                         if (_isLoading)
                           const CircularProgressIndicator(),
 
-                        // ── PIN entry ──
                         if (!_isLoading && _isPinMode) ...[
-                          // PIN error
                           if (_showError)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 16),
@@ -410,7 +396,6 @@ class _LockScreenState extends ConsumerState<LockScreen>
                               ),
                             ),
 
-                          // PIN digit fields
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: List.generate(
@@ -425,12 +410,10 @@ class _LockScreenState extends ConsumerState<LockScreen>
 
                           const SizedBox(height: 32),
 
-                          // ── Numpad ──
                           _buildNumpad(cs, s),
 
                           const SizedBox(height: 24),
 
-                          // ── Switch to biometric ──
                           FutureBuilder<bool>(
                             future: AppLockService.instance.canUseBiometric(),
                             builder: (context, snapshot) {
@@ -532,7 +515,6 @@ class _LockScreenState extends ConsumerState<LockScreen>
   }
 
   void _onNumpadTap(String digit) {
-    // Find the first empty slot
     for (var i = 0; i < _pinLength; i++) {
       if (_pinDigits[i].isEmpty) {
         _pinDigits[i] = digit;
@@ -543,7 +525,6 @@ class _LockScreenState extends ConsumerState<LockScreen>
           _pinFocusNodes[i + 1].requestFocus();
         }
 
-        // Auto-submit
         if (i == _pinLength - 1) {
           _verifyPin();
         }

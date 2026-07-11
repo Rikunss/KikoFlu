@@ -42,10 +42,10 @@ class EnhancedWorkCard extends ConsumerStatefulWidget {
 }
 
 class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
-  String? _progress; // 当前收藏状态
-  int? _rating; // 当前评分
-  bool _updating = false; // 是否在更新状态
-  bool _isPressed = false; // tap scale animation
+  String? _progress;
+  int? _rating;
+  bool _updating = false;
+  bool _isPressed = false;
 
   @override
   void initState() {
@@ -54,7 +54,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     _rating = widget.work.userRating;
   }
 
-  // 长按逻辑：显示上下文菜单
   Future<void> _onLongPress() async {
     HapticFeedback.mediumImpact();
     final s = S.of(context);
@@ -161,7 +160,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
 
       if (!mounted) return;
 
-      // Show track selection dialog (handles track building + queueing internally)
       await PlayNextSelectionDialog.show(
         context: context,
         work: widget.work,
@@ -216,7 +214,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     setState(() => _updating = true);
 
     try {
-      // Fetch latest progress from server
       final api = ref.read(kikoeruApiServiceProvider);
       final json = await api.getWork(widget.work.id);
       final detailed = Work.fromJson(json);
@@ -257,17 +254,14 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
 
   @override
   Widget build(BuildContext context) {
-    // Cache theme & orientation sekali saja untuk menghindari pemanggilan berulang
     final theme = Theme.of(context);
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     final screenWidth = MediaQuery.sizeOf(context).width;
 
-    // Gunakan `select()` agar kartu tidak rebuild saat field auth lain berubah
     final host = ref.watch(authProvider.select((s) => s.host ?? ''));
     final token = ref.watch(authProvider.select((s) => s.token ?? ''));
-    // Hanya watch field yang benar-benar dipakai, bukan seluruh object
     final displaySettings = ref.watch(workCardDisplayProvider.select((s) => (
       s.showRating,
       s.showPrice,
@@ -278,8 +272,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
       s.showSubtitleTag,
     )));
 
-    // Gunakan select() pada subtitleLibraryProvider agar kartu hanya rebuild
-    // saat status subtitle work ini saja yang berubah, bukan seluruh set.
     final hasLocalSubtitle = ref.watch(
       subtitleLibraryProvider.select((set) => set.contains(widget.work.id)),
     );
@@ -294,8 +286,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
           );
         };
 
-    // 横屏模式：4列显示中等卡片，5列显示紧凑卡片
-    // 竖屏模式：2列显示中等卡片，3列显示紧凑卡片
     if (widget.crossAxisCount >= 5 ||
         (widget.crossAxisCount == 3 && !isLandscape)) {
       return _buildCompactCard(context, theme, isLandscape, devicePixelRatio,
@@ -312,7 +302,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     }
   }
 
-  // 紧凑卡片 (3列布局)
   Widget _buildCompactCard(BuildContext context, ThemeData theme,
       bool isLandscape, double devicePixelRatio, double screenWidth,
       String host, String token,
@@ -348,21 +337,18 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
           onTapCancel: () => setState(() => _isPressed = false),
           child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min, // 让 Column 高度自适应
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // 封面图片区域
             AspectRatio(
               aspectRatio: 1.0,
               child: Stack(
                 children: [
                   _buildCoverImage(context, host, token, theme, isLandscape, devicePixelRatio, screenWidth),
-                  // RJ号标签 (左上角)
                   Positioned(
                     top: 4,
                     left: 4,
                     child: _buildRjTag(isLandscape),
                   ),
-                  // 字幕标签 (左下角)
                   if (showSubtitleTag && (hasSubtitle))
                     Positioned(
                       bottom: 4,
@@ -372,7 +358,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                         isLocal: hasLocalSubtitle,
                       ),
                     ),
-                  // 日期标签 (右下角)
                   if (showReleaseDate &&
                             widget.work.release != null)
                     Positioned(
@@ -383,14 +368,12 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                 ],
               ),
             ),
-            // 信息区域 - 自适应高度
             Padding(
               padding: const EdgeInsets.all(6.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 标题
                   Text(
                     widget.work.title,
                     style: theme.textTheme.titleSmall?.copyWith(
@@ -409,7 +392,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     );
   }
 
-  // 中等卡片 (2列布局)
   Widget _buildMediumCard(BuildContext context, ThemeData theme,
       bool isLandscape, double devicePixelRatio, double screenWidth,
       String host, String token,
@@ -451,7 +433,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 封面区域
             AspectRatio(
               aspectRatio: 1.3,
               child: Stack(
@@ -462,7 +443,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                     left: 6,
                     child: _buildRjTag(isLandscape),
                   ),
-                  // 字幕标签 (左下角)
                   if (showSubtitleTag && (hasSubtitle))
                     Positioned(
                       bottom: 6,
@@ -482,14 +462,12 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                 ],
               ),
             ),
-            // 信息区域 - 自适应高度
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 标题
                   Text(
                     widget.work.title,
                     style: theme.textTheme.titleSmall?.copyWith(
@@ -499,7 +477,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                         ),
                   ),
                   const SizedBox(height: 3),
-                  // 社团名称
                   if (showCircle)
                     Text(
                       widget.work.name ?? '',
@@ -509,7 +486,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                           ),
                     ),
                   if (showCircle) const SizedBox(height: 3),
-                  // 价格
                   if (showPrice && widget.work.price != null)
                     Text(
                       S.of(context).priceInYen(widget.work.price!),
@@ -519,7 +495,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                             fontSize: priceFontSize,
                           ),
                     ),
-                  // 评分信息
                   if (showRating &&
                       widget.work.rateAverage != null &&
                       widget.work.rateCount != null &&
@@ -546,7 +521,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                       ],
                     ),
                   ],
-                  // 时长信息
                   if (showDuration &&
                       widget.work.duration != null &&
                       widget.work.duration! > 0) ...[
@@ -589,7 +563,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
     );
   }
 
-  // 完整卡片 (列表布局)
   Widget _buildFullCard(BuildContext context, ThemeData theme,
       bool isLandscape, double devicePixelRatio, double screenWidth,
       String host, String token,
@@ -628,11 +601,9 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 第一行：封面和标题
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 封面图片
                   SizedBox(
                     width: 80,
                     height: 80,
@@ -642,7 +613,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                           borderRadius: BorderRadius.circular(8),
                           child: _buildCoverImage(context, host, token, theme, isLandscape, devicePixelRatio, screenWidth),
                         ),
-                        // RJ号标签
                         Positioned(
                           top: 2,
                           left: 2,
@@ -663,7 +633,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                             ),
                           ),
                         ),
-                        // 字幕标签 (左下角)
                         if (showSubtitleTag && (hasSubtitle))
                           Positioned(
                             bottom: 2,
@@ -677,7 +646,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // 标题
                   Expanded(
                     child: Text(
                       widget.work.title,
@@ -691,11 +659,9 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                 ],
               ),
               const SizedBox(height: 12),
-              // 第二行：其他信息
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 社团和价格行
                   Row(
                     children: [
                       if (showCircle)
@@ -720,7 +686,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  // 日期和下载数
                   Row(
                     children: [
                       if (showReleaseDate &&
@@ -732,7 +697,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                                     color: Colors.grey[500],
                                   ),
                         ),
-                      // 评分信息
                       if (showRating &&
                           widget.work.rateAverage != null &&
                           widget.work.rateCount != null &&
@@ -755,7 +719,6 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                                   ),
                         ),
                       ],
-                      // 时长信息
                       if (showDuration &&
                           widget.work.duration != null &&
                           widget.work.duration! > 0) ...[
@@ -789,11 +752,9 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  // 声优
                   if (widget.work.vas != null && widget.work.vas!.isNotEmpty)
                     _buildVoiceActorsWrap(context, isLandscape),
                   const SizedBox(height: 6),
-                  // 标签
                   if (widget.work.tags != null && widget.work.tags!.isNotEmpty)
                     _buildTagsWrap(context, isLandscape),
                 ],
@@ -808,13 +769,11 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
 
   Widget _buildCoverImage(BuildContext context, String host, String token,
       ThemeData theme, bool isLandscape, double devicePixelRatio, double screenWidth) {
-    // 使用缓存网络图片，减少滚动时的解码与网络开销，提升流畅度
     if (host.isEmpty) {
       return _buildPlaceholder(context);
     }
 
     final url = widget.work.getCoverImageUrl(host, token: token);
-    // Hitung ukuran decode berdasarkan lebar card sebenarnya (kurangi padding & spacing)
     int targetWidth;
     if (widget.crossAxisCount >= 2) {
       final padding = isLandscape ? 24.0 : 8.0;
@@ -824,12 +783,11 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
       targetWidth =
           (availableWidth / widget.crossAxisCount * devicePixelRatio).round();
     } else {
-      targetWidth = (80 * devicePixelRatio).round(); // 列表模式封面固定宽度
+      targetWidth = (80 * devicePixelRatio).round();
     }
 
     final httpHeaders = CookieService.coverHttpHeaders(token: token);
 
-    // Gunakan blurhash dari server API, fallback ke hasil generate lokal
     final blurHash = widget.work.blurHash ??
         BlurHashService.instance.getBlurHash(widget.work.id);
 
@@ -842,16 +800,13 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
             imageUrl: url,
             httpHeaders: httpHeaders,
             cacheKey: 'work_cover_${widget.work.id}',
-            memCacheWidth: targetWidth, // 降低解码分辨率，减少 GPU / CPU 压力
+            memCacheWidth: targetWidth,
             fadeInDuration: const Duration(milliseconds: 120),
             fadeOutDuration: const Duration(milliseconds: 90),
             placeholderFadeInDuration: const Duration(milliseconds: 80),
             placeholder: (context, _) => _buildPlaceholder(context, blurHash: blurHash),
             errorWidget: (context, _, __) => _buildPlaceholder(context, blurHash: blurHash),
             imageBuilder: (context, imageProvider) {
-              // Trigger blurhash generation in background jika blm ada
-              // Cek cache lokal dulu agar tidak panggil generateIfNeeded yang
-              // sudah di-handle oleh batch trigger
               if (widget.work.blurHash == null &&
                   !BlurHashService.instance.hasBlurHash(widget.work.id)) {
                 BlurHashService.instance
@@ -1084,7 +1039,6 @@ List<AudioFile> _convertApiFilesToAudioFiles(
     final size = file['size'] as int?;
     final duration = file['duration'];
 
-    // Build download URL
     String? downloadUrl;
     if (file['mediaDownloadUrl'] != null &&
         file['mediaDownloadUrl'].toString().isNotEmpty) {

@@ -2,9 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kikoeru_flutter/src/models/lyric.dart';
 
 void main() {
-  // ============================================================
-  // LRC 解析
-  // ============================================================
   group('LRC Parser', () {
     test('基本 LRC 解析', () {
       const lrc = '''[00:00.00]第一行歌词
@@ -27,7 +24,6 @@ void main() {
 [00:06.00]Line C''';
 
       final lyrics = LyricParser.parse(lrc);
-      // Line A endTime == Line B startTime
       expect(lyrics.first.endTime, const Duration(seconds: 3));
     });
 
@@ -37,7 +33,6 @@ void main() {
 
       final lyrics = LyricParser.parse(lrc);
       final last = lyrics.last;
-      // 最后一行如果 endTime == startTime，应该 +5s
       expect(last.endTime, const Duration(seconds: 8));
     });
 
@@ -61,7 +56,6 @@ void main() {
       const lrc = '[00:10.00][00:20.00][00:30.00]重复歌词';
 
       final lyrics = LyricParser.parse(lrc);
-      // 同一行文本应出现3次（3个时间戳）
       final matchingLines = lyrics.where((l) => l.text == '重复歌词');
       expect(matchingLines.length, 3);
     });
@@ -72,9 +66,7 @@ void main() {
 [00:10.00]恢复歌词''';
 
       final lyrics = LyricParser.parse(lrc);
-      // 空行应被处理：短间隔合并到上一行，长间隔替换为 ♪ - ♪
       final texts = lyrics.map((l) => l.text).toList();
-      // 不应有纯空字符串
       for (final t in texts) {
         expect(t.trim().isEmpty, isFalse);
       }
@@ -92,9 +84,6 @@ void main() {
     });
   });
 
-  // ============================================================
-  // WebVTT 解析
-  // ============================================================
   group('WebVTT Parser', () {
     test('标准 WebVTT 解析', () {
       const vtt = '''WEBVTT
@@ -173,14 +162,10 @@ Line one
 Line two''';
 
       final lyrics = LyricParser.parse(vtt);
-      // finalize 会设置 endTime = 下一行 startTime
       expect(lyrics[0].endTime, const Duration(seconds: 5));
     });
 
     test('SRT 格式（实质上同 WebVTT 解析器处理）', () {
-      // SRT 使用逗号分隔毫秒，但 parse() 检测不到 LRC 时用 WebVTT 解析
-      // VTT 解析器期望 . 而非 ,，所以标准 SRT 可能需要预处理
-      // 这里测试转换后的 SRT（. 替代 ,）
       const srt = '''1
 00:00:01.000 --> 00:00:04.000
 First subtitle
@@ -195,9 +180,6 @@ Second subtitle''';
     });
   });
 
-  // ============================================================
-  // 格式检测
-  // ============================================================
   group('Format Detection', () {
     test('自动检测 LRC 格式', () {
       const lrc = '[00:01.00]This is LRC';
@@ -230,9 +212,6 @@ This is VTT''';
     });
   });
 
-  // ============================================================
-  // getCurrentLyric
-  // ============================================================
   group('getCurrentLyric', () {
     late List<LyricLine> lyrics;
 
@@ -279,8 +258,6 @@ This is VTT''';
     });
 
     test('间隔 <1s 时延续上一行', () {
-      // Line 2: end=6s, Line 3: start=10s, gap=4s → null
-      // 构造一个短间隔场景
       final shortGapLyrics = [
         LyricLine(
           startTime: const Duration(seconds: 0),
@@ -293,7 +270,6 @@ This is VTT''';
           text: 'B',
         ),
       ];
-      // 在 3.0s ~ 3.5s 间隔内（<1s），应延续前一行
       expect(
         LyricParser.getCurrentLyric(
             shortGapLyrics, const Duration(seconds: 3, milliseconds: 200)),
@@ -302,7 +278,6 @@ This is VTT''';
     });
 
     test('间隔 >=1s 时返回 null', () {
-      // Line 2 ends at 6s, Line 3 starts at 10s (gap = 4s)
       expect(
         LyricParser.getCurrentLyric(lyrics, const Duration(seconds: 8)),
         isNull,
@@ -328,9 +303,6 @@ This is VTT''';
     });
   });
 
-  // ============================================================
-  // LyricLine Model
-  // ============================================================
   group('LyricLine', () {
     test('copyWith 正确复制和覆盖', () {
       final original = LyricLine(
@@ -371,9 +343,6 @@ This is VTT''';
     });
   });
 
-  // ============================================================
-  // 空行合并逻辑 (_mergeEmptyLines via finalize)
-  // ============================================================
   group('Empty Line Merging', () {
     test('短空行（<3s）合并到上一行', () {
       const lrc = '''[00:00.00]歌词A
@@ -381,8 +350,6 @@ This is VTT''';
 [00:06.00]歌词B''';
 
       final lyrics = LyricParser.parse(lrc);
-      // 空行 [05:00-06:00] 只有1s，应合并到歌词A
-      // 歌词A 的 endTime 应延伸到 06:00
       final lineA = lyrics.firstWhere((l) => l.text == '歌词A');
       expect(lineA.endTime, const Duration(seconds: 6));
     });
@@ -393,14 +360,10 @@ This is VTT''';
 [00:15.00]歌词B''';
 
       final lyrics = LyricParser.parse(lrc);
-      // 空行 [05:00-15:00] 有10s，应替换为 ♪ - ♪
       expect(lyrics.any((l) => l.text == '♪ - ♪'), isTrue);
     });
   });
 
-  // ============================================================
-  // 标准 SRT 格式解析
-  // ============================================================
   group('SRT Parser', () {
     test('标准 SRT 格式（逗号分隔毫秒）', () {
       const srt = '''1
@@ -473,9 +436,6 @@ Only one''';
     });
   });
 
-  // ============================================================
-  // ASS (Advanced SubStation Alpha) 格式
-  // ============================================================
   group('ASS Parser', () {
     test('标准 ASS 格式', () {
       const ass = '''[Script Info]
@@ -549,9 +509,6 @@ Dialogue: 0,1:30:15.50,1:30:20.00,Default,,0,0,0,,At 1h30m15.5s''';
     });
   });
 
-  // ============================================================
-  // SSA (SubStation Alpha v4) 格式
-  // ============================================================
   group('SSA Parser', () {
     test('标准 SSA 格式 (v4)', () {
       const ssa = '''[Script Info]
@@ -573,9 +530,6 @@ Dialogue: Marked=0,0:00:05.00,0:00:08.00,Default,,0000,0000,0000,,Second line'''
     });
   });
 
-  // ============================================================
-  // SBV (YouTube) 格式
-  // ============================================================
   group('SBV Parser', () {
     test('标准 SBV 格式', () {
       const sbv = '''0:00:01.000,0:00:04.000
@@ -615,14 +569,10 @@ Line one
 Line two''';
 
       final lyrics = LyricParser.parse(sbv);
-      // finalize 设置 endTime = 下一行 startTime
       expect(lyrics[0].endTime, const Duration(seconds: 6));
     });
   });
 
-  // ============================================================
-  // TTML / DFXP (XML) 格式
-  // ============================================================
   group('TTML/DFXP Parser', () {
     test('标准 TTML 格式', () {
       const ttml = '''<?xml version="1.0" encoding="UTF-8"?>
@@ -691,16 +641,12 @@ Line two''';
     });
   });
 
-  // ============================================================
-  // 边界情况
-  // ============================================================
   group('Edge Cases', () {
     test('单行 LRC', () {
       const lrc = '[00:00.00]Only one line';
       final lyrics = LyricParser.parse(lrc);
       expect(lyrics.length, 1);
       expect(lyrics[0].text, 'Only one line');
-      // 单行 endTime = startTime + 5s
       expect(lyrics[0].endTime, const Duration(seconds: 5));
     });
 
@@ -725,7 +671,6 @@ Only one cue''';
     test('LRC 时间戳精度：百分之一秒', () {
       const lrc = '[00:01.99]Precise timing';
       final lyrics = LyricParser.parse(lrc);
-      // 99 centiseconds = 990 ms
       expect(lyrics[0].startTime, const Duration(seconds: 1, milliseconds: 990));
     });
 
@@ -753,7 +698,6 @@ Precise''';
       stopwatch.stop();
 
       expect(lyrics.length, greaterThanOrEqualTo(400));
-      // 500 行应在 100ms 内完成
       expect(stopwatch.elapsedMilliseconds, lessThan(100));
     });
   });

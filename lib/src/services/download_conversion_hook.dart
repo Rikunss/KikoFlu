@@ -69,7 +69,6 @@ class DownloadConversionHook {
         return ConversionResult(originalFileName: task.fileName);
       }
 
-      // Update task status to show "Converting..." in the UI
       final currentTask = findTask(task.id);
       onUpdate(currentTask.copyWith(status: DownloadStatus.converting));
 
@@ -130,7 +129,6 @@ class DownloadConversionHook {
       unawaited(ConversionNotificationService.instance.showFailed(
         fileName: task.fileName,
       ));
-      // Reset task status so it doesn't stay stuck in "converting"
       try {
         final stuckTask = findTask(task.id);
         onUpdate(stuckTask.copyWith(status: DownloadStatus.completed));

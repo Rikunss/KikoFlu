@@ -43,14 +43,12 @@ class SettingsDashboardCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              // Tonal icon container (MD3 style)
               CircleAvatar(
                 backgroundColor: iconColor.withValues(alpha: 0.12),
                 radius: 22,
                 child: Icon(icon, color: iconColor, size: 22),
               ),
               const SizedBox(width: 16),
-              // Title + subtitle
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,7 +71,6 @@ class SettingsDashboardCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Chevron
               Icon(
                 Icons.chevron_right,
                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),

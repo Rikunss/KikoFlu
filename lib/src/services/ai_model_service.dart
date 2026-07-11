@@ -202,7 +202,6 @@ class AIModelService {
     final file = File(savePath);
     final tempFile = File(tempPath);
 
-    // If already exists, skip
     if (await file.exists()) {
       _log.info('Model already exists at: $savePath', tag: 'AI');
       onProgress?.call(100, 100);
@@ -212,10 +211,8 @@ class AIModelService {
     final modelUri = model.modelUri;
     _log.info('Download URL: ${modelUri.toString()}', tag: 'AI');
 
-    // Ensure the parent directory exists
     await Directory(p.dirname(savePath)).create(recursive: true);
 
-    // Acquire wakelock to prevent screen/during download
     bool wakelockAcquired = false;
     try {
       await WakelockPlus.enable();
@@ -226,7 +223,6 @@ class AIModelService {
     }
 
     try {
-      // ── Check for existing partial download (resume support) ──────
       int existingBytes = 0;
       if (await tempFile.exists()) {
         existingBytes = await tempFile.length();
@@ -240,7 +236,6 @@ class AIModelService {
 
       final request = await client.getUrl(modelUri);
 
-      // Send Range header if we have partial data
       if (existingBytes > 0) {
         request.headers.set('Range', 'bytes=$existingBytes-');
         _log.info('Resuming download from byte $existingBytes', tag: 'AI');
@@ -248,10 +243,8 @@ class AIModelService {
 
       final response = await request.close();
 
-      // Handle range / normal response
       int totalBytes;
       if (existingBytes > 0 && response.statusCode == 206) {
-        // Server supports resume
         final reportedLen = response.contentLength;
         totalBytes = reportedLen > 0
             ? existingBytes + reportedLen
@@ -259,13 +252,11 @@ class AIModelService {
         _log.info(
             'Server supports resume (206). Total: $totalBytes', tag: 'AI');
       } else if (existingBytes > 0 && response.statusCode == 200) {
-        // Server doesn't support Range — start from scratch
         _log.info('Server does not support resume, starting from scratch',
             tag: 'AI');
         existingBytes = 0;
         totalBytes =
             response.contentLength > 0 ? response.contentLength : 0;
-        // Delete the stale partial file
         if (await tempFile.exists()) {
           await tempFile.delete();
         }
@@ -281,18 +272,15 @@ class AIModelService {
 
       var receivedBytes = existingBytes;
 
-      // Open file in append mode when resuming, write mode when fresh
       final sink = tempFile.openWrite(
         mode: existingBytes > 0 ? FileMode.append : FileMode.write,
       );
 
       await for (final chunk in response) {
-        // Check for cancel request (higher priority than pause)
         if (isCancelled != null && isCancelled()) {
           _log.info('Download cancelled at byte $receivedBytes', tag: 'AI');
           await sink.flush();
           await sink.close();
-          // Delete the partial file
           if (await tempFile.exists()) {
             await tempFile.delete();
             _log.info('Partial file deleted: $tempPath', tag: 'AI');
@@ -302,15 +290,12 @@ class AIModelService {
           return modelName;
         }
 
-        // Check for pause request
         if (isPaused != null && isPaused()) {
           _log.info('Download paused at byte $receivedBytes', tag: 'AI');
           await sink.flush();
           await sink.close();
           onPaused?.call();
           client.close(force: true);
-          // Return WITHOUT throwing — paused is intentional, not an error.
-          // Partial file is kept for later resume.
           return modelName;
         }
 
@@ -322,7 +307,6 @@ class AIModelService {
       await sink.flush();
       await sink.close();
 
-      // Atomically rename temp file to final name
       if (await tempFile.exists()) {
         if (await file.exists()) {
           await file.delete();
@@ -339,7 +323,6 @@ class AIModelService {
       );
       return modelName;
     } on HttpException catch (e) {
-      // Handle 416 Range Not Satisfiable — file is likely complete
       if (e.message.contains('status: 416')) {
         if (await tempFile.exists()) {
           if (await file.exists()) {
@@ -351,15 +334,12 @@ class AIModelService {
           return modelName;
         }
       }
-      // Partial file kept on disk for resume — do NOT delete
       _log.error('Model download failed (HttpException): $e', tag: 'AI');
       rethrow;
     } catch (e) {
-      // Partial file kept on disk for resume — do NOT delete
       _log.error('Model download failed: $e', tag: 'AI');
       rethrow;
     } finally {
-      // Release wakelock
       if (wakelockAcquired) {
         try {
           await WakelockPlus.disable();
@@ -398,17 +378,13 @@ class AIModelService {
       throw Exception('Source file not found: $sourceFilePath');
     }
 
-    // Ensure the parent directory exists
     await Directory(p.dirname(savePath)).create(recursive: true);
 
-    // If a model already exists at the destination, remove it first
     final destFile = File(savePath);
     if (await destFile.exists()) {
       await destFile.delete();
     }
 
-    // Copy the file (copy instead of rename in case source is on a
-    // different volume, e.g. external SD card)
     await sourceFile.copy(savePath);
 
     _log.info(
@@ -423,7 +399,6 @@ class AIModelService {
   /// Delete the downloaded model files for the given model.
   Future<void> deleteModel({WhisperModel model = WhisperModel.base}) async {
     try {
-      // Get model path and delete the actual model file
       final path = await _ctrl.getPath(model);
       final file = File(path);
       if (await file.exists()) {
@@ -431,7 +406,6 @@ class AIModelService {
         _log.info('Model file deleted: $path', tag: 'AI');
       }
 
-      // Also try the model directory (only if it's empty now)
       final dir = Directory(await WhisperController.getModelDir());
       if (await dir.exists()) {
         final contents = await dir.list().toList();
@@ -481,7 +455,6 @@ class AIModelService {
         return null;
       }
 
-      // Convert segments
       final segments = <WhisperSegment>[];
       if (result.transcription.segments != null) {
         for (final seg in result.transcription.segments!) {
@@ -493,7 +466,6 @@ class AIModelService {
         }
       }
 
-      // Generate LRC
       final lrcContent = _segmentsToLrc(segments);
 
       _log.info(
@@ -594,13 +566,11 @@ class AIModelService {
     final baseName = p.basenameWithoutExtension(audioFileName);
     final lrcFileName = '$baseName.lrc';
 
-    // 1. Save alongside the audio file (primary)
     final audioDir = p.dirname(audioPath);
     final lrcPath = p.join(audioDir, lrcFileName);
     await File(lrcPath).writeAsString(result.lrcContent, encoding: utf8);
     _log.info('LRC saved alongside audio: $lrcPath', tag: 'AI');
 
-    // 2. Also save to subtitle library (backup / organization)
     await saveLrcToSubtitleLibrary(
       lrcContent: result.lrcContent,
       audioFileName: audioFileName,

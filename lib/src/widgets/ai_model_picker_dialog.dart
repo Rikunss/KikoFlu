@@ -106,7 +106,6 @@ class _AIModelPickerDialogState extends State<_AIModelPickerDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // File count subtitle (for batch)
             if (widget.fileCount != null) ...[
               Text(
                 widget.fileCount!,
@@ -115,7 +114,6 @@ class _AIModelPickerDialogState extends State<_AIModelPickerDialog> {
               const SizedBox(height: 12),
             ],
 
-            // ── Model List ──
             Text(
               'Model',
               style: tt.labelLarge?.copyWith(fontWeight: FontWeight.w600),
@@ -180,14 +178,12 @@ class _AIModelPickerDialogState extends State<_AIModelPickerDialog> {
 
             const Divider(height: 24),
 
-            // ── Advanced Settings ──
             Text(
               'Pengaturan',
               style: tt.labelLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
 
-            // Threads dropdown
             Row(
               children: [
                 Icon(Icons.memory, size: 18, color: cs.onSurfaceVariant),
@@ -219,7 +215,6 @@ class _AIModelPickerDialogState extends State<_AIModelPickerDialog> {
             ),
             const SizedBox(height: 10),
 
-            // Word-Level toggle
             Row(
               children: [
                 Icon(Icons.timer, size: 18, color: cs.onSurfaceVariant),

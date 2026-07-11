@@ -32,13 +32,11 @@ class CircleChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // 如果提供了自定义样式参数，使用自定义样式
     if (fontSize != null || padding != null || borderRadius != null) {
       return GestureDetector(
         onTap: onTap ??
             () {
               LogService.instance.debug('[CircleChip] Clicked circle: $circleName, id: $circleId', tag: 'UI');
-              // 默认跳转到社团搜索结果页面
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -73,15 +71,12 @@ class CircleChip extends StatelessWidget {
       );
     }
 
-    // 使用默认的 Chip 样式
     if (onDeleted != null) {
-      // 如果有删除功能，使用 InputChip
       return InputChip(
         label: Text(circleName),
         onPressed: onTap ??
             () {
               LogService.instance.debug('[CircleChip] Clicked circle: $circleName, id: $circleId', tag: 'UI');
-              // 默认跳转到社团搜索结果页面
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -111,13 +106,11 @@ class CircleChip extends StatelessWidget {
       );
     }
 
-    // 默认的 ActionChip
     return ActionChip(
       label: Text(circleName),
       onPressed: onTap ??
           () {
             LogService.instance.debug('[CircleChip] Clicked circle: $circleName, id: $circleId', tag: 'UI');
-            // 默认跳转到社团搜索结果页面
             Navigator.push(
               context,
               MaterialPageRoute(

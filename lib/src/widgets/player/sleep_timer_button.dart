@@ -17,12 +17,11 @@ class SleepTimerButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final timerState = ref.watch(sleepTimerProvider);
     final isLandscapeCompact =
-        iconSize != null; // 在横屏模式下我们传入了固定的 iconSize，用紧凑样式防止高度溢出
+        iconSize != null;
 
     if (timerState.isActive) {
-      // 定时器激活时显示带倒计时的按钮
       return SizedBox(
-        height: iconSize == null ? 62 : 40, // 固定高度确保对齐
+        height: iconSize == null ? 62 : 40,
         child: Align(
           alignment: Alignment.center,
           child: Column(
@@ -63,9 +62,8 @@ class SleepTimerButton extends ConsumerWidget {
         ),
       );
     } else {
-      // 定时器未激活时显示普通按钮
       return SizedBox(
-        height: iconSize == null ? 62 : 40, // 固定高度确保对齐
+        height: iconSize == null ? 62 : 40,
         child: Align(
           alignment: Alignment.center,
           child: Column(

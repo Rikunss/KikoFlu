@@ -52,7 +52,6 @@ final activeBitPerfectSourceProvider = Provider<String>((ref) {
 
   if (dacManagerState.dacActive) return 'libusb_usb_dac';
 
-  // Fall through to check AAudio exclusive state (handled by other providers)
   return 'none';
 });
 

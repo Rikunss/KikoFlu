@@ -171,7 +171,6 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
     final prefs = await SharedPreferences.getInstance();
     state = prefs.getBool(_key) ?? false;
 
-    // 如果已启用，尝试显示悬浮窗
     if (state) {
       _showFloatingLyric();
     }
@@ -180,7 +179,6 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
   Future<void> toggle() async {
     final newValue = !state;
 
-    // 如果要启用悬浮窗，先检查权限
     if (newValue) {
       final hasPermission = await FloatingLyricService.instance.hasPermission();
       if (!hasPermission) {
@@ -191,23 +189,18 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
         }
       }
 
-      // 显示悬浮窗
       await _showFloatingLyric();
     } else {
-      // 停止后台更新
       _stopBackgroundUpdate();
-      // 隐藏悬浮窗
       await FloatingLyricService.instance.hide();
     }
 
-    // 保存状态
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_key, newValue);
     state = newValue;
   }
 
   Future<void> _showFloatingLyric() async {
-    // 使用 Provider 中的样式，确保与当前设置一致
     final style = ref.read(floatingLyricStyleProvider);
 
     final styleMap = {
@@ -221,24 +214,17 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
 
     await FloatingLyricService.instance.show('♪ - ♪', style: styleMap);
 
-    // Windows 平台需要给予窗口一点初始化时间，避免立即发送消息导致 CHANNEL_UNREGISTERED
     if (Platform.isWindows || Platform.isLinux) {
       await Future.delayed(const Duration(milliseconds: 500));
     }
 
-    // 再次应用样式。
-    // 这样做有两个目的：
-    // 1. 如果上面的 show 使用的是默认样式（因为 Provider 还没加载完），此时 Provider 应该加载完了，再次应用可以修正样式。
-    // 2. 如果 Provider 在 show 执行期间加载完成并尝试 updateStyle 但失败了（因为窗口还没创建好），这里可以补救。
     ref.read(floatingLyricStyleProvider.notifier).applyStyle();
 
-    // 应用触摸设置（Android）
     if (Platform.isAndroid) {
       final touchEnabled = ref.read(floatingLyricTouchEnabledProvider);
       await FloatingLyricService.instance.setTouchEnabled(touchEnabled);
     }
 
-    // 启动后台更新
     _startBackgroundUpdate();
   }
 
@@ -247,22 +233,18 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
     _stopBackgroundUpdate();
     LogService.instance.debug('[FloatingLyric] 启动后台更新监听', tag: 'UI');
 
-    // 确保字幕自动加载器始终激活（即使在后台）
     ref.read(lyricAutoLoaderProvider);
 
-    // 监听播放位置变化，每次变化都更新字幕
     _positionSubscription =
         AudioPlayerService.instance.positionStream.listen((_) {
       _updateLyricInBackground();
     });
 
-    // 监听播放状态变化
     _playingSubscription =
         AudioPlayerService.instance.playerStateStream.listen((_) {
       _updateLyricInBackground();
     });
 
-    // 监听音轨变化
     _trackSubscription =
         AudioPlayerService.instance.currentTrackStream.listen((track) {
       LogService.instance.debug(
@@ -270,10 +252,8 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
       if (track?.id != _lastTrackId) {
         _lastTrackId = track?.id;
         LogService.instance.debug('[FloatingLyric] ✓ 音轨切换确认: ${track?.title}', tag: 'UI');
-        // 音轨切换时先显示"加载中"
         FloatingLyricService.instance.updateText('♪ 加载字幕中 ♪');
 
-        // 触发字幕加载
         if (track != null) {
           final fileListState = ref.read(fileListControllerProvider);
           if (fileListState.files.isNotEmpty) {
@@ -290,16 +270,13 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
       }
     });
 
-    // 监听字幕状态变化 - 当字幕加载完成或变化时更新
     _lyricStateSubscription = ref.listen<LyricState>(
       lyricControllerProvider,
       (previous, next) {
-        // 当字幕加载完成（isLoading 从 true 变为 false）时更新
         if (previous?.isLoading == true && next.isLoading == false) {
           LogService.instance.debug('[FloatingLyric] 字幕加载完成，更新悬浮窗', tag: 'UI');
           _updateLyricInBackground();
         }
-        // 或者字幕内容发生变化时也更新
         else if (previous?.lyrics != next.lyrics && !next.isLoading) {
           LogService.instance.debug('[FloatingLyric] 字幕内容变化，更新悬浮窗', tag: 'UI');
           _updateLyricInBackground();
@@ -330,7 +307,6 @@ class FloatingLyricEnabledNotifier extends StateNotifier<bool> {
     if (!isPlaying) {
       displayText = '♪ - ♪';
     } else if (lyricState.lyrics.isNotEmpty) {
-      // 使用显示用歌词（翻译后 > 原文）
       final displayLyrics = lyricState.displayLyrics;
       final currentLyric =
           LyricParser.getCurrentLyric(displayLyrics, currentPosition);

@@ -49,7 +49,6 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
 
       List<Work> allCandidates = [];
 
-      // 1. 按标签搜索（并行）
       if (searchTags.isNotEmpty) {
         final tagFutures = searchTags.map((tag) => _fetchWorksByTag(
               apiService,
@@ -64,14 +63,12 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
         }
       }
 
-      // 2. 如果标签搜索结果不足，fallback 到同声优搜索
       if (allCandidates.length < 5 && work.vas != null && work.vas!.isNotEmpty) {
         final va = work.vas!.first;
         final vaWorks = await _fetchWorksByVa(apiService, va.id);
         allCandidates.addAll(vaWorks);
       }
 
-      // 3. 去重，排除当前作品
       final seen = <int>{};
       final unique = <Work>[];
       for (final w in allCandidates) {
@@ -80,15 +77,13 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
         }
       }
 
-      // 4. 按相关度排序（加入随机扰动）
       final currentTagIds = work.tags?.map((t) => t.id).toSet() ?? {};
       unique.sort((a, b) {
         final scoreA = _relevanceScore(a, currentTagIds);
         final scoreB = _relevanceScore(b, currentTagIds);
-        return scoreB.compareTo(scoreA); // 降序
+        return scoreB.compareTo(scoreA);
       });
 
-      // 5. 取 Top 30 候选，随机打乱后取 20
       final topCandidates = unique.take(30).toList()..shuffle(_random);
       final recommendations = topCandidates.take(20).toList();
 
@@ -102,11 +97,9 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
   List<Tag> _selectSearchTags(List<Tag> allTags) {
     if (allTags.isEmpty) return [];
 
-    // 按名称长度排序：名称越长通常越具体
     final sorted = List<Tag>.from(allTags);
     sorted.sort((a, b) => b.name.length.compareTo(a.name.length));
 
-    // 从前 6 个候选中随机选 3 个，增加多样性
     final candidates = sorted.take(6).toList()..shuffle(_random);
     return candidates.take(3).toList();
   }

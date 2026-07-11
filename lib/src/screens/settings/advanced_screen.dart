@@ -81,7 +81,6 @@ class _AdvancedScreenState extends ConsumerState<AdvancedScreen> {
                   children: [
                     const SizedBox(height: 8),
 
-                    // ── Info banner ──
                     Card(
                       elevation: 0,
                       color: colorScheme.tertiaryContainer,
@@ -107,11 +106,9 @@ class _AdvancedScreenState extends ConsumerState<AdvancedScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── 1. Device Info ──
                     _buildDeviceInfoCard(context, colorScheme, s),
                     const SizedBox(height: 12),
 
-                    // ── 2. Display & Sorting ──
                     Card(
                       elevation: 0,
                       clipBehavior: Clip.antiAlias,
@@ -138,7 +135,6 @@ class _AdvancedScreenState extends ConsumerState<AdvancedScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // ── 3. Content Filtering ──
                     Card(
                       elevation: 0,
                       clipBehavior: Clip.antiAlias,
@@ -157,7 +153,6 @@ class _AdvancedScreenState extends ConsumerState<AdvancedScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // ── 4. Data Management ──
                     Card(
                       elevation: 0,
                       clipBehavior: Clip.antiAlias,
@@ -176,13 +171,11 @@ class _AdvancedScreenState extends ConsumerState<AdvancedScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // ── 5. Developer Tools ──
                     Card(
                       elevation: 0,
                       clipBehavior: Clip.antiAlias,
                       child: Column(
                         children: [
-                          // Section header
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                             child: Row(
@@ -208,10 +201,8 @@ class _AdvancedScreenState extends ConsumerState<AdvancedScreen> {
                             () => _navigate(const LogScreen()),
                             isLast: false,
                           ),
-                          // FPS Monitor toggle (debug builds only)
                           if (kDebugMode)
                             _buildFpsToggle(context, colorScheme),
-                          // USB DAC Diagnostics removed — now handled via Android API in Playback settings
                         ],
                       ),
                     ),
@@ -225,8 +216,6 @@ class _AdvancedScreenState extends ConsumerState<AdvancedScreen> {
       ),
     );
   }
-
-  // ── Device Info Card ──
 
   Widget _buildDeviceInfoCard(
     BuildContext context,

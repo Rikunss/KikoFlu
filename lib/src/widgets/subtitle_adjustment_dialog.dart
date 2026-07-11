@@ -69,7 +69,6 @@ class _SubtitleAdjustmentDialogState
         throw Exception(s.noAudioPlaying);
       }
 
-      // 选择保存目录
       final selectedDirectory = await FilePicker.getDirectoryPath(
         dialogTitle: S.of(context).selectSaveDirectory,
       );
@@ -79,12 +78,10 @@ class _SubtitleAdjustmentDialogState
         return;
       }
 
-      // 生成文件名
       final trackTitle = currentTrack.title;
       final audioNameWithoutExt =
           SubtitleLibraryService.removeAudioExtension(trackTitle);
 
-      // 获取导出内容
       final lyricController = ref.read(lyricControllerProvider.notifier);
       final lrcContent = lyricController.exportLyrics(format: 'lrc');
       final vttContent = lyricController.exportLyrics(format: 'vtt');
@@ -92,7 +89,6 @@ class _SubtitleAdjustmentDialogState
       if (lrcContent.isEmpty && vttContent.isEmpty) {            throw Exception(s.noSubtitleContentToSave);
       }
 
-      // 保存文件 (默认LRC格式)
       final filePath = path.join(selectedDirectory, '$audioNameWithoutExt.lrc');
       final file = File(filePath);
       await file.writeAsString(lrcContent);
@@ -123,7 +119,6 @@ class _SubtitleAdjustmentDialogState
         throw Exception(s.noAudioPlaying);
       }
 
-      // 获取字幕库目录
       final libraryDir =
           await SubtitleLibraryService.getSubtitleLibraryDirectory();
       final savedDir = Directory('${libraryDir.path}/${SubtitleLibraryService.savedFolderName}');
@@ -131,24 +126,20 @@ class _SubtitleAdjustmentDialogState
         await savedDir.create(recursive: true);
       }
 
-      // 生成文件名
       final trackTitle = currentTrack.title;
       final audioNameWithoutExt =
           SubtitleLibraryService.removeAudioExtension(trackTitle);
 
-      // 获取导出内容
       final lyricController = ref.read(lyricControllerProvider.notifier);
       final lrcContent = lyricController.exportLyrics(format: 'lrc');
 
       if (lrcContent.isEmpty) {            throw Exception(s.noSubtitleContentToSave);
       }
 
-      // 保存到字幕库
       final filePath = path.join(savedDir.path, '$audioNameWithoutExt.lrc');
       final file = File(filePath);
       await file.writeAsString(lrcContent);
 
-      // 局部刷新缓存以便字幕库更新该目录
       await SubtitleLibraryService.refreshDirectoryCache(savedDir.path);
 
       if (!mounted) return;
@@ -252,7 +243,6 @@ class _SubtitleAdjustmentDialogState
 
     return Stack(
       children: [
-        // 点击背景关闭
         Positioned.fill(
           child: GestureDetector(
             onTap: () => Navigator.pop(context),
@@ -296,7 +286,6 @@ class _SubtitleAdjustmentDialogState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 标题行
             Row(
               children: [
                 Icon(
@@ -313,7 +302,6 @@ class _SubtitleAdjustmentDialogState
                         ),
                   ),
                 ),
-                // 当前偏移显示
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -337,7 +325,6 @@ class _SubtitleAdjustmentDialogState
             ),
             const SizedBox(height: 20),
 
-            // 滑块调整
             Row(
               children: [
                 Icon(
@@ -368,7 +355,6 @@ class _SubtitleAdjustmentDialogState
             ),
             const SizedBox(height: 12),
 
-            // 快速调整按钮
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -407,7 +393,6 @@ class _SubtitleAdjustmentDialogState
             ),
             const SizedBox(height: 16),
 
-            // 操作按钮
             Row(
               children: [
                 Expanded(

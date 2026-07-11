@@ -105,7 +105,6 @@ class _MyScreenState extends ConsumerState<MyScreen>
         key: const ValueKey('downloads_badge'),
         stream: DownloadService.instance.tasksStream,
         builder: (context, snapshot) {
-          // Compute active count from stream data reactively.
           final tasks = snapshot.data ?? [];
           final activeCount = tasks.where((t) =>
               t.status == DownloadStatus.downloading ||
@@ -322,10 +321,6 @@ class _MyScreenState extends ConsumerState<MyScreen>
   }
 }
 
-// ═══════════════════════════════════════════════════
-// Profile Header Card
-// ═══════════════════════════════════════════════════
-
 class _ProfileHeaderCard extends ConsumerWidget {
   const _ProfileHeaderCard();
 
@@ -355,7 +350,6 @@ class _ProfileHeaderCard extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
-              // Avatar
               CircleAvatar(
                 radius: 22,
                 backgroundColor: colorScheme.primaryContainer,
@@ -371,7 +365,6 @@ class _ProfileHeaderCard extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              // Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -441,10 +434,6 @@ class _ProfileHeaderCard extends ConsumerWidget {
     return cleaned;
   }
 }
-
-// ═══════════════════════════════════════════════════
-// Empty State
-// ═══════════════════════════════════════════════════
 
 class _EmptyState extends StatelessWidget {
   final IconData icon;
@@ -520,10 +509,6 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════
-// Filter Toolbar — Animated Pill Chips
-// ═══════════════════════════════════════════════════
 
 class _FilterToolbar extends ConsumerWidget {
   const _FilterToolbar();
@@ -713,10 +698,6 @@ class _FilterToolbar extends ConsumerWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════
-// Content Area
-// ═══════════════════════════════════════════════════
-
 class _ContentArea extends ConsumerWidget {
   const _ContentArea();
 
@@ -763,12 +744,10 @@ class _ContentArea extends ConsumerWidget {
       );
     }
 
-    // Initial loading
     if (state.isLoading && state.works.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Empty state
     if (state.works.isEmpty && !state.isLoading) {
       return _EmptyState(
         icon: Icons.bookmark_border,
@@ -776,7 +755,6 @@ class _ContentArea extends ConsumerWidget {
         subtitle: 'Your marked works will appear here',
         actionLabel: S.of(context).search,
         onAction: () {
-          // Navigate to search — exploring content
         },
       );
     }

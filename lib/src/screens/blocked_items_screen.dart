@@ -167,7 +167,6 @@ class _AddItemDialogState extends ConsumerState<_AddItemDialog> {
       if (mounted) {
         setState(() {
           _suggestions = List<Map<String, dynamic>>.from(data);
-          // 按 count 字段从大到小排序
           _suggestions
               .sort((a, b) => (b['count'] ?? 0).compareTo(a['count'] ?? 0));
           _isLoading = false;
@@ -176,7 +175,6 @@ class _AddItemDialogState extends ConsumerState<_AddItemDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        // SnackBarUtil.showError(context, '加载建议列表失败: $e');
       }
     }
   }
@@ -241,7 +239,6 @@ class _AddItemDialogState extends ConsumerState<_AddItemDialog> {
                   },
                 fieldViewBuilder: (context, textEditingController, focusNode,
                     onFieldSubmitted) {
-                  // 同步控制器，以便在点击"添加"按钮时获取文本
                   textEditingController.addListener(() {
                     _controller.text = textEditingController.text;
                   });
@@ -273,8 +270,8 @@ class _AddItemDialogState extends ConsumerState<_AddItemDialog> {
                     child: Material(
                       elevation: 4.0,
                       child: SizedBox(
-                        width: 300, // 限制宽度
-                        height: 300, // 限制高度
+                        width: 300,
+                        height: 300,
                         child: ListView.builder(
                           padding: EdgeInsets.zero,
                           itemCount: options.length,
@@ -303,7 +300,6 @@ class _AddItemDialogState extends ConsumerState<_AddItemDialog> {
                 },
                 onSelected: (Map<String, dynamic> selection) {
                   _controller.text = selection['name'];
-                  // 选中后不自动提交，让用户确认
                 },
               ),
           ],

@@ -39,7 +39,6 @@ class _SmartPlaylistDetailScreenState
       ),
     );
     if (result == true && mounted) {
-      // Refresh the evaluator via the new playlist state
       final playlists = ref.read(smartPlaylistsProvider);
       final updated =
           playlists.where((p) => p.id == widget.playlist.id).firstOrNull;
@@ -213,5 +212,3 @@ class _SmartPlaylistDetailScreenState
     );
   }
 }
-
-

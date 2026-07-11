@@ -86,7 +86,6 @@ class TranslationService {
 
     final locale = await _getEffectiveLocale();
 
-    // 检查缓存
     final cachedTranslation =
         await _getCachedTranslation(text, sourceLang, locale);
     if (cachedTranslation != null) {
@@ -96,16 +95,13 @@ class TranslationService {
     final prefs = await SharedPreferences.getInstance();
     final selectedSource = prefs.getString('translation_source') ?? 'google';
 
-    // 构建尝试列表
     final sourcesToTry = <String>[selectedSource];
 
-    // 默认回退顺序
     final fallbackOrder = ['google', 'llm'];
 
     for (final source in fallbackOrder) {
       if (source == selectedSource) continue;
 
-      // 特殊检查 LLM
       if (source == 'llm') {
         const secureStorage = FlutterSecureStorage();
         final apiKey = await secureStorage.read(key: 'llm_api_key') ?? '';
@@ -122,7 +118,6 @@ class TranslationService {
           result = await _llmTranslator.translate(text,
               sourceLang: sourceLang, locale: locale);
         } else {
-          // Google 翻译
           final translation = await _googleTranslator.translate(
             text,
             from: sourceLang ?? 'auto',
@@ -131,22 +126,19 @@ class TranslationService {
           result = translation.text;
         }
 
-        // 如果成功且不是首选源，提示用户
         if (source != selectedSource) {
           _showFallbackNotification(source);
         }
 
-        // 缓存结果
         await _cacheTranslation(text, result, sourceLang, locale);
 
         return result;
       } catch (e) {
         _log.error('Translation error with $source: $e');
-        // 继续尝试下一个
       }
     }
 
-    return text; // 所有尝试都失败，返回原文
+    return text;
   }
 
   void _showFallbackNotification(String sourceName) {
@@ -171,7 +163,6 @@ class TranslationService {
       {String? sourceLang}) async {
     if (texts.isEmpty) return [];
 
-    // 获取并发设置
     final prefs = await SharedPreferences.getInstance();
     final source = prefs.getString('translation_source') ?? 'google';
     int concurrency = 1;
@@ -214,24 +205,19 @@ class TranslationService {
   }) async {
     if (text.isEmpty) return text;
 
-    // Google Translate 通过 URL 传参，URL 长度有限制
-    // 考虑到 URL 编码后长度会增加，保守设置为 1500 字符
     const maxChunkSize = 1500;
     final chunks = <String>[];
     final lines = text.split('\n');
 
     String currentChunk = '';
     for (final line in lines) {
-      // 预估加上换行符后的长度
       final estimatedLength = currentChunk.length + line.length + 1;
 
       if (estimatedLength > maxChunkSize && currentChunk.isNotEmpty) {
-        // 当前块已满，保存并开始新块
         chunks.add(currentChunk);
         currentChunk = '';
       }
 
-      // 如果单行就超过限制，按字符强制分割
       if (line.length > maxChunkSize) {
         if (currentChunk.isNotEmpty) {
           chunks.add(currentChunk);
@@ -244,18 +230,15 @@ class TranslationService {
           chunks.add(line.substring(i, endIndex));
         }
       } else {
-        // 正常情况，添加到当前块
         if (currentChunk.isNotEmpty) currentChunk += '\n';
         currentChunk += line;
       }
     }
 
-    // 添加最后一块
     if (currentChunk.isNotEmpty) {
       chunks.add(currentChunk);
     }
 
-    // 获取并发设置
     final prefs = await SharedPreferences.getInstance();
     final source = prefs.getString('translation_source') ?? 'google';
     int concurrency = 1;
@@ -263,7 +246,6 @@ class TranslationService {
       concurrency = prefs.getInt('llm_settings_concurrency') ?? 3;
     }
 
-    // 并发翻译
     final results = List<String>.filled(chunks.length, '');
     int currentIndex = 0;
     int completedCount = 0;
@@ -303,7 +285,6 @@ class TranslationService {
       final cached = prefs.getString(key);
       if (cached != null) {
         final data = json.decode(cached);
-        // 缓存7天有效
         final timestamp = data['timestamp'] as int;
         if (DateTime.now().millisecondsSinceEpoch - timestamp <
             7 * 24 * 60 * 60 * 1000) {

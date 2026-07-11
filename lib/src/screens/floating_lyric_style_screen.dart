@@ -22,31 +22,24 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 预览卡片
           _buildPreviewCard(context, style, colorScheme, textTheme),
           const SizedBox(height: 24),
 
-          // 预设样式
           _buildPresetsCard(context, ref, colorScheme, textTheme),
           const SizedBox(height: 24),
 
-          // 字体大小
           _buildFontSizeCard(context, ref, style, colorScheme, textTheme),
           const SizedBox(height: 16),
 
-          // 不透明度
           _buildOpacityCard(context, ref, style, colorScheme, textTheme),
           const SizedBox(height: 16),
 
-          // 颜色设置
           _buildColorsCard(context, ref, style, colorScheme, textTheme),
           const SizedBox(height: 16),
 
-          // 圆角和内边距
           _buildShapeCard(context, ref, style, colorScheme, textTheme),
           const SizedBox(height: 16),
 
-          // 重置按钮
           _buildResetButton(context, ref),
           const SizedBox(height: 32),
         ],
@@ -234,7 +227,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
               style.textColor,
               [
                 Colors.white,
-                const Color(0xFF212121), // 黑色，用于极简预设
+                const Color(0xFF212121),
                 const Color(0xFFE3F2FD),
                 const Color(0xFFFFF9C4),
                 const Color(0xFFFFCDD2),
@@ -255,7 +248,7 @@ class FloatingLyricStyleScreen extends ConsumerWidget {
               style.backgroundColor,
               [
                 Colors.black,
-                Colors.white, // 白色，用于极简预设
+                Colors.white,
                 const Color(0xFF1A237E),
                 const Color(0xFF0D47A1),
                 const Color(0xFF1B5E20),

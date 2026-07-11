@@ -3,9 +3,6 @@ import 'package:kikoeru_flutter/src/services/kikoeru_api_service.dart';
 import 'package:kikoeru_flutter/src/utils/server_utils.dart';
 
 void main() {
-  // ============================================================
-  // KikoeruApiException
-  // ============================================================
   group('KikoeruApiException', () {
     test('toString includes message', () {
       final exc = KikoeruApiException('Network error', 'timeout');
@@ -18,9 +15,6 @@ void main() {
     });
   });
 
-  // ============================================================
-  // KikoeruApiService — Host Normalization
-  // ============================================================
   group('Host Normalization', () {
     test('static constants are defined', () {
       expect(KikoeruApiService.remoteHost, isNotEmpty);
@@ -33,14 +27,8 @@ void main() {
     });
   });
 
-  // ============================================================
-  // KikoeruApiService — URL Construction
-  // ============================================================
   group('URL Construction', () {
     test('getDownloadUrl constructs correct URL', () {
-      // Note: getDownloadUrl uses _host which is set via init()
-      // We can verify the URL pattern without mocking Dio
-      // by checking the method signature and return type
       expect(KikoeruApiService().getDownloadUrl('hash123', 'file.mp3'),
           endsWith('/api/media/download/hash123/file.mp3'));
     });
@@ -66,9 +54,6 @@ void main() {
     });
   });
 
-  // ============================================================
-  // KikoeruApiService — Configuration Setters
-  // ============================================================
   group('Configuration', () {
     late KikoeruApiService service;
 
@@ -79,11 +64,8 @@ void main() {
     test('setOrder toggles sort when same order', () {
       service.init('test_token', 'example.com');
 
-      // First call: sets order and default sort (desc)
       service.setOrder('create_date');
-      // Second call with same order: toggles sort to asc
       service.setOrder('create_date');
-      // Third call with same order: toggles sort back to desc
       service.setOrder('create_date');
     });
 
@@ -91,7 +73,6 @@ void main() {
       service.init('test_token', 'example.com');
 
       service.setOrder('create_date');
-      // This should set order to 'dl_count' without toggling sort
       service.setOrder('dl_count');
     });
 
@@ -101,9 +82,6 @@ void main() {
     });
   });
 
-  // ============================================================
-  // KikoeruApiService — _fetchCombinedPages Logic
-  // ============================================================
   group('_fetchCombinedPages Logic', () {
     late KikoeruApiService service;
 

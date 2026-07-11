@@ -25,13 +25,11 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   Future<void> _exportBackup() async {
     final s = sLoc(context);
 
-    // Pick destination directory
     String? outputDir = await _pickDirectory(
       dialogTitle: s.backupSelectExportDir,
     );
     if (outputDir == null || !mounted) return;
 
-    // Build filename with timestamp
     final timestamp = DateTime.now()
         .toIso8601String()
         .replaceAll(':', '-')
@@ -46,7 +44,6 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
 
       if (!mounted) return;
 
-      // Show estimated file size
       final file = File(destPath);
       final sizeStr = _formatFileSize(await file.length());
 
@@ -66,7 +63,6 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
   Future<void> _importBackup() async {
     final s = sLoc(context);
 
-    // Pick backup file using custom file picker
     final filePath = await CustomFilePicker.pickFile(
       context: context,
       title: s.backupSelectImportFile,
@@ -74,7 +70,6 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     );
     if (filePath == null || !mounted) return;
 
-    // Confirm restore
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -100,7 +95,6 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
 
       if (!mounted) return;
 
-      // Show success message with any warnings
       final buffer = StringBuffer(s.backupRestoreSuccess);
       if (warnings.isNotEmpty) {
         buffer.write('\n\n');
@@ -150,7 +144,6 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
             onPressed: () {
               Navigator.of(ctx).pop();
               if (dismissLabel != null) {
-                // User chose to restart — show a restart suggestion
                 _showRestartPrompt();
               }
             },
@@ -218,7 +211,6 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ── Info card ──
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -238,7 +230,6 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
           ),
           const SizedBox(height: 24),
 
-          // ── Export section ──
           _SectionHeader(
             icon: Icons.file_download_outlined,
             title: s.backupExportTitle,
@@ -268,7 +259,6 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
           ),
           const SizedBox(height: 24),
 
-          // ── Import section ──
           _SectionHeader(
             icon: Icons.file_upload_outlined,
             title: s.backupRestoreTitle,
@@ -298,7 +288,6 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
           ),
           const SizedBox(height: 24),
 
-          // ── Data summary ──
           _SectionHeader(
             icon: Icons.storage_outlined,
             title: s.backupDataIncluded,

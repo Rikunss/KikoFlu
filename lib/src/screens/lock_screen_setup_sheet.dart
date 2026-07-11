@@ -130,7 +130,6 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
     setState(() {
       _isConfirming = true;
     });
-    // Use addPostFrameCallback so FocusNode's TextField is guaranteed built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _confirmFocusNodes[0].requestFocus();
@@ -156,7 +155,6 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
       return;
     }
 
-    // PINs match — save and enable
     _saveAndFinish(pin);
   }
 
@@ -259,7 +257,6 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Drag handle
               Container(
                 width: 32,
                 height: 4,
@@ -270,7 +267,6 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
                 ),
               ),
 
-              // Icon
               Container(
                 width: 64,
                 height: 64,
@@ -286,7 +282,6 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
               ),
               const SizedBox(height: 16),
 
-              // Title
               Text(
                 widget.changePin ? s.appLockChangePin : s.appLockSetupTitle,
                 style: tt.titleLarge?.copyWith(
@@ -295,7 +290,6 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
               ),
               const SizedBox(height: 4),
 
-              // Subtitle
               Text(
                 widget.changePin
                     ? s.appLockChangePinSubtitle
@@ -310,7 +304,6 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
 
               const SizedBox(height: 28),
 
-              // PIN length selector (only at setup, not confirm)
               if (!_isConfirming && !widget.changePin)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -324,7 +317,6 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
               if (!_isConfirming && !widget.changePin)
                 const SizedBox(height: 20),
 
-              // Error
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -349,7 +341,6 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
                   ),
                 ),
 
-              // PIN fields
               _buildPinFields(
                 _isConfirming ? _confirmDigits : _pinDigits,
                 _isConfirming ? _confirmControllers : _pinControllers,
@@ -357,7 +348,6 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
                 _isConfirming,
               ),
 
-              // Biometric toggle (only on initial setup)
               if (!widget.changePin && !_isConfirming && _canUseBiometric)
                 Padding(
                   padding: const EdgeInsets.only(top: 24),
@@ -378,7 +368,6 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
                   ),
                 ),
 
-              // Back / Confirm / Cancel buttons
               Padding(
                 padding: const EdgeInsets.only(top: 24),
                 child: Row(
@@ -430,7 +419,6 @@ class _LockScreenSetupSheetState extends State<LockScreenSetupSheet> {
       onTap: () {
         setState(() {
           _pinLength = length;
-          // Clear current digits
           for (var i = 0; i < 6; i++) {
             _pinDigits[i] = '';
             _pinControllers[i].text = '';

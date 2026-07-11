@@ -20,8 +20,8 @@ enum AiDownloadStatus { idle, downloading, paused, completed, failed }
 /// survives an app restart.
 class AiDownloadState {
   final AiDownloadStatus status;
-  final String? modelName;          // whisper_ggml_plus name, e.g. "large-v3-turbo"
-  final String? modelDisplayName;   // human label, e.g. "Large V3 Turbo"
+  final String? modelName;
+  final String? modelDisplayName;
   final int receivedBytes;
   final int totalBytes;
   final String? errorMessage;
@@ -84,14 +84,12 @@ class AiDownloadNotifier extends StateNotifier<AiDownloadState> {
     _loadPersistedState();
   }
 
-  // ── Persistence keys ──────────────────────────────────────────────
   static const String _kModel = 'ai_down_model';
   static const String _kDisplay = 'ai_down_display';
   static const String _kReceived = 'ai_down_received';
   static const String _kTotal = 'ai_down_total';
   static const String _kStatus = 'ai_down_status';
 
-  // ── Control flags ─────────────────────────────────────────────────
   bool _pauseRequested = false;
   bool _cancelRequested = false;
 
@@ -113,8 +111,6 @@ class AiDownloadNotifier extends StateNotifier<AiDownloadState> {
 
   void _acknowledgePause() => _pauseRequested = false;
   void _acknowledgeCancel() => _cancelRequested = false;
-
-  // ── Progress updates ──────────────────────────────────────────────
 
   void updateProgress({
     required AiDownloadStatus status,
@@ -170,8 +166,6 @@ class AiDownloadNotifier extends StateNotifier<AiDownloadState> {
     _acknowledgeCancel();
     _clearPersisted();
   }
-
-  // ── Persistence helpers ───────────────────────────────────────────
 
   Future<void> _persist() async {
     try {

@@ -19,13 +19,10 @@ class AccountDatabase {
   Future<Database> _initDB(String filePath) async {
     final String dbPath;
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      // For desktop platforms, use application documents directory
       final appDocDir = await getApplicationDocumentsDirectory();
       dbPath = join(appDocDir.path, 'KikoFlu');
-      // Create directory if it doesn't exist
       await Directory(dbPath).create(recursive: true);
     } else {
-      // For mobile platforms, use default path
       dbPath = await getDatabasesPath();
     }
     final path = join(dbPath, filePath);
@@ -65,7 +62,6 @@ class AccountDatabase {
 
     late final int id;
     await db.transaction((txn) async {
-      // Deactivate all other accounts if this one is active
       if (account.isActive) {
         await txn.update(
           'accounts',
@@ -126,7 +122,6 @@ class AccountDatabase {
 
     late final int result;
     await db.transaction((txn) async {
-      // If setting this account as active, deactivate others
       if (account.isActive) {
         await txn.update(
           'accounts',
@@ -160,10 +155,8 @@ class AccountDatabase {
 
     late final int result;
     await db.transaction((txn) async {
-      // Deactivate all accounts
       await txn.update('accounts', {'isActive': 0});
 
-      // Activate the selected account and update lastUsedAt
       result = await txn.update(
         'accounts',
         {

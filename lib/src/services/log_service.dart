@@ -36,7 +36,7 @@ class LogTag {
 
   /// Check if a log entry's tag matches this category.
   bool matches(String? entryTag) {
-    if (name.isEmpty) return true; // 'All' matches everything
+    if (name.isEmpty) return true;
     if (entryTag == null) return false;
     return entryTag.toUpperCase() == name.toUpperCase();
   }
@@ -88,9 +88,9 @@ class LogService {
   final Queue<LogEntry> _logs = Queue<LogEntry>();
   static const int _maxLogs = 1000;
   static const int _maxMessageLength = 500;
-  static const int _maxFileSize = 5 * 1024 * 1024; // 5MB
-  static const int _bufferSize = 10; // Flush after this many entries
-  static const Duration _flushInterval = Duration(seconds: 2); // Or every 2s
+  static const int _maxFileSize = 5 * 1024 * 1024;
+  static const int _bufferSize = 10;
+  static const Duration _flushInterval = Duration(seconds: 2);
   final _controller = StreamController<LogEntry>.broadcast();
 
   Stream<LogEntry> get logStream => _controller.stream;
@@ -106,7 +106,6 @@ class LogService {
     if (_initialized) return;
     _initialized = true;
 
-    // Set up log file for persistent storage
     try {
       final dir = await getApplicationDocumentsDirectory();
       final logDir = Directory(p.join(dir.path, 'logs'));
@@ -115,7 +114,6 @@ class LogService {
       }
       _logFile = File(p.join(logDir.path, 'app.log'));
 
-      // Rotate if file is too large
       if (await _logFile!.exists()) {
         final length = await _logFile!.length();
         if (length > _maxFileSize) {
@@ -125,17 +123,13 @@ class LogService {
         }
       }
     } catch (e) {
-      // Intentionally not using LogService here to avoid recursion;
-      // any failures during log initialization are non-critical.
       debugPrint('[LogService] Init error: $e');
     }
 
-    // Start periodic flush timer
     _flushTimer = Timer.periodic(_flushInterval, (_) => _flushBuffer());
   }
 
   void _addEntry(LogEntry entry) {
-    // Truncate long messages
     final truncated = entry.message.length > _maxMessageLength
         ? LogEntry(
             timestamp: entry.timestamp,
@@ -150,7 +144,6 @@ class LogService {
       _logs.removeFirst();
     }
 
-    // Buffer for batch file write
     _writeBuffer.add(truncated);
     if (_writeBuffer.length >= _bufferSize) {
       _flushBuffer();
@@ -170,7 +163,6 @@ class LogService {
     }
 
     try {
-      // Rotate if file is too large
       if (await file.exists()) {
         final length = await file.length();
         if (length > _maxFileSize) {
@@ -181,14 +173,12 @@ class LogService {
         }
       }
 
-      // Batch write all buffered entries
       final buffer = StringBuffer();
       while (_writeBuffer.isNotEmpty) {
         buffer.writeln(_writeBuffer.removeFirst().format());
       }
       await file.writeAsString(buffer.toString(), mode: FileMode.append);
     } catch (e) {
-      // Avoid LogService recursion — use debugPrint for internal failures.
       debugPrint('[LogService] File write error: $e');
     }
   }

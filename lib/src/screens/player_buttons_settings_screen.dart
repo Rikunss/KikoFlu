@@ -25,7 +25,6 @@ class _PlayerButtonsSettingsScreenState
   @override
   void initState() {
     super.initState();
-    // 从provider初始化
     final config = _isDesktop
         ? ref.read(playerButtonsConfigDesktopProvider)
         : ref.read(playerButtonsConfigMobileProvider);
@@ -142,7 +141,6 @@ class _PlayerButtonsSettingsScreenState
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // 说明卡片
                 Card(
                   margin: const EdgeInsets.all(16),
                   child: Padding(
@@ -178,7 +176,6 @@ class _PlayerButtonsSettingsScreenState
                     ),
                   ),
                 ),
-                // 按钮列表
                 Expanded(
                   child: ReorderableListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -233,7 +230,6 @@ class _PlayerButtonsSettingsScreenState
                     },
                   ),
                 ),
-                // 保存按钮
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.all(16),

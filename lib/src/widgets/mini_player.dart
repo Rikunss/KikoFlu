@@ -34,7 +34,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     final currentTrack = ref.watch(currentTrackProvider);
     final isPlaying = ref.watch(isPlayingProvider);
     final isTrackLoading = ref.watch(isTrackLoadingProvider).valueOrNull ?? false;
-    // .select() agar miniplayer tidak rebuild saat seluruh auth state berubah
     final host = ref.watch(authProvider.select((s) => s.host ?? ''));
     final token = ref.watch(authProvider.select((s) => s.token ?? ''));
     final isMiniPlayerVisible = ref.watch(miniPlayerVisibilityProvider);
@@ -61,7 +60,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
           return const SizedBox.shrink();
         }
 
-        // Build work cover URL
         String? workCoverUrl;
         if (track.artworkUrl != null &&
             track.artworkUrl!.startsWith('file://')) {
@@ -100,10 +98,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
               final tt = Theme.of(context).textTheme;
               final dividerColor = cs.outline.withValues(alpha: 0.15);
 
-              // Listener (not GestureDetector!) to detect UPWARD swipes
-              // for opening the fullscreen player. Listener doesn't
-              // participate in the gesture arena, so it won't conflict
-              // with Dismissible's vertical drag recognizer.
               return Listener(
                 onPointerDown: (event) => _swipeStart = event,
                 onPointerUp: (event) {
@@ -125,15 +119,12 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // ── Thin progress bar at the top (extracted widget) ──
                     const _MiniProgressBar(),
 
-                    // ── Content row: artwork + info | controls ──
                     SizedBox(
                       height: shouldShowLyric ? 82 : 66,
                       child: Row(
                         children: [
-                          // Left: artwork + info → tap opens full player
                           Expanded(
                             child: GestureDetector(
                               behavior: HitTestBehavior.opaque,
@@ -148,7 +139,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                               child: Row(
                                 children: [
                                   const SizedBox(width: 8),
-                                  // Album art
                                   _buildArtwork(
                                     context,
                                     track,
@@ -156,7 +146,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                                     token: token,
                                   ),
                                   const SizedBox(width: 10),
-                                  // Track info
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -183,7 +172,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ],
-                                        // Audio format pills + output device (compact)
                                         const Padding(
                                           padding: EdgeInsets.only(top: 1),
                                           child: Row(
@@ -194,7 +182,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                                             ],
                                           ),
                                         ),
-                                        // Lyric line (compact, below artist/pills)
                                         if (shouldShowLyric)
                                           Padding(
                                             padding:
@@ -216,7 +203,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                               ),
                             ),
                           ),
-                          // Controls
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -332,7 +318,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                       ),
                     ),
 
-                    // ── Divider line to separate from nav ──
                     Divider(height: 0, thickness: 0.5, color: dividerColor),
                   ],
                 ),
@@ -490,7 +475,6 @@ class _MiniOutputDevicePillState extends ConsumerState<_MiniOutputDevicePill>
     final deviceTypeAsync = ref.watch(activeOutputDeviceProvider);
     return deviceTypeAsync.when(
       data: (type) {
-        // Trigger brief glow on device type change (skip initial mount)
         if (type != _lastDeviceType && _lastDeviceType.isNotEmpty && mounted) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) _glowCtrl.forward(from: 0.0);

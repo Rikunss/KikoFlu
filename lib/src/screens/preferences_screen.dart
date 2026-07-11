@@ -149,9 +149,9 @@ class PreferencesScreen extends ConsumerWidget {
                             ),
                             TextButton(
                               onPressed: () async {
-                                Navigator.pop(context); // Close alert dialog
+                                Navigator.pop(context);
                                 Navigator.pop(
-                                    context); // Close source selection dialog
+                                    context);
                                 await Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (context) =>
@@ -159,7 +159,6 @@ class PreferencesScreen extends ConsumerWidget {
                                   ),
                                 );
 
-                                // Check if configured successfully
                                 final newSettings =
                                     ref.read(llmSettingsProvider);
                                 if (newSettings.apiKey.isNotEmpty) {
@@ -350,7 +349,6 @@ class PreferencesScreen extends ConsumerWidget {
                     }
                   },
                 ),
-                // 仅在 Android, Windows 和 macOS 平台上显示音频直通设置
                 if (platform == TargetPlatform.android ||
                     platform == TargetPlatform.windows ||
                     platform == TargetPlatform.macOS) ...[
@@ -412,10 +410,8 @@ class PreferencesScreen extends ConsumerWidget {
               ],
             ),
           ),
-          // Equalizer settings
           const SizedBox(height: 16),
           _buildEqualizerCard(context, ref, colorScheme),
-          // Crossfade settings
           const SizedBox(height: 16),
           _buildCrossfadeCard(context, ref, colorScheme, textTheme),
         ],
@@ -484,7 +480,7 @@ class PreferencesScreen extends ConsumerWidget {
             ),
             value: crossfadeEnabled,
             onChanged: (value) {
-              final newMs = value ? 3000 : 0; // Default 3 seconds when enabled
+              final newMs = value ? 3000 : 0;
               ref.read(crossfadeDurationProvider.notifier).updateDuration(newMs);
               ref.read(audioPlayerControllerProvider.notifier).setCrossfadeDuration(
                 Duration(milliseconds: newMs),
@@ -528,7 +524,7 @@ class PreferencesScreen extends ConsumerWidget {
                     value: crossfadeMs.toDouble(),
                     min: 500,
                     max: 10000,
-                    divisions: 19, // 500ms steps
+                    divisions: 19,
                     label: crossfadeMs >= 1000
                         ? '${(crossfadeMs / 1000).toStringAsFixed(1)}s'
                         : '${crossfadeMs}ms',

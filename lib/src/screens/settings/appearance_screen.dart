@@ -36,19 +36,15 @@ class AppearanceScreen extends ConsumerWidget {
                   children: [
                     const SizedBox(height: 8),
 
-                    // ── Theme Section ──
                     _buildThemeSection(context, ref, s),
                     const SizedBox(height: 16),
 
-                    // ── Language Section ──
                     _buildLanguageCard(context, ref, s),
                     const SizedBox(height: 16),
 
-                    // ── Player Controls Section ──
                     _buildPlayerControlsCard(context, ref, s),
                     const SizedBox(height: 16),
 
-                    // ── Display Settings Section ──
                     _buildDisplayCard(context, ref, s),
                     const SizedBox(height: 32),
                   ],
@@ -61,17 +57,12 @@ class AppearanceScreen extends ConsumerWidget {
     );
   }
 
-  // ──────────────────────────────────────────────
-  // Theme Section
-  // ──────────────────────────────────────────────
-
   Widget _buildThemeSection(BuildContext context, WidgetRef ref, S s) {
     final themeSettings = ref.watch(themeSettingsProvider);
     final theme = Theme.of(context);
 
     return Column(
       children: [
-        // Theme Mode — SegmentedButton
         Card(
           elevation: 0,
           color: theme.colorScheme.surfaceContainerLow,
@@ -130,7 +121,6 @@ class AppearanceScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 8),
-        // Color Scheme — color swatches
         Card(
           elevation: 0,
           color: theme.colorScheme.surfaceContainerLow,
@@ -377,10 +367,6 @@ class AppearanceScreen extends ConsumerWidget {
     );
   }
 
-  // ──────────────────────────────────────────────
-  // Language Card
-  // ──────────────────────────────────────────────
-
   Widget _buildLanguageCard(BuildContext context, WidgetRef ref, S s) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -473,10 +459,6 @@ class AppearanceScreen extends ConsumerWidget {
     );
   }
 
-  // ──────────────────────────────────────────────
-  // Player Controls Card
-  // ──────────────────────────────────────────────
-
   Widget _buildPlayerControlsCard(BuildContext context, WidgetRef ref, S s) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -535,10 +517,6 @@ class AppearanceScreen extends ConsumerWidget {
           ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Display Settings Card
-  // ──────────────────────────────────────────────
 
   Widget _buildDisplayCard(BuildContext context, WidgetRef ref, S s) {
     final theme = Theme.of(context);

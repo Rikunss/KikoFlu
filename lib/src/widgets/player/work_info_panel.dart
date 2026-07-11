@@ -23,11 +23,9 @@ Future<void> showWorkInfoPanel(
   WidgetRef ref,
   AudioTrack currentTrack,
 ) async {
-  // Fetch the full work data
   final Work? work = await _fetchWork(ref, currentTrack.workId);
   if (!context.mounted || work == null) return;
 
-  // Fetch tracks (file tree)
   final List<dynamic> workTracks = await _fetchWorkTracks(ref, currentTrack.workId);
   if (!context.mounted) return;
 
@@ -101,7 +99,6 @@ Future<AudioTrack> _buildTrack(
 
   String audioUrl = '';
 
-  // 1. Local download
   if (hash != null) {
     final localPath = await downloadService.getDownloadedFilePath(work.id, hash);
     if (localPath != null) {
@@ -109,7 +106,6 @@ Future<AudioTrack> _buildTrack(
     }
   }
 
-  // 2. Cache
   if (audioUrl.isEmpty && hash != null) {
     final cachedPath = await CacheService.getCachedAudioFile(hash);
     if (cachedPath != null) {
@@ -117,7 +113,6 @@ Future<AudioTrack> _buildTrack(
     }
   }
 
-  // 3. Network
   if (audioUrl.isEmpty) {
     var mediaUrl = file['mediaDownloadUrl'] as String? ?? '';
     if (mediaUrl.isEmpty) {
@@ -170,10 +165,6 @@ String? _buildCoverUrl(String host, String token, int? workId) {
       : '$normalized/api/cover/$workId';
 }
 
-// ======================================================================
-// Work Info Panel StatefulWidget
-// ======================================================================
-
 class _WorkInfoPanel extends ConsumerStatefulWidget {
   final Work work;
   final AudioTrack currentTrack;
@@ -223,7 +214,7 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
     final startIndex = tracks.indexWhere((t) => t.id == track.id);
     if (startIndex >= 0) {
       if (mounted) {
-        Navigator.pop(context); // close the panel
+        Navigator.pop(context);
       }
       ref.read(audioPlayerControllerProvider.notifier).playTracks(
         tracks,
@@ -279,7 +270,6 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
           ),
           child: Column(
             children: [
-              // Drag handle
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 4),
                 child: Center(
@@ -293,7 +283,6 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                   ),
                 ),
               ),
-              // Header
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Row(
@@ -318,17 +307,14 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                 ),
               ),
               const Divider(height: 1),
-              // Scrollable content
               Expanded(
                 child: ListView(
                   controller: scrollController,
                   padding: const EdgeInsets.only(top: 8, bottom: 24),
                   children: [
-                    // ── Work Info Card ──
                     _buildWorkInfoCard(cs, s),
                     const SizedBox(height: 12),
 
-                    // ── Voice Actors ──
                     if (widget.work.vas != null && widget.work.vas!.isNotEmpty) ...[
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -358,7 +344,6 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                       const SizedBox(height: 12),
                     ],
 
-                    // ── Tags ──
                     if (widget.work.tags != null && widget.work.tags!.isNotEmpty) ...[
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -388,7 +373,6 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                       const SizedBox(height: 12),
                     ],
 
-                    // ── Description ──
                     if (widget.work.description != null && widget.work.description!.isNotEmpty) ...[
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -416,7 +400,6 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                       const SizedBox(height: 16),
                     ],
 
-                    // ── Divider ──
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
@@ -433,7 +416,6 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                     ),
                     const SizedBox(height: 4),
 
-                    // ── Track List ──
                     FutureBuilder<List<AudioTrack>>(
                       future: _tracksFuture,
                       builder: (context, snapshot) {
@@ -483,7 +465,6 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                                 ),
                                 child: Row(
                                   children: [
-                                    // Track number
                                     SizedBox(
                                       width: 24,
                                       child: isCurrent
@@ -494,10 +475,8 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                                             ),
                                     ),
                                     const SizedBox(width: 8),
-                                    // Format icon
                                     Icon(_formatFileIcon(track.title), size: 18, color: _formatColor(track.title)),
                                     const SizedBox(width: 8),
-                                    // Title + codec
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -520,14 +499,12 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                                         ],
                                       ),
                                     ),
-                                    // Duration
                                     if (track.duration != null)
                                       Text(
                                         '${track.duration!.inMinutes}:${(track.duration!.inSeconds % 60).toString().padLeft(2, '0')}',
                                         style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                                       ),
                                     const SizedBox(width: 4),
-                                    // Play button
                                     if (!isCurrent)
                                       Icon(Icons.play_circle_outline, size: 20, color: cs.primary)
                                     else
@@ -570,7 +547,6 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              // Mini cover
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: SizedBox(
@@ -580,7 +556,6 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                 ),
               ),
               const SizedBox(width: 12),
-              // Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,7 +578,6 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        // Rating
                         if (work.rateAverage != null && work.rateAverage! > 0) ...[
                           const Icon(Icons.star, size: 14, color: Colors.amber),
                           const SizedBox(width: 2),
@@ -620,7 +594,6 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
                           ],
                           const SizedBox(width: 8),
                         ],
-                        // Duration
                         if (work.duration != null && work.duration! > 0) ...[
                           Icon(Icons.access_time, size: 12, color: cs.onSurfaceVariant),
                           const SizedBox(width: 2),

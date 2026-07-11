@@ -63,7 +63,6 @@ class _CommonSortDialogState extends State<CommonSortDialog> {
         MediaQuery.orientationOf(context) == Orientation.landscape;
     final options = widget.availableOptions ?? SortOrder.values;
 
-    // 横屏时使用两列布局
     if (isLandscape) {
       return ResponsiveAlertDialog(
         title: Row(
@@ -83,7 +82,6 @@ class _CommonSortDialogState extends State<CommonSortDialog> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 左列：排序字段
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -127,7 +125,6 @@ class _CommonSortDialogState extends State<CommonSortDialog> {
                 ),
               ),
               const VerticalDivider(width: 1),
-              // 右列：排序方向
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -184,14 +181,12 @@ class _CommonSortDialogState extends State<CommonSortDialog> {
       );
     }
 
-    // 竖屏时使用单列布局
     return ResponsiveAlertDialog(
       title: Text(widget.title),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 排序字段选择
             Text(
               S.of(context).sortField,
               style: const TextStyle(fontWeight: FontWeight.bold),
@@ -216,7 +211,6 @@ class _CommonSortDialogState extends State<CommonSortDialog> {
               ),
             ),
             const Divider(),
-            // 排序方向选择
             Text(
               S.of(context).sortDirection,
               style: const TextStyle(fontWeight: FontWeight.bold),

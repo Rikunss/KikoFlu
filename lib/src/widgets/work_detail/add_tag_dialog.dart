@@ -53,7 +53,6 @@ class _AddTagDialogState extends ConsumerState<AddTagDialog> {
       if (mounted) {
         setState(() {
           _allTags = List<Map<String, dynamic>>.from(data);
-          // 按 count 字段从大到小排序
           _allTags.sort((a, b) => (b['count'] ?? 0).compareTo(a['count'] ?? 0));
           _filteredTags = _allTags;
           _isLoading = false;
@@ -136,7 +135,6 @@ class _AddTagDialogState extends ConsumerState<AddTagDialog> {
 
         String errorMessage = S.of(context).addTagFailed(e.toString());
 
-        // 检查是否需要绑定邮箱
         if (e.toString().contains('Must bind email first') ||
             e.toString().contains('vote.mustBindEmailFirst')) {
           errorMessage = S.of(context).bindEmailFirst;
@@ -155,7 +153,6 @@ class _AddTagDialogState extends ConsumerState<AddTagDialog> {
 
   @override
   Widget build(BuildContext context) {
-    // 获取已存在的标签ID集合
     final existingTagIds = widget.existingTags.map((tag) => tag.id).toSet();
 
     return ResponsiveAlertDialog(
@@ -165,7 +162,6 @@ class _AddTagDialogState extends ConsumerState<AddTagDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 搜索框
             TextField(
               controller: _searchController,
               decoration: InputDecoration(
@@ -182,7 +178,6 @@ class _AddTagDialogState extends ConsumerState<AddTagDialog> {
             ),
             const SizedBox(height: 16),
 
-            // 已选择的标签
             if (_selectedTagIds.isNotEmpty) ...[
               Align(
                 alignment: Alignment.centerLeft,
@@ -219,7 +214,6 @@ class _AddTagDialogState extends ConsumerState<AddTagDialog> {
               const SizedBox(height: 16),
             ],
 
-            // 标签列表
             if (_isLoading)
               const Center(
                 child: Padding(

@@ -27,7 +27,6 @@ class WorkBookmarkManager {
     required Function(String? newProgress, int? newRating) onChanged,
     String? workTitle,
   }) async {
-    // Capture all labels before any async gap to avoid use_build_context_synchronously.
     final markWorkLabel = S.of(context).markWork;
     final bookmarkRemovedLabel = S.of(context).bookmarkRemoved;
     final updatedLabel = S.of(context).updated;
@@ -65,7 +64,6 @@ class WorkBookmarkManager {
         final newProgress = result['progress'];
         final newRating = result['rating'];
 
-        // Resolve progress label while context is still mounted.
         String? filterLabel;
         if (newProgress != null) {
           filterLabel = ReviewProgressDialog.getProgressLabel(newProgress, context);

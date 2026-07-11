@@ -40,31 +40,24 @@ class PlaybackScreen extends ConsumerWidget {
                   children: [
                     const SizedBox(height: 8),
 
-                    // ── Equalizer Section ──
                     _buildEqualizerCard(context, ref, s),
                     const SizedBox(height: 16),
 
-                    // ── Crossfade & Gapless Section ──
                     _buildCrossfadeCard(context, ref, s),
                     const SizedBox(height: 16),
 
-                    // ── ReplayGain Section ──
                     _buildReplayGainCard(context, ref, s),
                     const SizedBox(height: 16),
 
-                    // ── Audio Format Priority Section ──
                     _buildAudioFormatCard(context, ref, s),
                     const SizedBox(height: 16),
 
-                    // ── Preferred Sample Rate Section ──
                     _buildSampleRateCard(context, ref, s),
                     const SizedBox(height: 16),
 
-                    // ── USB DAC (Beta) Section ──
                     _buildUsbDacCard(context, ref, s),
                     const SizedBox(height: 16),
 
-                    // ── Audio Passthrough Section ──
                     _buildPassthroughCard(context, ref, s),
                     const SizedBox(height: 32),
                   ],
@@ -76,10 +69,6 @@ class PlaybackScreen extends ConsumerWidget {
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Equalizer Card
-  // ──────────────────────────────────────────────
 
   Widget _buildEqualizerCard(BuildContext context, WidgetRef ref, S s) {
     final eqEnabled = ref.watch(equalizerEnabledProvider);
@@ -133,10 +122,6 @@ class PlaybackScreen extends ConsumerWidget {
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Crossfade & Gapless Card
-  // ──────────────────────────────────────────────
 
   Widget _buildCrossfadeCard(BuildContext context, WidgetRef ref, S s) {
     final crossfadeMs = ref.watch(crossfadeDurationProvider);
@@ -194,7 +179,6 @@ class PlaybackScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Duration label + value
                   Row(
                     children: [
                       Text(
@@ -226,7 +210,6 @@ class PlaybackScreen extends ConsumerWidget {
                           );
                     },
                   ),
-                  // Min / Max labels
                   Row(
                     children: [
                       Text(
@@ -245,7 +228,6 @@ class PlaybackScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Info banner
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -287,10 +269,6 @@ class PlaybackScreen extends ConsumerWidget {
     }
     return '${ms}ms';
   }
-
-  // ──────────────────────────────────────────────
-  // ReplayGain Card
-  // ──────────────────────────────────────────────
 
   Widget _buildReplayGainCard(BuildContext context, WidgetRef ref, S s) {
     final rgSettings = ref.watch(replayGainSettingsProvider);
@@ -343,7 +321,6 @@ class PlaybackScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Pre-amp label + value
                   Row(
                     children: [
                       Text(
@@ -374,7 +351,7 @@ class PlaybackScreen extends ConsumerWidget {
                     value: rgSettings.preampDb,
                     min: -12.0,
                     max: 12.0,
-                    divisions: 48, // 0.5 dB steps
+                    divisions: 48,
                     label: '${rgSettings.preampDb.toStringAsFixed(1)} dB',
                     onChanged: (value) {
                       ref
@@ -384,7 +361,6 @@ class PlaybackScreen extends ConsumerWidget {
                       AudioPlayerService.instance.reapplyAudioGain();
                     },
                   ),
-                  // Min / Max labels
                   Row(
                     children: [
                       Text(
@@ -417,7 +393,6 @@ class PlaybackScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Info banner
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -455,16 +430,11 @@ class PlaybackScreen extends ConsumerWidget {
     );
   }
 
-  // ──────────────────────────────────────────────
-  // Audio Format Priority Card
-  // ──────────────────────────────────────────────
-
   Widget _buildAudioFormatCard(BuildContext context, WidgetRef ref, S s) {
     final preference = ref.watch(audioFormatPreferenceProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Show first 2 formats as summary, "+X more"
     final topFormats = preference.priority.take(2).map((f) => f.displayName).join(', ');
     final remaining = preference.priority.length - 2;
     final subtitle = remaining > 0
@@ -498,10 +468,6 @@ class PlaybackScreen extends ConsumerWidget {
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Preferred Sample Rate Card
-  // ──────────────────────────────────────────────
 
   Widget _buildSampleRateCard(BuildContext context, WidgetRef ref, S s) {
     final currentRate = ref.watch(preferredSampleRateProvider);
@@ -584,11 +550,6 @@ class PlaybackScreen extends ConsumerWidget {
     );
   }
 
-
-  // ──────────────────────────────────────────────
-  // USB DAC (Beta) Card
-  // ──────────────────────────────────────────────
-
   Widget _buildUsbDacCard(BuildContext context, WidgetRef ref, S s) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -650,10 +611,6 @@ class PlaybackScreen extends ConsumerWidget {
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Audio Passthrough Card
-  // ──────────────────────────────────────────────
 
   Widget _buildPassthroughCard(BuildContext context, WidgetRef ref, S s) {
     final theme = Theme.of(context);
@@ -734,8 +691,6 @@ class PlaybackScreen extends ConsumerWidget {
 
           ref.read(audioPassthroughProvider.notifier).toggle(value);
 
-          // On desktop, sync the AudioPlayerService exclusive mode flag
-          // so the audio info sheet shows the correct status.
           if (Platform.isWindows || Platform.isMacOS) {
             AudioPlayerService.instance.setExclusiveMode(value);
           }

@@ -83,18 +83,15 @@ class PlaylistsNotifier extends StateNotifier<PlaylistsState> {
         filterBy: 'all',
       );
 
-      // 解析播放列表
       final List<dynamic> rawList = result['playlists'] as List? ?? [];
       final playlists = rawList
           .map((item) => Playlist.fromJson(item as Map<String, dynamic>))
           .toList();
 
-      // 获取分页信息
       final pagination = result['pagination'] as Map<String, dynamic>?;
       final totalCount = pagination?['totalCount'] ?? 0;
       final pageSize = pagination?['pageSize'] ?? state.pageSize;
 
-      // 计算是否有更多页
       final totalPages = totalCount > 0 ? (totalCount / pageSize).ceil() : 1;
       final hasMore = page < totalPages;
 
@@ -111,13 +108,11 @@ class PlaylistsNotifier extends StateNotifier<PlaylistsState> {
     }
   }
 
-  // 跳转到指定页
   Future<void> goToPage(int page) async {
     if (page < 1 || state.isLoading) return;
     await load(targetPage: page);
   }
 
-  // 上一页
   Future<void> previousPage() async {
     if (state.currentPage > 1) {
       final prevPage = state.currentPage - 1;
@@ -125,7 +120,6 @@ class PlaylistsNotifier extends StateNotifier<PlaylistsState> {
     }
   }
 
-  // 下一页
   Future<void> nextPage() async {
     if (state.hasMore) {
       final nextPage = state.currentPage + 1;
@@ -140,22 +134,17 @@ class PlaylistsNotifier extends StateNotifier<PlaylistsState> {
     String currentUserName,
   ) async {
     try {
-      // 判断是否为当前用户创建的播放列表
       final isOwner = playlist.userName == currentUserName;
 
       if (isOwner) {
-        // 如果是系统播放列表，不允许删除
         if (playlist.isSystemPlaylist) {
           throw Exception('系统播放列表不能删除');
         }
-        // 使用删除API删除自己创建的播放列表
         await _apiService.deletePlaylist(playlist.id);
       } else {
-        // 使用取消收藏API删除别人的播放列表
         await _apiService.removeLikePlaylist(playlist.id);
       }
 
-      // 删除成功后刷新列表
       await load(refresh: true);
     } catch (e) {
       rethrow;
@@ -177,7 +166,6 @@ final playlistsProvider =
     }
   });
 
-  // 监听用户切换，自动刷新播放列表
   ref.listen(currentUserProvider, (previous, next) {
     final prevUser = previous;
     final nextUser = next;

@@ -44,7 +44,6 @@ class BatchTranscriptionNotificationService {
       ),
     );
 
-    // Request notification permission on Android 13+
     try {
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
@@ -125,7 +124,6 @@ class BatchTranscriptionNotificationService {
       ),
     );
 
-    // Auto-dismiss after 3 seconds
     await Future<void>.delayed(const Duration(seconds: 3));
     await dismiss();
   }
@@ -162,10 +160,8 @@ class BatchTranscriptionNotificationService {
   }) async {
     if (!Platform.isAndroid || !_initialized) return;
 
-    // Just show a timed popup — don't replace the main progress notification
-    // if a batch is running.
     await _plugin.show(
-      _notificationId + 1, // separate notification for transient errors
+      _notificationId + 1,
       'Transcription Failed',
       '$fileName: $error',
       const NotificationDetails(

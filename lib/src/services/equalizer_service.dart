@@ -22,7 +22,7 @@ class EqualizerBand {
 class EqualizerPreset {
   final String id;
   final String name;
-  final List<double> gains; // 10 bands, -12 to +12 dB
+  final List<double> gains;
 
   const EqualizerPreset({
     required this.id,
@@ -34,9 +34,9 @@ class EqualizerPreset {
 /// EQ state
 class EqualizerState {
   final bool enabled;
-  final String activePresetId; // 'custom' for custom bands
-  final List<double> gains; // 10 custom band gains
-  final List<double> deviceBands; // queried from device
+  final String activePresetId;
+  final List<double> gains;
+  final List<double> deviceBands;
   final bool deviceSupported;
 
   const EqualizerState({
@@ -111,7 +111,6 @@ class EqualizerService {
     if (_initialized) return;
     _initialized = true;
 
-    // Check platform support
     if (Platform.isAndroid) {
       try {
         final result = await _channel.invokeMethod('isSupported');
@@ -121,7 +120,6 @@ class EqualizerService {
         _deviceSupported = false;
       }
     } else if (Platform.isIOS || Platform.isMacOS) {
-      // iOS/macOS: AVAudioUnitEQ support (stub for now)
       _deviceSupported = false;
     } else {
       _deviceSupported = false;
@@ -180,7 +178,6 @@ class EqualizerService {
     final newGains = List<double>.from(_state.gains);
     newGains[bandIndex] = gainDb.clamp(-12.0, 12.0);
 
-    // Check if this matches a preset
     String newPresetId = 'custom';
     for (final preset in presets) {
       if (_gainsEqual(preset.gains, newGains)) {

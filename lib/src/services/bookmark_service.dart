@@ -54,7 +54,6 @@ class BookmarkService {
         _bookmarks.add(AudioBookmark.fromJson(item as Map<String, dynamic>));
       }
     } catch (e) {
-      // Corrupted data — start fresh
       _bookmarks.clear();
     }
     _emit();
@@ -69,12 +68,10 @@ class BookmarkService {
     String? note,
     String? trackTitle,
   }) {
-    // Avoid duplicates at the exact same position (within 1s tolerance)
     final existingIndex = _bookmarks.indexWhere((b) =>
         b.trackId == trackId &&
         (b.position - position).abs().inMilliseconds < 1000);
     if (existingIndex >= 0) {
-      // Update existing bookmark's note
       _bookmarks[existingIndex] = _bookmarks[existingIndex].copyWith(
         note: note ?? _bookmarks[existingIndex].note,
         createdAt: DateTime.now(),

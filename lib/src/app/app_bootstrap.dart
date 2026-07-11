@@ -40,27 +40,21 @@ class AppBootstrap {
   ///
   /// [initEssential] harus sudah dipanggil SEBELUM [initialize].
   static Future<void> initialize({bool isDesktop = false}) async {
-    // Hive + StorageService already initialized by initEssential()
 
-    // Initialize account database
     await AccountDatabase.instance.database;
     await _yield();
 
-    // Cache cleanup on startup (fire-and-forget, runs in background)
     CacheService.checkAndCleanCache(force: true).catchError((e) {
       LogService.instance.error('[Cache] Cache check failed: $e', tag: 'Download');
     });
 
-    // Initialize download service (only load tasks from memory, not disk scan)
     await DownloadService.instance.initialize();
     await _yield();
 
-    // Init blurhash service
     await BlurHashService.instance.init();
 
-    // Configure ImageCache untuk manajemen memori gambar yang optimal.
     PaintingBinding.instance.imageCache.maximumSize = 300;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = 50 << 20; // 50 MB
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 50 << 20;
   }
 
   /// Konfigurasi system UI overlay style dan orientasi.

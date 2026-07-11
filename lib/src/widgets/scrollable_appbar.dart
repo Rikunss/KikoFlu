@@ -69,7 +69,6 @@ class _ScrollableAppBarState extends State<ScrollableAppBar> {
         defaultScrollNotificationPredicate(notification)) {
       final ScrollMetrics metrics = notification.metrics;
 
-      // Compute scrolledUnder from axis direction
       final bool newScrolledUnder = switch (metrics.axisDirection) {
         AxisDirection.up => metrics.extentAfter > 0,
         AxisDirection.down => metrics.extentBefore > 0,

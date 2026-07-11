@@ -70,7 +70,6 @@ class WorkCardDisplayNotifier extends StateNotifier<WorkCardDisplaySettings> {
         showSubtitleTag: prefs.getBool(_keySubtitleTag) ?? true,
       );
     } catch (e) {
-      // 加载失败，使用默认值
     }
   }
 
@@ -120,7 +119,6 @@ class WorkCardDisplayNotifier extends StateNotifier<WorkCardDisplaySettings> {
       await prefs.setBool(_keyDuration, state.showDuration);
       await prefs.setBool(_keySubtitleTag, state.showSubtitleTag);
     } catch (e) {
-      // 保存失败时静默处理
     }
   }
 }

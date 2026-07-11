@@ -1,13 +1,3 @@
-// AUTO-GENERATED FILE — DO NOT EDIT MANUALLY
-// Generated from https://api.asmr-200.com/api/tags/
-// Date: 2026-04-09
-// Total tags: 418
-//
-// To regenerate: python3 scripts/generate_tag_translations.py
-//
-// Tag data is stored as compressed base64 to avoid exposing
-// raw tag names in source control.
-
 import 'dart:convert';
 import 'dart:io' show zlib;
 import "../services/log_service.dart";

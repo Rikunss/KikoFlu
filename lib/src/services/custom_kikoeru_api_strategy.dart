@@ -21,8 +21,6 @@ class CustomKikoeruApiStrategy extends KikoeruApiStrategy {
   @override
   bool get isOfficial => false;
 
-  // ── Authentication ──
-
   @override
   Future<Map<String, dynamic>> login(String username, String password) async {
     try {
@@ -40,7 +38,6 @@ class CustomKikoeruApiStrategy extends KikoeruApiStrategy {
   Future<Map<String, dynamic>> register(
       String username, String password) async {
     try {
-      // Custom server registration without recommender
       final savedToken = config.token;
       config = config.copyWith(token: null);
 
@@ -70,8 +67,6 @@ class CustomKikoeruApiStrategy extends KikoeruApiStrategy {
       throw KikoeruApiException('Failed to get user info', e);
     }
   }
-
-  // ── Works ──
 
   @override
   Future<Map<String, dynamic>> getWorks({
@@ -336,7 +331,6 @@ class CustomKikoeruApiStrategy extends KikoeruApiStrategy {
           conditions.add({'t': 1, 'd': keyword, 'name': keyword});
         }
 
-        // Resolve IDs for tags / VAs
         if (conditions.isNotEmpty) {
           List<dynamic>? allTags;
           List<dynamic>? allVas;
@@ -434,14 +428,11 @@ class CustomKikoeruApiStrategy extends KikoeruApiStrategy {
     }
   }
 
-  // ── Reviews ──
-
   @override
   Future<Map<String, dynamic>> getWorkReviews(int workId, {
     int page = 1,
     int pageSize = 20,
   }) async {
-    // Local backend does not support getting reviews for a specific work
     return {
       'reviews': [],
       'pagination': {'currentPage': 1, 'pageSize': pageSize, 'totalCount': 0},
@@ -529,8 +520,6 @@ class CustomKikoeruApiStrategy extends KikoeruApiStrategy {
       throw KikoeruApiException('Failed to delete review', e);
     }
   }
-
-  // ── Favorites ──
 
   @override
   Future<Map<String, dynamic>> getFavorites({

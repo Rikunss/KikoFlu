@@ -22,7 +22,6 @@ class ThemeSettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 主题模式选择
           Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,7 +68,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
             ),
           ),
 
-          const SizedBox(height: 16),          // 颜色方案选择
+          const SizedBox(height: 16),
           Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -160,19 +159,18 @@ class ThemeSettingsScreen extends ConsumerWidget {
                           padding:        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           child: Row(
                             children: [
-                              // 彩色渐变圆圈
                               Container(
                                 width: 32,
                                 height: 32,
                                 decoration: BoxDecoration(
                                   gradient: const LinearGradient(
                                     colors: [
-                                      Color(0xFFE91E63), // Pink
-                                      Color(0xFF9C27B0), // Purple
-                                      Color(0xFF2196F3), // Blue
-                                      Color(0xFF4CAF50), // Green
-                                      Color(0xFFFFEB3B), // Yellow
-                                      Color(0xFFFF5722), // Orange
+                                      Color(0xFFE91E63),
+                                      Color(0xFF9C27B0),
+                                      Color(0xFF2196F3),
+                                      Color(0xFF4CAF50),
+                                      Color(0xFFFFEB3B),
+                                      Color(0xFFFF5722),
                                     ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
@@ -237,7 +235,6 @@ class ThemeSettingsScreen extends ConsumerWidget {
 
           const SizedBox(height: 16),
 
-          // 预览卡片
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -363,7 +360,6 @@ class ThemeSettingsScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
-            // 颜色预览圆圈
             Container(
               width: 32,
               height: 32,
@@ -393,7 +389,6 @@ class ThemeSettingsScreen extends ConsumerWidget {
                   : null,
             ),
             const SizedBox(width: 12),
-            // 标题和副标题
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,7 +410,6 @@ class ThemeSettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            // 选中的单选按钮
             Radio<ColorSchemeType>(
               value: type,
             ),

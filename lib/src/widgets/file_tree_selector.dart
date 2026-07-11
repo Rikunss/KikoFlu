@@ -29,7 +29,7 @@ class FileTreeSelector extends StatefulWidget {
 }
 
 class FileTreeSelectorState extends State<FileTreeSelector> {
-  late Map<String, bool> _selectedFiles; // hash -> selected
+  late Map<String, bool> _selectedFiles;
   final Set<String> _expandedFolders = {};
 
   @override
@@ -42,9 +42,6 @@ class FileTreeSelectorState extends State<FileTreeSelector> {
   @override
   void didUpdateWidget(FileTreeSelector oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Re-initialize if files changed.
-    // Note: uses referential equality — the files list should be stable
-    // (e.g., not a new list with same elements) to avoid resetting selection.
     if (oldWidget.files != widget.files) {
       _selectedFiles = {};
       _initializeSelection(widget.files, widget.preSelectAll);
@@ -62,8 +59,6 @@ class FileTreeSelectorState extends State<FileTreeSelector> {
       }
     }
   }
-
-  // ── Public getters ──
 
   /// Number of currently selected files (excluding downloaded).
   int get selectedCount => _selectedFiles.values.where((v) => v).length;
@@ -127,8 +122,6 @@ class FileTreeSelectorState extends State<FileTreeSelector> {
     });
     widget.onSelectionChanged?.call();
   }
-
-  // ── Internal helpers ──
 
   String _itemPath(String parentPath, AudioFile item) {
     return parentPath.isEmpty ? item.title : '$parentPath/${item.title}';
@@ -209,8 +202,6 @@ class FileTreeSelectorState extends State<FileTreeSelector> {
     if (selectedCount == totalCount) return true;
     return null;
   }
-
-  // ── Build ──
 
   @override
   Widget build(BuildContext context) {
@@ -305,8 +296,6 @@ class FileTreeSelectorState extends State<FileTreeSelector> {
     return widgets;
   }
 }
-
-// ── Helper widgets ──
 
 class _FolderRow extends StatelessWidget {
   final AudioFile file;

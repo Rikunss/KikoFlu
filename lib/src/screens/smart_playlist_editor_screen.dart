@@ -27,16 +27,12 @@ class _SmartPlaylistEditorScreenState
   SmartPlaylistSortField _sortField = SmartPlaylistSortField.release;
   String _sortDirection = 'desc';
 
-  // Rating slider value
   double _minRating = 0;
 
-  // Subtitle filter
-  String _subtitleFilter = 'any'; // 'any', 'yes', 'no'
+  String _subtitleFilter = 'any';
 
-  // Age filter
-  String _ageFilter = 'any'; // 'any', 'general', 'adult'
+  String _ageFilter = 'any';
 
-  // Collected rules as display items
   final List<_RuleChip> _ruleChips = [];
 
   @override
@@ -162,7 +158,6 @@ class _SmartPlaylistEditorScreenState
     }
 
     final rules = <SmartPlaylistRule>[
-      // Tag/VA/Circle rules from chips
       ..._ruleChips
           .where((c) => c.type == _RuleChipType.tag)
           .map((c) => SmartPlaylistRule(
@@ -182,19 +177,16 @@ class _SmartPlaylistEditorScreenState
                 type: SmartPlaylistRuleType.circle,
                 value: c.value,
               )),
-      // Rating rule
       if (_minRating > 0)
         SmartPlaylistRule(
           type: SmartPlaylistRuleType.rating,
           value: _minRating.round().toString(),
         ),
-      // Subtitle rule
       if (_subtitleFilter != 'any')
         SmartPlaylistRule(
           type: SmartPlaylistRuleType.subtitle,
           value: (_subtitleFilter == 'yes').toString(),
         ),
-      // Age rule
       if (_ageFilter != 'any')
         SmartPlaylistRule(
           type: SmartPlaylistRuleType.age,
@@ -248,7 +240,6 @@ class _SmartPlaylistEditorScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Name field
             TextField(
               controller: _nameController,
               decoration: InputDecoration(
@@ -262,7 +253,6 @@ class _SmartPlaylistEditorScreenState
             ),
             const SizedBox(height: 16),
 
-            // Description
             TextField(
               controller: _descriptionController,
               decoration: InputDecoration(
@@ -276,7 +266,6 @@ class _SmartPlaylistEditorScreenState
             ),
             const SizedBox(height: 24),
 
-            // Rules section header
             Row(
               children: [
                 Icon(Icons.rule, size: 20, color: colorScheme.primary),
@@ -291,7 +280,6 @@ class _SmartPlaylistEditorScreenState
             ),
             const SizedBox(height: 12),
 
-            // Tag input
             _buildRuleInputSection(
               icon: Icons.label_outline,
               label: 'Tags',
@@ -302,7 +290,6 @@ class _SmartPlaylistEditorScreenState
               color: colorScheme.primary,
             ),
 
-            // VA input
             _buildRuleInputSection(
               icon: Icons.mic,
               label: s.vaLabel,
@@ -311,7 +298,6 @@ class _SmartPlaylistEditorScreenState
               color: colorScheme.tertiary,
             ),
 
-            // Circle input
             _buildRuleInputSection(
               icon: Icons.groups,
               label: s.circleLabel,
@@ -322,7 +308,6 @@ class _SmartPlaylistEditorScreenState
 
             const SizedBox(height: 16),
 
-            // Age filter
             _buildFilterDropdown(
               label: s.ageRatingLabel,
               icon: Icons.family_restroom,
@@ -336,11 +321,9 @@ class _SmartPlaylistEditorScreenState
             ),
             const SizedBox(height: 12),
 
-            // Rating slider
             _buildRatingSlider(s),
             const SizedBox(height: 12),
 
-            // Subtitle filter
             _buildFilterDropdown(
               label: s.hasSubtitle,
               icon: Icons.subtitles,
@@ -355,7 +338,6 @@ class _SmartPlaylistEditorScreenState
 
             const SizedBox(height: 24),
 
-            // Sort section
             Row(
               children: [
                 Icon(Icons.sort, size: 20, color: colorScheme.primary),
@@ -370,7 +352,6 @@ class _SmartPlaylistEditorScreenState
             ),
             const SizedBox(height: 12),
 
-            // Sort field
             _buildFilterDropdown(
               label: s.sortField,
               icon: Icons.swap_vert,
@@ -387,7 +368,6 @@ class _SmartPlaylistEditorScreenState
             ),
             const SizedBox(height: 12),
 
-            // Sort direction
             _buildFilterDropdown(
               label: s.sortDirection,
               icon: Icons.arrow_upward,
@@ -401,7 +381,6 @@ class _SmartPlaylistEditorScreenState
 
             const SizedBox(height: 24),
 
-            // Rule chips
             if (_ruleChips.isNotEmpty) ...[
               Row(
                 children: [
@@ -447,7 +426,6 @@ class _SmartPlaylistEditorScreenState
 
             const SizedBox(height: 32),
 
-            // Preview/summary card
             if (_ruleChips.isNotEmpty || _minRating > 0 || _subtitleFilter != 'any' || _ageFilter != 'any') ...[
               Card(
                 color: colorScheme.surfaceContainerHighest,

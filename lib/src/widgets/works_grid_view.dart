@@ -53,7 +53,6 @@ class WorksGridView extends StatelessWidget {
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
 
-    // 横屏模式下使用更大的间距，让布局更优雅
     final spacing = isLandscape ? 24.0 : 8.0;
     final padding = isLandscape ? 24.0 : 8.0;
 
@@ -88,7 +87,6 @@ class WorksGridView extends StatelessWidget {
           ),
         ),
 
-        // 到底提示
         if (showEndMessage)
           SliverToBoxAdapter(
             child: Container(
@@ -114,7 +112,6 @@ class WorksGridView extends StatelessWidget {
             ),
           ),
 
-        // 分页控件
         if (paginationWidget != null)
           SliverPadding(
             padding: EdgeInsets.fromLTRB(padding, spacing, padding, 24),
@@ -188,7 +185,6 @@ class WorksGridView extends StatelessWidget {
           ),
         ),
 
-        // 分页控件
         if (paginationWidget != null)
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),

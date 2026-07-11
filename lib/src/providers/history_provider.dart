@@ -133,7 +133,6 @@ class HistoryNotifier extends StateNotifier<HistoryState> {
     int playlistIndex = 0;
     int playlistTotal = 0;
 
-    // 尝试从播放历史服务获取播放列表信息
     if (audioService.currentWorkId == work.id) {
       playlistIndex = audioService.currentTrack != null
           ? AudioPlayerServiceHelper.currentIndex
@@ -186,7 +185,6 @@ class HistoryNotifier extends StateNotifier<HistoryState> {
     _historyUpdateSubscription =
         PlaybackHistoryService.instance.historyUpdatedStream.listen((_) {
       final now = DateTime.now();
-      // 节流：10 秒内最多刷新一次列表
       if (now.difference(_lastRefreshTime).inSeconds >= 10) {
         _lastRefreshTime = now;
         load(refresh: true, force: true);

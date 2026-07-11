@@ -32,10 +32,6 @@ class BackupException implements Exception {
 class BackupService {
   BackupService._();
 
-  // ──────────────────────────────────────────────
-  // Backup
-  // ──────────────────────────────────────────────
-
   /// Export all app data to [destinationPath] as a .zip file.
   ///
   /// Returns the final path of the created backup file.
@@ -43,24 +39,19 @@ class BackupService {
     final archive = Archive();
     final tmpDir = await _createTempDir();
     try {
-      // 1. Collect all data sources
       final dbDir = await _getDatabaseDirectory();
       final hiveDir = await _getHiveDirectory();
 
-      // 2. Close all open connections so file copying is safe
       await _closeAll();
 
-      // 3. Export SharedPreferences to JSON
       final prefsJson = await _exportPreferencesJson();
       final prefsFile = File(p.join(tmpDir.path, 'preferences.json'));
       await prefsFile.writeAsString(prefsJson);
       await _addFileToArchive(archive, 'preferences.json', prefsFile);
 
-      // 4. Copy database files
       for (final dbName in _kDatabaseFiles) {
         final src = File(p.join(dbDir.path, dbName));
         if (await src.exists()) {
-          // Copy to tmp so we don't hold a lock during zip
           final dest = File(p.join(tmpDir.path, 'databases', dbName));
           await dest.parent.create(recursive: true);
           await src.copy(dest.path);
@@ -71,7 +62,6 @@ class BackupService {
         }
       }
 
-      // 5. Copy Hive box files
       for (final hiveName in _kHiveFiles) {
         final src = File(p.join(hiveDir.path, hiveName));
         if (await src.exists()) {
@@ -84,7 +74,6 @@ class BackupService {
         }
       }
 
-      // 6. Create manifest
       final pkgInfo = await _getPackageInfo();
       final manifest = {
         'app_name': pkgInfo['app_name'],
@@ -103,7 +92,6 @@ class BackupService {
         utf8.encode(manifestJson),
       ));
 
-      // 7. Write .zip
       final zipBytes = ZipEncoder().encode(archive);
       if (zipBytes == null) {
         throw const BackupException('Failed to create zip archive');
@@ -114,15 +102,10 @@ class BackupService {
       _log.info('[Backup] Backup saved to: $destinationPath');
       return destinationPath;
     } finally {
-      // Always reopen connections
       await _reopenAll();
       await tmpDir.delete(recursive: true);
     }
   }
-
-  // ──────────────────────────────────────────────
-  // Restore
-  // ──────────────────────────────────────────────
 
   /// Restore app data from [backupFilePath] (.zip).
   ///
@@ -132,14 +115,12 @@ class BackupService {
     final warnings = <String>[];
     final tmpDir = await _createTempDir();
     try {
-      // 1. Read and extract .zip
       final zipBytes = await File(backupFilePath).readAsBytes();
       final archive = ZipDecoder().decodeBytes(zipBytes);
       if (archive.isEmpty) {
         throw const BackupException('Invalid backup file: not a valid zip archive');
       }
 
-      // Extract all files to temp directory
       for (final file in archive) {
         if (file.isFile) {
           final destPath = p.join(tmpDir.path, file.name);
@@ -149,7 +130,6 @@ class BackupService {
         }
       }
 
-      // 2. Validate manifest
       final manifestFile = File(p.join(tmpDir.path, 'manifest.json'));
       if (!await manifestFile.exists()) {
         throw const BackupException(
@@ -161,10 +141,8 @@ class BackupService {
       final version = '${manifest['version'] ?? 'unknown'}';
       _log.info('[Backup] Restoring from backup created by v$version');
 
-      // 3. Close all open connections
       await _closeAll();
 
-      // 4. Restore SharedPreferences
       final prefsFile = File(p.join(tmpDir.path, 'preferences.json'));
       if (await prefsFile.exists()) {
         await _importPreferencesJson(await prefsFile.readAsString());
@@ -172,7 +150,6 @@ class BackupService {
         warnings.add('preferences.json not found in backup');
       }
 
-      // 5. Restore database files
       final dbDir = await _getDatabaseDirectory();
       for (final dbName in _kDatabaseFiles) {
         final src = File(p.join(tmpDir.path, 'databases', dbName));
@@ -184,7 +161,6 @@ class BackupService {
         }
       }
 
-      // 6. Restore Hive box files
       final hiveDir = await _getHiveDirectory();
       for (final hiveName in _kHiveFiles) {
         final src = File(p.join(tmpDir.path, 'hive', hiveName));
@@ -203,10 +179,6 @@ class BackupService {
       await tmpDir.delete(recursive: true);
     }
   }
-
-  // ──────────────────────────────────────────────
-  // Internal helpers
-  // ──────────────────────────────────────────────
 
   static const _kDatabaseFiles = [
     'accounts.db',
@@ -235,7 +207,6 @@ class BackupService {
       final appDocDir = await getApplicationDocumentsDirectory();
       return Directory(p.join(appDocDir.path, 'KikoFlu'));
     } else {
-      // On mobile, Hive.initFlutter() uses getApplicationDocumentsDirectory
       return Directory((await getApplicationDocumentsDirectory()).path);
     }
   }
@@ -305,7 +276,6 @@ class BackupService {
     final data =
         jsonDecode(jsonStr) as Map<String, dynamic>;
 
-    // Clear existing preferences
     await prefs.clear();
 
     for (final entry in data.entries) {
@@ -336,29 +306,23 @@ class BackupService {
 
   /// Close all database connections and Hive boxes so file I/O is safe.
   static Future<void> _closeAll() async {
-    // Close SQLite databases
     await AccountDatabase.instance.close();
     await HistoryDatabase.instance.close();
     await SubtitleDatabase.instance.close();
 
-    // Close Hive boxes
     await StorageService.closeBoxes();
   }
 
   /// Reopen all database connections and Hive boxes.
   static Future<void> _reopenAll() async {
-    // Re-initialize StorageService (reopens Hive boxes)
     await StorageService.init();
 
-    // Database will be lazily re-opened on next access
-    // Touch each DB to force immediate initialization
     await AccountDatabase.instance.database;
     await HistoryDatabase.instance.database;
     await SubtitleDatabase.instance.database;
   }
 
   static Future<Map<String, String>> _getPackageInfo() async {
-    // Used for backup manifest metadata only.
     return {
       'app_name': 'KikoFlu Edge',
       'version': '3.2.0',

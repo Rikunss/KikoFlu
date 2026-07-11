@@ -67,7 +67,6 @@ class AudioFormatInfo {
         ext = filename.split('.').last.toLowerCase();
       }
     } catch (_) {
-      // Fallback: try the old split method as a last resort
       final cleanUrl = url.split('?')[0].split('#')[0];
       ext = cleanUrl.split('.').last.toLowerCase();
     }
@@ -120,7 +119,6 @@ class AudioFormatInfo {
           return extensionInfo;
         }
 
-        // Read up to ~256 KB (large enough for ID3v2 with album art + first MPEG frame)
         final chunks = <List<int>>[];
         int totalRead = 0;
         await for (final chunk in response) {
@@ -153,7 +151,6 @@ class AudioFormatInfo {
   static AudioFormatInfo? _parseFromBytes(Uint8List data) {
     if (data.length < 4) return null;
 
-    // FLAC — magic "fLaC" at offset 0
     if (data[0] == 0x66 &&
         data[1] == 0x4C &&
         data[2] == 0x61 &&
@@ -161,7 +158,6 @@ class AudioFormatInfo {
       return data.length >= 42 ? _parseFlacHeader(data) : null;
     }
 
-    // WAV — magic "RIFF" at offset 0
     if (data[0] == 0x52 &&
         data[1] == 0x49 &&
         data[2] == 0x46 &&
@@ -169,7 +165,6 @@ class AudioFormatInfo {
       return data.length >= 36 ? _parseWavHeader(data) : null;
     }
 
-    // Ogg/Opus — magic "OggS" at offset 0
     if (data[0] == 0x4F &&
         data[1] == 0x67 &&
         data[2] == 0x67 &&
@@ -177,7 +172,6 @@ class AudioFormatInfo {
       return _parseOggOpusHeader(data);
     }
 
-    // M4A/MP4 — first box type "ftyp" at offset 4
     if (data.length >= 8 &&
         data[4] == 0x66 &&
         data[5] == 0x74 &&
@@ -186,7 +180,6 @@ class AudioFormatInfo {
       return _parseM4aHeader(data);
     }
 
-    // MP3 — ID3v2 tag "ID3" at offset 0
     if (data.length >= 3 &&
         data[0] == 0x49 &&
         data[1] == 0x44 &&
@@ -194,12 +187,10 @@ class AudioFormatInfo {
       return _parseMp3Header(data);
     }
 
-    // MP3 — raw sync word 0xFF at offset 0
     if (data[0] == 0xFF) {
       return _parseMp3Header(data);
     }
 
-    // Fallback: check for MP4 with different box order
     if (data.length >= 8 && _isBoxType(data, 4, 'mp4a')) {
       return _parseM4aHeader(data);
     }
@@ -218,7 +209,6 @@ class AudioFormatInfo {
 
       final raf = await file.open(mode: FileMode.read);
       try {
-        // 512 KB — large enough for files with heavy ID3v2 tags or ISOBMFF moov
         const readSize = 524288;
         final data = await raf.read(readSize);
         if (data.length < 4) return fromUrl(filePath);
@@ -233,10 +223,6 @@ class AudioFormatInfo {
     }
     return fromUrl(filePath);
   }
-
-  // ---------------------------------------------------------------------------
-  // Internal helpers
-  // ---------------------------------------------------------------------------
 
   /// Read a big-endian 32-bit unsigned integer.
   static int _read32(Uint8List data, int offset) {
@@ -273,10 +259,6 @@ class AudioFormatInfo {
     return true;
   }
 
-  // ---------------------------------------------------------------------------
-  // FLAC parser
-  // ---------------------------------------------------------------------------
-
   /// Parse FLAC STREAMINFO metadata block.
   ///
   /// FLAC file structure (bytes 0-41):
@@ -303,16 +285,13 @@ class AudioFormatInfo {
       return const AudioFormatInfo(codec: 'FLAC');
     }
 
-    // 20-bit sample rate: all of data[18..19] + top nibble of data[20]
     final int sampleRate =
         ((data[18] & 0xFF) << 12) |
         ((data[19] & 0xFF) << 4) |
         ((data[20] >> 4) & 0x0F);
 
-    // 3-bit channels-1 at data[20] bits 3-1
     final int channels = ((data[20] >> 1) & 0x07) + 1;
 
-    // 5-bit sampleDepth-1 at data[20] bit 0 + data[21] bits 7-4
     final int bitsPerSample =
         (((data[20] & 0x01) << 4) | ((data[21] >> 4) & 0x0F)) + 1;
 
@@ -324,10 +303,6 @@ class AudioFormatInfo {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // WAV parser
-  // ---------------------------------------------------------------------------
-
   /// Parse WAV file header.
   /// "RIFF" at offset 0, then "WAVE" at 8, then "fmt " sub-chunk.
   static AudioFormatInfo _parseWavHeader(Uint8List data) {
@@ -335,7 +310,6 @@ class AudioFormatInfo {
       return const AudioFormatInfo(codec: 'WAV');
     }
 
-    // Search for "fmt " chunk
     int offset = 12;
     bool found = false;
     while (offset + 8 <= data.length) {
@@ -368,10 +342,6 @@ class AudioFormatInfo {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Ogg / Opus parser
-  // ---------------------------------------------------------------------------
-
   /// Parse the first Ogg page to find the OpusHead identification header.
   ///
   /// Ogg page header (27 bytes):
@@ -398,30 +368,26 @@ class AudioFormatInfo {
       return const AudioFormatInfo(codec: 'Opus');
     }
 
-    // Ogg page header is 27 bytes + segment table
     final pageSegments = data[26];
     final segmentTableEnd = 27 + pageSegments;
     if (segmentTableEnd > data.length) {
       return const AudioFormatInfo(codec: 'Opus');
     }
 
-    // Calculate the packet data start and verify it's within bounds
     final packetStart = segmentTableEnd;
 
     if (packetStart + 8 > data.length) {
       return const AudioFormatInfo(codec: 'Opus');
     }
 
-    // Check for "OpusHead" magic at packet start
     if (!_isBoxType(data, packetStart, 'Opus')) {
       return const AudioFormatInfo(codec: 'OGG');
     }
-    // Verify "Head" suffix manually since _isBoxType checks 4 bytes only
     if (packetStart + 8 > data.length ||
-        data[packetStart + 4] != 0x48 || // 'H'
-        data[packetStart + 5] != 0x65 || // 'e'
-        data[packetStart + 6] != 0x61 || // 'a'
-        data[packetStart + 7] != 0x64) { // 'd'
+        data[packetStart + 4] != 0x48 ||
+        data[packetStart + 5] != 0x65 ||
+        data[packetStart + 6] != 0x61 ||
+        data[packetStart + 7] != 0x64) {
       return const AudioFormatInfo(codec: 'OGG');
     }
 
@@ -435,14 +401,10 @@ class AudioFormatInfo {
     return AudioFormatInfo(
       codec: 'Opus',
       sampleRate: sampleRate > 0 ? sampleRate : null,
-      bitDepth: null, // Opus is a variable-bit-depth codec internally
+      bitDepth: null,
       channels: channels > 0 ? channels : null,
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // M4A / MP4 (ISOBMFF) parser
-  // ---------------------------------------------------------------------------
 
   /// Parse an M4A/MP4 ISOBMFF file to extract audio sample entry fields.
   ///
@@ -467,7 +429,6 @@ class AudioFormatInfo {
   ///   [22-23] packet size
   ///   [24-27] sample rate (16.16 fixed-point BE)
   static AudioFormatInfo _parseM4aHeader(Uint8List data) {
-    // Try ISOBMFF tree traversal for 'mp4a' first, then 'alac'
     Uint8List? sampleEntry = _findBox(data, 0, data.length, 'mp4a');
     String detectedCodec = 'M4A';
     if (sampleEntry == null || sampleEntry.length < 36) {
@@ -477,8 +438,6 @@ class AudioFormatInfo {
       }
     }
 
-    // If tree traversal failed (stsd is not in container types, so _findBox
-    // never descends into it), try a flat pattern scan for sample entry types.
     if (sampleEntry == null || sampleEntry.length < 36) {
       final int mp4aOffset = _findBoxTypeFlat(data, 'mp4a');
       if (mp4aOffset >= 0) {
@@ -503,14 +462,12 @@ class AudioFormatInfo {
       return AudioFormatInfo(codec: detectedCodec);
     }
 
-    // mp4a/alac box fields relative to box data start (offset 8 from box header)
-    // Since sampleEntry starts from the box header, fields start at offset 8.
     const int base = 8;
 
     final channels = _read16(sampleEntry, base + 16);
     final bitsPerSample = _read16(sampleEntry, base + 18);
     final sampleRateFixed = _read32(sampleEntry, base + 24);
-    final sampleRate = sampleRateFixed >> 16; // 16.16 fixed-point
+    final sampleRate = sampleRateFixed >> 16;
 
     return AudioFormatInfo(
       codec: detectedCodec,
@@ -538,7 +495,6 @@ class AudioFormatInfo {
           data[i + 1] == t1 &&
           data[i + 2] == t2 &&
           data[i + 3] == t3) {
-        // Validate: preceding 4 bytes should form a plausible box size
         final int size = _read32(data, i - 4);
         if (size >= 8 && size <= data.length - i + 4) {
           return i;
@@ -556,11 +512,10 @@ class AudioFormatInfo {
     int i = startOffset;
     while (i + 8 <= endLimit) {
       final int size = _read32(data, i);
-      if (size < 8) break; // invalid box
+      if (size < 8) break;
 
       final int end = (i + size > endLimit || size == 0) ? endLimit : i + size;
 
-      // Check box type (4 bytes at i+4)
       bool typeMatches = true;
       for (int j = 0; j < 4; j++) {
         if (data[i + 4 + j] != targetType.codeUnitAt(j)) {
@@ -573,7 +528,6 @@ class AudioFormatInfo {
         return data.sublist(i, end);
       }
 
-      // Container boxes — recurse into their contents
       if (_isContainerBox(data, i + 4)) {
         final result = _findBox(data, i + 8, end, targetType);
         if (result != null) return result;
@@ -588,7 +542,6 @@ class AudioFormatInfo {
   /// Known ISOBMFF container box types that may contain audio sample entries.
   static bool _isContainerBox(Uint8List data, int typeOffset) {
     if (typeOffset + 4 > data.length) return false;
-    // Read the 4-byte type at the given offset and compare
     const types = [
       'moov', 'trak', 'edts', 'mdia', 'minf',
       'dinf', 'stbl', 'udta', 'mvex', 'moof',
@@ -607,10 +560,6 @@ class AudioFormatInfo {
     }
     return false;
   }
-
-  // ---------------------------------------------------------------------------
-  // MP3 (MPEG Audio Layer III) parser
-  // ---------------------------------------------------------------------------
 
   /// Parse the first valid MPEG audio frame header in the data to extract
   /// sample rate and channel mode.
@@ -636,31 +585,26 @@ class AudioFormatInfo {
   ///   byte 3 bits 7-6: channel mode (00=Stereo, 01=Joint, 10=Dual, 11=Mono)
   ///   byte 3 bits 5-0: mode extension, copyright, original, emphasis
   static AudioFormatInfo _parseMp3Header(Uint8List data) {
-    // Skip ID3v2 tag if present
     int offset = 0;
     if (data.length >= 10 &&
         data[0] == 0x49 &&
         data[1] == 0x44 &&
         data[2] == 0x33) {
-      // Parse ID3v2 synchsafe size (bytes 6-9, 7 bits each)
       final int tagSize = (data[6] << 21) |
           (data[7] << 14) |
           (data[8] << 7) |
           data[9];
       offset = 10 + tagSize;
-      // Clamp offset to data length
       if (offset >= data.length) {
         return const AudioFormatInfo(codec: 'MP3');
       }
     }
 
-    // Search for valid sync word: 0xFF followed by (byte & 0xE0) == 0xE0
     final syncOffset = _findMp3Sync(data, offset);
     if (syncOffset < 0 || syncOffset + 4 > data.length) {
       return const AudioFormatInfo(codec: 'MP3');
     }
 
-    // Parse the 4-byte frame header at syncOffset
     final b1 = data[syncOffset + 1];
     final b2 = data[syncOffset + 2];
     final b3 = data[syncOffset + 3];
@@ -670,8 +614,6 @@ class AudioFormatInfo {
     final int sampleRateIndex = (b2 >> 2) & 0x03;
     final int channelMode = b3 >> 6;
 
-    // Validate: version 01 is reserved, layer 00 is reserved,
-    // sampleRateIndex 11 is reserved, bitrate index 0x0F is 'bad'
     if (versionID == 0x01 ||
         layer == 0x00 ||
         sampleRateIndex == 0x03 ||
@@ -679,34 +621,32 @@ class AudioFormatInfo {
       return const AudioFormatInfo(codec: 'MP3');
     }
 
-    // Sample rate lookup
     final int? sampleRate = _mp3SampleRate(versionID, sampleRateIndex);
     final int bitrateIndex = (b2 >> 4) & 0x0F;
     final int? bitrateKbps = _mp3Bitrate(versionID, layer, bitrateIndex);
 
-    // Channel mode
     final int? channels;
     switch (channelMode) {
-      case 3: // 11 = Single Channel (Mono)
+      case 3:
         channels = 1;
         break;
-      default: // 00 = Stereo, 01 = Joint Stereo, 10 = Dual Channel
+      default:
         channels = 2;
     }
 
     String codecName;
     if (layer == 0x01) {
-      codecName = 'MP3'; // Layer III
+      codecName = 'MP3';
     } else if (layer == 0x02) {
-      codecName = 'MP2'; // Layer II
+      codecName = 'MP2';
     } else {
-      codecName = 'MP1'; // Layer I
+      codecName = 'MP1';
     }
 
     return AudioFormatInfo(
       codec: codecName,
       sampleRate: sampleRate,
-      bitDepth: null, // MP3 decoded output is decoder-dependent
+      bitDepth: null,
       channels: channels,
       encodedBitrateKbps: bitrateKbps,
     );
@@ -719,11 +659,11 @@ class AudioFormatInfo {
   /// index:     0=00, 1=01, 2=10 (3=reserved, caller should have excluded it)
   static int? _mp3SampleRate(int versionID, int index) {
     switch (versionID) {
-      case 3: // MPEG 1
+      case 3:
         return [44100, 48000, 32000][index];
-      case 2: // MPEG 2
+      case 2:
         return [22050, 24000, 16000][index];
-      case 0: // MPEG 2.5
+      case 0:
         return [11025, 12000, 8000][index];
       default:
         return null;
@@ -740,17 +680,13 @@ class AudioFormatInfo {
   static int? _mp3Bitrate(int versionID, int layer, int bitrateIndex) {
     if (bitrateIndex == 0 || bitrateIndex == 15) return null;
 
-    // Layer I bitrates (all versions)
     if (layer == 0x03) {
-      // MPEG1 Layer I: 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448
-      // MPEG2/2.5 Layer I: 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256
       if (versionID == 3) {
         return [32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448][bitrateIndex - 1];
       }
       return [32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256][bitrateIndex - 1];
     }
 
-    // Layer II bitrates
     if (layer == 0x02) {
       if (versionID == 3) {
         return [32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384][bitrateIndex - 1];
@@ -758,11 +694,9 @@ class AudioFormatInfo {
       return [8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160][bitrateIndex - 1];
     }
 
-    // Layer III bitrates
     if (versionID == 3) {
       return [32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320][bitrateIndex - 1];
     }
-    // MPEG2 / MPEG2.5 Layer III
     return [8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160][bitrateIndex - 1];
   }
 

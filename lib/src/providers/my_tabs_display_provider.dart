@@ -52,7 +52,6 @@ class MyTabsDisplaySettingsNotifier
         showStats: prefs.getBool(_statsKey) ?? true,
       );
     } catch (e) {
-      // 加载失败，使用默认值
       state = const MyTabsDisplaySettings();
     }
   }
@@ -82,7 +81,6 @@ class MyTabsDisplaySettingsNotifier
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(key, value);
     } catch (e) {
-      // 保存失败时静默处理
     }
   }
 }

@@ -44,27 +44,25 @@ class FileExplorerWidget extends ConsumerStatefulWidget {
 
 class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
   List<dynamic> _rootFiles = [];
-  final Set<String> _expandedFolders = {}; // 记录展开的文件夹路径
-  final Map<String, bool> _downloadedFiles = {}; // hash -> downloaded
-  final Map<String, String> _fileRelativePaths = {}; // hash -> relative path
-  final Set<String> _audioWithLibrarySubtitles = {}; // 存储在字幕库中有匹配字幕的音频文件名
+  final Set<String> _expandedFolders = {};
+  final Map<String, bool> _downloadedFiles = {};
+  final Map<String, String> _fileRelativePaths = {};
+  final Set<String> _audioWithLibrarySubtitles = {};
   bool _isLoading = false;
   String? _errorMessage;
-  String? _mainFolderPath; // 主文件夹路径
+  String? _mainFolderPath;
   ScaffoldMessengerState? _scaffoldMessenger;
   StreamSubscription<List<DownloadTask>>? _downloadTasksSubscription;
 
-  // 翻译相关状态
   bool _isTranslating = false;
   bool _showTranslation = false;
   String _translationProgress = '';
-  final Map<String, String> _translationCache = {}; // 原文 -> 译文
+  final Map<String, String> _translationCache = {};
 
   @override
   void initState() {
     super.initState();
     _loadWorkTree();
-    // 监听下载任务变化
     _listenToDownloadTasks();
   }
 
@@ -81,14 +79,11 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     super.dispose();
   }
 
-  // 监听下载任务变化，当有任务完成或被删除时重新检测
   void _listenToDownloadTasks() {
     final downloadService = DownloadService.instance;
     _downloadTasksSubscription = downloadService.tasksStream.listen((tasks) {
-      // 过滤出与当前作品相关的任务
       final workTasks = tasks.where((t) => t.workId == widget.work.id).toList();
 
-      // 如果有任务状态变化，重新检测已下载文件
       if (workTasks.isNotEmpty) {
         _checkDownloadedFiles();
       }
@@ -105,21 +100,15 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       final apiService = ref.read(kikoeruApiServiceProvider);
       final files = await apiService.getWorkTracks(widget.work.id);
 
-      // 注意：不要在这里更新全局文件列表
-      // 只在播放音频时才更新，避免浏览其他作品时影响当前播放的歌曲?
-
       setState(() {
         _rootFiles = files;
         _isLoading = false;
       });
 
-      // 检查已下载的文件
       _checkDownloadedFiles();
 
-      // 检查字幕库中的匹配项
       await _checkLibrarySubtitles();
 
-      // 识别主文件夹并自动展开（需要在检查字幕库后执行）
       setState(() {
         _identifyAndExpandMainFolder();
       });
@@ -131,7 +120,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     }
   }
 
-  // 检查已下载的文件
   Future<void> _checkDownloadedFiles() async {
     final downloadService = DownloadService.instance;
     _downloadedFiles.clear();
@@ -140,7 +128,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     void collectHashes(List<dynamic> items, String parentPath) {
       for (final item in items) {
         final type = item['type'] ?? '';
-        // 收集所有文件类型的hash（除了文件夹）
         if (type != 'folder' && item['hash'] != null) {
           _downloadedFiles[item['hash']] = false;
           final title = item['title'] ?? item['name'] ?? 'unknown';
@@ -162,7 +149,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
 
     collectHashes(_rootFiles, '');
 
-    // 创建一个副本进行遍历，避免 Concurrent modification 错误
     final hashesToCheck = List<String>.from(_downloadedFiles.keys);
 
     for (final hash in hashesToCheck) {
@@ -189,7 +175,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     }
   }
 
-  // 检查字幕库中哪些音频文件有匹配的字幕
   Future<void> _checkLibrarySubtitles() async {
     final items = _rootFiles.whereType<Map<String, dynamic>>().toList();
     _audioWithLibrarySubtitles.addAll(await checkLibrarySubtitles(
@@ -200,11 +185,9 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     if (mounted) setState(() {});
   }
 
-  // 识别主文件夹：音频数量最多的目录，如果有多个则选择文本文件最多的
   void _identifyAndExpandMainFolder() {
     if (_rootFiles.isEmpty) return;
 
-    // 如果根目录本身包含音频文件，则不需要展开
     final rootHasAudio =
         _rootFiles.any((item) => FileIconUtils.isAudioFile(item));
     if (rootHasAudio) {
@@ -212,7 +195,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       return;
     }
 
-    // 收集所有文件夹及其统计信息（使用LinkedHashMap保持顺序）
     final Map<String, Map<String, dynamic>> folderStats = {};
 
     void analyzeFolders(List<dynamic> items, String parentPath) {
@@ -222,7 +204,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           if (children != null && children.isNotEmpty) {
             final itemPath = _getItemPath(parentPath, item);
 
-            // 统计该文件夹的音频和文本文件数量
             final stats = _countFilesInFolder(children);
             folderStats[itemPath] = {
               'audioCount': stats['audioCount'],
@@ -230,7 +211,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
               'item': item,
             };
 
-            // 递归分析子文件夹
             analyzeFolders(children, itemPath);
           }
         }
@@ -244,7 +224,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       return;
     }
 
-    // 找出音频数量最多的文件夹
     int maxAudioCount = 0;
     for (final stats in folderStats.values) {
       if (stats['audioCount'] > maxAudioCount) {
@@ -252,7 +231,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       }
     }
 
-    // 在音频数量最多的文件夹中，先选择文本文件最多的
     String? mainFolder;
     int maxTextCount = -1;
     List<String> candidateFolders = [];
@@ -269,7 +247,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       }
     }
 
-    // 如果有多个文件夹的音频和文本数量都相同，按照音频格式偏好选择
     if (candidateFolders.length > 1) {
       final formatPreference = ref.read(audioFormatPreferenceProvider);
       mainFolder = _selectByAudioFormatPreference(
@@ -280,14 +257,12 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
 
     if (mainFolder != null) {
       _mainFolderPath = mainFolder;
-      // 展开主文件夹路径上的所有父文件夹
       _expandPathToFolder(mainFolder);
       LogService.instance.debug(
           '[FileExplorer] 识别到主文件夹 $_mainFolderPath (音频:$maxAudioCount, 文本:$maxTextCount)', tag: 'UI');
     }
   }
 
-  // 统计文件夹中的音频和文本文件数量（仅统计当前层级，不递归子文件夹）
   Map<String, int> _countFilesInFolder(List<dynamic> items) {
     int audioCount = 0;
     int textCount = 0;
@@ -296,44 +271,37 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       if (FileIconUtils.isAudioFile(child)) {
         audioCount++;
 
-        // 检查该音频是否在字幕库中有匹配的字幕
         final audioTitle = child['title'] ?? child['name'] ?? '';
         if (_audioWithLibrarySubtitles.contains(audioTitle)) {
-          textCount++; // 字幕库匹配也算作文本文件
+          textCount++;
         }
       } else if (FileIconUtils.isTextFile(child)) {
         textCount++;
       }
-      // 不再递归统计子文件夹中的文件
     }
 
     return {'audioCount': audioCount, 'textCount': textCount};
   }
 
-  // 根据音频格式偏好选择文件夹
-  // 返回包含最高优先级音频格式的文件夹
   String _selectByAudioFormatPreference(
       List<String> folderPaths, List<AudioFormat> priorityOrder) {
-    // 为每个候选文件夹找到其包含的最高优先级格式
     Map<String, int> folderPriorities = {};
 
     for (final folderPath in folderPaths) {
-      // 找到该文件夹下的所有音频文件
       final folderChildren = _findFolderChildren(folderPath);
-      int highestPriority = priorityOrder.length; // 初始化为最低优先级（越大越低优先级）
+      int highestPriority = priorityOrder.length;
 
       for (final child in folderChildren) {
         if (FileIconUtils.isAudioFile(child)) {
           final fileName =
               (child['title'] ?? child['name'] ?? '').toLowerCase();
-          // 检查文件扩展名
           for (int i = 0; i < priorityOrder.length; i++) {
             final format = priorityOrder[i];
             if (fileName.endsWith('.${format.extension}')) {
               if (i < highestPriority) {
                 highestPriority = i;
               }
-              break; // 找到格式后跳出循环
+              break;
             }
           }
         }
@@ -342,7 +310,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       folderPriorities[folderPath] = highestPriority;
     }
 
-    // 选择优先级最高（数值最小）的文件夹
     String selectedFolder = folderPaths.first;
     int bestPriority = folderPriorities[selectedFolder]!;
 
@@ -357,7 +324,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     return selectedFolder;
   }
 
-  // 查找指定路径的文件夹中的子项
   List<dynamic> _findFolderChildren(String targetPath) {
     final segments = targetPath.split('/');
     List<dynamic> currentItems = _rootFiles;
@@ -373,16 +339,14 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         }
       }
       if (!found) {
-        return []; // 路径不存在
+        return [];
       }
     }
 
     return currentItems;
   }
 
-  // 展开到指定文件夹的路径
   void _expandPathToFolder(String targetPath) {
-    // 将路径拆分，展开所有父级文件夹
     final segments = targetPath.split('/');
     String currentPath = '';
 
@@ -399,7 +363,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     }
   }
 
-  // 切换文件夹展开/折叠状态
   void _toggleFolder(String path) {
     setState(() {
       if (_expandedFolders.contains(path)) {
@@ -410,17 +373,14 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     });
   }
 
-  // 生成文件/文件夹的唯一路径
   String _getItemPath(String parentPath, dynamic item) {
     final title = item['title'] ?? item['name'] ?? 'unknown';
     return parentPath.isEmpty ? title : '$parentPath/$title';
   }
 
-  // 格式化持续时间（秒 -> 时:分:秒 或 分:秒）
   String _formatDuration(dynamic durationValue) {
     if (durationValue == null) return '';
 
-    // duration 可能是整数（秒）或浮点数（秒）
     final totalSeconds = durationValue is int
         ? durationValue
         : (durationValue is double ? durationValue.toInt() : 0);
@@ -441,14 +401,12 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
   void _showSnackBar(SnackBar snackBar) {
     if (!mounted) return;
 
-    // 提取 SnackBar 的内容和类型
     final content = snackBar.content;
     String message = '';
 
     if (content is Text) {
       message = content.data ?? '';
     } else if (content is Row) {
-      // 处理包含 Row 的 SnackBar
       final children = content.children;
       for (final child in children) {
         if (child is Text) {
@@ -465,14 +423,12 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     }
 
     if (message.isEmpty) {
-      // 如果无法提取消息，使用原始方法
       final messenger =
           _scaffoldMessenger ?? ScaffoldMessenger.maybeOf(context);
       messenger?.showSnackBar(snackBar);
       return;
     }
 
-    // 根据背景色判断类型
     final backgroundColor = snackBar.backgroundColor;
     final duration = snackBar.duration;
 
@@ -483,7 +439,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     } else if (backgroundColor == Colors.orange) {
       SnackBarUtil.showWarning(context, message, duration: duration);
     } else {
-      // 默认使用 info
       SnackBarUtil.showInfo(context, message, duration: duration);
     }
   }
@@ -492,7 +447,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     final authState = ref.read(authProvider);
     final host = authState.host ?? '';
     final token = authState.token ?? '';
-    // Current work cover URL (used as track artwork)
     String? coverUrl;
     if (host.isNotEmpty) {
       String normalizedUrl = host;
@@ -504,24 +458,19 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           : '$normalizedUrl/api/cover/${widget.work.id}';
     }
 
-    // 获取音频文件信息
     final hash = audioFile['hash'];
     final title = audioFile['title'] ?? audioFile['name'] ?? S.of(context).unknown;
 
-    // 获取当前作品的完整文件树（用于字幕查找）
     try {
       final apiService = ref.read(kikoeruApiServiceProvider);
       final allFiles = await apiService.getWorkTracks(widget.work.id);
       if (!mounted) return;
 
-      // 只在播放音频时更新全局文件列表，这样字幕才能正确关联
       ref.read(fileListControllerProvider.notifier).updateFiles(allFiles);
     } catch (e) {
       LogService.instance.warning('获取完整文件树失败 $e', tag: 'UI');
-      // 即使获取失败也继续播放，只是可能没有字幕
     }
 
-    // 获取同一目录下的所有音频文件（不递归子文件夹）
     final audioFiles = _getAudioFilesFromSameDirectory(parentPath);
     final currentIndex = audioFiles.indexWhere((file) => file['hash'] == hash);
 
@@ -536,7 +485,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       return;
     }
 
-    // 构建播放队列
     final downloadService = DownloadService.instance;
     final List<AudioTrack> audioTracks = [];
     final unknownLabel = S.of(context).unknown;
@@ -545,21 +493,17 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       final fileHash = file['hash'];
       final fileTitle = file['title'] ?? file['name'] ?? unknownLabel;
 
-      // 优先级: 本地下载文件 → 缓存文件 → 网络URL
       String audioUrl = '';
       if (fileHash != null) {
-        // 1. 检查是否有本地下载的文件
         final localPath = await downloadService.getDownloadedFilePath(
           widget.work.id,
           fileHash,
         );
 
         if (localPath != null) {
-          // 使用本地文件（file:// 协议）
           audioUrl = 'file://$localPath';
           LogService.instance.debug('[FileExplorer] 使用本地下载的音频: $fileHash', tag: 'Playback');
         } else if (_downloadedFiles[fileHash] == true) {
-          // 检查是否是手动复制的本地文件
           final relativePath = _fileRelativePaths[fileHash];
           if (relativePath != null) {
             final downloadDir = await downloadService.getDownloadDirectory();
@@ -572,7 +516,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           }
         }
 
-        // 2. 如果没有本地文件，检查缓存
         if (audioUrl.isEmpty) {
           final cachedPath = await CacheService.getCachedAudioFile(fileHash);
           if (cachedPath != null) {
@@ -582,13 +525,11 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         }
       }
 
-      // 3. 如果缓存也没有，使用网络URL
       if (audioUrl.isEmpty) {
         if (file['mediaDownloadUrl'] != null &&
             file['mediaDownloadUrl'].toString().isNotEmpty) {
           audioUrl = file['mediaDownloadUrl'];
 
-          // 如果是相对路径，拼接 Host
           if (audioUrl.startsWith('/') && host.isNotEmpty) {
             String normalizedHost = host;
             if (!host.startsWith('http://') && !host.startsWith('https://')) {
@@ -603,7 +544,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
             audioUrl = '$normalizedHost$audioUrl';
           }
 
-          // 如果 URL 中没有 token 且 token 存在，追加 token
           if (token.isNotEmpty && !audioUrl.contains('token=')) {
             if (audioUrl.contains('?')) {
               audioUrl = '$audioUrl&token=$token';
@@ -615,7 +555,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
             file['mediaStreamUrl'].toString().isNotEmpty) {
           audioUrl = file['mediaStreamUrl'];
 
-          // 如果是相对路径，拼接 Host
           if (audioUrl.startsWith('/') && host.isNotEmpty) {
             String normalizedHost = host;
             if (!host.startsWith('http://') && !host.startsWith('https://')) {
@@ -630,7 +569,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
             audioUrl = '$normalizedHost$audioUrl';
           }
 
-          // 如果 URL 中没有 token 且 token 存在，追加 token
           if (token.isNotEmpty && !audioUrl.contains('token=')) {
             if (audioUrl.contains('?')) {
               audioUrl = '$audioUrl&token=$token';
@@ -648,7 +586,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       }
 
       if (audioUrl.isNotEmpty) {
-        // 获取声优信息
         final vaNames = widget.work.vas?.map((va) => va.name).toList() ?? [];
         final artistInfo = vaNames.isNotEmpty ? vaNames.join(', ') : null;
 
@@ -683,7 +620,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     LogService.instance.debug('播放音频: $title', tag: 'Playback');
     LogService.instance.debug('播放队列包含 ${audioTracks.length} 个文件', tag: 'Playback');
 
-    // 播放音频队列，从当前选择的文件开始
     final adjustedIndex =
         audioTracks.indexWhere((track) => track.id == (hash ?? title));
     final startIndex = adjustedIndex != -1 ? adjustedIndex : 0;
@@ -694,15 +630,11 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           work: widget.work,
         );
 
-    // 注意：字幕会通过 lyricAutoLoaderProvider 自动加载
-    // 不需要手动调用 loadLyricForTrack
   }
 
-  // 获取同一目录下的所有音频文件（不递归子文件夹）
   List<dynamic> _getAudioFilesFromSameDirectory(String targetPath) {
     final List<dynamic> audioFiles = [];
 
-    // 如果是根目录
     if (targetPath.isEmpty) {
       for (final item in _rootFiles) {
         if (FileIconUtils.isAudioFile(item)) {
@@ -712,18 +644,15 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       return audioFiles;
     }
 
-    // 查找目标路径对应的文件夹
     List<dynamic>? findFolderByPath(List<dynamic> items, String currentPath) {
       for (final item in items) {
         if (item['type'] == 'folder') {
           final itemPath = _getItemPath(currentPath, item);
 
           if (itemPath == targetPath) {
-            // 找到目标文件夹，返回其子文件夹
             return item['children'] as List<dynamic>?;
           }
 
-          // 继续在子文件夹中查找
           if (item['children'] != null) {
             final result = findFolderByPath(item['children'], itemPath);
             if (result != null) return result;
@@ -745,13 +674,11 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     return audioFiles;
   }
 
-  // 手动加载字幕
   Future<void> _loadLyricManually(dynamic file) async {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final title = file['title'] ?? file['name'] ?? S.of(context).unknown;
 
-    // 检查当前是否有播放中的音频
     final currentTrackAsync = ref.read(currentTrackProvider);
     final currentTrack = currentTrackAsync.value;
 
@@ -768,7 +695,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       return;
     }
 
-    // 二次确认对话框
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => ResponsiveAlertDialog(
@@ -907,7 +833,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
 
     if (confirmed != true || !mounted) return;
 
-    // 显示加载中提示
     _showSnackBar(
       SnackBar(
         content: Row(
@@ -929,7 +854,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     );
 
     try {
-      // 调用手动加载字幕方法，传入当前作品ID
       await ref.read(lyricControllerProvider.notifier).loadLyricManually(
             file,
             workId: widget.work.id,
@@ -992,7 +916,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       normalizedUrl = 'https://$host';
     }
 
-    // 获取当前目录下所有图片文件（递归遍历整个树）
     final imageFiles = _getImageFilesFromCurrentDirectory();
     final currentIndex =
         imageFiles.indexWhere((f) => f['hash'] == file['hash']);
@@ -1007,7 +930,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       return;
     }
 
-    // 构建图片URL列表，优先使用本地文件，否则使用网络URL
     final imageItems = <Map<String, String>>[];
 
     final unknownLabel2 = S.of(context).unknown;
@@ -1016,7 +938,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       final title = f['title'] ?? f['name'] ?? unknownLabel2;
       String imageUrl;
 
-      // 1. 先检查是否已下载到本地
       final relativePath = _fileRelativePaths[hash];
       if (relativePath != null && _downloadedFiles[hash] == true) {
         try {
@@ -1029,7 +950,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           if (await localFile.exists()) {
             imageUrl = 'file://$localPath';
           } else {
-            // 本地文件不存在，使用网络URL
             imageUrl = '$normalizedUrl/api/media/stream/$hash?token=$token';
           }
         } catch (e) {
@@ -1037,7 +957,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           imageUrl = '$normalizedUrl/api/media/stream/$hash?token=$token';
         }
       } else {
-        // 2. 本地文件不存在，使用网络URL (CachedImageWidget会检查缓存)
         imageUrl = '$normalizedUrl/api/media/stream/$hash?token=$token';
       }
 
@@ -1054,13 +973,12 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         builder: (context) => ImageGalleryScreen(
           images: imageItems,
           initialIndex: currentIndex,
-          workId: widget.work.id, // 传递作品ID用于缓存
+          workId: widget.work.id,
         ),
       ),
     );
   }
 
-  // 获取当前目录下所有图片文件（递归遍历整个树）
   List<dynamic> _getImageFilesFromCurrentDirectory() {
     final List<dynamic> imageFiles = [];
 
@@ -1100,7 +1018,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
 
     String textUrl;
 
-    // 1. 先检查是否已下载到本地
     final relativePath = _fileRelativePaths[hash];
     if (relativePath != null && _downloadedFiles[hash] == true) {
       try {
@@ -1112,7 +1029,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         if (await localFile.exists()) {
           textUrl = 'file://$localPath';
         } else {
-          // 本地文件不存在，使用网络URL
           String normalizedUrl = host;
           if (!host.startsWith('http://') && !host.startsWith('https://')) {
             normalizedUrl = 'https://$host';
@@ -1128,7 +1044,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         textUrl = '$normalizedUrl/api/media/stream/$hash?token=$token';
       }
     } else {
-      // 2. 本地文件不存在，使用网络URL (TextPreviewScreen会检查缓存)
       String normalizedUrl = host;
       if (!host.startsWith('http://') && !host.startsWith('https://')) {
         normalizedUrl = 'https://$host';
@@ -1142,8 +1057,8 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         builder: (context) => TextPreviewScreen(
           textUrl: textUrl,
           title: title,
-          workId: widget.work.id, // 传递作品ID
-          hash: hash, // 传递文件hash
+          workId: widget.work.id,
+          hash: hash,
         ),
       ),
     );
@@ -1166,7 +1081,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       return;
     }
 
-    // 1. 先检查是否已下载到本地
     final relativePath = _fileRelativePaths[hash];
     if (relativePath != null && _downloadedFiles[hash] == true) {
       try {
@@ -1177,7 +1091,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         final localFile = File(localPath);
 
         if (await localFile.exists()) {
-          // 使用本地文件
           if (!mounted) return;
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -1196,7 +1109,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       }
     }
 
-    // 2. 本地文件不存在,构造网络URL(PdfPreviewScreen会检查缓存)
     String normalizedUrl = host;
     if (!host.startsWith('http://') && !host.startsWith('https://')) {
       normalizedUrl = 'https://$host';
@@ -1217,7 +1129,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     );
   }
 
-  // 使用系统播放器播放视频文件
   Future<void> _playVideoWithSystemPlayer(dynamic videoFile) async {
     final authState = ref.read(authProvider);
     final host = authState.host ?? '';
@@ -1237,9 +1148,8 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     }
 
     Uri uri;
-    String uriString; // 用于错误信息显示
+    String uriString;
 
-    // 1. 先检查是否已下载到本地
     final relativePath = _fileRelativePaths[hash];
     if (relativePath != null && _downloadedFiles[hash] == true) {
       try {
@@ -1250,7 +1160,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         final localFile = File(localPath);
 
         if (await localFile.exists()) {
-          // 使用本地文件 - 通过 open_filex 打开
           uriString = localPath;
           LogService.instance.debug('[FileExplorer] 使用本地视频文件: $localPath', tag: 'Playback');
 
@@ -1278,7 +1187,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           }
           return;
         } else {
-          // 本地文件不存在，使用网络URL
           if (host.isEmpty || token.isEmpty) {
             if (mounted) {
               _showSnackBar(
@@ -1320,7 +1228,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         uriString = videoUrl;
       }
     } else {
-      // 2. 本地文件不存在，使用网络URL
       if (host.isEmpty || token.isEmpty) {
         if (mounted) {
           _showSnackBar(
@@ -1341,28 +1248,23 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       uriString = videoUrl;
     }
 
-    // 使用 url_launcher 打开网络视频URL
     try {
       final canLaunch = await canLaunchUrl(uri);
 
       if (canLaunch) {
-        // 先尝试外部应用模式
         final launched = await launchUrl(
           uri,
           mode: LaunchMode.externalApplication,
         );
         if (!launched && mounted) {
-          // 如果外部应用模式失败，尝试浏览器模式
           await launchUrl(
             uri,
             mode: LaunchMode.externalNonBrowserApplication,
           );
         }
       } else {
-        // 如果无法通过 url_launcher 打开，显示提示
 
         if (mounted) {
-          // 提供复制链接的选项
           showDialog(
             context: context,
             builder: (context) => ResponsiveAlertDialog(
@@ -1393,7 +1295,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                 TextButton(
                   onPressed: () async {
                     Navigator.pop(context);
-                    // 在浏览器中打开
                     await launchUrl(uri, mode: LaunchMode.platformDefault);
                   },
                   child: Text(S.of(context).openInBrowserOption),
@@ -1420,7 +1321,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
-    // 直接返回文件列表，占满全部空间
     return _buildFileList(colorScheme, textTheme);
   }
 
@@ -1534,13 +1434,11 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
       );
     }
 
-    // 使用Column构建树形结构，可以自由展开
     final rootItems = _rootFiles.whereType<Map<String, dynamic>>().toList();
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 翻译按钮栏
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
@@ -1621,7 +1519,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           ),
           const Divider(height: 1),
           const SizedBox(height: 4),
-          // 翻译进度显示
           if (_isTranslating)
             Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -1646,7 +1543,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
                 ],
               ),
             ),
-          // 文件树列表 (shared ExplorerFileTree)
           ExplorerFileTree(
             items: rootItems,
             expandedFolders: _expandedFolders,
@@ -1668,10 +1564,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     );
   }
 
-  // Deleted: _buildFileTree — replaced by shared ExplorerFileTree widget
-  // See explorer/explorer_file_tree.dart
-
-  // 收集所有文件和文件夹的名称
   List<String> _collectAllNames(List<dynamic> items) {
     final List<String> names = [];
 
@@ -1682,7 +1574,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           names.add(title);
         }
 
-        // 递归处理子文件夹
         if (item['type'] == 'folder' && item['children'] != null) {
           collect(item['children'] as List<dynamic>);
         }
@@ -1693,11 +1584,9 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     return names;
   }
 
-  // 分块批量翻译所有文件/文件夹名称
   Future<void> _translateAllNames() async {
     if (_isTranslating) return;
 
-    // 如果已有翻译，直接切换显示
     if (_translationCache.isNotEmpty) {
       setState(() {
         _showTranslation = !_showTranslation;
@@ -1711,7 +1600,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     });
 
     try {
-      // 1. 收集所有需要翻译的名称
       final allNames = _collectAllNames(_rootFiles);
 
       if (allNames.isEmpty) {
@@ -1727,7 +1615,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         return;
       }
 
-      // 2. 分块翻译（每块最多500字符，避免URL长度限制）
       const maxChunkSize = 500;
       final List<String> chunks = [];
       String currentChunk = '';
@@ -1749,7 +1636,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
         chunks.add(currentChunk);
       }
 
-      // 3. 逐块翻译
       final translationService = TranslationService();
       final List<String> translatedChunks = [];
 
@@ -1766,17 +1652,14 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
           translatedChunks.add(translated);
         } catch (e) {
           LogService.instance.warning('[FileExplorer] 翻译块 $i 失败: $e', tag: 'UI');
-          // 翻译失败时保留原文
           translatedChunks.add(chunks[i]);
         }
 
-        // 添加小延迟避免频繁请求
         if (i < chunks.length - 1) {
           await Future.delayed(const Duration(milliseconds: 300));
         }
       }
 
-      // 4. 构建翻译缓存（原文 -> 译文映射）
       final allTranslatedNames = translatedChunks.join('\n').split('\n');
 
       for (int i = 0;
@@ -1818,7 +1701,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     }
   }
 
-  // 获取显示的名称（根据翻译状态）
   String _getDisplayName(String originalName) {
     if (_showTranslation && _translationCache.containsKey(originalName)) {
       return _translationCache[originalName]!;
@@ -1850,7 +1732,6 @@ class _FileExplorerWidgetState extends ConsumerState<FileExplorerWidget> {
     );
   }
 
-  // 处理文件点击
   void _handleFileTap(dynamic file, String title, String parentPath) {
     if (FileIconUtils.isVideoFile(file)) {
       _playVideoWithSystemPlayer(file);

@@ -252,7 +252,6 @@ class _PaginationBarState extends State<PaginationBar> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    // 如果总数小于等于一页的大小，显示到底提示
     if (widget.totalCount <= widget.pageSize) {
       return _buildEndMessage();
     }
@@ -266,7 +265,6 @@ class _PaginationBarState extends State<PaginationBar> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 页码和总数信息（animated）
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -304,11 +302,9 @@ class _PaginationBarState extends State<PaginationBar> {
           ),
           const SizedBox(height: 14),
 
-          // 按钮组
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 上一页
               _buildPageButton(
                 icon: Icons.chevron_left,
                 label: S.of(context).previousPage,
@@ -317,11 +313,9 @@ class _PaginationBarState extends State<PaginationBar> {
               ),
               const SizedBox(width: 10),
 
-              // 跳转输入
               _buildPageJumpButton(),
               const SizedBox(width: 10),
 
-              // 下一页
               _buildPageButton(
                 label: S.of(context).nextPage,
                 icon: Icons.chevron_right,

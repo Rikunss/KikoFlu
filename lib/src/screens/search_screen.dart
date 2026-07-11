@@ -16,7 +16,6 @@ import '../widgets/scrollable_appbar.dart';
 import '../widgets/download_fab.dart';
 import 'search_result_screen.dart';
 
-// 搜索条件项
 class SearchCondition {
   final String id;
   final SearchType type;
@@ -107,7 +106,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         _currentSearchType == SearchType.rjNumber) {
       return;
     }
-    // Determine if data needs loading for the current type.
     final needsLoad = switch (_currentSearchType) {
       SearchType.tag => _allTags.isEmpty,
       SearchType.va => _allVas.isEmpty,
@@ -444,13 +442,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   List<Widget> _buildContentSections() {
     final tt = Theme.of(context).textTheme;
     return [
-      // ── 1. Active condition chips ──
       if (_searchConditions.isNotEmpty) ...[
         _buildConditionChipsCard(),
         const SizedBox(height: 16),
       ],
 
-      // ── 2. Search type segmented pills ──
       Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child:
@@ -462,11 +458,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           _currentSearchType == SearchType.circle)
         _buildExcludeModeIndicator(),
 
-      // ── 3. Premium search bar ──
       const SizedBox(height: 12),
       _buildPremiumSearchBar(),
 
-      // ── 4. Advanced filters (portrait) ──
       if (!(MediaQuery.orientationOf(context) == Orientation.landscape) &&
           _showAdvancedFilters) ...[
         const SizedBox(height: 16),
@@ -475,18 +469,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         ..._buildAdvancedFilterSections(),
       ],
 
-      // ── 5. Search button ──
       const SizedBox(height: 16),
       _buildSearchButton(),
 
-      // ── 6. Search history ──
       ..._buildSearchHistory(),
     ];
   }
-
-  // ═══════════════════════════════════════════════════
-  // Condition Chips
-  // ═══════════════════════════════════════════════════
 
   Widget _buildConditionChipsCard() {
     final theme = Theme.of(context);
@@ -570,10 +558,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       ),
     );
   }
-
-  // ═══════════════════════════════════════════════════
-  // Search Type Pills (Segmented)
-  // ═══════════════════════════════════════════════════
 
   Widget _buildSearchTypePills() {
     final colorScheme = Theme.of(context).colorScheme;
@@ -698,10 +682,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     );
   }
 
-  // ═══════════════════════════════════════════════════
-  // Premium Search Bar — Pill types show filterable chip grid
-  // ═══════════════════════════════════════════════════
-
   Widget _buildPremiumSearchBar() {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -723,7 +703,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       );
     }
 
-    // Non-pill types (keyword / rjNumber)
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
@@ -734,8 +713,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       child: _buildPlainTextField(),
     );
   }
-
-  // ────────── Pill type: filter text field ──────────
 
   Widget _buildFilterTextField() {
     final colorScheme = Theme.of(context).colorScheme;
@@ -793,8 +770,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     );
   }
 
-  // ────────── Pill type: filtered items ──────────
-
   List<Map<String, dynamic>> _getFilteredItems() {
     List<Map<String, dynamic>> sourceList;
     switch (_currentSearchType) {
@@ -843,15 +818,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     return filtered.take(300).toList();
   }
 
-  // ────────── Pill type: filterable chips grid ──────────
-
   Widget _buildFilterableChipsArea() {
     final hasData = _allTags.isNotEmpty ||
         _allVas.isNotEmpty ||
         _allCircles.isNotEmpty;
 
     if (!hasData) {
-      // Data not loaded yet — show nothing (or loading inside the field)
       return const SizedBox.shrink();
     }
 
@@ -1041,10 +1013,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     );
   }
 
-  // ═══════════════════════════════════════════════════
-  // Search Button
-  // ═══════════════════════════════════════════════════
-
   Widget _buildSearchButton() {
     return SizedBox(
       width: double.infinity,
@@ -1065,10 +1033,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       ),
     );
   }
-
-  // ═══════════════════════════════════════════════════
-  // Search History
-  // ═══════════════════════════════════════════════════
 
   List<Widget> _buildSearchHistory() {
     final historyState = ref.watch(searchHistoryProvider);
@@ -1196,10 +1160,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       return '${timestamp.month}/${timestamp.day}';
     }
   }
-
-  // ═══════════════════════════════════════════════════
-  // Advanced Filters
-  // ═══════════════════════════════════════════════════
 
   List<Widget> _buildAdvancedFilterSections() {
     final theme = Theme.of(context);

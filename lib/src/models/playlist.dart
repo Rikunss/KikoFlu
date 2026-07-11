@@ -98,13 +98,11 @@ class Playlist extends Equatable {
 
   /// 获取完整的封面URL
   String getFullCoverUrl(String baseUrl, {String? token}) {
-    // 如果已经是完整URL，直接返回
     if (mainCoverUrl.startsWith('http://') ||
         mainCoverUrl.startsWith('https://')) {
       return mainCoverUrl;
     }
 
-    // 处理相对路径
     String normalizedUrl = baseUrl;
     if (baseUrl.isNotEmpty &&
         !baseUrl.startsWith('http://') &&
@@ -112,12 +110,10 @@ class Playlist extends Equatable {
       normalizedUrl = 'https://$baseUrl';
     }
 
-    // 如果是默认图片，直接拼接
     if (mainCoverUrl.startsWith('/statics/')) {
       return '$normalizedUrl$mainCoverUrl';
     }
 
-    // 带token的封面请求
     if (token != null && token.isNotEmpty) {
       return '$normalizedUrl$mainCoverUrl?token=$token';
     }

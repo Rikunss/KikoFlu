@@ -66,23 +66,19 @@ class CookieService {
   static Map<String, String> coverHttpHeaders({String? token}) {
     final headers = <String, String>{};
 
-    // Cookie (from server login session)
     final cookie = _cachedCookie;
     if (cookie != null && cookie.isNotEmpty) {
       headers['Cookie'] = cookie;
     }
 
-    // Required for ASMR.one — blocks non-Chinese Accept-Language
     headers['Accept-Language'] = 'zh-CN,zh;q=0.9';
 
-    // Standard browser headers for anti-bot protection
     headers['User-Agent'] =
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
         '(KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
     headers['Referer'] = 'https://www.asmr.one/';
     headers['Origin'] = 'https://www.asmr.one';
 
-    // Auth token — the server may reject query-param tokens
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }

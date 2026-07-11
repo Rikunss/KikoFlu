@@ -52,7 +52,6 @@ Set<String> extractAudioFormats(List<AudioFile>? children) {
     }
   }
   walk(children);
-  // Normalize common extensions
   final normalized = <String>{};
   for (final f in formats) {
     if (f == 'M4A' || f == 'M4B') {
@@ -65,7 +64,6 @@ Set<String> extractAudioFormats(List<AudioFile>? children) {
       normalized.add(f);
     }
   }
-  // Sort: FLAC > WAV > MP3 > AAC > OGG > Opus > rest
   final priority = ['FLAC', 'WAV', 'MP3', 'AAC', 'OGG', 'Opus'];
   final sorted = normalized.toList()..sort((a, b) {
     final ia = priority.indexOf(a);
@@ -92,4 +90,3 @@ String formatDurationShort(int totalSeconds) {
 int totalDurationFromWorks(List<Work> works) {
   return works.fold<int>(0, (sum, w) => sum + (w.duration ?? 0));
 }
-

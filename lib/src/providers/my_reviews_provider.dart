@@ -24,9 +24,9 @@ enum MyReviewFilter {
 
 /// 布局类型枚举
 enum MyReviewLayoutType {
-  bigGrid, // 大网格（2列）
-  smallGrid, // 小网格（3列）
-  list, // 列表视图
+  bigGrid,
+  smallGrid,
+  list,
 }
 
 class MyReviewsState extends Equatable {
@@ -126,32 +126,27 @@ class MyReviewsNotifier extends StateNotifier<MyReviewsState> {
         sort: state.sortOrder.value,
       );
 
-      // 服务器返回结构未知，尝试多种字段名
       final List<dynamic> rawList =
-          (result['works'] as List?) ?? // 与 searchWorks 保持一致
+          (result['works'] as List?) ??
               (result['reviews'] as List?) ??
               (result['data'] as List?) ??
               [];
 
-      // 每个条目可能直接是 Work 或包含 work 字段
       final works = rawList.map((item) {
         if (item is Map<String, dynamic>) {
           if (item.containsKey('work')) {
             final workJson = item['work'] as Map<String, dynamic>;
             return Work.fromJson(workJson);
           } else {
-            // 直接当作 Work
             return Work.fromJson(item);
           }
         }
         throw Exception('Unexpected review item format');
       }).toList();
 
-      // 获取分页信息
       final pagination = result['pagination'] as Map<String, dynamic>?;
       final totalCount = pagination?['totalCount'] ?? 0;
 
-      // 计算是否有更多页
       final totalPages =
           totalCount > 0 ? (totalCount / state.pageSize).ceil() : 1;
       final hasMore = page < totalPages;
@@ -168,13 +163,11 @@ class MyReviewsNotifier extends StateNotifier<MyReviewsState> {
     }
   }
 
-  // 跳转到指定页
   Future<void> goToPage(int page) async {
     if (page < 1 || state.isLoading) return;
     await load(targetPage: page);
   }
 
-  // 上一页
   Future<void> previousPage() async {
     if (state.currentPage > 1) {
       final prevPage = state.currentPage - 1;
@@ -182,7 +175,6 @@ class MyReviewsNotifier extends StateNotifier<MyReviewsState> {
     }
   }
 
-  // 下一页
   Future<void> nextPage() async {
     if (state.hasMore) {
       final nextPage = state.currentPage + 1;
@@ -206,7 +198,6 @@ class MyReviewsNotifier extends StateNotifier<MyReviewsState> {
     load(targetPage: 1);
   }
 
-  // 切换布局类型
   void toggleLayoutType() {
     final nextLayout = switch (state.layoutType) {
       MyReviewLayoutType.bigGrid => MyReviewLayoutType.smallGrid,
@@ -231,7 +222,6 @@ final myReviewsProvider =
     }
   });
 
-  // 监听用户切换，自动刷新我的评价/收藏列表
   ref.listen(currentUserProvider, (previous, next) {
     final prevUser = previous;
     final nextUser = next;

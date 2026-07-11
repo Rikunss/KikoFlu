@@ -19,16 +19,15 @@ import 'auth_provider.dart';
 import 'audio_provider.dart';
 import 'settings_provider.dart';
 
-// 字幕状态
 class LyricState {
   final List<LyricLine> lyrics;
   final bool isLoading;
   final String? error;
   final String? lyricUrl;
-  final Duration timelineOffset; // 时间轴偏移（毫秒）
-  final List<LyricLine>? translatedLyrics; // 翻译后的歌词
-  final bool isTranslating; // 是否正在翻译
-  final bool showTranslated; // 是否显示翻译
+  final Duration timelineOffset;
+  final List<LyricLine>? translatedLyrics;
+  final bool isTranslating;
+  final bool showTranslated;
 
   LyricState({
     this.lyrics = const [],
@@ -112,10 +111,8 @@ class LyricState {
 
     switch (appLocale.languageCode) {
       case 'ja':
-        // 日文：包含平/片假名+汉字
         return (hiragana + katakana + cjk) / total < 0.5;
       case 'zh':
-        // 中文：纯汉字；有假名则可能是日语
         if (hiragana + katakana > 0) return true;
         return cjk / total < 0.5;
       case 'en':
@@ -128,7 +125,6 @@ class LyricState {
   }
 }
 
-// 字幕控制器
 class LyricController extends StateNotifier<LyricState> {
   final Ref ref;
   /// Generation counter to cancel stale async operations (rapid track changes).
@@ -154,7 +150,6 @@ class LyricController extends StateNotifier<LyricState> {
 
   LyricController(this.ref) : super(LyricState());
 
-  // 根据音频轨道查找并加载字幕
   Future<void> loadLyricForTrack(
       AudioTrack track, List<dynamic> allFiles) async {
     final myGen = ++_currentLoadGeneration;
@@ -164,15 +159,12 @@ class LyricController extends StateNotifier<LyricState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // 获取字幕库优先级设置
       final libraryPriority = ref.read(subtitleLibraryPriorityProvider);
       final isLibraryFirst = libraryPriority == SubtitleLibraryPriority.highest;
 
       LogService.instance.debug('[Lyric] 字幕库优先级: ${libraryPriority.displayName}', tag: 'Playback');
 
-      // 根据设置决定查找顺序
       if (isLibraryFirst) {
-        // 优先级1：从字幕库查找匹配的字幕文件
         final libraryLyricPath = await _findLyricInLibrary(track);
         if (_isStale(myGen)) {
           LogService.instance.debug('[Lyric] 取消加载（已过期）: gen=$myGen, current=$_currentLoadGeneration', tag: 'Playback');
@@ -185,11 +177,9 @@ class LyricController extends StateNotifier<LyricState> {
         }
       }
 
-      // 从完整文件树查找字幕文件
       final lyricFile = _findLyricFile(track, allFiles);
 
       if (lyricFile == null) {
-        // 如果文件树未找到且优先级为最后，尝试字幕库
         if (!isLibraryFirst) {
           LogService.instance.debug('[Lyric] 文件树未找到，尝试字幕库', tag: 'Playback');
           final libraryLyricPath = await _findLyricInLibrary(track);
@@ -214,7 +204,6 @@ class LyricController extends StateNotifier<LyricState> {
       LogService.instance.debug(
           '[Lyric] 找到匹配字幕: title="${lyricFile['title']}", type="${lyricFile['type']}", hash=${lyricFile['hash']}', tag: 'Playback');
 
-      // 获取认证信息
       final authState = ref.read(authProvider);
       final host = authState.host ?? '';
       final token = authState.token ?? '';
@@ -232,11 +221,6 @@ class LyricController extends StateNotifier<LyricState> {
       String? content;
       String? resolvedLyricUrl;
 
-      // ── Local imported work: hash starts with 'local_' ──────────────
-      // Read the lyric file directly from the local filesystem via
-      // the work's local_import_path, instead of trying to stream it
-      // from the server (which would fail since the file isn't on the
-      // Kikoeru server).
       if (hash is String && hash.startsWith('local_')) {
         LogService.instance.debug(
             '[Lyric] Local hash detected — reading from local filesystem: $hash', tag: 'Playback');
@@ -259,7 +243,6 @@ class LyricController extends StateNotifier<LyricState> {
         }
       }
 
-      // ── Try cache (including downloaded files) ──
       if (content == null) {
         final cachedContent = await CacheService.getCachedTextContent(
           workId: workId,
@@ -273,7 +256,6 @@ class LyricController extends StateNotifier<LyricState> {
         if (cachedContent != null) {
           LogService.instance.debug('[Lyric] 从缓存加载字幕: $hash', tag: 'Playback');
           content = cachedContent;
-          // Build a server URL as fallback lyricUrl for display purposes
           if (host.isNotEmpty) {
             String normalizedUrl = host;
             if (!host.startsWith('http://') && !host.startsWith('https://')) {
@@ -284,7 +266,6 @@ class LyricController extends StateNotifier<LyricState> {
         }
       }
 
-      // ── Fallback: stream from server (only for non-local hashes) ──
       String? normalizedUrl;
       if (content == null && host.isNotEmpty) {
         normalizedUrl = host;
@@ -314,7 +295,6 @@ class LyricController extends StateNotifier<LyricState> {
                 EncodingUtils.decodeBytes(response.data!);
             LogService.instance.debug('[Lyric] 网络字幕编码: $encoding', tag: 'Playback');
             content = decodedContent;
-            // Cache the text content for next time
             await CacheService.cacheTextContent(
               workId: workId,
               hash: hash,
@@ -339,7 +319,6 @@ class LyricController extends StateNotifier<LyricState> {
         }
       }
 
-      // ── If still no content, abort ──
       if (content == null) {
         if (!_isStale(myGen)) {
           state = LyricState(lyrics: [], isLoading: false,
@@ -348,12 +327,10 @@ class LyricController extends StateNotifier<LyricState> {
         return;
       }
 
-      // 解析字幕
-      final lyrics = LyricParser.parse(content); // 自动检测格式
+      final lyrics = LyricParser.parse(content);
       LogService.instance.debug('[Lyric] 解析完成: ${lyrics.length} 行字幕', tag: 'Playback');
 
       if (!_isStale(myGen)) {
-        // Clear stale translation before setting new lyrics
         _clearStaleTranslation();
         state = LyricState(
           lyrics: lyrics,
@@ -364,7 +341,6 @@ class LyricController extends StateNotifier<LyricState> {
                   : null),
         );
 
-        // 5. 自动翻译（如果启用）
         if (lyrics.isNotEmpty) {
           _autoTranslateIfEnabled(generation: myGen);
         }
@@ -396,7 +372,6 @@ class LyricController extends StateNotifier<LyricState> {
     }
   }
 
-  // 从字幕库查找匹配的字幕文件（使用数据库查询）
   ///
   /// Performance note: File.exists() is called at most TWICE per invocation
   /// (once for a perfect match early return, once for the final best-match
@@ -409,18 +384,12 @@ class LyricController extends StateNotifier<LyricState> {
 
       LogService.instance.debug('[Lyric] 在字幕库中查找: track="$trackTitle", workId=$workId', tag: 'Playback');
 
-      // 确保数据库已初始化
       await SubtitleLibraryService.ensureInitialized();
 
-      // 获取字幕库根目录，用于将相对路径拼接为绝对路径
       final libraryDir =
           await SubtitleLibraryService.getSubtitleLibraryDirectory();
       final libraryRoot = libraryDir.path;
 
-      // ── Scan a list of records and return the best match ───────────
-      // Scans without File.exists() in the hot loop. Perfect matches
-      // verify existence immediately. The final best match is verified
-      // once before returning. This avoids N async IO calls for N records.
       Future<String?> scanRecords(List<SubtitleFileRecord> records) async {
         String? bestMatchPath;
         double bestScore = 0.0;
@@ -435,24 +404,20 @@ class LyricController extends StateNotifier<LyricState> {
           bestMatchPath = absolutePath;
 
           if (score == 1.0) {
-            // Perfect match — verify existence before early return.
             if (await File(absolutePath).exists()) {
               return absolutePath;
             }
-            // File deleted (stale DB entry) — reset and keep scanning.
             bestScore = 0.0;
             bestMatchPath = null;
           }
         }
 
-        // Verify the best non-perfect match exists.
         if (bestMatchPath != null && !await File(bestMatchPath).exists()) {
           bestMatchPath = null;
         }
         return bestMatchPath;
       }
 
-      // 优先级1: 通过 workId 查询数据库
       if (workId != null) {
         final records =
             await SubtitleDatabase.instance.getFilesByWorkId(workId);
@@ -466,7 +431,6 @@ class LyricController extends StateNotifier<LyricState> {
         }
       }
 
-      // 优先级2: 在"已保存"分类中查找
       final savedRecords = await SubtitleDatabase.instance
           .getFilesByCategory(SubtitleLibraryService.savedFolderName);
       if (savedRecords.isNotEmpty) {
@@ -486,22 +450,9 @@ class LyricController extends StateNotifier<LyricState> {
     }
   }
 
-  // 查找字幕文件
   dynamic _findLyricFile(AudioTrack track, List<dynamic> allFiles) {
-    // 获取音频文件名
     final trackTitle = track.title;
-    // 尝试获取音频文件的相对路径（如果AudioTrack中有保存的话，目前AudioTrack结构里可能没有直接保存相对路径，
-    // 但我们可以尝试通过遍历allFiles找到track对应的文件对象来获取其父路径，或者简化处理：
-    // 由于AudioTrack通常是从allFiles构建的，我们可以在遍历时比较层级结构。
-    // 但为了简化，我们这里定义"真完美匹配"为：文件名完全匹配(score=1.0) 且 位于同一目录下。
-    // 由于我们是在递归遍历allFiles，我们可以记录当前遍历的文件夹路径。
 
-    // 实际上，AudioTrack对象中并没有保存其在文件树中的位置信息，只保存了url/hash等。
-    // 如果要实现"相对文件树路径也一致"，我们需要知道AudioTrack的原始路径。
-    // 现有的AudioTrack结构：id, url, title, artist, album, artworkUrl, duration, workId, hash.
-    // 我们可以尝试通过hash在allFiles中找到原始音频文件对象，从而确定其路径。
-
-    // 1. 先找到音频文件在文件树中的位置（父文件夹路径）
     String? audioParentPath;
 
     String? findAudioPath(List<dynamic> files, String currentPath) {
@@ -515,7 +466,6 @@ class LyricController extends StateNotifier<LyricState> {
           final result = findAudioPath(file['children'], path);
           if (result != null) return result;
         } else {
-          // 通过hash匹配（如果track有hash）或者title匹配
           if ((track.hash != null && file['hash'] == track.hash) ||
               (track.hash == null && fileName == trackTitle)) {
             return currentPath;
@@ -531,16 +481,13 @@ class LyricController extends StateNotifier<LyricState> {
     double bestScore = 0.0;
     bool foundTruePerfectMatch = false;
 
-    // 递归搜索字幕文件
     void searchInFiles(List<dynamic> files, String currentPath) {
       for (final file in files) {
-        // 如果已经找到真完美匹配，停止搜索
         if (foundTruePerfectMatch) return;
 
         final fileType = file['type'] ?? '';
         final fileName = file['title'] ?? file['name'] ?? '';
 
-        // 如果是文件夹，递归搜索
         if (fileType == 'folder' && file['children'] != null) {
           final path =
               currentPath.isEmpty ? fileName : '$currentPath/$fileName';
@@ -552,7 +499,6 @@ class LyricController extends StateNotifier<LyricState> {
             SubtitleLibraryService.checkMatch(fileName, trackTitle);
 
         if (isMatch) {
-          // 检查是否是"真完美匹配"：分数1.0 且 路径相同
           final isSamePath =
               audioParentPath != null && currentPath == audioParentPath;
           final isTruePerfect = score == 1.0 && isSamePath;
@@ -565,17 +511,11 @@ class LyricController extends StateNotifier<LyricState> {
             return;
           }
 
-          // 如果不是真完美匹配，但分数更高，或者分数相同但之前没有找到过1.0的匹配
-          // 注意：如果之前已经找到了一个score=1.0的（非同目录），我们不应该被低分的覆盖
-          // 但如果找到了另一个score=1.0的（非同目录），我们可以保留任意一个，或者保留第一个
           if (score > bestScore) {
             bestScore = score;
             bestMatchFile = file;
             LogService.instance.debug('[Lyric] 找到更佳匹配: lyric="$fileName", score=$score', tag: 'Playback');
           } else if (score == 1.0 && bestScore == 1.0) {
-            // 已经有一个完美匹配了，但不是同目录的（否则上面就return了）
-            // 当前这个也是完美匹配，也不是同目录的（否则上面就return了）
-            // 保持原样，或者根据其他规则（如文件名长度？）
           }
         }
       }
@@ -606,19 +546,16 @@ class LyricController extends StateNotifier<LyricState> {
     if (generation != null && _isStale(generation)) return;
     if (state.lyrics.isEmpty || state.isTranslating) return;
 
-    // 已有翻译结果，切换显示
     if (state.isTranslated) {
       state = state.copyWith(showTranslated: !state.showTranslated);
       return;
     }
 
-    // 首次翻译
     state = state.copyWith(isTranslating: true);
 
     try {
       final translationService = TranslationService();
 
-      // 收集需要翻译的文本（跳过空行和音符占位）
       final textsToTranslate = <String>[];
       final indexMap = <int>[];
 
@@ -635,14 +572,11 @@ class LyricController extends StateNotifier<LyricState> {
         return;
       }
 
-      // 将歌词行用换行符拼接后分块翻译，复用 translateLongText 的分块机制
-      // 使用特殊分隔符以便翻译后准确拆分回各行
       const separator = '\n';
       const maxChunkSize = 1500;
 
-      // 按字符限制分块（保证每块不超过 maxChunkSize）
       final chunks = <String>[];
-      final chunkLineCounts = <int>[]; // 每块包含的行数
+      final chunkLineCounts = <int>[];
       String currentChunk = '';
       int currentLineCount = 0;
 
@@ -663,7 +597,6 @@ class LyricController extends StateNotifier<LyricState> {
         chunkLineCounts.add(currentLineCount);
       }
 
-      // 并发翻译各块
       final prefs = await SharedPreferences.getInstance();
       final source = prefs.getString('translation_source') ?? 'google';
       int concurrency = 1;
@@ -682,27 +615,23 @@ class LyricController extends StateNotifier<LyricState> {
           try {
             chunkResults[idx] = await translationService.translate(chunks[idx]);
           } catch (e) {
-            chunkResults[idx] = chunks[idx]; // 失败保留原文
+            chunkResults[idx] = chunks[idx];
           }
         }
       }
 
       await Future.wait(List.generate(concurrency, (_) => worker()));
 
-      // 将翻译结果按换行符拆回逐行，映射回原歌词
       final translatedTexts = <String>[];
       for (int i = 0; i < chunkResults.length; i++) {
         final lines = chunkResults[i].split(separator);
         final expectedCount = chunkLineCounts[i];
-        // 翻译器可能合并/拆分行，尽量对齐
         if (lines.length == expectedCount) {
           translatedTexts.addAll(lines);
         } else if (lines.length > expectedCount) {
-          // 多出来的行合并到最后一行
           translatedTexts.addAll(lines.take(expectedCount - 1));
           translatedTexts.add(lines.skip(expectedCount - 1).join(' '));
         } else {
-          // 不够的行用原文补齐
           translatedTexts.addAll(lines);
           final startIdx = translatedTexts.length - lines.length;
           for (int j = lines.length; j < expectedCount; j++) {
@@ -716,15 +645,12 @@ class LyricController extends StateNotifier<LyricState> {
         }
       }
 
-      // Double-check generation before applying results — the translation
-      // API calls may have taken long enough for a new track to load.
       if (generation != null && _isStale(generation)) {
         LogService.instance.debug('[Lyric] 取消翻译结果（已过期）', tag: 'Playback');
         state = state.copyWith(isTranslating: false);
         return;
       }
 
-      // 构建翻译后的歌词列表（保留原时间戳）
       final translated = List<LyricLine>.from(state.lyrics);
       for (int i = 0; i < indexMap.length; i++) {
         final idx = indexMap[i];
@@ -743,7 +669,6 @@ class LyricController extends StateNotifier<LyricState> {
     }
   }
 
-  // 清空字幕
   void clearLyrics() {
     state = LyricState();
   }
@@ -767,9 +692,8 @@ class LyricController extends StateNotifier<LyricState> {
     final buffer = StringBuffer();
 
     if (format == 'lrc') {
-      // LRC 格式
       for (final lyric in adjustedLyrics) {
-        if (lyric.text.isEmpty) continue; // 跳过占位符
+        if (lyric.text.isEmpty) continue;
         final minutes = lyric.startTime.inMinutes;
         final seconds = lyric.startTime.inSeconds % 60;
         final centiseconds = (lyric.startTime.inMilliseconds % 1000) ~/ 10;
@@ -777,10 +701,9 @@ class LyricController extends StateNotifier<LyricState> {
             '[${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}.${centiseconds.toString().padLeft(2, '0')}]${lyric.text}');
       }
     } else if (format == 'vtt') {
-      // WebVTT 格式
       buffer.writeln('WEBVTT\n');
       for (final lyric in adjustedLyrics) {
-        if (lyric.text.isEmpty) continue; // 跳过占位符
+        if (lyric.text.isEmpty) continue;
         buffer.writeln('${_formatWebVTTTime(lyric.startTime)} --> ${_formatWebVTTTime(lyric.endTime)}');
         buffer.writeln(lyric.text);
         buffer.writeln();
@@ -798,7 +721,6 @@ class LyricController extends StateNotifier<LyricState> {
     return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}.${milliseconds.toString().padLeft(3, '0')}';
   }
 
-  // 手动加载字幕文件
   /// 从本地文件路径加载字幕（用于字幕库）
   /// 接受可选的 [generation] 用于协调快速切换时的陈旧操作取消。
   /// For imported local works, resolve the absolute file path on disk.
@@ -823,7 +745,6 @@ class LyricController extends StateNotifier<LyricState> {
       return null;
     }
 
-    // 1. Find the download task and extract local_import_path
     String? localImportPath;
     try {
       for (final task in DownloadService.instance.tasks) {
@@ -850,12 +771,10 @@ class LyricController extends StateNotifier<LyricState> {
       return null;
     }
 
-    // 2. Walk the allFiles children tree to find the matching lyric file
-    //    and compute its relative path within the imported folder.
     String? relativePath;
 
     void walkTree(List<dynamic> items, String currentPath) {
-      if (relativePath != null) return; // already found
+      if (relativePath != null) return;
 
       for (final item in items) {
         final type = item['type'] ?? '';
@@ -887,7 +806,6 @@ class LyricController extends StateNotifier<LyricState> {
       return null;
     }
 
-    // 3. Construct absolute path
     final absolutePath = '$localImportPath/$relativePath'
         .replaceAll(Platform.pathSeparator, '/');
 
@@ -902,7 +820,6 @@ class LyricController extends StateNotifier<LyricState> {
     try {
       LogService.instance.debug('[Lyric] 从本地文件加载字幕: $filePath', tag: 'Playback');
 
-      // 读取文件内容
       final file = File(filePath);
       if (!await file.exists()) {
         if (generation == null || !_isStale(generation)) {
@@ -915,7 +832,6 @@ class LyricController extends StateNotifier<LyricState> {
         return;
       }
 
-      // 使用智能编码检测读取文件
       final (content, encoding) =
           await EncodingUtils.readFileWithEncoding(file);
 
@@ -926,7 +842,6 @@ class LyricController extends StateNotifier<LyricState> {
 
       LogService.instance.debug('[Lyric] 检测到文件编码: $encoding', tag: 'Playback');
 
-      // 解析字幕
       final lyrics = LyricParser.parse(content);
 
       if (generation != null && _isStale(generation)) {
@@ -960,7 +875,6 @@ class LyricController extends StateNotifier<LyricState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // 获取认证信息
       final authState = ref.read(authProvider);
       final host = authState.host ?? '';
       final token = authState.token ?? '';
@@ -977,7 +891,6 @@ class LyricController extends StateNotifier<LyricState> {
         return;
       }
 
-      // 构建字幕 URL
       String normalizedUrl = host;
       if (!host.startsWith('http://') && !host.startsWith('https://')) {
         if (host.contains('localhost') ||
@@ -992,8 +905,6 @@ class LyricController extends StateNotifier<LyricState> {
 
       String content;
 
-      // 1. 先尝试从缓存加载（包括下载文件和缓存文件）
-      // 优先级：传入的 workId > lyricFile 中的 workId > 当前播放音轨的 workId
       int? effectiveWorkId = workId ?? lyricFile['workId'] as int?;
       if (effectiveWorkId == null) {
         final currentTrackAsync = ref.read(currentTrackProvider);
@@ -1019,7 +930,6 @@ class LyricController extends StateNotifier<LyricState> {
         LogService.instance.debug('[Lyric] 手动加载 - 从缓存加载字幕: $hash', tag: 'Playback');
         content = cachedContent;
       } else {
-        // 2. 缓存未命中，从网络下载
         LogService.instance.debug('[Lyric] 手动加载 - 从网络下载字幕: $hash', tag: 'Playback');
         final dio = Dio();
         final response = await dio.get<List<int>>(
@@ -1037,13 +947,11 @@ class LyricController extends StateNotifier<LyricState> {
         }
 
         if (response.statusCode == 200) {
-          // 使用智能编码检测解码字节
           final (decodedContent, encoding) =
               EncodingUtils.decodeBytes(response.data!);
           LogService.instance.debug('[Lyric] 手动加载 - 网络字幕编码: $encoding', tag: 'Playback');
           content = decodedContent;
 
-          // 3. 缓存字幕内容
           if (effectiveWorkId != null) {
             await CacheService.cacheTextContent(
               workId: effectiveWorkId,
@@ -1068,7 +976,6 @@ class LyricController extends StateNotifier<LyricState> {
         }
       }
 
-      // 4. 解析字幕
       final lyrics = LyricParser.parse(content);
 
       if (!_isStale(myGen)) {
@@ -1092,7 +999,6 @@ class LyricController extends StateNotifier<LyricState> {
   }
 }
 
-// 存储当前工作的文件列表（用于查找字幕）
 class FileListState {
   final List<dynamic> files;
 
@@ -1116,20 +1022,17 @@ final fileListControllerProvider =
   return FileListController();
 });
 
-// Provider
 final lyricControllerProvider =
     StateNotifierProvider<LyricController, LyricState>((ref) {
   return LyricController(ref);
 });
 
-// 监听曲目变化，自动重新加载字幕
 final lyricAutoLoaderProvider = Provider<void>((ref) {
   final currentTrack = ref.watch(currentTrackProvider);
   final fileListState = ref.watch(fileListControllerProvider);
 
   currentTrack.whenData((track) {
     if (track != null && fileListState.files.isNotEmpty) {
-      // 延迟加载，避免同步问题
       Future.microtask(() {
         ref.read(lyricControllerProvider.notifier).loadLyricForTrack(
               track,
@@ -1137,20 +1040,17 @@ final lyricAutoLoaderProvider = Provider<void>((ref) {
             );
       });
     } else if (track == null) {
-      // 没有播放时清空字幕
       ref.read(lyricControllerProvider.notifier).clearLyrics();
     }
   });
 });
 
-// 当前字幕文本 Provider（根据播放位置）
 final currentLyricTextProvider = Provider<String?>((ref) {
   final lyricState = ref.watch(lyricControllerProvider);
   final position = ref.watch(positionProvider);
 
   if (lyricState.lyrics.isEmpty) return null;
 
-  // 使用显示用歌词（翻译后 > 原文）
   final displayLyrics = lyricState.displayLyrics;
 
   return position.when(

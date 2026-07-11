@@ -14,18 +14,13 @@ import 'package:image/image.dart' as img;
 /// Returns PNG bytes of the blurred image, or null on failure.
 Future<Uint8List?> _blurImageInIsolate(Uint8List imageBytes) async {
   try {
-    // Decode image using pure-Dart decoder
     final original = img.decodeImage(imageBytes);
     if (original == null) return null;
 
-    // Downscale to ~200px wide for faster blur processing
-    // Privacy blur doesn't need full resolution
     final thumb = img.copyResize(original, width: 200);
 
-    // Apply heavy gaussian blur with large radius
     final blurred = img.gaussianBlur(thumb, radius: 50);
 
-    // Encode back to PNG bytes
     final pngBytes = img.encodePng(blurred);
     return Uint8List.fromList(pngBytes);
   } catch (e) {
@@ -43,19 +38,16 @@ class ImageBlurUtil {
   /// agar tidak memblokade main thread (UI).
   static Future<String?> blurNetworkImageToFile(String imageUrl) async {
     try {
-      // Generate cache file name hash (quick — can stay on main thread)
       final urlHash = md5.convert(utf8.encode(imageUrl)).toString();
       final tempDir = await getTemporaryDirectory();
       final blurredFile = File('${tempDir.path}/blurred_$urlHash.png');
 
-      // If already cached, return immediately (no processing needed)
       if (await blurredFile.exists()) {
         return 'file://${blurredFile.path}';
       }
 
       Uint8List imageData;
 
-      // Download image bytes on main thread (async HTTP — non-blocking)
       if (imageUrl.startsWith('file://')) {
         final localPath = Uri.parse(imageUrl).toFilePath();
         final localFile = File(localPath);
@@ -75,8 +67,6 @@ class ImageBlurUtil {
         imageData = response.bodyBytes;
       }
 
-      // Process heavy work (decode → downscale → blur → encode PNG) in Isolate.
-      // Menggunakan pure-Dart [image] package agar kompatibel dengan isolate.
       final pngBytes = await compute(_blurImageInIsolate, imageData);
 
       if (pngBytes == null || pngBytes.isEmpty) {
@@ -84,7 +74,6 @@ class ImageBlurUtil {
         return null;
       }
 
-      // Save to temp file (I/O — non-blocking)
       await blurredFile.writeAsBytes(pngBytes);
       return 'file://${blurredFile.path}';
     } catch (e) {

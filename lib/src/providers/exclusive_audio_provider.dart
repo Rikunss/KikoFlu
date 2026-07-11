@@ -27,23 +27,16 @@ final activeUsbDacNameProvider = StreamProvider<String>((ref) {
   final ex = ExclusiveAudioService.instance;
   final hiRes = HiResAudioService.instance;
 
-  // Emit current value immediately
   controller.add(ex.activeUsbDacName);
 
-  // Listen for USB attach events from ExclusiveAudioService
-  // (only fires when exclusive mode is enabled)
   final attachSub = ex.usbAttachedStream.listen((name) {
     controller.add(name);
   });
 
-  // Listen for USB detach events from ExclusiveAudioService
   final detachSub = ex.usbDetachedStream.listen((_) {
     controller.add('');
   });
 
-  // Listen for USB device list changes from HiResAudioService.
-  // This fires on every USB attach/detach regardless of exclusive mode,
-  // ensuring the provider emits even when exclusive mode is OFF.
   final usbDevicesSub = hiRes.usbDevicesStream.listen((devices) {
     if (devices.isNotEmpty) {
       controller.add(devices.first.productName);
@@ -69,11 +62,7 @@ final activeUsbDacNameProvider = StreamProvider<String>((ref) {
 final hiResUsbRoutingProvider = StreamProvider<UsbRoutingState>((ref) {
   final hiRes = HiResAudioService.instance;
   final controller = StreamController<UsbRoutingState>();
-  // Emit cached value first to avoid the "broadcast stream loses initial
-  // event" bug — the stream may have already emitted before this provider
-  // was first watched (e.g. DAC plugged before sheet opened).
   controller.add(hiRes.lastUsbRoutingState);
-  // Forward live stream events.
   final sub = hiRes.usbRoutingStream.listen((state) {
     controller.add(state);
   });
@@ -98,23 +87,13 @@ final hiResPlaybackStateProvider = StreamProvider<bool>((ref) {
 /// headphones/USB DAC/Bluetooth are plugged/unplugged.
 /// On desktop: uses AudioSession's becomingNoisy events and platform APIs.
 final activeOutputDeviceProvider = StreamProvider<String>((ref) {
-  // On Android, use the native HiResAudioService for precise device detection
   if (Platform.isAndroid) {
     final hiRes = HiResAudioService.instance;
-    // Emit cached value first (avoids "broadcast stream loses initial event" bug),
-    // then actively query native for the REAL current device type (since the
-    // startup push from attachChannel() was likely lost before Dart handler
-    // was set up). Then forward live stream events for device plug/unplug.
     final controller = StreamController<String>.broadcast();
     controller.add(hiRes.lastOutputDeviceType);
 
-    // Guard: if a live push event arrives before the async query completes,
-    // skip the stale query result so we don't overwrite real-time data.
     var hasLiveData = false;
 
-    // Query native for the actual current device type (async).
-    // This fires after the cached value so the pill renders immediately
-    // (never stuck in 'loading') and then updates to the correct type.
     hiRes.queryActiveOutputDeviceType().then((type) {
       if (!controller.isClosed && !hasLiveData) {
         controller.add(type);
@@ -138,21 +117,15 @@ final activeOutputDeviceProvider = StreamProvider<String>((ref) {
     return controller.stream;
   }
 
-  // On desktop/iOS, create a lightweight controller that listens to
-  // AudioSession events and provides basic device type info.
   final controller = StreamController<String>.broadcast();
 
-  // Emit 'speaker' as initial default (conservative assumption)
   controller.add('speaker');
 
-  // Listen for headphone unplug events via AudioSession
   AudioSession.instance.then((session) {
     session.becomingNoisyEventStream.listen((_) {
-      // becomingNoisy fires when headphones are UNPLUGGED → speaker now
       if (!controller.isClosed) controller.add('speaker');
     });
   }).catchError((_) {
-    // AudioSession not available on this platform — keep default
   });
 
   ref.onDispose(() => controller.close());

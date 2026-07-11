@@ -36,9 +36,8 @@ class _CachedImageWidgetState extends State<CachedImageWidget> {
   }
 
   Future<void> _loadImage() async {
-    // 优先检查是否是本地文件（file:// 协议）
     if (widget.imageUrl.startsWith('file://')) {
-      final localPath = widget.imageUrl.substring(7); // 移除 'file://' 前缀
+      final localPath = widget.imageUrl.substring(7);
       final localFile = File(localPath);
 
       if (await localFile.exists()) {
@@ -105,7 +104,6 @@ class _CachedImageWidgetState extends State<CachedImageWidget> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Decode at a reasonable max size — file explorer thumbnails don't need full res
     const int cacheSize = 400;
 
     if (_cachedFilePath != null) {

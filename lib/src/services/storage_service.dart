@@ -13,19 +13,15 @@ class StorageService {
   static late SharedPreferences _prefs;
   static const _secureStorage = FlutterSecureStorage();
 
-  // Keys that should be stored in secure storage
   static const _secureKeys = {'auth_token'};
 
   static Future<void> init() async {
-    // Initialize Hive boxes
     _settingsBox = await Hive.openBox('settings');
     _userBox = await Hive.openBox('users');
     _cacheBox = await Hive.openBox('cache');
 
-    // Initialize SharedPreferences
     _prefs = await SharedPreferences.getInstance();
 
-    // Migrate auth_token from SharedPreferences to secure storage
     await _migrateSecureKeys();
   }
 
@@ -40,7 +36,6 @@ class StorageService {
     }
   }
 
-  // Settings
   static Future<void> setSetting(String key, dynamic value) async {
     await _settingsBox.put(key, value);
   }
@@ -53,7 +48,6 @@ class StorageService {
     await _settingsBox.delete(key);
   }
 
-  // User data
   static Future<void> setUser(String key, dynamic value) async {
     await _userBox.put(key, value);
   }
@@ -70,7 +64,6 @@ class StorageService {
     return _userBox.keys.cast<String>().toList();
   }
 
-  // Cache
   static Future<void> setCache(String key, dynamic value) async {
     await _cacheBox.put(key, value);
   }
@@ -87,7 +80,6 @@ class StorageService {
     await _cacheBox.clear();
   }
 
-  // SharedPreferences methods (with secure storage override for sensitive keys)
   static Future<void> setString(String key, String value) async {
     if (_secureKeys.contains(key)) {
       await _secureStorage.write(key: key, value: value);
@@ -98,7 +90,6 @@ class StorageService {
 
   static String? getString(String key) {
     if (_secureKeys.contains(key)) {
-      // Return null for sync access - use getStringAsync for secure keys
       return null;
     }
     return _prefs.getString(key);
@@ -138,15 +129,12 @@ class StorageService {
 
   static Future<void> clear() async {
     await _prefs.clear();
-    // Don't clear secure storage - it contains auth tokens
   }
 
-  // Get SharedPreferences instance
   static Future<SharedPreferences> getPrefs() async {
     return _prefs;
   }
 
-  // JSON Map methods for complex objects
   static Future<void> setMap(String key, Map<String, dynamic> value) async {
     await _prefs.setString(key, jsonEncode(value));
   }

@@ -63,8 +63,6 @@ String formatFileSize(int? bytes) {
   return '${size.toStringAsFixed(2)} ${units[unitIndex]}';
 }
 
-// ── Expand/collapse helpers ───────────────────────────────────────
-
 /// Expand all parent folders along the path to [targetPath].
 void expandPathToFolder(Set<String> expandedFolders, String targetPath) {
   final segments = targetPath.split('/');
@@ -83,8 +81,6 @@ void toggleFolder(Set<String> expandedFolders, String path) {
     expandedFolders.add(path);
   }
 }
-
-// ── File tree navigation helpers ─────────────────────────────────
 
 /// Find a folder's children by path.
 List<Map<String, dynamic>>? findFolderChildren(
@@ -109,8 +105,6 @@ List<Map<String, dynamic>>? findFolderChildren(
   return currentItems;
 }
 
-// ── Library subtitle checking ────────────────────────────────────
-
 /// Check which audio files have matching subtitles in the subtitle library.
 Future<Set<String>> checkLibrarySubtitles({
   required int workId,
@@ -128,7 +122,6 @@ Future<Set<String>> checkLibrarySubtitles({
       'RJ$workId', 'RJ0$workId', 'BJ$workId', 'BJ0$workId', 'VJ$workId', 'VJ0$workId',
     ];
 
-    // Collect all audio file names
     final audioFiles = <String>[];
     void collectAudioFiles(List<Map<String, dynamic>> fileItems) {
       for (final item in fileItems) {
@@ -143,7 +136,6 @@ Future<Set<String>> checkLibrarySubtitles({
     }
     collectAudioFiles(items);
 
-    // Check each possible folder
     for (final folderName in possibleFolderNames) {
       final folderPath = '$parsedFolderPath/$folderName';
       final folder = Directory(folderPath);
@@ -160,12 +152,9 @@ Future<Set<String>> checkLibrarySubtitles({
       }
     }
   } catch (e) {
-    // Silently fail — subtitle library check is non-critical
   }
   return subtitledAudioFiles;
 }
-
-// ── Main folder identification ───────────────────────────────────
 
 /// Statistics for a folder.
 class FolderStats {
@@ -241,9 +230,8 @@ String? identifyMainFolder(
   List<AudioFormat> priorityOrder,
 ) {
   if (items.isEmpty) return null;
-  if (items.any((item) => FileIconUtils.isAudioFile(item))) return ''; // root has audio
+  if (items.any((item) => FileIconUtils.isAudioFile(item))) return '';
 
-  // Collect folder statistics
   final folderStats = <String, FolderStats>{};
   void analyzeFolders(List<Map<String, dynamic>> fileItems, String parentPath) {
     for (final item in fileItems) {
@@ -260,13 +248,11 @@ String? identifyMainFolder(
   analyzeFolders(items, '');
   if (folderStats.isEmpty) return null;
 
-  // Find max audio count
   int maxAudio = 0;
   for (final s in folderStats.values) {
     if (s.audioCount > maxAudio) maxAudio = s.audioCount;
   }
 
-  // Find candidates with max audio, then max text
   int maxText = -1;
   List<String> candidates = [];
   for (final entry in folderStats.entries) {
@@ -290,8 +276,6 @@ String? identifyMainFolder(
   }
   return mainFolder;
 }
-
-// ── Audio file collection ────────────────────────────────────────
 
 /// Get all audio files from the same directory (non-recursive).
 List<Map<String, dynamic>> getAudioFilesFromSameDirectory(

@@ -46,7 +46,6 @@ class SmartPlaylistsNotifier extends StateNotifier<List<SmartPlaylist>> {
         state = playlists;
       }
     } catch (e) {
-      // If loading fails, start with empty list
       state = [];
     }
   }
@@ -57,7 +56,6 @@ class SmartPlaylistsNotifier extends StateNotifier<List<SmartPlaylist>> {
       final jsonString = jsonEncode(state.map((p) => p.toJson()).toList());
       await StorageService.setString(_storageKey, jsonString);
     } catch (e) {
-      // Save failure — silently ignore
     }
   }
 

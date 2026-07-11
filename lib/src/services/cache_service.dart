@@ -12,16 +12,14 @@ import '../models/download_task.dart';
 import '../utils/encoding_utils.dart';
 
 class CacheService {
-  // 缓存时长（过期后自动删除）
   static const Duration workDetailCacheDuration =
-      Duration(hours: 24); // 作品详情缓存24小时（SharedPreferences）
+      Duration(hours: 24);
   static const Duration workTracksCacheDuration =
-      Duration(hours: 24); // 作品文件列表缓存24小时（包含URL，避免token过期）
+      Duration(hours: 24);
   static const Duration fileCacheDuration =
-      Duration(days: 30); // 文件资源（PDF等）缓存30天（基于hash，不受URL变化影响）
+      Duration(days: 30);
   static const Duration audioCacheDuration =
-      Duration(days: 30); // 音频文件缓存30天（基于hash，不受URL变化影响）
-  // 注意：图片缓存由 cached_network_image 包自己管理过期时间（默认7天）
+      Duration(days: 30);
 
   static String _safeAudioHash(String hash) => hash.replaceAll('/', '_');
 
@@ -55,7 +53,6 @@ class CacheService {
     if (await tempFile.exists()) {
       await tempFile.delete();
     }
-    // 在重新下载之前移除旧的 meta，防止过期逻辑误判
     await _removeAudioCacheMeta(hash);
   }
 
@@ -89,27 +86,22 @@ class CacheService {
     await _writeAudioCacheMeta(hash);
   }
 
-  // 缓存大小上限配置键
   static const String cacheSizeLimitKey = 'cache_size_limit_mb';
-  static const int defaultCacheSizeLimitMB = 1000; // 默认1GB (1000MB)
+  static const int defaultCacheSizeLimitMB = 1000;
 
-  // 自动清理检查间隔（避免过于频繁检查）
   static const Duration autoCleanCheckInterval = Duration(minutes: 5);
   static const String lastCleanCheckTimeKey = 'last_clean_check_time';
 
-  // 缓存作品详情
   static Future<void> cacheWorkDetail(
       int workId, Map<String, dynamic> workData) async {
     final prefs = await StorageService.getPrefs();
     final cacheKey = 'work_detail_$workId';
     final cacheTimeKey = 'work_detail_time_$workId';
 
-    // 使用 JSON 编码保存完整数据
     await prefs.setString(cacheKey, jsonEncode(workData));
     await prefs.setInt(cacheTimeKey, DateTime.now().millisecondsSinceEpoch);
   }
 
-  // 获取缓存的作品详情
   static Future<Map<String, dynamic>?> getCachedWorkDetail(int workId) async {
     final prefs = await StorageService.getPrefs();
     final cacheKey = 'work_detail_$workId';
@@ -122,28 +114,23 @@ class CacheService {
       return null;
     }
 
-    // 检查是否过期
     final cacheDateTime = DateTime.fromMillisecondsSinceEpoch(cacheTime);
     if (DateTime.now().difference(cacheDateTime) > workDetailCacheDuration) {
-      // 过期，删除缓存
       await prefs.remove(cacheKey);
       await prefs.remove(cacheTimeKey);
       return null;
     }
 
-    // 返回解码后的完整数据
     try {
       return jsonDecode(cachedData) as Map<String, dynamic>;
     } catch (e) {
       LogService.instance.error('[Cache] 解码作品详情缓存失败: $e');
-      // 数据损坏，删除缓存
       await prefs.remove(cacheKey);
       await prefs.remove(cacheTimeKey);
       return null;
     }
   }
 
-  // 清除指定作品的详情缓存（用于收藏状态更新后强制刷新）
   static Future<void> invalidateWorkDetailCache(int workId) async {
     final prefs = await StorageService.getPrefs();
     final cacheKey = 'work_detail_$workId';
@@ -154,7 +141,6 @@ class CacheService {
     LogService.instance.info('[Cache] 已清除作品详情缓存: $workId');
   }
 
-  // 缓存作品文件列表
   static Future<void> cacheWorkTracks(int workId, String tracksJson) async {
     final prefs = await StorageService.getPrefs();
     final cacheKey = 'work_tracks_$workId';
@@ -164,7 +150,6 @@ class CacheService {
     await prefs.setInt(cacheTimeKey, DateTime.now().millisecondsSinceEpoch);
   }
 
-  // 获取缓存的作品文件列表
   static Future<String?> getCachedWorkTracks(int workId) async {
     final prefs = await StorageService.getPrefs();
     final cacheKey = 'work_tracks_$workId';
@@ -177,10 +162,8 @@ class CacheService {
       return null;
     }
 
-    // 检查是否过期
     final cacheDateTime = DateTime.fromMillisecondsSinceEpoch(cacheTime);
     if (DateTime.now().difference(cacheDateTime) > workTracksCacheDuration) {
-      // 过期，删除缓存
       await prefs.remove(cacheKey);
       await prefs.remove(cacheTimeKey);
       return null;
@@ -189,7 +172,6 @@ class CacheService {
     return cachedData;
   }
 
-  // 缓存音频文件（基于 hash）
   static Future<String?> cacheAudioFile({
     required String hash,
     required String url,
@@ -202,29 +184,23 @@ class CacheService {
         final lastModified = await file.lastModified();
         if (DateTime.now().difference(lastModified) < audioCacheDuration) {
           LogService.instance.info('[Cache] 音频缓存命中: $hash');
-          return file.path; // 未过期，直接返回
+          return file.path;
         }
-        // 过期，删除旧文件
         LogService.instance.info('[Cache] 音频缓存过期，重新下载: $hash');
         await file.delete();
         await _removeAudioCacheMeta(hash);
       }
 
-      // 清理旧的临时文件
       await resetAudioCachePartial(hash);
       final tempFile = await prepareAudioCacheTempFile(hash);
 
-      // 下载文件（先至临时文件）
       LogService.instance.info('[Cache] 下载音频文件: $hash');
 
-      // 配置服务器Cookie（如果存在）
       dio.options.headers.addAll(CookieService.serverCookieHeaders);
       await dio.download(url, tempFile.path);
 
-      // 下载完成后重命名为最终文件并写入 meta
       await finalizeAudioCacheFile(hash, expectedSize: await tempFile.length());
 
-      // 检查并自动清理缓存
       await checkAndCleanCache();
       return (await _audioFinalFile(hash)).path;
     } catch (e) {
@@ -233,23 +209,18 @@ class CacheService {
     }
   }
 
-  // 获取缓存的音频文件（基于 hash）
   static Future<String?> getCachedAudioFile(String hash) async {
     try {
-      // 1. 先检查下载文件（优先级最高，因为是用户主动下载的）
       final downloadedFile = await _getDownloadedAudioFile(hash);
       if (downloadedFile != null) {
         LogService.instance.info('[Cache] 使用已下载的音频文件: $hash');
         return downloadedFile;
       }
 
-      // 2. 检查缓存文件
       final finalFile = await _audioFinalFile(hash);
       final tempFile = await _audioTempFile(hash);
 
-      // 如果只有临时文件存在，说明尚未缓存完成
       if (!await finalFile.exists()) {
-        // 清理久远的临时文件，避免占用空间
         if (await tempFile.exists()) {
           final lastModified = await tempFile.lastModified();
           if (DateTime.now().difference(lastModified) > audioCacheDuration) {
@@ -261,7 +232,6 @@ class CacheService {
 
       final file = finalFile;
       if (await file.exists()) {
-        // 检查是否过期
         final prefs = await StorageService.getPrefs();
         final metaKey = 'audio_cache_meta_${_safeAudioHash(hash)}';
         final cacheTime = prefs.getInt(metaKey);
@@ -270,11 +240,10 @@ class CacheService {
           final cacheDateTime = DateTime.fromMillisecondsSinceEpoch(cacheTime);
           if (DateTime.now().difference(cacheDateTime) < audioCacheDuration) {
             LogService.instance.info('[Cache] 使用缓存的音频文件: $hash');
-            return file.path; // 未过期
+            return file.path;
           }
         }
 
-        // 过期，删除
         LogService.instance.info('[Cache] 音频缓存过期: $hash');
         await file.delete();
         await prefs.remove(metaKey);
@@ -290,7 +259,6 @@ class CacheService {
     }
   }
 
-  // 缓存文件资源（PDF等）
   static Future<String?> cacheFileResource({
     required int workId,
     required String hash,
@@ -299,43 +267,34 @@ class CacheService {
     required Dio dio,
   }) async {
     try {
-      // 1. 先检查下载文件
       final downloadedFile = await _getDownloadedFile(workId, hash, null);
       if (downloadedFile != null) {
         LogService.instance.info('[Cache] 使用已下载的文件: $hash');
         return downloadedFile;
       }
 
-      // 2. 检查缓存文件
       final cacheDir = await _getCacheDirectory();
-      // 使用 hash 作为文件名（替换路径分隔符为下划线）
       final safeHash = hash.replaceAll('/', '_');
       final fileName = '${workId}_${safeHash}_$fileType';
       final filePath = '${cacheDir.path}/$fileName';
 
-      // 如果文件已存在，检查是否过期
       final file = File(filePath);
       if (await file.exists()) {
         final lastModified = await file.lastModified();
         if (DateTime.now().difference(lastModified) < fileCacheDuration) {
-          return filePath; // 未过期，直接返回
+          return filePath;
         }
-        // 过期，删除旧文件
         await file.delete();
       }
 
-      // 下载文件
-      // 配置服务器Cookie（如果存在）
       dio.options.headers.addAll(CookieService.serverCookieHeaders);
 
       await dio.download(url, filePath);
 
-      // 保存缓存元数据
       final prefs = await StorageService.getPrefs();
       final metaKey = 'file_cache_meta_${workId}_$safeHash';
       await prefs.setInt(metaKey, DateTime.now().millisecondsSinceEpoch);
 
-      // 检查并自动清理缓存
       await checkAndCleanCache();
 
       return filePath;
@@ -345,7 +304,6 @@ class CacheService {
     }
   }
 
-  // 获取缓存的文件资源
   static Future<String?> getCachedFileResource({
     required int workId,
     required String hash,
@@ -359,7 +317,6 @@ class CacheService {
 
       final file = File(filePath);
       if (await file.exists()) {
-        // 检查是否过期
         final prefs = await StorageService.getPrefs();
         final metaKey = 'file_cache_meta_${workId}_$safeHash';
         final cacheTime = prefs.getInt(metaKey);
@@ -367,11 +324,10 @@ class CacheService {
         if (cacheTime != null) {
           final cacheDateTime = DateTime.fromMillisecondsSinceEpoch(cacheTime);
           if (DateTime.now().difference(cacheDateTime) < fileCacheDuration) {
-            return filePath; // 未过期
+            return filePath;
           }
         }
 
-        // 过期，删除
         await file.delete();
         await prefs.remove(metaKey);
       }
@@ -383,7 +339,6 @@ class CacheService {
     }
   }
 
-  // 缓存文本内容
   static Future<void> cacheTextContent({
     required int workId,
     required String hash,
@@ -398,37 +353,31 @@ class CacheService {
       final file = File(filePath);
       await file.writeAsString(content);
 
-      // 保存缓存元数据
       final prefs = await StorageService.getPrefs();
       final metaKey = 'text_cache_meta_${workId}_$safeHash';
       await prefs.setInt(metaKey, DateTime.now().millisecondsSinceEpoch);
 
-      // 检查并自动清理缓存
       await checkAndCleanCache();
     } catch (e) {
       LogService.instance.error('[Cache] 缓存文本失败: $e');
     }
   }
 
-  // 获取缓存的文本内容
   static Future<String?> getCachedTextContent({
     required int workId,
     required String hash,
-    String? fileName, // 添加可选的文件名参数，用于查找手动复制的文件
+    String? fileName,
   }) async {
     try {
-      // 1. 先检查下载文件
       final downloadedFile = await _getDownloadedFile(workId, hash, fileName);
       if (downloadedFile != null) {
         final file = File(downloadedFile);
         if (await file.exists()) {
           LogService.instance.info('[Cache] 从已下载的文件读取文本内容: $hash');
-          // 使用智能编码检测读取文件
           return await EncodingUtils.readFileAsString(file);
         }
       }
 
-      // 2. 检查缓存文件
       final cacheDir = await _getCacheDirectory();
       final safeHash = hash.replaceAll('/', '_');
       final cacheFileName = '${workId}_${safeHash}_text.txt';
@@ -436,7 +385,6 @@ class CacheService {
 
       final file = File(filePath);
       if (await file.exists()) {
-        // 检查是否过期
         final prefs = await StorageService.getPrefs();
         final metaKey = 'text_cache_meta_${workId}_$safeHash';
         final cacheTime = prefs.getInt(metaKey);
@@ -444,12 +392,10 @@ class CacheService {
         if (cacheTime != null) {
           final cacheDateTime = DateTime.fromMillisecondsSinceEpoch(cacheTime);
           if (DateTime.now().difference(cacheDateTime) < fileCacheDuration) {
-            // 使用智能编码检测读取缓存文件
-            return await EncodingUtils.readFileAsString(file); // 未过期
+            return await EncodingUtils.readFileAsString(file);
           }
         }
 
-        // 过期，删除
         await file.delete();
         await prefs.remove(metaKey);
       }
@@ -461,22 +407,17 @@ class CacheService {
     }
   }
 
-  // 清除所有缓存
   static Future<void> clearAllCache() async {
     try {
-      // 1. 清除文件缓存（PDF、文本等）
       final cacheDir = await _getCacheDirectory();
       if (await cacheDir.exists()) {
         await cacheDir.delete(recursive: true);
       }
 
-      // 2. 清除音频缓存
       await clearAudioCache();
 
-      // 3. 清除图片缓存
       await clearImageCache();
 
-      // 4. 清除 SharedPreferences 中的缓存元数据
       final prefs = await StorageService.getPrefs();
       final keys = prefs.getKeys();
       for (final key in keys) {
@@ -496,17 +437,14 @@ class CacheService {
     }
   }
 
-  // 清除音频缓存
   static Future<void> clearAudioCache() async {
     try {
-      // 1. 清除自定义音频缓存（基于 hash）
       final customAudioCacheDir = await _getAudioCacheDirectory();
       if (await customAudioCacheDir.exists()) {
         await customAudioCacheDir.delete(recursive: true);
         LogService.instance.info('[Cache] 自定义音频缓存已清除');
       }
 
-      // 2. 清除 SharedPreferences 中的音频缓存元数据
       final prefs = await StorageService.getPrefs();
       final keys = prefs.getKeys();
       for (final key in keys) {
@@ -515,7 +453,6 @@ class CacheService {
         }
       }
 
-      // 3. 清除 just_audio 的旧缓存（如果存在）
       final appCacheDir = await getApplicationCacheDirectory();
       final justAudioCacheDir =
           Directory('${appCacheDir.path}/just_audio_cache');
@@ -528,7 +465,6 @@ class CacheService {
     }
   }
 
-  // 清除图片缓存
   static Future<void> clearImageCache() async {
     try {
       final appCacheDir = await getApplicationCacheDirectory();
@@ -543,16 +479,13 @@ class CacheService {
     }
   }
 
-  // 获取缓存大小
   static Future<int> getCacheSize() async {
     try {
       LogService.instance.info('[Cache] Getting cache size via isolate');
 
-      // Jalankan file I/O di isolate
       final result = await _runCacheIoInIsolate(cleanExpired: false);
       final fileSize = result?.totalSize ?? 0;
 
-      // SharedPreferences size (hanya bisa di main thread)
       final prefsSize = await _getSharedPreferencesCacheSize();
 
       final total = fileSize + prefsSize;
@@ -564,12 +497,10 @@ class CacheService {
     }
   }
 
-  // 获取音频缓存目录大小
   static Future<int> _getAudioCacheSize() async {
     try {
       int totalSize = 0;
 
-      // 1. 获取自定义音频缓存大小（基于 hash）
       final customAudioCacheDir = await _getAudioCacheDirectory();
       if (await customAudioCacheDir.exists()) {
         await for (final entity in customAudioCacheDir.list(recursive: true)) {
@@ -579,7 +510,6 @@ class CacheService {
         }
       }
 
-      // 2. 获取 just_audio 的旧缓存大小（如果存在）
       final appCacheDir = await getApplicationCacheDirectory();
       final justAudioCacheDir =
           Directory('${appCacheDir.path}/just_audio_cache');
@@ -598,11 +528,8 @@ class CacheService {
     }
   }
 
-  // 获取图片缓存目录大小
   static Future<int> _getImageCacheSize() async {
     try {
-      // cached_network_image 使用 flutter_cache_manager 管理缓存
-      // 默认缓存目录名为 libCachedImageData
       final appCacheDir = await getApplicationCacheDirectory();
       final imageCacheDir = Directory('${appCacheDir.path}/libCachedImageData');
 
@@ -624,7 +551,6 @@ class CacheService {
     }
   }
 
-  // 获取 SharedPreferences 缓存大小（估算）
   static Future<int> _getSharedPreferencesCacheSize() async {
     try {
       final prefs = await StorageService.getPrefs();
@@ -632,20 +558,18 @@ class CacheService {
       int estimatedSize = 0;
 
       for (final key in keys) {
-        // 只统计缓存相关的键
         if (key.startsWith('work_detail_') ||
             key.startsWith('work_tracks_') ||
             key.startsWith('file_cache_meta_') ||
             key.startsWith('text_cache_meta_') ||
             key.startsWith('audio_cache_meta_')) {
-          // 估算：键名长度 + 值长度
           estimatedSize += key.length;
 
           final value = prefs.get(key);
           if (value is String) {
             estimatedSize += value.length;
           } else if (value is int) {
-            estimatedSize += 8; // int 通常 8 字节
+            estimatedSize += 8;
           }
         }
       }
@@ -657,7 +581,6 @@ class CacheService {
     }
   }
 
-  // 获取缓存目录
   static Future<Directory> _getCacheDirectory() async {
     final appCacheDir = await getApplicationCacheDirectory();
     final cacheDir = Directory('${appCacheDir.path}/kikoeru_cache');
@@ -669,7 +592,6 @@ class CacheService {
     return cacheDir;
   }
 
-  // 获取音频缓存目录
   static Future<Directory> _getAudioCacheDirectory() async {
     final appCacheDir = await getApplicationCacheDirectory();
     final cacheDir = Directory('${appCacheDir.path}/kikoeru_audio_cache');
@@ -681,24 +603,18 @@ class CacheService {
     return cacheDir;
   }
 
-  // 设置缓存大小上限（MB）
   static Future<void> setCacheSizeLimit(int limitMB) async {
     final prefs = await StorageService.getPrefs();
     await prefs.setInt(cacheSizeLimitKey, limitMB);
   }
 
-  // 获取缓存大小上限（MB）
   static Future<int> getCacheSizeLimit() async {
     final prefs = await StorageService.getPrefs();
     return prefs.getInt(cacheSizeLimitKey) ?? defaultCacheSizeLimitMB;
   }
 
-  // 检查并自动清理缓存（如果超过上限）
-  // 使用时间间隔控制，避免过于频繁检查
-  // 利用 isolate 执行重文件 I/O，避免阻塞主线程
   static Future<void> checkAndCleanCache({bool force = false}) async {
     try {
-      // 如果不是强制检查，先判断是否需要检查
       if (!force) {
         final prefs = await StorageService.getPrefs();
         final lastCheckTime = prefs.getInt(lastCleanCheckTimeKey);
@@ -707,22 +623,18 @@ class CacheService {
           final lastCheck = DateTime.fromMillisecondsSinceEpoch(lastCheckTime);
           final timeSinceLastCheck = DateTime.now().difference(lastCheck);
 
-          // 如果距离上次检查不到5分钟，跳过检查
           if (timeSinceLastCheck < autoCleanCheckInterval) {
             return;
           }
         }
 
-        // 更新最后检查时间
         await prefs.setInt(
             lastCleanCheckTimeKey, DateTime.now().millisecondsSinceEpoch);
       }
 
-      // Jalankan file I/O berat di isolate
       final result = await _runCacheIoInIsolate(cleanExpired: true);
       if (result == null) return;
 
-      // Bersihkan metadata SharedPreferences untuk file yang dihapus (di main thread)
       final prefs = await StorageService.getPrefs();
 
       for (final fileName in result.deletedKikoeruFiles) {
@@ -739,7 +651,6 @@ class CacheService {
         await prefs.remove('audio_cache_meta_$hash');
       }
 
-      // Bersihkan juga SharedPreferences expired entries (work detail/tracks)
       await _cleanExpiredSharedPreferences();
 
       if (result.expiredFileCount > 0) {
@@ -750,7 +661,6 @@ class CacheService {
     }
   }
 
-  // 清理过期的 SharedPreferences 缓存
   static Future<int> _cleanExpiredSharedPreferences() async {
     try {
       final prefs = await StorageService.getPrefs();
@@ -759,14 +669,12 @@ class CacheService {
       int deletedCount = 0;
 
       for (final key in keys) {
-        // 检查作品详情缓存是否过期
         if (key.startsWith('work_detail_time_')) {
           final cacheTime = prefs.getInt(key);
           if (cacheTime != null) {
             final cacheDateTime =
                 DateTime.fromMillisecondsSinceEpoch(cacheTime);
             if (now.difference(cacheDateTime) > workDetailCacheDuration) {
-              // 过期，删除缓存数据和时间戳
               final workId = key.replaceFirst('work_detail_time_', '');
               await prefs.remove('work_detail_$workId');
               await prefs.remove(key);
@@ -774,14 +682,12 @@ class CacheService {
             }
           }
         }
-        // 检查作品文件列表缓存是否过期
         else if (key.startsWith('work_tracks_time_')) {
           final cacheTime = prefs.getInt(key);
           if (cacheTime != null) {
             final cacheDateTime =
                 DateTime.fromMillisecondsSinceEpoch(cacheTime);
             if (now.difference(cacheDateTime) > workTracksCacheDuration) {
-              // 过期，删除缓存数据和时间戳
               final workId = key.replaceFirst('work_tracks_time_', '');
               await prefs.remove('work_tracks_$workId');
               await prefs.remove(key);
@@ -789,7 +695,6 @@ class CacheService {
             }
           }
         }
-        // 文件和文本的元数据会在清理文件时一起删除，这里不需要单独处理
       }
 
       return deletedCount;
@@ -799,13 +704,11 @@ class CacheService {
     }
   }
 
-  // 从下载服务中获取已下载的音频文件
   static Future<String?> _getDownloadedAudioFile(String hash) async {
     try {
       final downloadService = DownloadService.instance;
       final tasks = downloadService.tasks;
 
-      // 查找已完成的下载任务
       for (final task in tasks) {
         if (task.hash == hash && task.status == DownloadStatus.completed) {
           final filePath = await downloadService.getDownloadedFilePath(
@@ -828,7 +731,6 @@ class CacheService {
     }
   }
 
-  // 从下载服务中获取已下载的文件（通用）
   static Future<String?> _getDownloadedFile(
     int workId,
     String hash,
@@ -837,16 +739,14 @@ class CacheService {
     try {
       final downloadService = DownloadService.instance;
 
-      // 处理可能的 workId/hash 格式
       String actualHash = hash;
       if (hash.contains('/')) {
         final parts = hash.split('/');
         if (parts.length == 2) {
-          actualHash = parts[1]; // 使用文件hash部分
+          actualHash = parts[1];
         }
       }
 
-      // 1. 先检查 DownloadService 管理的下载任务
       final filePath =
           await downloadService.getDownloadedFilePath(workId, actualHash);
       if (filePath != null) {
@@ -856,7 +756,6 @@ class CacheService {
         }
       }
 
-      // 2. 如果提供了文件名，检查手动复制的文件
       if (fileName != null && fileName.isNotEmpty) {
         try {
           final downloadDir = await downloadService.getDownloadDirectory();
@@ -864,12 +763,10 @@ class CacheService {
               Directory(p.join(downloadDir.path, workId.toString()));
 
           if (await workDir.exists()) {
-            // 递归查找匹配文件名的文件
             await for (final entity in workDir.list(recursive: true)) {
               if (entity is File) {
                 final entityFileName =
                     entity.path.split(Platform.pathSeparator).last;
-                // 精确匹配文件名
                 if (entityFileName == fileName) {
                   LogService.instance.info('[Cache] 找到手动复制的文件: ${entity.path}');
                   return entity.path;
@@ -889,7 +786,6 @@ class CacheService {
     }
   }
 
-  // 格式化字节大小为可读字符串
   static String _formatBytes(int bytes) {
     if (bytes < 1024) {
       return '$bytes B';
@@ -902,7 +798,6 @@ class CacheService {
     }
   }
 
-  // 获取格式化的缓存大小字符串
   static Future<String> getFormattedCacheSize() async {
     final size = await getCacheSize();
     return _formatBytes(size);
@@ -919,7 +814,6 @@ class CacheService {
       int otherSize = 0;
       final cacheDir = await _getCacheDirectory();
       if (await cacheDir.exists()) {
-        // Calculate main cache directory size minus SharedPreferences (estimated)
         int mainSize = 0;
         await for (final entity in cacheDir.list(recursive: true)) {
           if (entity is File) {
@@ -947,8 +841,6 @@ class CacheService {
   static String formatBytes(int bytes) {
     return _formatBytes(bytes);
   }
-
-  // ── Isolate helpers for heavy file I/O ──
 
   /// Runs heavy file I/O operations (cache size scanning, expired file cleanup)
   /// in a separate isolate to avoid blocking the main thread.
@@ -979,8 +871,8 @@ class CacheService {
 class _IsolateCacheResult {
   final int totalSize;
   final int expiredFileCount;
-  final List<String> deletedKikoeruFiles; // filenames for metadata cleanup
-  final List<String> deletedAudioHashes;  // hash values for audio meta cleanup
+  final List<String> deletedKikoeruFiles;
+  final List<String> deletedAudioHashes;
 
   const _IsolateCacheResult({
     required this.totalSize,
@@ -1008,7 +900,6 @@ _IsolateCacheResult _doCacheFileIo({
   int expiredFileCount = 0;
   int totalSize = 0;
 
-  // ── 1. Clean expired + compute size for kikoeru_cache ──
   final cacheDir = Directory(cacheDirPath);
   if (cacheDir.existsSync()) {
     for (final entity in cacheDir.listSync(recursive: true)) {
@@ -1027,7 +918,6 @@ _IsolateCacheResult _doCacheFileIo({
     }
   }
 
-  // ── 2. Clean expired + compute size for kikoeru_audio_cache ──
   final audioCacheDir = Directory(audioCacheDirPath);
   if (audioCacheDir.existsSync()) {
     for (final entity in audioCacheDir.listSync(recursive: true)) {
@@ -1048,7 +938,6 @@ _IsolateCacheResult _doCacheFileIo({
     }
   }
 
-  // ── 3. Compute size for just_audio_cache ──
   final justAudioDir = Directory('$appCacheDirPath/just_audio_cache');
   if (justAudioDir.existsSync()) {
     for (final entity in justAudioDir.listSync(recursive: true)) {
@@ -1065,7 +954,6 @@ _IsolateCacheResult _doCacheFileIo({
     }
   }
 
-  // ── 4. Compute size for libCachedImageData ──
   final imageCacheDir = Directory('$appCacheDirPath/libCachedImageData');
   if (imageCacheDir.existsSync()) {
     for (final entity in imageCacheDir.listSync(recursive: true)) {
@@ -1075,9 +963,7 @@ _IsolateCacheResult _doCacheFileIo({
     }
   }
 
-  // ── 5. If over limit, delete oldest files ──
   if (cleanExpired && totalSize > limitBytes) {
-    // Collect all file entries from kikoeru_cache and audio cache
     final allEntries = <_FileEntry>[];
 
     void collectDir(String dirPath) {
@@ -1098,7 +984,6 @@ _IsolateCacheResult _doCacheFileIo({
     collectDir(cacheDirPath);
     collectDir(audioCacheDirPath);
 
-    // Sort by oldest first
     allEntries.sort((a, b) => a.modified.compareTo(b.modified));
 
     final targetSize = (limitBytes * 0.8).toInt();

@@ -87,10 +87,6 @@ class ListeningStatisticsScreen extends ConsumerWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Main Content
-// ═══════════════════════════════════════════════════════════════
-
 class _StatsContent extends ConsumerStatefulWidget {
   final ListeningStats stats;
 
@@ -146,21 +142,18 @@ class _StatsContentState extends ConsumerState<_StatsContent>
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
-          // ── Hero Header ──
           FadeTransition(
             opacity: _fadeIn,
             child: _HeroHeader(stats: widget.stats),
           ),
           const SizedBox(height: 10),
 
-          // ── Overview Stats Grid ──
           FadeTransition(
             opacity: _fadeIn,
             child: _OverviewGrid(stats: widget.stats),
           ),
           const SizedBox(height: 28),
 
-          // ── Tabbed Chart (Daily / Weekly / Monthly) ──
           FadeTransition(
             opacity: _fadeIn,
             child: _SectionHeader(
@@ -190,7 +183,6 @@ class _StatsContentState extends ConsumerState<_StatsContent>
           ),
           const SizedBox(height: 28),
 
-          // ── Activity Heatmap ──
           FadeTransition(
             opacity: _fadeIn,
             child: _SectionHeader(
@@ -217,7 +209,6 @@ class _StatsContentState extends ConsumerState<_StatsContent>
           ),
           const SizedBox(height: 28),
 
-          // ── Milestones ──
           if (widget.stats.milestones.isNotEmpty) ...[
             FadeTransition(
               opacity: _fadeIn,
@@ -244,7 +235,6 @@ class _StatsContentState extends ConsumerState<_StatsContent>
             const SizedBox(height: 28),
           ],
 
-          // ── Top VAs ──
           if (widget.stats.topVAs.isNotEmpty) ...[
             FadeTransition(
               opacity: _fadeIn,
@@ -270,7 +260,6 @@ class _StatsContentState extends ConsumerState<_StatsContent>
             const SizedBox(height: 28),
           ],
 
-          // ── Top Circles ──
           if (widget.stats.topCircles.isNotEmpty) ...[
             FadeTransition(
               opacity: _fadeIn,
@@ -296,7 +285,6 @@ class _StatsContentState extends ConsumerState<_StatsContent>
             const SizedBox(height: 28),
           ],
 
-          // ── Recent Plays ──
           FadeTransition(
             opacity: _fadeIn,
             child: _SectionHeader(
@@ -315,10 +303,6 @@ class _StatsContentState extends ConsumerState<_StatsContent>
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Empty State
-// ═══════════════════════════════════════════════════════════════
-
 class _EmptyStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -331,7 +315,6 @@ class _EmptyStats extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Decorative illustration
             Container(
               width: 120,
               height: 120,
@@ -371,10 +354,6 @@ class _EmptyStats extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Hero Header
-// ═══════════════════════════════════════════════════════════════
-
 class _HeroHeader extends StatelessWidget {
   final ListeningStats stats;
 
@@ -409,7 +388,6 @@ class _HeroHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Total works — big number
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -433,7 +411,6 @@ class _HeroHeader extends StatelessWidget {
               ],
             ),
           ),
-          // Quick stats chips
           Wrap(
             spacing: 8,
             runSpacing: 6,
@@ -503,10 +480,6 @@ class _QuickChip extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// Overview Grid
-// ═══════════════════════════════════════════════════════════════
 
 class _OverviewGrid extends StatelessWidget {
   final ListeningStats stats;
@@ -620,7 +593,6 @@ class _StatCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon with subtle background
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -630,7 +602,6 @@ class _StatCard extends StatelessWidget {
               child: Icon(icon, size: 20, color: iconColor),
             ),
             const Spacer(),
-            // Value row
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -679,11 +650,6 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-
-// ═══════════════════════════════════════════════════════════════
-// Chart Tab Bar
-// ═══════════════════════════════════════════════════════════════
-
 class _ChartTabBar extends StatelessWidget {
   final TabController tabCtrl;
 
@@ -720,10 +686,6 @@ class _ChartTabBar extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Weekly Chart
-// ═══════════════════════════════════════════════════════════════
-
 class _WeeklyChart extends StatelessWidget {
   final List<WeeklyStats> weekly;
 
@@ -749,7 +711,6 @@ class _WeeklyChart extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Y-axis legend
               Padding(
                 padding: const EdgeInsets.only(left: 4, bottom: 6),
                 child: Row(children: [
@@ -806,10 +767,6 @@ class _WeeklyChart extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// Monthly Chart
-// ═══════════════════════════════════════════════════════════════
 
 class _MonthlyChart extends StatelessWidget {
   final List<MonthlyStats> monthly;
@@ -893,10 +850,6 @@ class _MonthlyChart extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Activity Heatmap (GitHub-style)
-// ═══════════════════════════════════════════════════════════════
-
 class _ActivityHeatmap extends StatelessWidget {
   final List<DailyActivity> activity;
 
@@ -907,15 +860,12 @@ class _ActivityHeatmap extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     if (activity.isEmpty) return const SizedBox.shrink();
 
-    // We have 14 days of daily activity. Build a GitHub-style grid by
-    // grouping into weeks. Each column = 1 week of 7 days.
     final dayData = <DateTime, int>{};
     for (final a in activity) {
       final d = DateTime(a.date.year, a.date.month, a.date.day);
       dayData[d] = a.playCount;
     }
 
-    // Build 2 weeks of data (14 days = 2 columns of 7 days)
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final cells = <int>[];
@@ -923,11 +873,6 @@ class _ActivityHeatmap extends StatelessWidget {
       final d = today.subtract(Duration(days: dayOffset));
       cells.add(dayData[d] ?? 0);
     }
-
-    // Build 6+ weeks of data for the full 12-week heatmap (but we only have
-    // 14 days, so reuse a wider range). Actually, we should use the
-    // listening stats dailyActivity but we only have 14 days.
-    // For now, show what we have as a compact grid.
 
     final maxVal = cells.fold<int>(0, (m, v) => v > m ? v : m);
 
@@ -950,8 +895,6 @@ class _ActivityHeatmap extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Grid row: 2 weeks × 7 days, laid out as 7 rows × 2 cols
-            // (7 rows = day-of-week, 2 cols = weeks)
             LayoutBuilder(
               builder: (context, constraints) {
                 final cellSize = (constraints.maxWidth - 12) / 14;
@@ -976,7 +919,6 @@ class _ActivityHeatmap extends StatelessWidget {
               },
             ),
             const SizedBox(height: 10),
-            // Legend row
             Row(
               children: [
                 Text('Less', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 9, color: cs.onSurfaceVariant)),
@@ -1000,10 +942,6 @@ class _ActivityHeatmap extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// Milestones Section
-// ═══════════════════════════════════════════════════════════════
 
 /// Maps milestone [iconId] to Material [IconData].
 IconData _milestoneIcon(String id) {
@@ -1113,7 +1051,6 @@ class _MilestoneCard extends StatelessWidget {
       padding: EdgeInsets.only(top: index > 0 ? 6 : 0, bottom: index < totalCount - 1 ? 6 : 0),
       child: Row(
         children: [
-          // Icon
           Container(
             width: 40,
             height: 40,
@@ -1130,7 +1067,6 @@ class _MilestoneCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          // Title + description
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1154,7 +1090,6 @@ class _MilestoneCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          // Progress bar or check
           if (achieved)
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -1199,11 +1134,6 @@ class _MilestoneCard extends StatelessWidget {
   }
 }
 
-
-// ═══════════════════════════════════════════════════════════════
-// Section Header
-// ═══════════════════════════════════════════════════════════════
-
 class _SectionHeader extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -1234,10 +1164,6 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Daily Activity Chart
-// ═══════════════════════════════════════════════════════════════
-
 class _DailyActivityChart extends StatelessWidget {
   final List<DailyActivity> activity;
 
@@ -1263,7 +1189,6 @@ class _DailyActivityChart extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Y-axis legend row
               Padding(
                 padding: const EdgeInsets.only(left: 4, bottom: 6),
                 child: Row(
@@ -1280,7 +1205,6 @@ class _DailyActivityChart extends StatelessWidget {
                   ],
                 ),
               ),
-              // Bars
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -1298,7 +1222,6 @@ class _DailyActivityChart extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            // Count label above bar
                             if (day.playCount > 0)
                               Text(
                                 '${day.playCount}',
@@ -1309,7 +1232,6 @@ class _DailyActivityChart extends StatelessWidget {
                                 ),
                               ),
                             const SizedBox(height: 2),
-                            // Gradient bar
                             Container(
                               height: barHeight.clamp(0.0, maxBarHeight),
                               decoration: BoxDecoration(
@@ -1332,7 +1254,6 @@ class _DailyActivityChart extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            // Day label
                             Text(
                               dayLabel,
                               style: tt.labelSmall?.copyWith(
@@ -1361,10 +1282,6 @@ class _DailyActivityChart extends StatelessWidget {
     return weekdays[date.weekday - 1];
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// Top Lists (VAs / Circles)
-// ═══════════════════════════════════════════════════════════════
 
 /// Data class for a ranked item in the top lists.
 class _RankedItem {
@@ -1414,7 +1331,6 @@ class _TopListCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 children: [
-                  // Rank badge
                   SizedBox(
                     width: 28,
                     child: Center(
@@ -1447,7 +1363,6 @@ class _TopListCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  // Name
                   Expanded(
                     child: Text(
                       item.name,
@@ -1457,7 +1372,6 @@ class _TopListCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Mini progress bar
                   SizedBox(
                     width: 60,
                     height: 6,
@@ -1489,7 +1403,6 @@ class _TopListCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Count
                   SizedBox(
                     width: 36,
                     child: Text(
@@ -1511,10 +1424,6 @@ class _TopListCard extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// Recent Plays Grid
-// ═══════════════════════════════════════════════════════════════
 
 class _RecentPlaysGrid extends StatelessWidget {
   final List<HistoryRecord> records;

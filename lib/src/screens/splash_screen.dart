@@ -85,7 +85,6 @@ class _SplashBodyState extends State<SplashBody>
       duration: const Duration(milliseconds: 2000),
     );
 
-    // ── Icon: fade-in (0→25%) + elastic scale (0→35%) ──
     _iconFade = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0.0, 0.25, curve: Curves.easeOut),
@@ -97,13 +96,11 @@ class _SplashBodyState extends State<SplashBody>
       ),
     );
 
-    // ── Title: fade-in (15→40%) ──
     _titleFade = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0.15, 0.40, curve: Curves.easeOut),
     );
 
-    // ── Subtitle: fade (25→50%) + slide-up + letter-spacing ──
     _subtitleFade = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0.25, 0.50, curve: Curves.easeOut),
@@ -121,13 +118,11 @@ class _SplashBodyState extends State<SplashBody>
       ),
     );
 
-    // ── Loader: fade-in (35→55%) ──
     _spinnerFade = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0.35, 0.55, curve: Curves.easeOut),
     );
 
-    // ── Bottom info: fade-in (40→70%) ──
     _bottomFade = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0.40, 0.70, curve: Curves.easeOut),
@@ -135,7 +130,6 @@ class _SplashBodyState extends State<SplashBody>
 
     _controller.forward();
 
-    // Start pulse loop after initial animation
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) {
         _controller.addStatusListener(_pulseListener);
@@ -148,7 +142,7 @@ class _SplashBodyState extends State<SplashBody>
       final info = await PackageInfo.fromPlatform();
       if (mounted) setState(() => _version = 'v${info.version}');
     } catch (_) {
-      if (mounted) setState(() => _version = 'v3.2.0'); // fallback
+      if (mounted) setState(() => _version = 'v3.2.0');
     }
   }
 
@@ -175,9 +169,6 @@ class _SplashBodyState extends State<SplashBody>
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
 
-    // Note: NOT using Scaffold here because SplashBody is rendered inside
-    // the _SplashCrossFade overlay which has no MaterialApp ancestor.
-    // Scaffold requires a Directionality widget ancestor (from MaterialApp).
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -200,7 +191,6 @@ class _SplashBodyState extends State<SplashBody>
       child: Stack(
         alignment: Alignment.topLeft,
         children: [
-            // Subtle decorative circles
             Positioned(
               top: -80,
               right: -60,
@@ -227,7 +217,6 @@ class _SplashBodyState extends State<SplashBody>
               ),
             ),
 
-            // Main content
             Center(
               child: isLandscape
                   ? _buildLandscapeLayout(theme, colorScheme)
@@ -241,14 +230,12 @@ class _SplashBodyState extends State<SplashBody>
   Widget _buildPortraitLayout(ThemeData theme, ColorScheme colorScheme) {
     return Column(
       children: [
-        // ── Main content (icon, title, subtitle, loader) — truly centered ──
         Expanded(
           child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // ── App icon with pulse ──
                 AnimatedBuilder(
                   animation: _controller,
                   builder: (context, child) {
@@ -298,7 +285,6 @@ class _SplashBodyState extends State<SplashBody>
 
                 const SizedBox(height: 24),
 
-                // ── App name ──
                 FadeTransition(
                   opacity: _titleFade,
                   child: Text(
@@ -313,7 +299,6 @@ class _SplashBodyState extends State<SplashBody>
 
                 const SizedBox(height: 8),
 
-                // ── Tagline with slide-up + letter-spacing animation ──
                 FadeTransition(
                   opacity: _subtitleFade,
                   child: Transform.translate(
@@ -331,7 +316,6 @@ class _SplashBodyState extends State<SplashBody>
 
                 const SizedBox(height: 48),
 
-                // ── Animated loading indicator ──
                 FadeTransition(
                   opacity: _spinnerFade,
                   child: _AnimatedDotsLoader(
@@ -345,7 +329,6 @@ class _SplashBodyState extends State<SplashBody>
           ),
         ),
 
-        // ── Version info at bottom ──
         Padding(
           padding: const EdgeInsets.only(bottom: 32),
           child: FadeTransition(
@@ -367,7 +350,6 @@ class _SplashBodyState extends State<SplashBody>
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Left: icon
         AnimatedBuilder(
           animation: _controller,
           builder: (context, child) {
@@ -417,7 +399,6 @@ class _SplashBodyState extends State<SplashBody>
 
         const SizedBox(width: 32),
 
-        // Right: text + spinner
         Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -545,7 +526,6 @@ class _AnimatedDotsLoaderState extends State<_AnimatedDotsLoader>
                     (-2.0 * bouncePhase * bouncePhase +
                         2.0 * bouncePhase));
 
-            // Color cycle through primary → tertiary → secondary
             final colorCycle = (_ctrl.value * 2.0 + i * 0.33) % 1.0;
             final fromIdx = (i + (colorCycle * 3).floor()) % 3;
             final toIdx = (fromIdx + 1) % 3;

@@ -83,10 +83,6 @@ class ProgressSyncService {
     _lastSyncedPositionMs = 0;
   }
 
-  // ==========================================================================
-  // Periodic sync
-  // ==========================================================================
-
   void _startPeriodicSync() {
     _stopPeriodicSync();
     _periodicTimer = Timer.periodic(const Duration(seconds: 5), (_) {
@@ -94,7 +90,6 @@ class ProgressSyncService {
       final service = AudioPlayerService.instance;
       if (!service.playing) return;
       final positionMs = service.position.inMilliseconds;
-      // Only sync if position has moved by at least 5 seconds
       if ((positionMs - _lastSyncedPositionMs).abs() < 5000) return;
       unawaited(_syncProgress(_currentWorkId!, positionMs));
       _lastSyncedPositionMs = positionMs;
@@ -106,10 +101,6 @@ class ProgressSyncService {
     _periodicTimer = null;
   }
 
-  // ==========================================================================
-  // Core sync — push progress to server
-  // ==========================================================================
-
   Future<void> _syncProgress(int workId, int positionMs) async {
     if (_isSyncing) return;
     _isSyncing = true;
@@ -120,9 +111,6 @@ class ProgressSyncService {
         progress = (positionMs / duration.inMilliseconds).clamp(0.0, 1.0);
       }
 
-      // Use the stored Ref to read the API provider.
-      // init(ref) is called from main.dart before any playback, so _ref
-      // is always available at runtime.
       if (_ref != null) {
         final api = _ref!.read(kikoeruApiServiceProvider);
         await api.updateProgress(workId, progress);
@@ -133,10 +121,6 @@ class ProgressSyncService {
       _isSyncing = false;
     }
   }
-
-  // ==========================================================================
-  // Cleanup
-  // ==========================================================================
 
   void dispose() {
     _stopPeriodicSync();

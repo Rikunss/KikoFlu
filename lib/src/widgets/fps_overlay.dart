@@ -34,7 +34,6 @@ class _FpsOverlayState extends State<FpsOverlay> {
     SchedulerBinding.instance.addPostFrameCallback(_onFrame);
     SchedulerBinding.instance.addTimingsCallback(_onTimings);
 
-    // Log performance stats every 10 seconds for before/after comparison.
     _logTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       debugPrint(
         '[FPS] ${_periodFps.toStringAsFixed(1)} avg FPS | '
@@ -42,7 +41,6 @@ class _FpsOverlayState extends State<FpsOverlay> {
         'worst raster: ${_worstRasterMs.toStringAsFixed(1)}ms | '
         '$_periodJank janks in 10s',
       );
-      // Reset worst values and jank for the next measurement window
       _worstBuildMs = 0;
       _worstRasterMs = 0;
       _periodJank = 0;
@@ -77,11 +75,9 @@ class _FpsOverlayState extends State<FpsOverlay> {
       final buildMs = timing.buildDuration.inMicroseconds / 1000.0;
       final rasterMs = timing.rasterDuration.inMicroseconds / 1000.0;
 
-      // Track worst values with simple max comparison (no allocations)
       if (buildMs > _worstBuildMs) _worstBuildMs = buildMs;
       if (rasterMs > _worstRasterMs) _worstRasterMs = rasterMs;
 
-      // Jank = frame exceeds 16.7ms (60Hz) budget
       if (buildMs > 16.7 || rasterMs > 16.7) {
         _jankCount++;
         _periodJank++;
@@ -122,7 +118,6 @@ class _FpsOverlayState extends State<FpsOverlay> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // FPS line
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -147,7 +142,6 @@ class _FpsOverlayState extends State<FpsOverlay> {
             ],
           ),
           const SizedBox(height: 2),
-          // Build time
           Text(
             'Build: ${_worstBuildMs.toStringAsFixed(1)}ms',
             style: const TextStyle(
@@ -156,7 +150,6 @@ class _FpsOverlayState extends State<FpsOverlay> {
               fontFeatures: [FontFeature.tabularFigures()],
             ),
           ),
-          // Raster time
           Text(
             'Raster: ${_worstRasterMs.toStringAsFixed(1)}ms',
             style: const TextStyle(
@@ -165,7 +158,6 @@ class _FpsOverlayState extends State<FpsOverlay> {
               fontFeatures: [FontFeature.tabularFigures()],
             ),
           ),
-          // Jank count
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [

@@ -4,7 +4,6 @@ import 'package:translator/translator.dart';
 
 void main() {
   group('Translation Sources Availability Test', () {
-    // 测试 Google 翻译源
     test('Google Translator should translate "Hello" to Chinese', () async {
       final translator = GoogleTranslator();
       const sourceText = 'Hello';

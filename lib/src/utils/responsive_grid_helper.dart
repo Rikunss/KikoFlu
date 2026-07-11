@@ -14,16 +14,13 @@ class ResponsiveGridHelper {
   ///   - 屏幕宽度 < 1200px 或宽高比 < 1.3：3列
   ///   - 屏幕宽度 >= 1200px 且宽高比 >= 1.3：4列
   static int getBigGridCrossAxisCountForSize(Size size, Orientation orientation) {
-    // 竖屏固定2列
     if (orientation == Orientation.portrait) {
       return 2;
     }
 
-    // 横屏根据屏幕尺寸决定3列或4列
     final aspectRatio = size.width / size.height;
     final width = size.width;
 
-    // 宽度较小或宽高比不够宽时使用3列
     if (width < 1200 || aspectRatio < 1.3) {
       return 3;
     }
@@ -98,12 +95,6 @@ class ResponsiveGridHelper {
     return aspectRatio >= 1.6;
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // Legacy convenience methods — still accept BuildContext
-  // internally delegate to the *_ForSize overloads.
-  // Prefer the *_ForSize variants in performance-sensitive builds.
-  // ═══════════════════════════════════════════════════════════
-
   static int getBigGridCrossAxisCount(BuildContext context) {
     return getBigGridCrossAxisCountForSize(
       MediaQuery.of(context).size,
@@ -142,8 +133,8 @@ class ResponsiveGridHelper {
 
 /// 屏幕宽度分类
 enum ScreenWidthClass {
-  compact, // < 600px  (手机)
-  medium, // < 840px  (小平板)
-  expanded, // < 1200px (大平板)
-  large, // >= 1200px (桌面)
+  compact,
+  medium,
+  expanded,
+  large,
 }

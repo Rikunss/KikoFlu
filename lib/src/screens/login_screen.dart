@@ -12,7 +12,7 @@ import '../widgets/scrollable_appbar.dart';
 import 'main_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  final bool isAddingAccount; // true when adding from account management
+  final bool isAddingAccount;
 
   const LoginScreen({
     super.key,
@@ -72,12 +72,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   String _hostValue = '';
   final Map<String, _LatencyResult> _latencyResults = {};
 
-  // ── Inline validation state ──
   String? _usernameError;
   String? _passwordError;
   String? _hostError;
 
-  // ── Logo pulse animation ──
   late final AnimationController _pulseCtrl;
 
   @override
@@ -102,8 +100,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _pulseCtrl.dispose();
     super.dispose();
   }
-
-  // ── Inline validation helpers ──
 
   void _validateUsername(String value) {
     final s = S.of(context);
@@ -142,8 +138,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _validateHost(_hostValue);
     return _usernameError == null && _passwordError == null && _hostError == null;
   }
-
-  // ── Form submission ──
 
   Future<void> _submit() async {
     if (!_validateAll()) return;
@@ -275,7 +269,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void _toggleMode() {
     setState(() {
       _isLogin = !_isLogin;
-      // Clear inline errors when switching mode
       _usernameError = null;
       _passwordError = null;
     });
@@ -309,8 +302,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     _hostOptions = options;
   }
-
-  // ── Latency / connection test (unchanged) ──
 
   Widget _buildHostLatencyActions(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -478,8 +469,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return '${message.substring(0, maxLength)}...';
   }
 
-  // ── Animated inline error widget ──
-
   Widget _buildInlineError(String? error) {
     return AnimatedSize(
       duration: const Duration(milliseconds: 200),
@@ -508,8 +497,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           : const SizedBox.shrink(),
     );
   }
-
-  // ── Animated decorative circles ──
 
   Widget _buildDecorativeCircles(ColorScheme cs) {
     return Stack(
@@ -553,8 +540,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ],
     );
   }
-
-  // ── Logo widget with pulse animation ──
 
   Widget _buildLogo(ColorScheme cs, {double size = 120}) {
     return AnimatedBuilder(
@@ -600,8 +585,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
-  // ── Main build ──
-
   @override
   Widget build(BuildContext context) {
     final isLandscape =
@@ -622,8 +605,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
     );
   }
-
-  // ── Portrait layout ──
 
   Widget _buildPortraitLayout() {
     final cs = Theme.of(context).colorScheme;
@@ -646,10 +627,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         child: Stack(
           children: [
-            // Decorative circles
             _buildDecorativeCircles(cs),
 
-            // Main content
             SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Form(
@@ -658,13 +637,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   children: [
                     const SizedBox(height: 16),
 
-                    // Logo
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       child: _buildLogo(cs),
                     ),
 
-                    // App name
                     Text(
                       'KikoFlu',
                       style: tt.headlineMedium?.copyWith(
@@ -683,7 +660,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
                     const SizedBox(height: 28),
 
-                    // Form card
                     AnimatedOpacity(
                       opacity: _isLoading ? 0.6 : 1.0,
                       duration: const Duration(milliseconds: 200),
@@ -712,8 +688,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
-  // ── Landscape layout ──
-
   Widget _buildLandscapeLayout() {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
@@ -739,7 +713,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
             Row(
               children: [
-                // Left: Logo + branding
                 Expanded(
                   flex: 2,
                   child: Column(
@@ -766,7 +739,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   ),
                 ),
 
-                // Right: Form
                 Expanded(
                   flex: 3,
                   child: SingleChildScrollView(
@@ -801,15 +773,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
-  // ── Form content (shared between portrait & landscape) ──
-
   Widget _buildFormContent() {
     final cs = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Username field
         _buildField(
           controller: _usernameController,
           label: S.of(context).username,
@@ -822,7 +791,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
         const SizedBox(height: 16),
 
-        // Password field
         _buildField(
           controller: _passwordController,
           label: S.of(context).password,
@@ -846,7 +814,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
         const SizedBox(height: 16),
 
-        // Server address with autocomplete
         _buildServerAddressField(cs),
 
         const SizedBox(height: 8),
@@ -854,12 +821,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
         const SizedBox(height: 16),
 
-        // Cookie field (collapsible)
         _buildCookieSection(cs),
 
         const SizedBox(height: 20),
 
-        // Submit button
         FilledButton(
           onPressed: _isLoading
               ? null
@@ -887,7 +852,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
         const SizedBox(height: 12),
 
-        // Guest login
         if (_isLogin)
           OutlinedButton.icon(
             onPressed: _isLoading
@@ -910,7 +874,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
         const SizedBox(height: 12),
 
-        // Toggle mode
         TextButton(
           onPressed: _toggleMode,
           child: AnimatedSwitcher(
@@ -942,8 +905,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ],
     );
   }
-
-  // ── Reusable form field with inline error ──
 
   Widget _buildField({
     required TextEditingController controller,
@@ -996,15 +957,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.3),
           ),
           onChanged: onChanged,
-          validator: null, // We use inline validation instead
+          validator: null,
           textInputAction: TextInputAction.next,
         ),
         _buildInlineError(error),
       ],
     );
   }
-
-  // ── Server address field with Autocomplete ──
 
   Widget _buildServerAddressField(ColorScheme cs) {
     return Column(
@@ -1072,8 +1031,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ],
     );
   }
-
-  // ── Cookie expansion section ──
 
   Widget _buildCookieSection(ColorScheme cs) {
     return Container(

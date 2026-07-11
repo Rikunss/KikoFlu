@@ -18,7 +18,6 @@ class HiResAudioService {
   static const MethodChannel _channel =
       MethodChannel('com.kikoeru.flutter/hires_audio');
 
-  // Stream controllers for state changes from native
   final StreamController<bool> _playbackStateController =
       StreamController<bool>.broadcast();
   final StreamController<HiResFormatInfo?> _formatInfoController =
@@ -35,16 +34,12 @@ class HiResAudioService {
       StreamController<String>.broadcast();
   final StreamController<UsbDacAutoRoutedEvent> _usbDacAutoRoutedController =
       StreamController<UsbDacAutoRoutedEvent>.broadcast();
-  // Streams for native-pushed position & duration (50ms interval from Kotlin Handler)
   final StreamController<int> _nativePositionController =
       StreamController<int>.broadcast();
   final StreamController<int> _nativeDurationController =
       StreamController<int>.broadcast();
-  // Stream for native-pushed buffered position (same 50ms interval as position).
-  // Used by [StreamingSpeedTracker] to estimate download speed for hi-res tracks.
   final StreamController<int> _nativeBufferedPositionController =
       StreamController<int>.broadcast();
-  // Stream for track-ended event — pushed by native when ExoPlayer reaches STATE_ENDED
   final StreamController<bool> _trackEndedController =
       StreamController<bool>.broadcast();
 
@@ -224,26 +219,22 @@ class HiResAudioService {
         ));
         break;
       case 'onPositionChanged':
-        // Position pushed from native Handler every 50ms
         final posMs = call.arguments as int? ?? 0;
         _nativePositionController.add(posMs);
         break;
       case 'onBufferedPositionChanged':
-        // Buffered position pushed from native Handler every 50ms
         final bufPosMs = call.arguments as int? ?? 0;
         if (bufPosMs >= 0) {
           _nativeBufferedPositionController.add(bufPosMs);
         }
         break;
       case 'onDurationChanged':
-        // Duration pushed once from native when ExoPlayer is ready
         final durMs = call.arguments as int? ?? 0;
         if (durMs > 0) {
           _nativeDurationController.add(durMs);
         }
         break;
       case 'onTrackEnded':
-        // Reliable track-ended signal from native STATE_ENDED
         _trackEndedController.add(true);
         break;
       default:
@@ -361,8 +352,6 @@ class HiResAudioService {
     }
   }
 
-  // ── USB DAC Bypass methods ──
-
   /// Get the list of connected USB audio devices.
   Future<List<UsbAudioDevice>> getUsbAudioDevices() async {
     try {
@@ -476,8 +465,6 @@ class HiResAudioService {
       return false;
     }
   }
-
-  // ── Hardware Sample Rate methods ──
 
   /// Get the native sample rate used by Android's AudioTrack for STREAM_MUSIC.
   /// This tells us what the Android mixer is outputting at.

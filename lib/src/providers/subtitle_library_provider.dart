@@ -29,7 +29,6 @@ class SubtitleLibraryNotifier extends StateNotifier<Set<int>> {
         state = ids;
       }
     } catch (e) {
-      // 数据库尚未初始化时回退到旧方式
       final parsedFolders = await SubtitleLibraryService.getParsedSubtitleFolders();
       
       final ids = <int>{};

@@ -22,7 +22,6 @@ class ReplayGainData {
   /// [preamp] is an optional additional boost/cut (default 0 dB).
   double volumeMultiplier({double preampDb = 0.0}) {
     if (trackGain == null) return 1.0;
-    // ReplayGain: apply gain + preamp, convert dB to linear
     final totalDb = trackGain! + preampDb;
     return _dbToLinear(totalDb);
   }
@@ -108,8 +107,6 @@ class ReplayGainService {
     return _currentGain!.volumeMultiplier(preampDb: _preampDb);
   }
 
-  // ── FLAC Vorbis Comment parser ──
-
   /// Parse FLAC file for ReplayGain from Vorbis Comments.
   ///
   /// FLAC metadata structure:
@@ -130,18 +127,15 @@ class ReplayGainService {
   Future<ReplayGainData?> _parseFlacReplayGain(File file) async {
     final raf = await file.open(mode: FileMode.read);
     try {
-      // Read enough for metadata headers (typically < 8KB, read 32KB to be safe)
       const readSize = 32768;
       final data = await raf.read(readSize);
       if (data.length < 42) return null;
 
-      // Verify FLAC magic
       if (data[0] != 0x66 || data[1] != 0x4C || data[2] != 0x61 || data[3] != 0x43) {
         return null;
       }
 
       int offset = 4;
-      // Scan metadata blocks for Vorbis Comment (type 4)
       String? trackGain;
       String? trackPeak;
 
@@ -152,7 +146,6 @@ class ReplayGainService {
         offset += 4;
 
         if (blockType == 4) {
-          // Vorbis Comment block
           if (offset + blockLen > data.length) break;
           final tags = _parseVorbisComments(data, offset, blockLen);
           for (final tag in tags) {
@@ -163,7 +156,7 @@ class ReplayGainService {
               trackPeak = tag.value;
             }
           }
-          break; // Vorbis Comment is usually only one block
+          break;
         }
 
         offset += blockLen;
@@ -191,13 +184,11 @@ class ReplayGainService {
     int offset = start;
     final end = start + length;
 
-    // Skip vendor string
     if (offset + 4 > end) return tags;
     final vendorLen = _read32LE(data, offset);
     offset += 4 + vendorLen;
     if (offset > end) return tags;
 
-    // Number of tags
     if (offset + 4 > end) return tags;
     final numTags = _read32LE(data, offset);
     offset += 4;
@@ -220,43 +211,34 @@ class ReplayGainService {
     return tags;
   }
 
-  // ── MP3 ID3v2 TXXX parser ──
-
   /// Parse MP3 file for ReplayGain from ID3v2 TXXX frames.
   Future<ReplayGainData?> _parseMp3ReplayGain(File file) async {
     final raf = await file.open(mode: FileMode.read);
     try {
-      // ID3v2 header is 10 bytes, read 64KB to cover typical tag size
       const readSize = 65536;
       final data = await raf.read(readSize);
       if (data.length < 10) return null;
 
-      // Check for ID3v2 magic
       if (data[0] != 0x49 || data[1] != 0x44 || data[2] != 0x33) {
         return null;
       }
 
-      // Parse ID3v2 header size (syncsafe integer)
       final tagSize = _readSynchsafe32(data, 6);
       if (tagSize <= 0) return null;
 
       final headerEnd = 10 + tagSize;
       final effectiveEnd = headerEnd > data.length ? data.length : headerEnd;
 
-      // Check for extended header (ID3v2.3+)
       int frameOffset = 10;
       final majorVersion = data[3];
       if (majorVersion >= 3) {
         final flags = data[5];
         if ((flags & 0x40) != 0) {
-          // Extended header present, skip it
           if (majorVersion == 3) {
-            // ID3v2.3: extended header size (4 bytes, big-endian)
             if (frameOffset + 4 > effectiveEnd) return null;
             final extSize = _read32BE(data, frameOffset);
             frameOffset += extSize;
           } else {
-            // ID3v2.4: extended header size (4 bytes, syncsafe)
             if (frameOffset + 4 > effectiveEnd) return null;
             final extSize = _readSynchsafe32(data, frameOffset);
             frameOffset += extSize;
@@ -267,28 +249,23 @@ class ReplayGainService {
       String? trackGain;
       String? trackPeak;
 
-      // Parse frames
       while (frameOffset + 8 <= effectiveEnd) {
-        // Check for padding (0x00) or end of tag
         if (data[frameOffset] == 0x00) break;
 
         final frameId = String.fromCharCodes(data.sublist(frameOffset, frameOffset + 4));
         int frameSize;
         if (majorVersion >= 3) {
           frameSize = _read32BE(data, frameOffset + 4);
-          // ID3v2.4 uses syncsafe integers for size, but many implementations
-          // use regular ints. Try both.
         } else {
           frameSize = _read32BE(data, frameOffset + 4);
         }
-        frameOffset += 10; // 4 (id) + 4 (size) + 2 (flags)
+        frameOffset += 10;
 
         if (frameSize <= 0 || frameOffset + frameSize > effectiveEnd) break;
 
         if (frameId == 'TXXX') {
-          // TXXX frame: encoding (1 byte) + description (null-terminated) + value
           final frameData = data.sublist(frameOffset, frameOffset + frameSize);
-          final nullPos = frameData.indexOf(0, 1); // skip encoding byte
+          final nullPos = frameData.indexOf(0, 1);
           if (nullPos > 1) {
             final description = String.fromCharCodes(frameData.sublist(1, nullPos)).toUpperCase();
             final value = String.fromCharCodes(frameData.sublist(nullPos + 1)).trim();
@@ -317,12 +294,9 @@ class ReplayGainService {
 
   /// Parse a gain string like "-2.34 dB" → -2.34
   static double? _parseGainString(String s) {
-    // Remove "dB" suffix and trim
     var clean = s.toUpperCase().replaceFirst('DB', '').trim();
     return double.tryParse(clean);
   }
-
-  // ── Binary helpers ──
 
   static int _read32LE(Uint8List data, int offset) {
     return data[offset] |

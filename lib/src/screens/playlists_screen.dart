@@ -27,8 +27,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
   bool _hasVisited = false;
 
   @override
-  bool get wantKeepAlive => true; // 保持状态不被销毁
-
+  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -86,7 +85,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
       ),
     );
     if (result == true && mounted) {
-      setState(() {}); // Refresh widget
+      setState(() {});
     }
   }
 
@@ -96,7 +95,7 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
     final descriptionController = TextEditingController();
     final linkController = TextEditingController();
     PlaylistPrivacy selectedPrivacy = PlaylistPrivacy.private;
-    bool isCreateMode = true; // true: 创建模式, false: 添加链接模式
+    bool isCreateMode = true;
 
     final result = await showDialog<bool>(
       context: context,
@@ -117,7 +116,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 标题栏
                     Padding(
                       padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
                       child: Row(
@@ -132,7 +130,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                       ),
                     ),
 
-                    // 模式切换
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: SegmentedButton<bool>(
@@ -158,7 +155,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                     ),
                     const SizedBox(height: 16),
 
-                    // 内容区域
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Column(
@@ -166,8 +162,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: isCreateMode
                             ? [
-                                // 创建模式的输入框
-                                // 名称输入
                                 TextField(
                                   controller: nameController,
                                   decoration: InputDecoration(
@@ -181,7 +175,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                                 ),
                                 const SizedBox(height: 16),
 
-                                // 隐私设置
                                 DropdownButtonFormField<PlaylistPrivacy>(
                                   initialValue: selectedPrivacy,
                                   decoration: InputDecoration(
@@ -209,7 +202,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                                 ),
                                 const SizedBox(height: 16),
 
-                                // 描述输入
                                 TextField(
                                   controller: descriptionController,
                                   decoration: InputDecoration(
@@ -225,7 +217,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                                 const SizedBox(height: 8),
                               ]
                             : [
-                                // 添加链接模式的输入框
                                 TextField(
                                   controller: linkController,
                                   decoration: InputDecoration(
@@ -242,7 +233,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                       ),
                     ),
 
-                    // 操作按钮
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: Row(
@@ -297,12 +287,10 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
       },
     );
 
-    // 先保存值，再释放 controller
     final name = nameController.text.trim();
     final description = descriptionController.text.trim();
     final link = linkController.text.trim();
 
-    // 延迟释放 controller，等待对话框关闭动画完成
     Future.delayed(const Duration(milliseconds: 300), () {
       nameController.dispose();
       descriptionController.dispose();
@@ -325,16 +313,14 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
   /// 通过链接添加播放列表
   Future<void> _addPlaylistByLink(String link) async {
     try {
-      // 解析链接中的 ID
       String? playlistId;
 
-      // 支持多种链接格式（不限域名）
       final patterns = [
         RegExp(r'playlist\?id=([a-f0-9-]+)',
-            caseSensitive: false), // 匹配 ?id= 参数
+            caseSensitive: false),
         RegExp(r'playlist/([a-f0-9-]+)',
-            caseSensitive: false), // 匹配 /playlist/ 路径
-        RegExp(r'^([a-f0-9-]+)$', caseSensitive: false), // 直接输入 ID
+            caseSensitive: false),
+        RegExp(r'^([a-f0-9-]+)$', caseSensitive: false),
       ];
 
       for (final pattern in patterns) {
@@ -357,7 +343,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
         return;
       }
 
-      // 显示加载提示
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -381,10 +366,8 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
 
       if (!mounted) return;
 
-      // 隐藏加载提示
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-      // 显示成功提示
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(S.of(context).playlistAddedSuccess),
@@ -393,15 +376,12 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
         ),
       );
 
-      // 刷新列表
       ref.read(playlistsProvider.notifier).refresh();
     } catch (e) {
       if (!mounted) return;
 
-      // 隐藏加载提示
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-      // 解析错误信息
       String errorMessage = S.of(context).addFailed;
       final errorString = e.toString();
 
@@ -419,7 +399,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
             : errorString);
       }
 
-      // 显示错误提示
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMessage),
@@ -438,7 +417,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
     String? description,
   }) async {
     try {
-      // 显示加载提示
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -466,10 +444,8 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
 
       if (!mounted) return;
 
-      // 隐藏加载提示
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-      // 显示成功提示
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(S.of(context).playlistCreatedSuccess(name)),
@@ -478,15 +454,12 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
         ),
       );
 
-      // 刷新列表
       ref.read(playlistsProvider.notifier).refresh();
     } catch (e) {
       if (!mounted) return;
 
-      // 隐藏加载提示
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-      // 显示错误提示
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(S.of(context).createFailedWithError(e.toString())),
@@ -499,14 +472,13 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // 必须调用以保持状态
+    super.build(context);
 
     final state = ref.watch(playlistsProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
 
-    // Defer data loading to first visit
     if (!_hasVisited) {
       _hasVisited = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -516,7 +488,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
       });
     }
 
-    // 错误状态
     if (state.error != null && state.playlists.isEmpty) {
       return Center(
         child: Column(
@@ -551,14 +522,12 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
       );
     }
 
-    // 加载中且无数据
     if (state.isLoading && state.playlists.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(),
       );
     }
 
-    // 空状态
     if (state.playlists.isEmpty) {
       return Scaffold(
         floatingActionButton: FloatingActionButton(
@@ -637,7 +606,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              // Amber icon container
               Container(
                 width: 44,
                 height: 44,
@@ -663,7 +631,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
               ),
               const SizedBox(width: 12),
 
-              // Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -693,7 +660,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
 
               const SizedBox(width: 8),
 
-              // Works count + auto badge
               Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -754,7 +720,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
       cacheExtent: ScrollOptimization.cacheExtent, controller: _scrollController,
       physics: ScrollOptimization.physics,
       slivers: [
-        // Smart Playlists section
         if (smartPlaylists.isNotEmpty) ...[
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -793,7 +758,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
           ),
         ],
 
-        // Regular playlists header
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           sliver: SliverToBoxAdapter(
@@ -823,7 +787,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
           ),
         ),
 
-        // 播放列表列表
         SliverList(
           delegate: SliverChildBuilderDelegate(
             (context, index) {
@@ -833,7 +796,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                   key: ValueKey(playlist.id),
                   playlist: playlist,
                   onTap: () async {
-                    // 导航到播放列表详情页
                     final deleted = await Navigator.of(context).push<bool>(
                       MaterialPageRoute(
                         builder: (context) => PlaylistDetailScreen(
@@ -842,7 +804,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
                         ),
                       ),
                     );
-                    // 如果在详情页中删除了播放列表，刷新列表
                     if (deleted == true) {
                       ref.read(playlistsProvider.notifier).refresh();
                     }
@@ -854,7 +815,6 @@ class _PlaylistsScreenState extends ConsumerState<PlaylistsScreen>
           ),
         ),
 
-        // 分页控件
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
           sliver: SliverToBoxAdapter(

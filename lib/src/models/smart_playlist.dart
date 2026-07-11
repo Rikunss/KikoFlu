@@ -78,10 +78,10 @@ class SmartPlaylist extends Equatable {
   final String description;
   final List<SmartPlaylistRule> rules;
   final SmartPlaylistSortField sortField;
-  final String sortDirection; // 'asc' or 'desc'
+  final String sortDirection;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final int cachedWorksCount; // cached from last evaluation
+  final int cachedWorksCount;
 
   const SmartPlaylist({
     required this.id,

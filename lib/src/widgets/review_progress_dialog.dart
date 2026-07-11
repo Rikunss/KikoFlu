@@ -58,10 +58,9 @@ class ReviewProgressDialog {
     int? selectedRating = currentRating;
 
     if (isLandscape) {
-      // 横屏模式：使用对话框形式，3+3两列布局
       return showDialog<Map<String, dynamic>>(
         context: context,
-        barrierDismissible: !Platform.isIOS, // iOS 上防止点击外部区域意外关闭
+        barrierDismissible: !Platform.isIOS,
         builder: (dialogContext) {
           return StatefulBuilder(
             builder: (context, setState) {
@@ -73,7 +72,6 @@ class ReviewProgressDialog {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // 标题栏（含评分）
                       Padding(
                         padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
                         child: Row(
@@ -86,7 +84,6 @@ class ReviewProgressDialog {
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(width: 16),
-                            // 评分星星
                             ...List.generate(5, (index) {
                               final starValue = index + 1;
                               final isSelected = selectedRating != null &&
@@ -147,7 +144,6 @@ class ReviewProgressDialog {
                         ),
                       ),
                       const Divider(height: 1),
-                      // 内容区域 - 3+3两列布局，支持滚动
                       Flexible(
                         child: SingleChildScrollView(
                           child: Padding(
@@ -166,7 +162,6 @@ class ReviewProgressDialog {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                    // 左列：前3个选项
                                     Expanded(
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
@@ -185,7 +180,6 @@ class ReviewProgressDialog {
                                       ),
                                     ),
                                     const VerticalDivider(width: 1),
-                                    // 右列：后2个选项 + 移除按钮
                                     Expanded(
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
@@ -257,7 +251,6 @@ class ReviewProgressDialog {
                         ),
                       ),
                       const Divider(height: 1),
-                      // 底部按钮
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Row(
@@ -290,11 +283,10 @@ class ReviewProgressDialog {
         },
       );
     } else {
-      // 竖屏模式：使用底部弹窗
       return showResponsiveBottomSheet<Map<String, dynamic>>(
         context: context,
-        isDismissible: !Platform.isIOS, // iOS 上防止点击外部区域或下拉意外关闭
-        enableDrag: !Platform.isIOS, // iOS 上禁止下拉关闭
+        isDismissible: !Platform.isIOS,
+        enableDrag: !Platform.isIOS,
         builder: (context) {
           return StatefulBuilder(
             builder: (context, setState) {
@@ -310,7 +302,6 @@ class ReviewProgressDialog {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 标题行
                           Padding(
                             padding: const EdgeInsets.only(bottom: 4),
                             child: Text(
@@ -325,10 +316,8 @@ class ReviewProgressDialog {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          // 评分和操作行
                           Row(
                             children: [
-                              // 评分星星
                               ...List.generate(5, (index) {
                                 final starValue = index + 1;
                                 final isSelected = selectedRating != null &&
@@ -383,7 +372,6 @@ class ReviewProgressDialog {
                       ),
                     ),
                     const Divider(),
-                    // 进度选项
                     ...filters.map((filter) {
                       final isSelected = selectedProgress == filter.value;
                       return ListTile(
@@ -425,7 +413,6 @@ class ReviewProgressDialog {
                         },
                       ),
                     const Divider(),
-                    // 底部按钮
                     Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
@@ -434,7 +421,7 @@ class ReviewProgressDialog {
                           Expanded(
                             child: TextButton(
                               onPressed: () {
-                                Navigator.pop(context); // 取消，不返回任何值
+                                Navigator.pop(context);
                               },
                               child: Text(S.of(context).cancel),
                             ),

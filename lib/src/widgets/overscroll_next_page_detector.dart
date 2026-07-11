@@ -104,7 +104,6 @@ class _OverscrollNextPageDetectorState
 
     if (notification.depth != 0) return false;
 
-    // Skip non-scroll notifications early
     if (notification is! OverscrollNotification &&
         notification is! ScrollUpdateNotification &&
         notification is! ScrollStartNotification &&
@@ -138,9 +137,6 @@ class _OverscrollNextPageDetectorState
       if (isDraggingUpdate) {
         _isUserDragging = true;
       } else if (_isUserDragging) {
-        // Finger released. Keep the current trigger state armed until
-        // ScrollEndNotification arrives, otherwise the elastic bounce-back
-        // phase will clear the pending next-page action prematurely.
         _isUserDragging = false;
       }
 

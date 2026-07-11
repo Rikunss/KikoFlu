@@ -29,12 +29,10 @@ class ResponsiveDialog extends StatelessWidget {
     final isLandscape = orientation == Orientation.landscape;
     final theme = Theme.of(context);
 
-    // 横屏时限制对话框最大宽度
-    // 使用 ConstrainedBox 而不是直接设置 AlertDialog 的宽度，避免布局问题
     final dialogMaxWidth = maxWidth ??
         (isLandscape
-            ? size.width * 0.6 // 横屏时最多占60%宽度
-            : size.width * 0.85); // 竖屏时最多占85%宽度
+            ? size.width * 0.6
+            : size.width * 0.85);
 
     return Dialog(
       child: ConstrainedBox(
@@ -111,11 +109,10 @@ class ResponsiveAlertDialog extends StatelessWidget {
     final orientation = MediaQuery.orientationOf(context);
     final isLandscape = orientation == Orientation.landscape;
 
-    // 横屏时限制对话框最大宽度
     final dialogMaxWidth = maxWidth ??
         (isLandscape
-            ? size.width * 0.6 // 横屏时最多占60%宽度
-            : size.width * 0.85); // 竖屏时最多占85%宽度
+            ? size.width * 0.6
+            : size.width * 0.85);
 
     return AlertDialog(
       title: title,
@@ -157,7 +154,6 @@ class ResponsiveBottomSheet extends StatelessWidget {
     final isLandscape = orientation == Orientation.landscape;
 
     if (isLandscape) {
-      // 横屏时使用居中对话框样式
       return Center(
         child: Material(
           elevation: 4,
@@ -175,7 +171,6 @@ class ResponsiveBottomSheet extends StatelessWidget {
         ),
       );
     } else {
-      // 竖屏时使用底部弹窗
       return ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: maxHeight ?? size.height * 0.9,
@@ -200,7 +195,6 @@ Future<T?> showResponsiveBottomSheet<T>({
       MediaQuery.orientationOf(context) == Orientation.landscape;
 
   if (isLandscape) {
-    // 横屏时使用对话框样式
     return showDialog<T>(
       context: context,
       builder: (context) => Dialog(
@@ -212,7 +206,6 @@ Future<T?> showResponsiveBottomSheet<T>({
       ),
     );
   } else {
-    // 竖屏时使用底部弹窗
     return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: isScrollControlled,

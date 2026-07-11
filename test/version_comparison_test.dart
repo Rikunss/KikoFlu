@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Version Comparison Tests', () {
-    // Simulate the version comparison logic
     int compareVersions(String v1, String v2) {
       final parts1 = v1.split('.').map((e) => int.tryParse(e) ?? 0).toList();
       final parts2 = v2.split('.').map((e) => int.tryParse(e) ?? 0).toList();
@@ -21,7 +20,6 @@ void main() {
       return 0;
     }
 
-    // Simulate the tag name processing
     String extractVersion(String tagName) {
       return tagName
           .replaceFirst('v', '')
@@ -40,31 +38,31 @@ void main() {
     test('Current version 1.0.5 vs new version 1.0.6', () {
       const current = '1.0.5';
       final latest = extractVersion('v1.0.6');
-      expect(compareVersions(current, latest), -1); // 1.0.5 < 1.0.6
+      expect(compareVersions(current, latest), -1);
     });
 
     test('Current version 1.0.5 vs new version 1.0.6(1024)', () {
       const current = '1.0.5';
       final latest = extractVersion('v1.0.6(1024)');
-      expect(compareVersions(current, latest), -1); // 1.0.5 < 1.0.6
+      expect(compareVersions(current, latest), -1);
     });
 
     test('Current version 1.0.5 vs same version 1.0.5', () {
       const current = '1.0.5';
       final latest = extractVersion('v1.0.5');
-      expect(compareVersions(current, latest), 0); // 1.0.5 = 1.0.5
+      expect(compareVersions(current, latest), 0);
     });
 
     test('Current version 1.0.5 vs same version 1.0.5(0721)', () {
       const current = '1.0.5';
       final latest = extractVersion('v1.0.5(0721)');
-      expect(compareVersions(current, latest), 0); // 1.0.5 = 1.0.5
+      expect(compareVersions(current, latest), 0);
     });
 
     test('Current version 1.0.6 vs old version 1.0.5', () {
       const current = '1.0.6';
       final latest = extractVersion('v1.0.5');
-      expect(compareVersions(current, latest), 1); // 1.0.6 > 1.0.5
+      expect(compareVersions(current, latest), 1);
     });
 
     test('Various version comparisons', () {

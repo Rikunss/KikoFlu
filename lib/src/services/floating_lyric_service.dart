@@ -65,7 +65,6 @@ class FloatingLyricService {
         if (_windowId != null) {
           final result = await updateText(text);
           if (result) {
-            // 如果更新成功，且有样式参数，也更新样式
             if (style != null) {
               await updateStyle(
                 fontSize: style['fontSize'],
@@ -78,7 +77,6 @@ class FloatingLyricService {
             }
             return true;
           }
-          // 如果更新失败，说明窗口可能已关闭，重置ID并重新创建
           _windowId = null;
         }
 
@@ -152,7 +150,6 @@ class FloatingLyricService {
       return false;
     }
 
-    // 去重检查，避免频繁调用 MethodChannel
     if (text == _lastText) {
       return true;
     }
@@ -161,7 +158,6 @@ class FloatingLyricService {
     if (Platform.isWindows) {
       if (_windowId != null) {
         try {
-          // (commented out)
           final controller = WindowController.fromWindowId(_windowId!);
           await controller.invokeMethod('updateText', {
             'text': text,
@@ -169,7 +165,6 @@ class FloatingLyricService {
           return true;
         } catch (e) {
           _log.error('Windows更新文本失败: $e', tag: 'FloatingLyric');
-          // 如果是通道未注册（通常意味着窗口已关闭或未初始化），重置 ID
           if (e.toString().contains('CHANNEL_UNREGISTERED')) {
             _windowId = null;
           }

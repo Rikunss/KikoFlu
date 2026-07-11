@@ -22,7 +22,6 @@ class ExclusiveAudioService {
   static const MethodChannel _channel =
       MethodChannel('com.kikoeru.flutter/exclusive_audio');
 
-  // Stream controllers for state changes
   final StreamController<ExclusiveModeState> _stateController =
       StreamController<ExclusiveModeState>.broadcast();
   final StreamController<String> _usbAttachedController =
@@ -40,9 +39,6 @@ class ExclusiveAudioService {
   String _activeUsbDacName = '';
 
   ExclusiveAudioService._() {
-    // Initial optimistic value — gets overwritten by native status via _handleMethodCall.
-    // AAudio requires Android 8.1+ (API 27+). The native side (loadAaudioLibrary)
-    // does the actual API level check via android_get_device_api_level() >= 26.
     _aaudioAvailable = Platform.isAndroid;
     _channel.setMethodCallHandler(_handleMethodCall);
   }
@@ -92,12 +88,6 @@ class ExclusiveAudioService {
         _aaudioActive = args['aaudioActive'] == true;
         _aaudioExclusive = args['aaudioExclusive'] == true;
         _mixerBypassed = args['mixerBypassed'] == true;
-        // NOTE: Do NOT map aaudioExclusive from mixerBypassed — they are
-        // independent flags. mixerBypassed reflects whether the Android
-        // mixer was bypassed for the playback stream, while aaudioExclusive
-        // reflects whether exclusive mode was granted for THAT stream.
-        // When status is fetched from playback stream, both should be
-        // reported from the same stream (not mixed cross-source).
         _stateController.add(ExclusiveModeState(
           enabled: _enabled,
           volumeLocked: _volumeLocked,

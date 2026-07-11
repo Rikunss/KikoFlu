@@ -10,23 +10,18 @@ class FileIconUtils {
   static IconData getFileIconByName(String fileName) {
     final title = fileName.toLowerCase();
 
-    // 视频文件
     if (_isVideoFile(title)) {
       return Icons.video_library;
     }
-    // 图片文件
     else if (_isImageFile(title)) {
       return Icons.image;
     }
-    // 文本文件
     else if (_isTextFile(title)) {
       return Icons.text_snippet;
     }
-    // PDF 文件
     else if (_isPdfFile(title)) {
       return Icons.picture_as_pdf;
     }
-    // 音频文件（默认）
     else {
       return Icons.audiotrack;
     }
@@ -36,23 +31,18 @@ class FileIconUtils {
   static Color getFileIconColorByName(String fileName) {
     final title = fileName.toLowerCase();
 
-    // 视频文件
     if (_isVideoFile(title)) {
       return Colors.purple;
     }
-    // 图片文件
     else if (_isImageFile(title)) {
       return Colors.blue;
     }
-    // 文本文件
     else if (_isTextFile(title)) {
       return Colors.grey;
     }
-    // PDF 文件
     else if (_isPdfFile(title)) {
       return Colors.red;
     }
-    // 音频文件（默认）
     else {
       return Colors.green;
     }
@@ -147,8 +137,6 @@ class FileIconUtils {
       return Colors.grey;
     }
   }
-
-  // ========== 文件类型判断方法 ==========
 
   /// 判断是否是视频文件
   static bool _isVideoFile(String title) {

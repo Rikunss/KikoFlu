@@ -32,7 +32,6 @@ class MpvConfigService {
 
       final configFile = File(p.join(configDir.path, 'mpv.conf'));
 
-      // Force set MPV_HOME to ensure config is read
       setEnv('MPV_HOME', configDir.path);
       _log.info('Set MPV_HOME to: ${configDir.path}', tag: 'Audio');
 
@@ -79,7 +78,6 @@ video=no
 sub-auto=no
 ''';
     } else {
-      // macOS
       return '''ao=coreaudio
 audio-exclusive=yes
 audio-spdif=ac3,dts,eac3

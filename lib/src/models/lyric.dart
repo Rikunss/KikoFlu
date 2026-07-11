@@ -35,25 +35,20 @@ class LyricParser {
   static List<LyricLine> parse(String content) {
     List<LyricLine> result = [];
 
-    // 检测是否是 LRC 格式（包含 [mm:ss.xx] 格式的时间戳）
     if (content.contains(RegExp(r'\[\d{2}:\d{2}\.\d{2}\]'))) {
       result = parseLRC(content);
     }
-    // 检测 ASS/SSA 格式（包含 [Events] 区段和 Dialogue: 行）
     else if (content.contains('[Events]') &&
         content.contains(RegExp(r'^Dialogue:', multiLine: true))) {
       result = parseASS(content);
     }
-    // 检测 TTML/DFXP 格式（XML 中含 <p begin= 标签）
     else if (content.contains(RegExp(r'<p\s+begin='))) {
       result = parseTTML(content);
     }
-    // 检测 SBV 格式（YouTube，H:MM:SS.mmm,H:MM:SS.mmm 逗号分隔的时间对）
     else if (content
         .contains(RegExp(r'^\d+:\d{2}:\d{2}\.\d{3},\d+:\d{2}:\d{2}\.\d{3}', multiLine: true))) {
       result = parseSBV(content);
     }
-    // 尝试 WebVTT / SRT 格式
     else {
       result = parseWebVTT(content);
     }
@@ -167,14 +162,12 @@ class LyricParser {
     final lines = content.split('\n');
     final List<LyricLine> lyrics = [];
 
-    // ASS 时间格式: H:MM:SS.cc (centiseconds)
     final timeRegex = RegExp(r'(\d+):(\d{2}):(\d{2})\.(\d{2})');
 
     for (final line in lines) {
       final trimmed = line.trim();
       if (!trimmed.startsWith('Dialogue:')) continue;
 
-      // 找到 Dialogue: 后面的内容，按逗号分割（前9个逗号是字段分隔，第10个字段是文本）
       final afterDialogue = trimmed.substring(trimmed.indexOf(':') + 1).trim();
       final parts = afterDialogue.split(',');
       if (parts.length < 10) continue;
@@ -186,15 +179,13 @@ class LyricParser {
       final startTime = _parseASSTime(startMatch);
       final endTime = _parseASSTime(endMatch);
 
-      // 文本是第10个字段之后的所有内容（文本中可能含逗号）
       var text = parts.sublist(9).join(',');
 
-      // 处理 ASS 特殊标记
       text = text
-          .replaceAll(RegExp(r'\{[^}]*\}'), '') // 移除 {\\b1} 等内联样式
-          .replaceAll('\\N', '\n')               // 换行符
-          .replaceAll('\\n', '\n')               // 软换行
-          .replaceAll('\\h', ' ')                // 硬空格
+          .replaceAll(RegExp(r'\{[^}]*\}'), '')
+          .replaceAll('\\N', '\n')
+          .replaceAll('\\n', '\n')
+          .replaceAll('\\h', ' ')
           .trim();
 
       if (text.isEmpty) continue;
@@ -280,13 +271,11 @@ class LyricParser {
   static List<LyricLine> parseTTML(String content) {
     final List<LyricLine> lyrics = [];
 
-    // 匹配 <p begin="..." end="...">...</p>（支持跨行）
     final pRegex = RegExp(
       r'<p\s+begin="([^"]+)"\s+end="([^"]+)"[^>]*>(.*?)</p>',
       dotAll: true,
     );
 
-    // TTML 时间格式: HH:MM:SS.mmm 或 HH:MM:SS:ff
     final timeRegex = RegExp(r'(\d{2}):(\d{2}):(\d{2})[.:](\d{3})');
 
     for (final match in pRegex.allMatches(content)) {
@@ -311,7 +300,6 @@ class LyricParser {
         milliseconds: int.parse(endMatch.group(4)!),
       );
 
-      // 移除 XML/HTML 标签，保留文本
       text = text
           .replaceAll(RegExp(r'<[^>]+>'), '')
           .replaceAll('&amp;', '&')
@@ -341,7 +329,6 @@ class LyricParser {
     final List<LyricLine> finalLyrics = [];
 
     for (int i = 0; i < lyrics.length - 1; i++) {
-      // 当前字幕的结束时间直接设置为下一行的开始时间
       finalLyrics.add(LyricLine(
         startTime: lyrics[i].startTime,
         endTime: lyrics[i + 1].startTime,
@@ -349,7 +336,6 @@ class LyricParser {
       ));
     }
 
-    // 最后一行
     final lastIndex = lyrics.length - 1;
     finalLyrics.add(LyricLine(
       startTime: lyrics[lastIndex].startTime,
@@ -371,7 +357,6 @@ class LyricParser {
       final isEmpty = line.text.trim().isEmpty;
 
       if (mergedLyrics.isEmpty) {
-        // 第一行特殊处理：如果是长空行（>=3秒）也替换为音符
         if (isEmpty) {
           mergedLyrics.add(line.copyWith(text: '♪ - ♪'));
         } else {
@@ -385,11 +370,9 @@ class LyricParser {
       final isShort = duration < const Duration(seconds: 3);
 
       if (isEmpty && isShort) {
-        // 合并到上一行：更新上一行的结束时间
         mergedLyrics.removeLast();
         mergedLyrics.add(lastLine.copyWith(endTime: line.endTime));
       } else {
-        // 保留的行：如果是空行（说明是长空行），替换为音符
         if (isEmpty) {
           mergedLyrics.add(line.copyWith(text: '♪ - ♪'));
         } else {

@@ -48,7 +48,6 @@ class SubtitleLibraryPriorityNotifier
         state = priority;
       }
     } catch (e) {
-      // 加载失败，使用默认值
       state = SubtitleLibraryPriority.highest;
     }
   }
@@ -63,7 +62,6 @@ class SubtitleLibraryPriorityNotifier
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_preferenceKey, state.value);
     } catch (e) {
-      // 保存失败时静默处理
     }
   }
 }
@@ -142,7 +140,6 @@ class LLMSettingsNotifier extends StateNotifier<LLMSettings> {
   Future<void> _loadSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      // Read API key from secure storage, with migration from SharedPreferences
       String apiKey = await _secureStorage.read(key: _secureApiKeyKey) ?? '';
       if (apiKey.isEmpty) {
         final legacyKey = prefs.getString('${_prefix}api_key');
@@ -268,7 +265,6 @@ class AudioFormatPreferenceNotifier
                 ))
             .toList();
 
-        // 确保所有格式都存在
         for (final format in AudioFormat.values) {
           if (!priority.contains(format)) {
             priority.add(format);
@@ -278,7 +274,6 @@ class AudioFormatPreferenceNotifier
         state = AudioFormatPreference(priority: priority);
       }
     } catch (e) {
-      // 加载失败，使用默认值
       state = const AudioFormatPreference();
     }
   }
@@ -294,7 +289,6 @@ class AudioFormatPreferenceNotifier
       final order = state.priority.map((format) => format.extension).toList();
       await prefs.setStringList(_preferenceKey, order);
     } catch (e) {
-      // 保存失败时静默处理
     }
   }
 
@@ -370,7 +364,6 @@ class PrivacyModeSettingsNotifier extends StateNotifier<PrivacyModeSettings> {
         customTitle: prefs.getString(_customTitleKey) ?? '正在播放音频',
       );
     } catch (e) {
-      // 加载失败，使用默认值
       state = const PrivacyModeSettings();
     }
   }
@@ -406,7 +399,6 @@ class PrivacyModeSettingsNotifier extends StateNotifier<PrivacyModeSettings> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(key, value);
     } catch (e) {
-      // 保存失败时静默处理
     }
   }
 }
@@ -741,7 +733,7 @@ class CrossfadeDurationNotifier extends StateNotifier<int> {
 final crossfadeDurationProvider =
     StateNotifierProvider<CrossfadeDurationNotifier, int>((ref) {
   return CrossfadeDurationNotifier();
-});/// ReplayGain setting.
+});
 class ReplayGainSettings {
   final bool enabled;
   final double preampDb;
@@ -784,7 +776,7 @@ class ReplayGainNotifier extends StateNotifier<ReplayGainSettings> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_enabledKey, enabled);
-    } catch (e) {/* ignore */}
+    } catch (e) {}
   }
 
   Future<void> setPreampDb(double db) async {
@@ -792,7 +784,7 @@ class ReplayGainNotifier extends StateNotifier<ReplayGainSettings> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble(_preampKey, state.preampDb);
-    } catch (e) {/* ignore */}
+    } catch (e) {}
   }
 }
 
@@ -844,7 +836,7 @@ class VolumeNormalizationNotifier extends StateNotifier<VolumeNormalizationSetti
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_enabledKey, enabled);
-    } catch (e) {/* ignore */}
+    } catch (e) {}
   }
 
   Future<void> setTargetLevel(double db) async {
@@ -852,7 +844,7 @@ class VolumeNormalizationNotifier extends StateNotifier<VolumeNormalizationSetti
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble(_targetKey, state.targetLevelDb);
-    } catch (e) {/* ignore */}
+    } catch (e) {}
   }
 }
 
@@ -1014,7 +1006,6 @@ class WavConversionFormatNotifier extends StateNotifier<WavConversionFormat> {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Try new key (string-based)
       final savedValue = prefs.getString(_preferenceKeyNew);
       if (savedValue != null) {
         final format = WavConversionFormat.values.firstWhere(
@@ -1025,11 +1016,9 @@ class WavConversionFormatNotifier extends StateNotifier<WavConversionFormat> {
         return;
       }
 
-      // Migrate from old bool key
       final oldEnabled = prefs.getBool(_preferenceKeyOld);
       if (oldEnabled == true) {
-        state = WavConversionFormat.flac; // old default
-        // Save to new key and remove old
+        state = WavConversionFormat.flac;
         await prefs.setString(_preferenceKeyNew, WavConversionFormat.flac.value);
         await prefs.remove(_preferenceKeyOld);
       }
@@ -1043,7 +1032,6 @@ class WavConversionFormatNotifier extends StateNotifier<WavConversionFormat> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_preferenceKeyNew, format.value);
-      // Clean up old key if present
       if (prefs.containsKey(_preferenceKeyOld)) {
         await prefs.remove(_preferenceKeyOld);
       }
@@ -1088,4 +1076,3 @@ final showFpsOverlayProvider =
     StateNotifierProvider<FpsOverlayNotifier, bool>((ref) {
   return FpsOverlayNotifier();
 });
-

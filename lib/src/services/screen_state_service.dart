@@ -37,7 +37,6 @@ class ScreenStateService {
   }
 
   Future<void> _handleMethodCall(MethodCall call) async {
-    // Only process screen-off if app lock is enabled
     if (!AppLockService.instance.isEnabled) return;
 
     if (call.method == _methodScreenOff) {

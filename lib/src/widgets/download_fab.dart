@@ -22,14 +22,11 @@ class DownloadFab extends StatelessWidget {
     return StreamBuilder<List<DownloadTask>>(
       stream: DownloadService.instance.tasksStream,
       builder: (context, snapshot) {
-        // Compute active count from stream data reactively instead of
-        // reading DownloadService.instance.activeDownloadCount statically.
         final tasks = snapshot.data ?? [];
         final activeCount = tasks.where((t) =>
             t.status == DownloadStatus.downloading ||
             t.status == DownloadStatus.pending).length;
 
-        // 没有活跃任务时不显示
         if (activeCount == 0) {
           return const SizedBox.shrink();
         }

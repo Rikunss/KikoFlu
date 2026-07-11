@@ -84,7 +84,7 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
       final apiService = ref.read(kikoeruApiServiceProvider);
       final allPlaylists = <Playlist>[];
       int page = 1;
-      const pageSize = 96; // API 最大数量
+      const pageSize = 96;
       const maxPages = 5;
 
       while (page <= maxPages) {
@@ -130,7 +130,6 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
     try {
       final apiService = ref.read(kikoeruApiServiceProvider);
 
-      // 并行检查所有播放列表
       final results = await Future.wait(
         _allPlaylists.map((playlist) async {
           try {
@@ -168,7 +167,7 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
   Future<bool> _isWorkInPlaylist(
       dynamic apiService, Playlist playlist) async {
     int page = 1;
-    const pageSize = 96; // API 最大数量
+    const pageSize = 96;
     const maxPages = 5;
 
     while (page <= maxPages) {
@@ -200,13 +199,10 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
       );
 
       if (mounted) {
-        // 刷新播放列表详情（如果正在查看该播放列表）
         ref.invalidate(playlistDetailProvider(playlist.id));
 
-        // 刷新播放列表列表（更新作品数量等信息）
         ref.read(playlistsProvider.notifier).refresh();
 
-        // 更新本地状态
         setState(() {
           _inPlaylists.add(playlist.id);
         });
@@ -241,13 +237,10 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
       );
 
       if (mounted) {
-        // 刷新播放列表详情
         ref.invalidate(playlistDetailProvider(playlist.id));
 
-        // 刷新播放列表列表
         ref.read(playlistsProvider.notifier).refresh();
 
-        // 更新本地状态
         setState(() {
           _inPlaylists.remove(playlist.id);
         });
@@ -280,7 +273,6 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
     Widget content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 标题栏
         Padding(
           padding: EdgeInsets.fromLTRB(
             isLandscape ? 24 : 16,
@@ -331,7 +323,6 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
           ),
         ),
         const Divider(height: 1),
-        // 播放列表
         if (_isLoadingPlaylists)
           const Padding(
             padding: EdgeInsets.all(32),
@@ -491,7 +482,6 @@ class _AddToPlaylistDialogState extends ConsumerState<AddToPlaylistDialog> {
               },
             ),
           ),
-        // 底部按钮（竖屏模式）
         if (!isLandscape) ...[
           const Divider(height: 1),
           Padding(

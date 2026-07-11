@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../providers/theme_provider.dart';
 
 class AppTheme {
-  // iOS 使用 Cupertino 转场以支持侧滑返回
   static const _pageTransitionsTheme = PageTransitionsTheme(
     builders: {
       TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
@@ -15,8 +14,6 @@ class AppTheme {
     },
   );
 
-  // Platform-aware font configuration with GoogleSans as the primary font.
-  // Falls back to CJK-compatible system fonts for Chinese/Japanese/Korean text.
   static TextTheme? _getTextTheme() {
     const fontFamily = 'GoogleSans';
     const cjkFallback = [
@@ -31,8 +28,6 @@ class AppTheme {
       'Roboto',
     ];
 
-    // On Windows, prefer Microsoft YaHei first in the CJK fallback chain
-    // since it's always available and renders Chinese text natively.
     final fallback = Platform.isWindows
         ? <String>[
             'Microsoft YaHei',
@@ -174,7 +169,6 @@ class AppTheme {
     );
   }
 
-  // 根据主题类型获取对应的颜色方案
   static ColorScheme getColorScheme(ColorSchemeType type, bool isDark) {
     switch (type) {
       case ColorSchemeType.oceanBlue:
@@ -194,18 +188,16 @@ class AppTheme {
       case ColorSchemeType.slateGray:
         return isDark ? _slateGrayDark : _slateGrayLight;
       case ColorSchemeType.dynamic:
-        return isDark ? _oceanBlueDark : _oceanBlueLight; // 动态主题的后备方案
+        return isDark ? _oceanBlueDark : _oceanBlueLight;
     }
   }
 
   /// Return the seed (primary) color for a given [ColorSchemeType].
   /// Used by the splash screen before Riverpod / SharedPreferences are ready.
   static Color seedColorForType(ColorSchemeType type) {
-    // Extract primary color from the matching light scheme as the seed.
     return getColorScheme(type, false).primary;
   }
 
-  // ========== 海洋蓝主题 ==========
   static const _oceanBlueLight = ColorScheme(
     brightness: Brightness.light,
     primary: Color(0xFF146683),
@@ -252,7 +244,6 @@ class AppTheme {
     onSurfaceVariant: Color(0xFFC0C8CD),
   );
 
-  // ========== 森林绿主题 ==========
   static const _forestGreenLight = ColorScheme(
     brightness: Brightness.light,
     primary: Color(0xFF3A6F41),
@@ -299,7 +290,6 @@ class AppTheme {
     onSurfaceVariant: Color(0xFFC1C9BF),
   );
 
-  // ========== 日落橙主题 ==========
   static const _sunsetOrangeLight = ColorScheme(
     brightness: Brightness.light,
     primary: Color(0xFF904D00),
@@ -346,7 +336,6 @@ class AppTheme {
     onSurfaceVariant: Color(0xFFD3C4B8),
   );
 
-  // ========== 薰衣草紫主题 ==========
   static const _lavenderPurpleLight = ColorScheme(
     brightness: Brightness.light,
     primary: Color(0xFF6750A4),
@@ -393,7 +382,6 @@ class AppTheme {
     onSurfaceVariant: Color(0xFFCAC4CF),
   );
 
-  // ========== 樱花粉主题 ==========
   static const _sakuraPinkLight = ColorScheme(
     brightness: Brightness.light,
     primary: Color(0xFFB4276E),
@@ -440,7 +428,6 @@ class AppTheme {
     onSurfaceVariant: Color(0xFFD5C2C6),
   );
 
-  // ========== 绯红主题 ==========
   static const _crimsonRedLight = ColorScheme(
     brightness: Brightness.light,
     primary: Color(0xFFB3261E),
@@ -487,7 +474,6 @@ class AppTheme {
     onSurfaceVariant: Color(0xFFD5C3C1),
   );
 
-  // ========== 琥珀金主题 ==========
   static const _amberGoldLight = ColorScheme(
     brightness: Brightness.light,
     primary: Color(0xFF8F5A00),
@@ -555,9 +541,6 @@ class AppTheme {
         surfaceContainerHighest: trueBlack,
         surfaceDim: trueBlack,
         surfaceBright: trueBlack,
-        // surfaceVariant is intentionally excluded — it's a deprecated alias
-        // for surfaceContainerHighest (already set above). Using it would be
-        // redundant and trigger a deprecation warning.
       ),
       appBarTheme: theme.appBarTheme.copyWith(
         backgroundColor: trueBlack,
@@ -565,7 +548,6 @@ class AppTheme {
       navigationBarTheme: theme.navigationBarTheme.copyWith(
         backgroundColor: trueBlack,
       ),
-      // ── Additional surface-level overrides for full AMOLED consistency ──
       bottomSheetTheme: theme.bottomSheetTheme.copyWith(
         backgroundColor: trueBlack,
       ),
@@ -574,8 +556,6 @@ class AppTheme {
       ),
       cardTheme: theme.cardTheme.copyWith(
         color: trueBlack,
-        // Prevent M3 from applying a subtle primary-color tint to elevated
-        // cards, which would make them appear slightly non-black.
         surfaceTintColor: Colors.transparent,
       ),
       popupMenuTheme: theme.popupMenuTheme.copyWith(
@@ -594,8 +574,6 @@ class AppTheme {
       searchBarTheme: theme.searchBarTheme.copyWith(
         backgroundColor: WidgetStateProperty.all(trueBlack),
       ),
-      // MenuThemeData does not have a copyWith() method in the current
-      // Flutter version, so we construct a new MenuThemeData directly.
       menuTheme: const MenuThemeData(
         style: MenuStyle(
           backgroundColor: WidgetStatePropertyAll<Color>(Color(0xFF000000)),
@@ -604,7 +582,6 @@ class AppTheme {
     );
   }
 
-  // ========== 岩灰主题 ==========
   static const _slateGrayLight = ColorScheme(
     brightness: Brightness.light,
     primary: Color(0xFF455A64),

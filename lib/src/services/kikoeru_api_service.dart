@@ -22,7 +22,6 @@ class KikoeruApiService {
   void Function()? onUnauthorized;
 
   late Dio _dio;
-  // Kept for URL building (getDownloadUrl / getStreamUrl / getCoverUrl).
   String? _host;
 
   /// The active strategy: [OfficialKikoeruApiStrategy] or [CustomKikoeruApiStrategy].
@@ -36,15 +35,12 @@ class KikoeruApiService {
     _setupInterceptors();
   }
 
-  // ── Interceptors ──
-
   void _setupInterceptors() {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
           final strategy = _strategy;
 
-          // User-Agent differs between official and custom servers
           if (strategy?.isOfficial ?? false) {
             options.headers['User-Agent'] =
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
@@ -57,9 +53,6 @@ class KikoeruApiService {
           options.headers['Accept-Language'] = 'zh-CN,zh;q=0.9';
           options.headers.addAll(CookieService.serverCookieHeaders);
 
-          // Add Authorization header if token exists.
-          // Skip for auth endpoints (login / register) so they can be called
-          // without a Bearer token.
           final token = strategy?.config.token;
           if (token != null && token.isNotEmpty) {
             final isLoginRequest = options.method == 'POST' &&
@@ -90,7 +83,6 @@ class KikoeruApiService {
             onUnauthorized!();
           }
 
-          // Auto-retry connection timeout once
           if (error.type == DioExceptionType.connectionTimeout &&
               error.requestOptions.extra['retried'] != true) {
             _log.warning('Connection timeout detected, retrying once...', tag: 'API');
@@ -111,7 +103,6 @@ class KikoeruApiService {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          // Log request without body for sensitive endpoints
           final isAuthEndpoint = options.path.contains('/api/auth/');
           if (!isAuthEndpoint) {
             _log.info('[API] ${options.method} ${options.uri}');
@@ -131,8 +122,6 @@ class KikoeruApiService {
       ),
     );
   }
-
-  // ── Shared helpers ──
 
   /// Sets up [host], creates the appropriate strategy, and updates config.
   void _initializeForHost(String host) {
@@ -184,14 +173,10 @@ class KikoeruApiService {
     }
   }
 
-  // ── Initialisation ──
-
   void init(String token, String host) {
-    // Normalize host
     _host = _normalizeHost(host);
     _dio.options.baseUrl = _host!;
 
-    // Update config and (re)create strategy
     _currentConfig = StrategyConfig(
       token: token,
       host: _host,
@@ -217,8 +202,6 @@ class KikoeruApiService {
   /// Returns the normalized version of [host] (with protocol prefix).
   String _normalizeHost(String host) => ServerUtils.normalizeHost(host);
 
-  // ── Configuration setters ──
-
   void setOrder(String order) {
     if (_currentConfig.order == order) {
       _currentConfig = _currentConfig.copyWith(
@@ -234,8 +217,6 @@ class KikoeruApiService {
     _currentConfig = _currentConfig.copyWith(subtitle: subtitle);
     _strategy?.config = _currentConfig;
   }
-
-  // ── Connectivity ──
 
   Future<bool> isConnected() async {
     final connectivityResult = await Connectivity().checkConnectivity();
@@ -268,8 +249,6 @@ class KikoeruApiService {
   /// Public helper so external callers can check the server type.
   bool get isOfficialServer => _strategy?.isOfficial ?? false;
 
-  // ── Authentication ──
-
   Future<Map<String, dynamic>> login(
       String username, String password, String host) async {
     _initializeForHost(host);
@@ -285,8 +264,6 @@ class KikoeruApiService {
   Future<Map<String, dynamic>> getUserInfo() {
     return _strategy!.getUserInfo();
   }
-
-  // ── Works ──
 
   Future<Map<String, dynamic>> getWorks({
     int page = 1,
@@ -406,8 +383,6 @@ class KikoeruApiService {
     );
   }
 
-  // ── Tags ──
-
   Future<List<dynamic>> getAllTags() =>
       _simpleGet('/api/tags/', 'Failed to get tags');
 
@@ -417,12 +392,6 @@ class KikoeruApiService {
         mapper: Tag.fromJson,
         errorMessage: 'Failed to search tags',
       );
-
-  // ── VAs ──
-
-
-
-  // ── Circles ──
 
   Future<List<dynamic>> getAllVas() =>
       _simpleGet('/api/vas/', 'Failed to get VAs');
@@ -436,8 +405,6 @@ class KikoeruApiService {
 
   Future<List<dynamic>> getAllCircles() =>
       _simpleGet('/api/circles/', 'Failed to get circles');
-
-  // ── Tracks ──
 
   Future<List<dynamic>> getWorkTracks(int workId) async {
     try {
@@ -458,8 +425,6 @@ class KikoeruApiService {
       throw KikoeruApiException('Failed to get tracks', e);
     }
   }
-
-  // ── Reviews ──
 
   Future<Map<String, dynamic>> getWorkReviews(int workId,
       {int page = 1, int pageSize = 20}) {
@@ -499,8 +464,6 @@ class KikoeruApiService {
   Future<void> deleteReview(int workId) {
     return _strategy!.deleteReview(workId);
   }
-
-  // ── Tags (vote / attach) ──
 
   Future<Map<String, dynamic>> voteWorkTag({
     required int workId,
@@ -554,8 +517,6 @@ class KikoeruApiService {
     }
   }
 
-  // ── Favorites ──
-
   Future<Map<String, dynamic>> getFavorites(
       {int page = 1, int pageSize = 20}) {
     return _strategy!.getFavorites(page: page, pageSize: pageSize);
@@ -576,8 +537,6 @@ class KikoeruApiService {
       throw KikoeruApiException('Failed to remove from favorites', e);
     }
   }
-
-  // ── Playlists ──
 
   Future<List<dynamic>> getPlaylists() async {
     try {
@@ -737,8 +696,6 @@ class KikoeruApiService {
     }
   }
 
-  // ── Progress ──
-
   Future<void> updateProgress(int workId, double progress) async {
     try {
       await _dio.put(
@@ -759,8 +716,6 @@ class KikoeruApiService {
     }
   }
 
-  // ── Download URLs ──
-
   String getDownloadUrl(String hash, String fileName) {
     return '$_host/api/media/download/$hash/$fileName';
   }
@@ -773,14 +728,11 @@ class KikoeruApiService {
     return '$_host/api/cover/$workId';
   }
 
-  // ── Cleanup ──
-
   void dispose() {
     _dio.close();
   }
 }
 
-// Provider
 final kikoeruApiServiceProvider = Provider<KikoeruApiService>((ref) {
   return KikoeruApiService();
 });

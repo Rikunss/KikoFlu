@@ -28,7 +28,6 @@ class MyTabsDisplaySettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 显示选项卡片
           Card(
             child: Column(
               children: [

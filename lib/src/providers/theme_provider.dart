@@ -2,28 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// 主题模式枚举
 enum AppThemeMode {
-  system, // 跟随系统
-  light, // 浅色模式
-  dark, // 深色模式
-  trueBlack, // 纯黑 OLED 模式
+  system,
+  light,
+  dark,
+  trueBlack,
 }
 
-// 颜色方案类型枚举
 enum ColorSchemeType {
-  oceanBlue, // 海洋蓝（默认）
-  forestGreen, // 森林绿
-  sunsetOrange, // 日落橙
-  lavenderPurple, // 薰衣草紫
-  sakuraPink, // 樱花粉
-  crimsonRed, // 绯红
-  amberGold, // 琥珀金
-  slateGray, // 岩灰
-  dynamic, // 系统动态取色
+  oceanBlue,
+  forestGreen,
+  sunsetOrange,
+  lavenderPurple,
+  sakuraPink,
+  crimsonRed,
+  amberGold,
+  slateGray,
+  dynamic,
 }
 
-// 主题设置状态
 class ThemeSettings {
   final AppThemeMode themeMode;
   final ColorSchemeType colorSchemeType;
@@ -57,7 +54,6 @@ class ThemeSettings {
   }
 }
 
-// 主题设置控制器
 class ThemeSettingsNotifier extends StateNotifier<ThemeSettings> {
   static const String themeModeKey = 'theme_mode';
   static const String colorSchemeTypeKey = 'color_scheme_type';
@@ -76,9 +72,8 @@ class ThemeSettingsNotifier extends StateNotifier<ThemeSettings> {
   }
 
   ThemeSettingsNotifier() : super(_preloaded ?? const ThemeSettings()) {
-    _preloaded = null; // one-time use, avoid leaking
+    _preloaded = null;
     if (state == const ThemeSettings()) {
-      // Only load async if no preload was done (splash-only / cold start fallback)
       _loadSettings();
     }
   }
@@ -108,7 +103,6 @@ class ThemeSettingsNotifier extends StateNotifier<ThemeSettings> {
   }
 }
 
-// 主题设置提供者
 final themeSettingsProvider =
     StateNotifierProvider<ThemeSettingsNotifier, ThemeSettings>((ref) {
   return ThemeSettingsNotifier();

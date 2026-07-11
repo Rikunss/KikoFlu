@@ -50,13 +50,11 @@ import 'src/services/kikoeru_api_service.dart';
 
 void main(List<String> args) {
   AppBootstrap.runWithZone(() async {
-    // --- Multi-window mode (floating lyric as separate window) ---
     if (args.firstOrNull == 'multi_window') {
       await _runMultiWindow(args);
       return;
     }
 
-    // --- Desktop-only setup that must happen before any UI ---
     final bool isDesktop =
         Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
@@ -86,51 +84,32 @@ void main(List<String> args) {
       setupSqfliteDatabaseFactory();
     }
 
-    // --- Pre-load theme before single runApp ---
     await ThemeSettingsNotifier.preload();
     final splashSeed = await SplashApp.loadSavedSeedColor();
 
-    // --- CRITICAL: Init Hive + StorageService BEFORE runApp ---
-    // AuthNotifier._loadCurrentUser() accesses StorageService synchronously
-    // on creation. If runApp creates the widget tree before storage is ready,
-    // it throws a HiveError/StateError.
     await AppBootstrap.initEssential(isDesktop: isDesktop);
 
-    // Notifier: signals when heavy init is done → triggers splash cross-fade
     final initComplete = ValueNotifier<bool>(false);
 
-    // --- Single runApp with splash → main cross-fade ---
     runApp(_SplashCrossFade(
       initComplete: initComplete,
       splashSeed: splashSeed,
       child: const ProviderScope(child: KikoeruApp()),
     ));
 
-    // --- Wait for first frame to render so splash screen is visible first ---
-    // runApp() schedules root widget attachment asynchronously via Timer.run.
-    // Without this delay, AppBootstrap.initialize() starts immediately and may
-    // complete before the first frame renders, especially on devices where
-    // Impeller/Vulkan shader compilation takes ~2s (Davey! frames).
-    // This 100ms is enough for the Timer to fire and the initial frame to begin.
     await Future<void>.delayed(const Duration(milliseconds: 100));
 
-    // Record when splash became visible (for minimum display duration)
     final splashStart = DateTime.now();
 
-    // --- Remaining heavy initialization (runs while splash is showing) ---
     await AppBootstrap.initialize(isDesktop: isDesktop);
     AppBootstrap.configureSystemUi();
 
-    // --- Ensure splash is visible for at least 1.5 seconds total ---
-    // Prevents the splash from flashing and disappearing too quickly when
-    // initialization finishes faster than the first frame can render.
     const minSplashDuration = Duration(milliseconds: 1500);
     final splashElapsed = DateTime.now().difference(splashStart);
     if (splashElapsed < minSplashDuration) {
       await Future<void>.delayed(minSplashDuration - splashElapsed);
     }
 
-    // --- Signal init complete → triggers cross-fade transition ---
     initComplete.value = true;
   });
 }
@@ -172,7 +151,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       windowManager.addListener(this);
     }
-    // Initialize audio and video services after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeAppServices();
     });
@@ -195,7 +173,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     _initSubtitleLibraryFileWatcher();
     _setupAppLockTileHandler();
 
-    // Heavy download disk scan (fire-and-forget, runs after app is visible)
     DownloadService.instance.syncWithDiskAfterInit().catchError((e) {
       LogService.instance.warning('[Main] Disk sync failed: $e', tag: 'Main');
     });
@@ -246,9 +223,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     tileChannel.setMethodCallHandler((call) async {
       if (call.method == 'tileToggled') {
         final enabled = call.arguments as bool? ?? false;
-        // Sync the in-memory AppLockService with the tile's toggle
-        // The native TileService already updated SharedPreferences.
-        // The UI will adapt on next build via _buildHomeScreen() check.
         LogService.instance.debug('[AppLockTile] Toggled to $enabled', tag: 'Main');
         if (mounted) {
           setState(() {});
@@ -268,7 +242,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
   }
 
   void _initProgressSync() {
-    // Initialize cross-device progress sync
     ProgressSyncService.instance.init(ref);
   }
 
@@ -278,13 +251,11 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       windowManager.removeListener(this);
     }
-    // Dispose services to prevent memory leaks
     AudioPlayerService.instance.dispose();
     HiResAudioService.instance.dispose();
     StreamingSpeedTracker.instance.dispose();
     ListeningStatsService.instance.unsubscribeFromHistoryUpdates();
     PlaybackHistoryService.instance.detach();
-    // Flush remaining logs before exit
     LogService.instance.flush();
     super.dispose();
   }
@@ -312,7 +283,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
       PlaybackHistoryService.instance
           .flushNow(reason: FlushReason.appBackground);
 
-      // Track background time for auto-relock
       if (state == AppLifecycleState.paused ||
           state == AppLifecycleState.inactive ||
           state == AppLifecycleState.hidden) {
@@ -322,7 +292,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
       }
     }
 
-    // Auto-relock check when app returns to foreground
     if (state == AppLifecycleState.resumed) {
       if (AppLockService.instance.isEnabled &&
           AppLockService.instance.notifyAppForegrounded()) {
@@ -330,13 +299,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
       }
     }
 
-    // On Android, when the app is swiped away from recent apps (detached),
-    // fully stop audio playback and dismiss the notification.
-    //
-    // The sequence: stop() halts the player + transitions processing state
-    // to idle → AudioService._observePlaybackState() detects the transition
-    // and calls stopSelf() on the native service → notification is dismissed.
-    // clearQueue() resets the queue + current track so state is fully clean.
     if (state == AppLifecycleState.detached && Platform.isAndroid) {
       try {
         final service = AudioPlayerService.instance;
@@ -345,7 +307,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
             .then((_) => service.clearQueue())
             .catchError((_) {});
       } catch (e) {
-        // Service may already be disposed — safe to ignore.
       }
     }
   }
@@ -367,7 +328,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
   }
 
   void _initHomeWidget() {
-    // Initialize widget service on Android only
     if (!Platform.isAndroid) return;
     HomeWidgetService.instance.init();
   }
@@ -453,9 +413,7 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
             return Stack(
               children: [
                 if (child != null) child,
-                // Global FPS overlay (top-right, togglable via Developer Tools)
                 const _FpsOverlayGlobal(),
-                // Session-expired dialog listener (must be inside Navigator scope)
                 const _SessionExpiredListener(),
               ],
             );
@@ -471,8 +429,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
       return const LoginScreen();
     }
 
-    // If app lock is enabled, show lock screen before MainScreen
-    // Use lockGeneration as key to force fresh LockScreen on auto-relock
     if (AppLockService.instance.isEnabled) {
       return _LockScreenWrapper(
         key: ValueKey('lock_${AppLockService.instance.lockGeneration}'),
@@ -599,7 +555,6 @@ class _LockScreenWrapperState extends ConsumerState<_LockScreenWrapper>
     if (_unlocked) {
       return const MainScreen();
     }
-    // Stack MainScreen underneath + LockScreen overlay with exit animation
     return Stack(
       children: [
         const MainScreen(),
@@ -654,11 +609,10 @@ class _SplashCrossFadeState extends State<_SplashCrossFade>
       duration: const Duration(milliseconds: 400),
     )..addStatusListener((status) {
         if (status == AnimationStatus.completed && mounted) {
-          setState(() {}); // remove splash overlay from tree
+          setState(() {});
         }
       });
 
-    // Wait for init to complete before starting the cross-fade
     widget.initComplete.addListener(_onInitComplete);
   }
 
@@ -679,8 +633,6 @@ class _SplashCrossFadeState extends State<_SplashCrossFade>
   @override
   Widget build(BuildContext context) {
     final seed = widget.splashSeed ?? const Color(0xFF146683);
-    // Use light theme by default — will update on first app frame via
-    // the real KikoeruApp theme. Splash is brief so this is fine.
     final splashCs = ColorScheme.fromSeed(
       seedColor: seed,
       brightness: Brightness.dark,
@@ -689,10 +641,8 @@ class _SplashCrossFadeState extends State<_SplashCrossFade>
     return Stack(
       alignment: Alignment.topLeft,
       children: [
-        // Real app (renders underneath, fully opaque)
         widget.child,
 
-        // Splash overlay (fades out, removed from tree when done)
         if (_ctrl.status != AnimationStatus.completed)
           FadeTransition(
             opacity: Tween<double>(begin: 1.0, end: 0.0).animate(

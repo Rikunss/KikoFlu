@@ -30,7 +30,7 @@ import '../../l10n/app_localizations.dart';
 /// 只显示硬盘上实际存在的文件，不显示未下载的文件
 class OfflineFileExplorerWidget extends ConsumerStatefulWidget {
   final Work work;
-  final List<dynamic>? fileTree; // 从 work_metadata.json 中读取的文件树
+  final List<dynamic>? fileTree;
 
   /// For imported local works — absolute path to the original source folder.
   /// When set, file existence checks and path resolution use this instead of
@@ -51,19 +51,18 @@ class OfflineFileExplorerWidget extends ConsumerStatefulWidget {
 
 class _OfflineFileExplorerWidgetState
     extends ConsumerState<OfflineFileExplorerWidget> {
-  List<dynamic> _localFiles = []; // 仅包含本地存在的文件
-  final Set<String> _expandedFolders = {}; // 记录展开的文件夹路径
-  final Map<String, bool> _fileExists = {}; // hash -> exists on disk
-  final Set<String> _audioWithLibrarySubtitles = {}; // 存储在字幕库中有匹配字幕的音频文件名
+  List<dynamic> _localFiles = [];
+  final Set<String> _expandedFolders = {};
+  final Map<String, bool> _fileExists = {};
+  final Set<String> _audioWithLibrarySubtitles = {};
   bool _isLoading = true;
   String? _errorMessage;
-  String? _mainFolderPath; // 主文件夹路径
+  String? _mainFolderPath;
   late final FileListController _fileListController;
 
-  // 翻译相关状态
   bool _showTranslation = false;
-  final Map<String, String> _translationCache = {}; // 原文 -> 译文
-  final Set<String> _translatingItems = {}; // 正在翻译的项目
+  final Map<String, String> _translationCache = {};
+  final Set<String> _translatingItems = {};
 
   @override
   void initState() {
@@ -74,8 +73,6 @@ class _OfflineFileExplorerWidgetState
 
   @override
   void dispose() {
-    // 离线页面关闭时清空文件列表，避免影响其他作品
-    // 使用 Future.microtask 延迟执行，避免在 dispose 中直接修改 provider
     Future.microtask(() => _fileListController.clear());
     super.dispose();
   }
@@ -92,7 +89,6 @@ class _OfflineFileExplorerWidgetState
     return p.join(downloadDir.path, widget.work.id.toString());
   }
 
-  // 加载本地存在的文件
   Future<void> _loadLocalFiles() async {
     if (widget.fileTree == null) {
       setState(() {
@@ -119,15 +115,11 @@ class _OfflineFileExplorerWidgetState
         return;
       }
 
-      // 递归检查并过滤本地存在的文件
       _localFiles = await _filterLocalFiles(widget.fileTree!, workDir.path, '');
-      // 更新全局文件列表供字幕自动加载使用
       _fileListController.updateFiles(List<dynamic>.from(_localFiles));
 
-      // 检查字幕库中的匹配项
       await _checkLibrarySubtitles();
 
-      // 识别主文件夹并自动展开（需要在检查字幕库后执行）
       _identifyAndExpandMainFolder();
 
       setState(() {
@@ -141,7 +133,6 @@ class _OfflineFileExplorerWidgetState
     }
   }
 
-  // 递归过滤本地存在的文件
   Future<List<dynamic>> _filterLocalFiles(
       List<dynamic> items, String workDirPath, String parentPath) async {
     final List<dynamic> filteredItems = [];
@@ -159,15 +150,12 @@ class _OfflineFileExplorerWidgetState
           final filteredChildren =
               await _filterLocalFiles(children, workDirPath, folderPath);
 
-          // 只添加包含文件的文件夹
           if (filteredChildren.isNotEmpty) {
-            // 创建文件夹的 Map 副本
             if (item is Map<String, dynamic>) {
               final folderCopy = Map<String, dynamic>.from(item);
               folderCopy['children'] = filteredChildren;
               filteredItems.add(folderCopy);
             } else {
-              // 如果是 AudioFile 对象，转换为 Map
               final folderMap = <String, dynamic>{
                 'type': 'folder',
                 'title': title,
@@ -178,28 +166,21 @@ class _OfflineFileExplorerWidgetState
           }
         }
       } else if (hash != null) {
-        // 检查文件是否存在
         final relativePath = parentPath.isEmpty ? title : '$parentPath/$title';
         final filePath = '$workDirPath/$relativePath';
         final file = File(filePath);
         final downloadingFile = File('$filePath.downloading');
 
-        // 检查文件是否存在且没有正在下载的临时文件
-        // 如果存在 .downloading 文件，说明下载未完成，不显示
         if (await file.exists() && !await downloadingFile.exists()) {
           _fileExists[hash] = true;
 
-          // 根据文件扩展名确定正确的类型
-          String fileType = type; // 默认使用现有类型
+          String fileType = type;
 
-          // 如果类型是 'file' 或为空，根据扩展名重新判断
           if (type == 'file' || type == null || type.isEmpty) {
             fileType = FileIconUtils.inferFileType(title);
           }
 
-          // 统一创建或修正 Map
           if (item is Map<String, dynamic>) {
-            // 如果是 Map，可能需要修正类型
             if (item['type'] != fileType) {
               final correctedMap = Map<String, dynamic>.from(item);
               correctedMap['type'] = fileType;
@@ -208,7 +189,6 @@ class _OfflineFileExplorerWidgetState
               filteredItems.add(item);
             }
           } else {
-            // 如果是 AudioFile 对象，转换为 Map
             final fileMap = <String, dynamic>{
               'type': fileType,
               'title': title,
@@ -225,14 +205,12 @@ class _OfflineFileExplorerWidgetState
     return filteredItems;
   }
 
-  // 安全获取对象属性（支持 Map 和 AudioFile 对象）
   dynamic _getProperty(dynamic item, String key, {dynamic defaultValue}) {
     if (item == null) return defaultValue;
 
     if (item is Map) {
       return item[key] ?? defaultValue;
     } else {
-      // AudioFile 对象
       try {
         switch (key) {
           case 'type':
@@ -260,7 +238,6 @@ class _OfflineFileExplorerWidgetState
     }
   }
 
-  // 检查字幕库中哪些音频文件有匹配的字幕
   Future<void> _checkLibrarySubtitles() async {
     final items = _localFiles.whereType<Map<String, dynamic>>().toList();
     _audioWithLibrarySubtitles.addAll(await checkLibrarySubtitles(
@@ -271,11 +248,9 @@ class _OfflineFileExplorerWidgetState
     if (mounted) setState(() {});
   }
 
-  // 识别主文件夹：音频数量最多的目录，如果有多个则选择文本文件最多的
   void _identifyAndExpandMainFolder() {
     if (_localFiles.isEmpty) return;
 
-    // 如果根目录本身包含音频文件，则不需要展开
     final rootHasAudio = _localFiles.any((item) =>
         item is Map<String, dynamic> && FileIconUtils.isAudioFile(item));
     if (rootHasAudio) {
@@ -283,7 +258,6 @@ class _OfflineFileExplorerWidgetState
       return;
     }
 
-    // 收集所有文件夹及其统计信息
     final Map<String, Map<String, dynamic>> folderStats = {};
 
     void analyzeFolders(List<dynamic> items, String parentPath) {
@@ -293,7 +267,6 @@ class _OfflineFileExplorerWidgetState
           if (children != null && children.isNotEmpty) {
             final itemPath = _getItemPath(parentPath, item);
 
-            // 统计该文件夹的音频和文本文件数量
             final stats = _countFilesInFolder(children);
             folderStats[itemPath] = {
               'audioCount': stats['audioCount'],
@@ -301,7 +274,6 @@ class _OfflineFileExplorerWidgetState
               'item': item,
             };
 
-            // 递归分析子文件夹
             analyzeFolders(children, itemPath);
           }
         }
@@ -315,7 +287,6 @@ class _OfflineFileExplorerWidgetState
       return;
     }
 
-    // 找出音频数量最多的文件夹
     int maxAudioCount = 0;
     for (final stats in folderStats.values) {
       if (stats['audioCount'] > maxAudioCount) {
@@ -323,7 +294,6 @@ class _OfflineFileExplorerWidgetState
       }
     }
 
-    // 在音频数量最多的文件夹中，先选择文本文件最多的
     String? mainFolder;
     int maxTextCount = -1;
     List<String> candidateFolders = [];
@@ -340,7 +310,6 @@ class _OfflineFileExplorerWidgetState
       }
     }
 
-    // 如果有多个文件夹的音频和文本数量都相同，按照音频格式偏好选择
     if (candidateFolders.length > 1) {
       final formatPreference = ref.read(audioFormatPreferenceProvider);
       mainFolder = _selectByAudioFormatPreference(
@@ -351,14 +320,12 @@ class _OfflineFileExplorerWidgetState
 
     if (mainFolder != null) {
       _mainFolderPath = mainFolder;
-      // 展开主文件夹路径上的所有父文件夹
       _expandPathToFolder(mainFolder);
       LogService.instance.debug(
           '[OfflineFileExplorer] 识别到主文件夹 $_mainFolderPath (音频:$maxAudioCount, 文本:$maxTextCount)', tag: 'UI');
     }
   }
 
-  // 统计文件夹中的音频和文本文件数量（仅统计当前层级，不递归子文件夹）
   Map<String, int> _countFilesInFolder(List<dynamic> items) {
     int audioCount = 0;
     int textCount = 0;
@@ -367,10 +334,9 @@ class _OfflineFileExplorerWidgetState
       if (child is Map<String, dynamic> && FileIconUtils.isAudioFile(child)) {
         audioCount++;
 
-        // 检查该音频是否在字幕库中有匹配的字幕
         final audioTitle = _getProperty(child, 'title', defaultValue: '');
         if (_audioWithLibrarySubtitles.contains(audioTitle)) {
-          textCount++; // 字幕库匹配也算作文本文件
+          textCount++;
         }
       } else if (FileIconUtils.isTextFile(child)) {
         textCount++;
@@ -380,30 +346,25 @@ class _OfflineFileExplorerWidgetState
     return {'audioCount': audioCount, 'textCount': textCount};
   }
 
-  // 根据音频格式偏好选择文件夹
-  // 返回包含最高优先级音频格式的文件夹
   String _selectByAudioFormatPreference(
       List<String> folderPaths, List<AudioFormat> priorityOrder) {
-    // 为每个候选文件夹找到其包含的最高优先级格式
     Map<String, int> folderPriorities = {};
 
     for (final folderPath in folderPaths) {
-      // 找到该文件夹下的所有音频文件
       final folderChildren = _findFolderChildren(folderPath);
-      int highestPriority = priorityOrder.length; // 初始化为最低优先级（越大越低优先级）
+      int highestPriority = priorityOrder.length;
 
       for (final child in folderChildren) {
         if (child is Map<String, dynamic> && FileIconUtils.isAudioFile(child)) {
           final fileName =
               _getProperty(child, 'title', defaultValue: '').toLowerCase();
-          // 检查文件扩展名
           for (int i = 0; i < priorityOrder.length; i++) {
             final format = priorityOrder[i];
             if (fileName.endsWith('.${format.extension}')) {
               if (i < highestPriority) {
                 highestPriority = i;
               }
-              break; // 找到格式后跳出循环
+              break;
             }
           }
         }
@@ -412,7 +373,6 @@ class _OfflineFileExplorerWidgetState
       folderPriorities[folderPath] = highestPriority;
     }
 
-    // 选择优先级最高（数值最小）的文件夹
     String selectedFolder = folderPaths.first;
     int bestPriority = folderPriorities[selectedFolder]!;
 
@@ -427,7 +387,6 @@ class _OfflineFileExplorerWidgetState
     return selectedFolder;
   }
 
-  // 查找指定路径的文件夹中的子项
   List<dynamic> _findFolderChildren(String targetPath) {
     final segments = targetPath.split('/');
     List<dynamic> currentItems = _localFiles;
@@ -444,14 +403,13 @@ class _OfflineFileExplorerWidgetState
         }
       }
       if (!found) {
-        return []; // 路径不存在
+        return [];
       }
     }
 
     return currentItems;
   }
 
-  // 展开到指定文件夹的路径
   void _expandPathToFolder(String targetPath) {
     final segments = targetPath.split('/');
     String currentPath = '';
@@ -469,13 +427,11 @@ class _OfflineFileExplorerWidgetState
     }
   }
 
-  // 生成文件/文件夹的唯一路径
   String _getItemPath(String parentPath, dynamic item) {
     final title = _getProperty(item, 'title', defaultValue: 'unknown');
     return parentPath.isEmpty ? title : '$parentPath/$title';
   }
 
-  // 切换文件夹展开/折叠状态
   void _toggleFolder(String path) {
     setState(() {
       if (_expandedFolders.contains(path)) {
@@ -486,7 +442,6 @@ class _OfflineFileExplorerWidgetState
     });
   }
 
-  // 格式化文件大小
   String _formatFileSize(int? bytes) {
     if (bytes == null || bytes <= 0) return '';
 
@@ -506,15 +461,12 @@ class _OfflineFileExplorerWidgetState
     }
   }
 
-  // 获取文件大小（从元数据或本地文件）
   Future<int?> _getFileSize(dynamic item, String parentPath) async {
-    // 先尝试从元数据获取
     final metaSize = _getProperty(item, 'size');
     if (metaSize != null && metaSize is int && metaSize > 0) {
       return metaSize;
     }
 
-    // 如果元数据没有，从本地文件读取
     final title = _getProperty(item, 'title', defaultValue: '');
 
     try {
@@ -528,13 +480,11 @@ class _OfflineFileExplorerWidgetState
         return await file.length();
       }
     } catch (e) {
-      // 忽略错误
     }
 
     return null;
   }
 
-  // 播放音频文件（从本地）
   Future<void> _playAudioFile(dynamic audioFile, String parentPath) async {
     final hash = _getProperty(audioFile, 'hash');
     final unknownLabel = S.of(context).unknown;
@@ -545,7 +495,6 @@ class _OfflineFileExplorerWidgetState
       return;
     }
 
-    // 获取本地文件路径
     final basePath = await _getWorkBasePath();
     final localPath = parentPath.isEmpty
         ? p.join(basePath, title)
@@ -558,12 +507,8 @@ class _OfflineFileExplorerWidgetState
       return;
     }
 
-    // 获取作品封面URL（用于播放器显示）
     String? coverUrl;
     try {
-      // Priority 1: Read localCoverPath from work_metadata.json (always
-      // points to cover.jpg for properly imported works, but may reference
-      // a different file for works imported with older versions).
       final metadataFile = File(p.join(basePath, 'work_metadata.json'));
       if (await metadataFile.exists()) {
         try {
@@ -582,7 +527,6 @@ class _OfflineFileExplorerWidgetState
         }
       }
 
-      // Priority 2: Fallback to cover.jpg
       if (coverUrl == null) {
         final coverFile = File(p.join(basePath, 'cover.jpg'));
         if (await coverFile.exists()) {
@@ -590,10 +534,6 @@ class _OfflineFileExplorerWidgetState
         }
       }
 
-      // Priority 3: Recursively scan the base directory (including
-      // subdirectories) for any image file. This covers legacy imported
-      // works whose cover is in a subfolder and whose metadata doesn't
-      // have a localCoverPath field.
       if (coverUrl == null) {
         final dir = Directory(basePath);
         if (await dir.exists()) {
@@ -604,10 +544,8 @@ class _OfflineFileExplorerWidgetState
             return aN.toLowerCase().compareTo(bN.toLowerCase());
           });
           for (final entry in entries) {
-            // Skip directories; only care about files
             if (entry is! File) continue;
             final lower = entry.path.toLowerCase();
-            // Skip work_metadata.json and .downloading temp files
             if (lower.endsWith('.downloading') ||
                 lower.endsWith('work_metadata.json')) {
               continue;
@@ -622,10 +560,8 @@ class _OfflineFileExplorerWidgetState
         }
       }
     } catch (e) {
-      // 封面不存在，忽略
     }
 
-    // 获取同一目录下的所有本地音频文件
     final audioFiles = _getAudioFilesFromSameDirectory(parentPath);
 
     final currentIndex =
@@ -637,7 +573,6 @@ class _OfflineFileExplorerWidgetState
       return;
     }
 
-    // 构建播放队列（仅使用本地文件）
     final List<AudioTrack> audioTracks = [];
     for (final file in audioFiles) {
       final fileHash = _getProperty(file, 'hash');
@@ -645,17 +580,14 @@ class _OfflineFileExplorerWidgetState
 
       if (fileHash == null) continue;
 
-      // 获取本地文件路径（使用 path 包确保路径分隔符正确）
       final filePath = parentPath.isEmpty
           ? p.join(basePath, fileTitle)
           : p.join(basePath, parentPath, fileTitle);
       final file2 = File(filePath);
 
       if (await file2.exists()) {
-        // 使用 file:// 协议的本地路径
         final audioUrl = 'file://$filePath';
 
-        // 获取声优信息
         final vaNames = widget.work.vas?.map((va) => va.name).toList() ?? [];
         final artistInfo = vaNames.isNotEmpty ? vaNames.join(', ') : null;
 
@@ -682,7 +614,6 @@ class _OfflineFileExplorerWidgetState
       return;
     }
 
-    // 播放音频队列，从当前选择的文件开始
     final adjustedIndex = audioTracks.indexWhere((track) => track.hash == hash);
     final startIndex = adjustedIndex != -1 ? adjustedIndex : 0;
 
@@ -693,11 +624,9 @@ class _OfflineFileExplorerWidgetState
         );
   }
 
-  // 获取同一目录下的所有音频文件（不递归子文件夹）
   List<dynamic> _getAudioFilesFromSameDirectory(String targetPath) {
     final List<dynamic> audioFiles = [];
 
-    // 如果是根目录
     if (targetPath.isEmpty) {
       for (final item in _localFiles) {
         if (item is Map<String, dynamic> && FileIconUtils.isAudioFile(item)) {
@@ -707,7 +636,6 @@ class _OfflineFileExplorerWidgetState
       return audioFiles;
     }
 
-    // 查找目标路径对应的文件夹
     List<dynamic>? findFolderByPath(List<dynamic> items, String currentPath) {
       for (final item in items) {
         if (_getProperty(item, 'type', defaultValue: '') == 'folder') {
@@ -741,8 +669,6 @@ class _OfflineFileExplorerWidgetState
     return audioFiles;
   }
 
-  // 辅助方法：判断文件名是否为音频格式
-  // 手动加载字幕
   Future<void> _loadLyricManually(dynamic file) async {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
@@ -907,7 +833,6 @@ class _OfflineFileExplorerWidgetState
     }
   }
 
-  // 预览图片文件（从本地）
   Future<void> _previewImageFile(dynamic file) async {
     final unknownLabel = S.of(context).unknown;
     final basePath = await _getWorkBasePath();
@@ -1111,11 +1036,9 @@ class _OfflineFileExplorerWidgetState
     }
 
     try {
-      // 使用 OpenFilex 打开本地视频文件（支持 iOS/Android 沙盒路径）
       final result = await OpenFilex.open(localPath);
 
       if (result.type != ResultType.done) {
-        // 打开失败，显示错误信息
         if (mounted) {
           showDialog(
             context: context,
@@ -1214,7 +1137,6 @@ class _OfflineFileExplorerWidgetState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 标题栏
           Container(
             padding: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
@@ -1286,7 +1208,6 @@ class _OfflineFileExplorerWidgetState
               ],
             ),
           ),
-          // 文件树列表 (shared ExplorerFileTree)
           ExplorerFileTree(
             items: rootItems,
             expandedFolders: _expandedFolders,
@@ -1316,10 +1237,6 @@ class _OfflineFileExplorerWidgetState
     );
   }
 
-  // Deleted: _buildFileTree — replaced by shared ExplorerFileTree widget
-  // See explorer/explorer_file_tree.dart
-
-  // 获取显示的名称（根据翻译状态）
   String _getDisplayName(String originalName) {
     if (_showTranslation && _translationCache.containsKey(originalName)) {
       return _translationCache[originalName]!;
@@ -1327,7 +1244,6 @@ class _OfflineFileExplorerWidgetState
     return originalName;
   }
 
-  // 按需翻译单个项目
   Future<void> _translateItem(String originalName) async {
     if (_translationCache.containsKey(originalName) ||
         _translatingItems.contains(originalName)) {
@@ -1357,7 +1273,6 @@ class _OfflineFileExplorerWidgetState
     }
   }
 
-  // 处理文件点击
   void _handleFileTap(dynamic file, String title, String parentPath) {
     if (FileIconUtils.isAudioFile(file)) {
       _playAudioFile(file, parentPath);
@@ -1374,10 +1289,7 @@ class _OfflineFileExplorerWidgetState
     }
   }
 
-  // 删除单个文件
   Future<void> _deleteFile(dynamic file, String parentPath) async {
-    // For imported works, deletion is not supported — files are referenced
-    // from their original location and cannot be safely removed by the app.
     if (widget.localImportPath != null) {
       if (!mounted) return;
       SnackBarUtil.showInfo(
@@ -1390,7 +1302,6 @@ class _OfflineFileExplorerWidgetState
     final title = _getProperty(file, 'title', defaultValue: S.of(context).unknown);
     final relativePath = parentPath.isEmpty ? title : '$parentPath/$title';
 
-    // 显示确认对话框
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => ResponsiveAlertDialog(
@@ -1429,7 +1340,6 @@ class _OfflineFileExplorerWidgetState
     if (confirmed != true || !mounted) return;
 
     try {
-      // 显示加载指示器
       if (mounted) {
         showDialog(
           context: context,
@@ -1440,28 +1350,22 @@ class _OfflineFileExplorerWidgetState
         );
       }
 
-      // 删除文件
       await DownloadService.instance.deleteFile(widget.work.id, relativePath);
 
-      // 关闭加载指示器
       if (mounted) {
         Navigator.of(context).pop();
       }
 
-      // 重新加载文件列表
       await _loadLocalFiles();
 
-      // 显示成功消息
       if (mounted) {
         SnackBarUtil.showSuccess(context, S.of(context).deletedItem(title));
       }
     } catch (e) {
-      // 关闭加载指示器
       if (mounted) {
         Navigator.of(context).pop();
       }
 
-      // 显示错误消息
       if (mounted) {
         SnackBarUtil.showError(context, S.of(context).deleteFailedWithError(e.toString()));
       }

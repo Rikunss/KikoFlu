@@ -20,7 +20,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize EQ service
     EqualizerService.instance.initialize();
   }
 
@@ -141,7 +140,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
           },
         ),
         const SizedBox(height: 16),
-        // Band sliders skeleton
         TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.3, end: 0.7),
           duration: const Duration(milliseconds: 1000),
@@ -273,7 +271,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Enable/disable switch
         Card(
           elevation: 0,
           color: cs.surfaceContainerLow,
@@ -313,7 +310,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Presets
         Card(
           elevation: 0,
           color: cs.surfaceContainerLow,
@@ -359,7 +355,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Band sliders
         Row(
           children: [
             Text(
@@ -387,7 +382,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
               height: 280,
               child: Column(
                 children: [
-                  // dB scale labels
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Row(
@@ -410,7 +404,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // Band sliders
                   Expanded(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -430,7 +423,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
                       }),
                     ),
                   ),
-                  // Band labels
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Row(
@@ -452,7 +444,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Reset button
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
@@ -466,7 +457,6 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Info card
         if (!Platform.isAndroid) ...[
           Card(
             elevation: 0,
@@ -531,7 +521,6 @@ class _BandSlider extends StatelessWidget {
 
     return Column(
       children: [
-        // Current dB value
         Text(
           '${value >= 0 ? "+" : ""}${value.toStringAsFixed(0)}',
           style: TextStyle(
@@ -541,7 +530,6 @@ class _BandSlider extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        // Vertical slider
         Expanded(
           child: RotatedBox(
             quarterTurns: -1,

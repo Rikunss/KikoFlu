@@ -36,8 +36,8 @@ import '../widgets/batch_transcription_sheet.dart';
 /// 不依赖网络请求，完全离线可用
 class OfflineWorkDetailScreen extends ConsumerStatefulWidget {
   final Work work;
-  final bool isOffline; // 标记是否为离线模式
-  final String? localCoverPath; // 本地封面图片路径
+  final bool isOffline;
+  final String? localCoverPath;
 
   /// For imported local works — absolute path to the original source folder.
   final String? localImportPath;
@@ -57,19 +57,16 @@ class OfflineWorkDetailScreen extends ConsumerStatefulWidget {
 
 class _OfflineWorkDetailScreenState
     extends ConsumerState<OfflineWorkDetailScreen> {
-  // 翻译相关状态
-  String? _translatedTitle; // 翻译后的标题
-  bool _showTranslation = false; // 是否显示翻译
-  bool _isTranslating = false; // 是否正在翻译
+  String? _translatedTitle;
+  bool _showTranslation = false;
+  bool _isTranslating = false;
 
-  // 翻译标题
   Future<void> _translateTitle() async {
     if (_isTranslating) return;
 
     final work = widget.work;
     final s = S.of(context);
 
-    // 如果已有翻译，直接切换显示
     if (_translatedTitle != null) {
       setState(() {
         _showTranslation = !_showTranslation;
@@ -105,7 +102,6 @@ class _OfflineWorkDetailScreenState
     }
   }
 
-  // 复制标题到剪贴板
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
     SnackBarUtil.showSuccess(
@@ -115,10 +111,8 @@ class _OfflineWorkDetailScreenState
     );
   }
 
-  // 导出作品为ZIP
   Future<void> _exportWork() async {
     try {
-      // 显示进度对话框
       if (!mounted) return;
       showDialog(
         context: context,
@@ -138,14 +132,13 @@ class _OfflineWorkDetailScreenState
         ),
       );
 
-      // 获取作品下载目录
       final downloadService = DownloadService.instance;
       final downloadDir = await downloadService.getDownloadDirectory();
       final workDir = Directory('${downloadDir.path}/${widget.work.id}');
 
       if (!await workDir.exists()) {
         if (mounted) {
-          Navigator.of(context).pop(); // 关闭进度对话框
+          Navigator.of(context).pop();
 
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
@@ -156,13 +149,10 @@ class _OfflineWorkDetailScreenState
         return;
       }
 
-      // 创建ZIP压缩包
       final archive = Archive();
 
-      // 递归添加文件到压缩包
       await _addDirectoryToArchive(archive, workDir, workDir.path);
 
-      // 编码为ZIP字节
       final zipBytes = ZipEncoder().encode(archive);
       if (zipBytes == null) {
         if (mounted) {
@@ -178,15 +168,13 @@ class _OfflineWorkDetailScreenState
       }
 
       if (!mounted) return;
-      Navigator.of(context).pop(); // 关闭进度对话框
+      Navigator.of(context).pop();
 
-      // 生成文件名
       final fileName = '${formatRJCode(widget.work.id)}.zip';
 
       if (!mounted) return;
 
       if (Platform.isIOS) {
-        // iOS: 通过分享面板导出
         final tempDir = await getTemporaryDirectory();
         final tempFile = File('${tempDir.path}/$fileName');
         await tempFile.writeAsBytes(zipBytes);
@@ -206,7 +194,6 @@ class _OfflineWorkDetailScreenState
           }
         }
       } else {
-        // 其他平台: 选择目录后写入
         final directoryPath = await FilePicker.getDirectoryPath();
         if (directoryPath == null) return;
 
@@ -229,13 +216,10 @@ class _OfflineWorkDetailScreenState
         }
       }
     } catch (e) {
-      // 在 catch 块中也需要安全处理
       if (mounted) {
-        // 尝试关闭可能存在的进度对话框
         try {
           Navigator.of(context).pop();
         } catch (_) {
-          // 如果对话框已经关闭，忽略错误
         }
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -247,7 +231,6 @@ class _OfflineWorkDetailScreenState
     }
   }
 
-  // 递归添加目录内容到压缩包
   Future<void> _addDirectoryToArchive(
     Archive archive,
     Directory dir,
@@ -278,7 +261,6 @@ class _OfflineWorkDetailScreenState
     final settings = ref.watch(aiSettingsProvider);
     final modelInstalled = settings.modelDownloaded;
 
-    // Running — show tappable spinner that opens the detail sheet
     if (batchState.status == BatchJobStatus.running) {
       return IconButton(
         icon: SizedBox(
@@ -295,7 +277,6 @@ class _OfflineWorkDetailScreenState
       );
     }
 
-    // Completed / Cancelled — show status icon (tappable to open sheet)
     if (batchState.status == BatchJobStatus.completed ||
         batchState.status == BatchJobStatus.cancelled) {
       final isCancelled = batchState.status == BatchJobStatus.cancelled;
@@ -317,7 +298,6 @@ class _OfflineWorkDetailScreenState
       );
     }
 
-    // Idle — show AI icon
     return IconButton(
       icon: const Icon(Icons.auto_awesome),
       tooltip: 'AI Transcribe All',
@@ -332,7 +312,6 @@ class _OfflineWorkDetailScreenState
     final work = widget.work;
     final localImportPath = widget.localImportPath ?? work.localImportPath;
 
-    // Collect audio files
     final files = await BatchTranscriptionHelper.collectAudioFiles(
       work: work,
       localImportPath: localImportPath,
@@ -348,7 +327,6 @@ class _OfflineWorkDetailScreenState
       return;
     }
 
-    // Check if files exist on disk
     final anyExist = await BatchTranscriptionHelper.anyFilesExist(files: files);
     if (!anyExist) {
       if (mounted) {
@@ -360,7 +338,6 @@ class _OfflineWorkDetailScreenState
       return;
     }
 
-    // Check installed models
     final aiService = ref.read(aiModelServiceProvider);
     final settings = ref.read(aiSettingsProvider);
 
@@ -381,7 +358,6 @@ class _OfflineWorkDetailScreenState
       return;
     }
 
-    // Determine initial model from settings
     WhisperModel initialModel;
     try {
       initialModel = WhisperModel.values.firstWhere(
@@ -394,7 +370,6 @@ class _OfflineWorkDetailScreenState
       initialModel = installedConfigs.first.model;
     }
 
-    // Show AI model picker dialog (replaces old confirmation dialog)
     if (!mounted) return;
     final config = await showAIModelPickerDialog(
       context,
@@ -407,7 +382,6 @@ class _OfflineWorkDetailScreenState
 
     if (config == null || !mounted) return;
 
-    // Start batch with chosen config
     ref.read(batchTranscriptionProvider.notifier).startBatch(
       files: files,
       workId: work.id,
@@ -417,7 +391,6 @@ class _OfflineWorkDetailScreenState
     );
   }
 
-  // 构建网络封面图片（使用缓存）
   Widget _buildNetworkCover(Work work, String host, String token) {
     final cs = Theme.of(context).colorScheme;
     return CachedNetworkImage(
@@ -457,7 +430,6 @@ class _OfflineWorkDetailScreenState
           appBar: ScrollableAppBar(
             systemOverlayStyle: systemOverlayStyle,
             actions: [
-              // Batch AI Transcribe button (disabled if model not installed)
               _buildBatchTranscribeButton(),
               IconButton(
                 icon: const Icon(Icons.archive_outlined),
@@ -529,7 +501,6 @@ class _OfflineWorkDetailScreenState
 
     final work = widget.work;
 
-    // 封面图片组件
     final coverWidget = GestureDetector(
       onLongPress: () {
         final imageUrl = widget.localCoverPath != null
@@ -573,7 +544,6 @@ class _OfflineWorkDetailScreenState
                 child: Stack(
                   fit: StackFit.passthrough,
                   children: [
-                    // 优先使用本地封面图片
                     if (widget.localCoverPath != null &&
                         File(widget.localCoverPath!).existsSync())
                       Image.file(
@@ -581,12 +551,10 @@ class _OfflineWorkDetailScreenState
                         fit: BoxFit.contain,
                         cacheWidth: 1080,
                         errorBuilder: (context, error, stackTrace) {
-                          // 如果本地图片加载失败，回退到网络图片
                           return _buildNetworkCover(work, host, token);
                         },
                       )
                     else
-                      // 回退到网络图片（缓存）
                       _buildNetworkCover(work, host, token),
                   ],
                 ),
@@ -597,13 +565,11 @@ class _OfflineWorkDetailScreenState
       ),
     );
 
-    // 信息内容组件
     final infoWidget = Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 标题（可长按复制）+ 翻译按钮
           GestureDetector(
             onLongPress: () => _copyToClipboard(
               _showTranslation && _translatedTitle != null
@@ -619,7 +585,6 @@ class _OfflineWorkDetailScreenState
                         ? _translatedTitle
                         : work.title,
                   ),
-                  // 翻译按钮
                   WidgetSpan(
                     alignment: PlaceholderAlignment.middle,
                     child: Padding(
@@ -662,7 +627,6 @@ class _OfflineWorkDetailScreenState
           ),
           const SizedBox(height: 16),
 
-          // 社团和声优信息
           if ((work.name != null && work.name!.isNotEmpty) ||
               (work.vas != null && work.vas!.isNotEmpty)) ...[
             Text(
@@ -703,7 +667,6 @@ class _OfflineWorkDetailScreenState
             const SizedBox(height: 16),
           ],
 
-          // 标签信息
           if (work.tags != null && work.tags!.isNotEmpty) ...[
             Text(
               S.of(context).tagLabel,
@@ -731,7 +694,6 @@ class _OfflineWorkDetailScreenState
             const SizedBox(height: 16),
           ],
 
-          // 发布日期
           if (work.release != null) ...[
             Text(
               S.of(context).releaseDate,
@@ -750,14 +712,12 @@ class _OfflineWorkDetailScreenState
             const SizedBox(height: 16),
           ],
 
-          // 文件浏览器
           OfflineFileExplorerWidget(
             work: work,
             fileTree: work.children?.map((e) {
                     if (e is Map<String, dynamic>) {
                       return e;
                     }
-                    // 如果是 AudioFile 对象，转换为 Map
                     return e.toJson();
                   }).toList(),
             localImportPath: widget.localImportPath,
@@ -766,20 +726,16 @@ class _OfflineWorkDetailScreenState
       ),
     );
 
-    // 根据屏幕方向返回不同布局
     if (isLandscape) {
-      // 横屏布局：左右分栏
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 左侧：封面
           Expanded(
             flex: 2,
             child: Center(
               child: coverWidget,
             ),
           ),
-          // 右侧：信息（可滚动）
           Expanded(
             flex: 3,
             child: SingleChildScrollView(
@@ -791,7 +747,6 @@ class _OfflineWorkDetailScreenState
         ],
       );
     } else {
-      // 竖屏布局：上下排列
       return SingleChildScrollView(
         padding: const EdgeInsets.all(0),
         physics: const AlwaysScrollableScrollPhysics(),

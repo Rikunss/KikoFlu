@@ -2,15 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PlayerLyricSettings {
-  // Mini Player
   final double miniFontSize;
   final double miniLineHeight;
 
-  // Small Player (Portrait below cover)
   final double smallFontSize;
   final double smallLineHeight;
 
-  // Full Player (Portrait full / Landscape)
   final double fullActiveFontSize;
   final double fullInactiveFontSize;
   final double fullLineHeight;

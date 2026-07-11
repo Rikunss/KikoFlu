@@ -22,7 +22,6 @@ class _DesktopFloatingLyricState extends State<DesktopFloatingLyric>
     with WindowListener {
   String _text = '♪ - ♪';
 
-  // Style properties
   double _fontSize = 24.0;
   Color _textColor = Colors.white;
   Color _backgroundColor = Colors.transparent;
@@ -72,10 +71,8 @@ class _DesktopFloatingLyricState extends State<DesktopFloatingLyric>
       await windowManager.setAlwaysOnTop(true);
       await windowManager.setBackgroundColor(Colors.transparent);
       await windowManager.setHasShadow(false);
-      // 设置一个合理的默认大小
       await windowManager.setSize(const Size(800, 200));
 
-      // Setup method handler
       final controller = await WindowController.fromCurrentEngine();
       controller.setWindowMethodHandler(_handleMethodCall);
     } catch (e) {

@@ -73,9 +73,7 @@ class BlurHashService {
   /// Fires and forgets — runs in background.
   Future<void> generateIfNeeded(int workId, String imageUrl) async {
     if (_cache.containsKey(workId)) return;
-    // Skip works that have already failed — prevents infinite retry spam.
     if (_failedWorkIds.contains(workId)) return;
-    // Skip works that are already being generated — prevents duplicate Isolate spawns.
     if (_pendingWorkIds.contains(workId)) return;
 
     _pendingWorkIds.add(workId);
@@ -86,7 +84,6 @@ class BlurHashService {
         await _persist();
         _log.info('Generated hash for work $workId: ${hash.length} chars', tag: 'BlurHash');
       } else {
-        // Null/empty hash counts as failure too
         _failedWorkIds.add(workId);
       }
     } catch (e) {
@@ -109,7 +106,6 @@ class BlurHashService {
       final uri = Uri.parse(imageUrl);
       final request = await httpClient.getUrl(uri);
 
-      // Include server cookie if configured
       final cookie = await CookieService.getCookie();
       if (cookie != null && cookie.isNotEmpty) {
         request.headers.set('Cookie', cookie);
@@ -124,8 +120,6 @@ class BlurHashService {
 
       final bytes = await consolidateHttpClientResponseBytes(response);
 
-      // 2. Decode image + encode blurhash di Isolate terpisah
-      //    agar tidak memblokade main thread (UI)
       final hash = await compute(_generateBlurHashInIsolate, bytes);
       return hash;
     } catch (e) {
@@ -144,7 +138,6 @@ class BlurHashService {
     List<({int workId, String imageUrl})> items, {
     int concurrency = 3,
   }) async {
-    // Filter out already-cached works
     final toProcess = <({int workId, String imageUrl})>[];
     for (final item in items) {
       if (!_cache.containsKey(item.workId) &&
@@ -176,5 +169,3 @@ class BlurHashService {
     await StorageService.setString(_storageKey, jsonEncode(data));
   }
 }
-
-

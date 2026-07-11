@@ -6,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import 'dart:io';
 
-
 import '../../l10n/app_localizations.dart';
 import '../../src/services/log_service.dart';
 import '../models/download_task.dart';
@@ -76,26 +75,21 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
   int _currentPage = 1;
   static const int _pageSize = 30;
 
-  // Search
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isSearchVisible = false;
 
-  // Sort
   SortOrder _sortOrder = SortOrder.downloadDate;
   SortDirection _sortDirection = SortDirection.desc;
 
-  // Filter by circle / VA / tag
   _FilterType _filterType = _FilterType.all;
   String _filterValue = '';
 
-  // Source filter
   _SourceFilter _sourceFilter = _SourceFilter.all;
 
   /// Cache parsed Work objects by workId to avoid re-parsing metadata.
   final Map<int, Work> _workCache = {};
 
-  // ── Reactive subscriptions ──
   StreamSubscription<List<DownloadTask>>? _tasksSub;
   List<DownloadTask> _allTasks = [];
 
@@ -105,7 +99,7 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     _allTasks = DownloadService.instance.tasks;
     _tasksSub = DownloadService.instance.tasksStream.listen((tasks) {
       if (!mounted) return;
-      _workCache.clear(); // invalidate cache on data change
+      _workCache.clear();
       setState(() => _allTasks = tasks);
     });
   }
@@ -195,7 +189,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
 
   Future<void> _refreshMetadata() async {
     if (!mounted) return;
-    // Clear work cache so filter options are rebuilt
     _workCache.clear();
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
       content: Row(children: [
@@ -403,7 +396,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       Map<int, List<DownloadTask>> groupedTasks) {
     Map<int, List<DownloadTask>> result = groupedTasks;
 
-    // Apply source filter
     if (_sourceFilter != _SourceFilter.all) {
       final targetImported = _sourceFilter == _SourceFilter.imported;
       result = Map.fromEntries(result.entries.where((e) =>
@@ -411,7 +403,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       ));
     }
 
-    // Apply metadata filter
     if (_filterType != _FilterType.all && _filterValue.isNotEmpty) {
       result = Map.fromEntries(groupedTasks.entries.where((e) {
         final work = _getWork(e.key, e.value);
@@ -429,7 +420,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       }));
     }
 
-    // Then apply search query
     if (_searchQuery.isEmpty) return result;
     final query = _searchQuery.toLowerCase();
     return Map.fromEntries(result.entries.where((e) {
@@ -456,7 +446,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         case SortOrder.title:
           final aTitle = groupedTasks[a]!.first.workTitle.toLowerCase();
           final bTitle = groupedTasks[b]!.first.workTitle.toLowerCase();
-          // Use natural compare for titles with numbers (e.g. "Work 2" vs "Work 10")
           r = _naturalCompare(aTitle, bTitle);
         default:
           r = 0;
@@ -470,7 +459,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     final s = S.of(context);
     Map<String, dynamic>? metadata = task.workMetadata;
     if (metadata == null) {
-      // Try loading from disk — useful before syncWithDiskAfterInit completes
       try {
         metadata = await DownloadService.instance.getWorkMetadata(workId);
       } catch (e) {
@@ -506,7 +494,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       }
     }
   }
-
 
   /// Natural sort comparator for work titles (e.g. "Work 2" before "Work 10").
   static int _naturalCompare(String a, String b) {
@@ -604,7 +591,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       );
       if (!mounted) return;
       ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
-      // Reset to page 1 so the newly imported work is visible
       setState(() => _currentPage = 1);
       _scrollToTop();
       _showSnackBarSafe(SnackBar(
@@ -762,17 +748,14 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     final tasks = _allTasks;
     final completed = tasks.where((t) => t.status == DownloadStatus.completed).toList();
 
-    // Group by workId
     final Map<int, List<DownloadTask>> allGrouped = {};
     for (final task in completed) {
       allGrouped.putIfAbsent(task.workId, () => []).add(task);
     }
 
-    // Filter + sort
     final grouped = _filterTasks(allGrouped);
     final sortedIds = _sortWorkIds(grouped);
 
-    // Pagination
     final total = sortedIds.length;
     final totalPages = (total / _pageSize).ceil();
     final start = (_currentPage - 1) * _pageSize;
@@ -785,7 +768,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     final (downloadedCount, importedCount) =
         _countBySource(allGrouped);
 
-    // Grid layout — responsive masonry, matching main menu's big-grid style
     final size = MediaQuery.sizeOf(context);
     final orientation = MediaQuery.orientationOf(context);
     final isLandscape = orientation == Orientation.landscape;
@@ -793,13 +775,11 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
     final crossAxisCount =
         ResponsiveGridHelper.getBigGridCrossAxisCountForSize(size, orientation);
 
-    // For empty states, show contextual message based on active filters
     Widget? emptyWidget;
     if (allGrouped.isEmpty) {
       emptyWidget = _emptyState(context,
         S.of(context).noLocalDownloads, Icons.download_outlined);
     } else if (grouped.isEmpty) {
-      // Priority: metadata filter → search query → source filter → default
       if (_filterType != _FilterType.all) {
         final filterLabel = switch (_filterType) {
           _FilterType.circle => 'circle',
@@ -893,7 +873,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
                             itemBuilder: (context, index) {
                               final id = pageIds[index];
                               final workTasks = pageMap[id]!;
-                              // Compute actual card width from grid dimensions
                               final cardWidth = (size.width -
                                       2 * spacing -
                                       (crossAxisCount - 1) * spacing) /
@@ -959,7 +938,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       ),
       child: Row(
         children: [
-          // Scrollable source tabs
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -1011,7 +989,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
                               ),
                             ),
                             const SizedBox(width: 6),
-                            // Count badge
                             _SourceCountBadge(
                               count: _countForFilter(filter, downloadedCount, importedCount),
                               isSelected: isSel,
@@ -1026,7 +1003,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
               ),
             ),
           ),
-          // Trailing action buttons (always visible, never scroll)
           const SizedBox(width: 4),
           _CompactIconButton(
             icon: Icons.more_vert_rounded,
@@ -1081,10 +1057,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         return importedCount;
     }
   }
-
-
-
-
 
   /// Show overflow menu (Select, Reload, Import, Browse, etc.)
   void _showOverflowMenu(BuildContext context) {
@@ -1177,7 +1149,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            // "All" chip (always visible to clear filter)
             _FilterChip(
               label: 'All',
               icon: Icons.filter_alt_off_rounded,
@@ -1190,7 +1161,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
               cs: cs,
             ),
             const SizedBox(width: 6),
-      // Filter button
       _buildCategoryFilterButton(Theme.of(context).colorScheme, options, hasActiveFilter),
           ],
         ),
@@ -1261,7 +1231,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Row(
@@ -1289,7 +1258,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
             const Divider(height: 1),
             const SizedBox(height: 4),
 
-            // Circle options
             if (options['circles']!.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -1329,7 +1297,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
               ),
             ],
 
-            // VA options
             if (options['vas']!.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -1369,7 +1336,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
               ),
             ],
 
-            // Tag options
             if (options['tags']!.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -1416,8 +1382,6 @@ class _LocalDownloadListState extends State<_LocalDownloadList> {
       ),
     );
   }
-
-
 
   Widget _buildSearchBar() {
     final colorScheme = Theme.of(context).colorScheme;
@@ -1721,13 +1685,11 @@ class _DownloadWorkCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Cover — AspectRatio 1.3 (matching EnhancedWorkCard medium)
             AspectRatio(
               aspectRatio: 1.3,
               child: Stack(
                 children: [
                   _WorkCardCover(workId: workId, work: work, firstTask: firstTask, cardWidth: cardWidth, fileCount: workTasks.length),
-                  // RJ tag (top-left) — matches EnhancedWorkCard style
                   Positioned(
                     top: 6,
                     left: 6,
@@ -1747,14 +1709,12 @@ class _DownloadWorkCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Source badge (top-right) — only show when NOT in selection mode
                   if (!isSelectionMode)
                     Positioned(
                       top: 6,
                       right: 6,
                       child: _SourceBadge(isImported: isImported),
                     ),
-                  // Selection check (top-right) — overlaps source badge in selection mode
                   if (isSelectionMode)
                     Positioned(
                       top: 6,
@@ -1780,14 +1740,12 @@ class _DownloadWorkCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Info area — matching EnhancedWorkCard medium card padding & font sizes
             Padding(
               padding: const EdgeInsets.all(8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Title
                   Text(
                     workTitle,
                     maxLines: 2,
@@ -1799,7 +1757,6 @@ class _DownloadWorkCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // VA (if available)
                   if (work?.vas != null && work!.vas!.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
@@ -1822,7 +1779,6 @@ class _DownloadWorkCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                  // File count + size row
                   Row(
                     children: [
                       Icon(Icons.folder_outlined, size: 12,
@@ -2004,7 +1960,6 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
   @override
   void didUpdateWidget(covariant _WorkCardCover oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Re-resolve cover when workMetadata changes (e.g. after cover resize)
     if (widget.firstTask.workMetadata != oldWidget.firstTask.workMetadata) {
       _resolved = false;
       _coverPath = null;
@@ -2040,17 +1995,14 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
   @override
   Widget build(BuildContext context) {
     final dpr = MediaQuery.devicePixelRatioOf(context);
-    // Use actual card width from masonry grid, scaled by aspect ratio 1.3
     final cacheWidth = (widget.cardWidth * dpr).round();
     final cacheHeight = ((widget.cardWidth / 1.3) * dpr).round();
 
-    // Check if this work's cover is being processed
     final processingIds = ref.watch(processingCoversProvider);
     final isProcessing = processingIds.whenOrNull(
       data: (ids) => ids.contains(widget.workId),
     ) ?? false;
 
-    // Start/stop shimmer animation based on processing state
     if (isProcessing && !_shimmerCtrl.isAnimating) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && isProcessing) _shimmerCtrl.repeat(reverse: true);
@@ -2079,7 +2031,6 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
         ),
       );
     } else if (isProcessing) {
-      // Show shimmer placeholder while cover is being processed
       coverWidget = _buildProcessingPlaceholder(context);
     } else if (!_resolved) {
       coverWidget = _buildPlaceholder(context);
@@ -2108,12 +2059,10 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
       }
     }
 
-    // Wrap in a Stack to overlay the processing indicator
     if (isProcessing) {
       return Stack(
         children: [
           coverWidget,
-          // Processing indicator overlay (bottom-right)
           Positioned(
             bottom: 8,
             right: 8,
@@ -2158,19 +2107,16 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
       );
     }
 
-    // Check if work has local subtitle — use .select() to avoid unnecessary rebuilds
     final work = widget.work;
     final hasLocalSubtitle = ref.watch(
       subtitleLibraryProvider.select((set) =>
           work != null && set.contains(work.id)),
     );
 
-    // Wrap in Stack to add subtitle tag overlay when applicable
     if (hasLocalSubtitle && coverWidget is! Stack) {
       return Stack(
         children: [
           coverWidget,
-          // Subtitle tag (bottom-left) — matching EnhancedWorkCard style
           const Positioned(
             bottom: 6,
             left: 6,

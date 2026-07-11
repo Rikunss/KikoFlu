@@ -69,7 +69,6 @@ class SmartPlaylistEvaluatorNotifier
           parts.add('\$age:${rule.value}\$');
         case SmartPlaylistRuleType.rating:
         case SmartPlaylistRuleType.subtitle:
-          // These are handled as client-side filters
           break;
       }
     }
@@ -106,26 +105,22 @@ class SmartPlaylistEvaluatorNotifier
       const pageSize = 40;
 
       final result = await _api.searchWorks(
-        keyword: keyword.isNotEmpty ? keyword : ' ', // space = default search
+        keyword: keyword.isNotEmpty ? keyword : ' ',
         page: 1,
-        pageSize: pageSize * 2, // Fetch more for client-side filtering
+        pageSize: pageSize * 2,
         order: _playlist.sortField.value,
         sort: _playlist.sortDirection,
       );
 
-      // Parse works
       final List<dynamic> rawWorks = result['works'] as List? ?? [];
       List<Work> allWorks = rawWorks
           .map((json) => Work.fromJson(json as Map<String, dynamic>))
           .toList();
 
-      // Apply client-side filters
       final filtered = allWorks.where(_passesClientFilters).toList();
 
-      // Get pagination info
       final pagination = result['pagination'] as Map<String, dynamic>?;
       final totalRaw = pagination?['totalCount'] ?? filtered.length;
-      // Rough estimate: we fetched 2x pageSize, so cap total
       final estimatedTotal =
           (totalRaw is int) ? totalRaw : filtered.length;
 
@@ -165,7 +160,6 @@ class SmartPlaylistEvaluatorNotifier
           .map((json) => Work.fromJson(json as Map<String, dynamic>))
           .toList();
 
-      // Apply client-side filters
       final filtered = newWorks.where(_passesClientFilters).toList();
 
       final pagination = result['pagination'] as Map<String, dynamic>?;

@@ -23,7 +23,6 @@ class AccountScreen extends ConsumerStatefulWidget {
 }
 
 class _AccountScreenState extends ConsumerState<AccountScreen> {
-  // ── Permission state ──
   bool _notificationGranted = false;
   bool _ignoreBatteryOptimizationsGranted = false;
   bool _isCheckingPermissions = true;
@@ -37,8 +36,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       _isCheckingPermissions = false;
     }
   }
-
-  // ── Permissions (Android only) ──
 
   Future<void> _checkPermissions() async {
     setState(() => _isCheckingPermissions = true);
@@ -127,8 +124,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     );
   }
 
-  // ── Logout ──
-
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -165,8 +160,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
   }
 
-  // ── Build ──
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -187,15 +180,12 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                   children: [
                     const SizedBox(height: 8),
 
-                    // ── 1. Account Management ──
                     _buildAccountCard(context, colorScheme, s, authState, Theme.of(context)),
                     const SizedBox(height: 8),
 
-                    // ── 2. Floating Lyric ──
                     _buildFloatingLyricCard(context, colorScheme, s, Theme.of(context)),
                     const SizedBox(height: 8),
 
-                    // ── 3. Permissions ──
                     _buildPermissionsCard(context, colorScheme, s, Theme.of(context)),
 
                     const SizedBox(height: 32),
@@ -208,8 +198,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       ),
     );
   }
-
-  // ── Account Card ──
 
   Widget _buildAccountCard(
     BuildContext context,
@@ -231,7 +219,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          // Current user info
           ListTile(
             leading: leadingIcon,
             title: Text(
@@ -327,8 +314,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     );
   }
 
-  // ── Floating Lyric Card ──
-
   Widget _buildFloatingLyricCard(
     BuildContext context,
     ColorScheme colorScheme,
@@ -342,7 +327,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          // Master switch
           SwitchListTile(
             secondary: CircleAvatar(
               backgroundColor: colorScheme.tertiaryContainer,
@@ -362,7 +346,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
             },
           ),
 
-          // Style settings
           if (floatingLyricEnabled) ...[
             const Divider(height: 1, indent: 72),
           ListTile(
@@ -382,7 +365,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
             ),
           ],
 
-          // Touch lock (Android)
           if (Platform.isAndroid && floatingLyricEnabled) ...[
             const Divider(height: 1, indent: 72),
             _buildPlatformSwitch(
@@ -398,7 +380,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
             ),
           ],
 
-          // FPS display (iOS)
           if (Platform.isIOS && floatingLyricEnabled) ...[
             const Divider(height: 1, indent: 72),
             _buildPlatformSwitch(
@@ -414,7 +395,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
             ),
           ],
 
-          // Network speed (iOS)
           if (Platform.isIOS && floatingLyricEnabled) ...[
             const Divider(height: 1, indent: 72),
             _buildPlatformSwitch(
@@ -452,8 +432,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       onChanged: onChanged,
     );
   }
-
-  // ── Permissions Card ──
 
   Widget _buildPermissionsCard(
     BuildContext context,
@@ -497,7 +475,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          // Header
           ListTile(
             leading: CircleAvatar(
               backgroundColor: colorScheme.secondaryContainer,
@@ -517,7 +494,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
           ),
           const Divider(height: 1, indent: 72),
 
-          // Notification
           ListTile(
             leading: CircleAvatar(
               backgroundColor: colorScheme.secondary.withValues(alpha: 0.12),
@@ -539,7 +515,6 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
           ),
           const Divider(height: 1, indent: 72),
 
-          // Background running
           ListTile(
             leading: CircleAvatar(
               backgroundColor: colorScheme.secondary.withValues(alpha: 0.12),

@@ -11,7 +11,7 @@ class Milestone {
   final String description;
   final bool achieved;
   final double progress;
-  final String iconId; // mapped to IconData in UI
+  final String iconId;
 
   const Milestone({
     required this.id,
@@ -171,9 +171,6 @@ class ListeningStatsService {
     if (_initialized) return;
     _initialized = true;
     _historySub = PlaybackHistoryService.instance.historyUpdatedStream.listen((_) {
-      // Throttle: only clear cache if last fetch was 15+ seconds ago.
-      // During playback, checkpoints fire every ~5s but stats don't change
-      // meaningfully — the 30s internal cache in compute() handles freshness.
       if (_lastFetch == null ||
           DateTime.now().difference(_lastFetch!).inSeconds >= 15) {
         _cached = null;
@@ -208,15 +205,12 @@ class ListeningStatsService {
       return _cached!;
     }
 
-    // ── Basic counts ──
     final totalWorks = allRecords.length;
     int completed = 0;
     int inProgress = 0;
     int totalPositionMs = 0;
 
     for (final record in allRecords) {
-      // Use totalListenedMs for accurate cumulative listening time.
-      // Falls back to lastPositionMs for records predating DB v3 migration.
       totalPositionMs +=
           record.totalListenedMs > 0 ? record.totalListenedMs : record.lastPositionMs;
 
@@ -230,7 +224,6 @@ class ListeningStatsService {
 
     final approximateTime = Duration(milliseconds: totalPositionMs);
 
-    // ── Daily activity (last 14 days) ──
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final dayCounts = <int, int>{};
@@ -254,17 +247,15 @@ class ListeningStatsService {
       ));
     }
 
-    // ── Streak calculation ──
     final uniqueDays = dayCounts.keys
         .map((ms) => DateTime.fromMillisecondsSinceEpoch(ms))
         .toList()
-      ..sort((a, b) => b.compareTo(a)); // most recent first
+      ..sort((a, b) => b.compareTo(a));
 
     int currentStreak = 0;
     if (uniqueDays.isNotEmpty) {
       final mostRecent = uniqueDays.first;
       if (mostRecent.isAfter(today.subtract(const Duration(days: 2)))) {
-        // Check if the streak includes today or yesterday
         currentStreak = 1;
         for (int i = 1; i < uniqueDays.length; i++) {
           final expectedPrev =
@@ -279,7 +270,6 @@ class ListeningStatsService {
       }
     }
 
-    // Longest streak
     int longestStreak = 0;
     if (uniqueDays.length >= 2) {
       int run = 1;
@@ -296,7 +286,6 @@ class ListeningStatsService {
       longestStreak = 1;
     }
 
-    // ── Top VAs ──
     final vaCounts = <String, int>{};
     for (final record in allRecords) {
       final vas = record.work.vas;
@@ -312,7 +301,6 @@ class ListeningStatsService {
       ..sort((a, b) => b.playCount.compareTo(a.playCount));
     final topVAs = sortedVAs.take(8).toList();
 
-    // ── Top Circles ──
     final circleCounts = <String, int>{};
     for (final record in allRecords) {
       final circleName = record.work.circleTitle;
@@ -326,7 +314,6 @@ class ListeningStatsService {
       ..sort((a, b) => b.playCount.compareTo(a.playCount));
     final topCircles = sortedCircles.take(5).toList();
 
-    // ── Weekly stats (last 4 weeks) ──
     final weeklyStats = <WeeklyStats>[];
     for (int w = 3; w >= 0; w--) {
       final weekStart = today.subtract(Duration(days: today.weekday - 1 + w * 7));
@@ -349,7 +336,6 @@ class ListeningStatsService {
       ));
     }
 
-    // ── Monthly stats (last 6 months) ──
     final monthlyStats = <MonthlyStats>[];
     for (int m = 5; m >= 0; m--) {
       final monthDate = DateTime(today.year, today.month - m, 1);
@@ -372,7 +358,6 @@ class ListeningStatsService {
       ));
     }
 
-    // ── Milestones ──
     final totalHours = approximateTime.inMinutes / 60.0;
     final milestones = <Milestone>[
       Milestone(
@@ -457,7 +442,6 @@ class ListeningStatsService {
       ),
     ];
 
-    // ── Recent plays ──
     final sortedByTime = List<HistoryRecord>.from(allRecords)
       ..sort((a, b) => b.lastPlayedTime.compareTo(a.lastPlayedTime));
     final recentPlays = sortedByTime.take(10).toList();

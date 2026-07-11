@@ -7794,7 +7794,6 @@ class _SDelegate extends LocalizationsDelegate<S> {
 }
 
 S lookupS(Locale locale) {
-  // Lookup logic when language+script codes are specified.
   switch (locale.languageCode) {
     case 'zh':
       {
@@ -7806,7 +7805,6 @@ S lookupS(Locale locale) {
       }
   }
 
-  // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
     case 'en':
       return SEn();

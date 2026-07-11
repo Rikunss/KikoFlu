@@ -83,7 +83,6 @@ class WorkDetailDisplayNotifier
         showRecommendations: prefs.getBool(_keyRecommendations) ?? true,
       );
     } catch (e) {
-      // 加载失败，使用默认值
     }
   }
 
@@ -145,7 +144,6 @@ class WorkDetailDisplayNotifier
       await prefs.setBool(_keySubtitleTag, state.showSubtitleTag);
       await prefs.setBool(_keyRecommendations, state.showRecommendations);
     } catch (e) {
-      // 保存失败时静默处理
     }
   }
 }

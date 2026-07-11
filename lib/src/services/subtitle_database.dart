@@ -116,8 +116,6 @@ class SubtitleDatabase {
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      // v2: 移除 file_path 列，改用 relative_path 作为唯一键
-      // SQLite 不支持直接 DROP COLUMN，需要重建表
       await db.execute(
           'ALTER TABLE subtitle_files RENAME TO subtitle_files_old');
       await db.execute('''
@@ -149,8 +147,6 @@ class SubtitleDatabase {
     }
   }
 
-  // ==================== CRUD ====================
-
   /// 插入单条记录
   Future<void> insertFile(SubtitleFileRecord record) async {
     final db = await database;
@@ -180,7 +176,6 @@ class SubtitleDatabase {
   /// 按相对路径前缀删除（用于删除目录下所有文件）
   Future<int> deleteByRelativePathPrefix(String relativePrefix) async {
     final db = await database;
-    // 确保路径以 / 结尾，避免误删同前缀的其他目录
     final prefix =
         relativePrefix.endsWith('/') ? relativePrefix : '$relativePrefix/';
     return await db.delete('subtitle_files',
@@ -244,8 +239,6 @@ class SubtitleDatabase {
     }
     await batch.commit(noResult: true);
   }
-
-  // ==================== 查询 ====================
 
   /// 获取所有文件记录
   Future<List<Map<String, dynamic>>> getAllFiles() async {
@@ -322,8 +315,6 @@ class SubtitleDatabase {
   /// 获取不重复的文件夹数量（从 relative_path 推算）
   Future<int> getFolderCount() async {
     final db = await database;
-    // 提取 relative_path 中所有目录层级，去重计数
-    // 例如 "已解析/RJ123/sub/a.vtt" → "已解析", "已解析/RJ123", "已解析/RJ123/sub"
     final results = await db.query('subtitle_files', columns: ['relative_path']);
     final folderPaths = <String>{};
     for (final row in results) {
@@ -335,8 +326,6 @@ class SubtitleDatabase {
     }
     return folderPaths.length;
   }
-
-  // ==================== 元数据 ====================
 
   Future<String?> getMeta(String key) async {
     final db = await database;
@@ -352,8 +341,6 @@ class SubtitleDatabase {
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  // ==================== 维护 ====================
-
   /// 清空所有记录
   Future<void> clear() async {
     final db = await database;
@@ -366,8 +353,6 @@ class SubtitleDatabase {
     await _database?.close();
     _database = null;
   }
-
-  // ==================== 工具方法 ====================
 
   static final _workIdRegex = RegExp(r'[RrBbVv][Jj]0*(\d+)');
 
@@ -382,10 +367,8 @@ class SubtitleDatabase {
 
   /// 从相对路径提取 workId
   static int? _extractWorkIdFromRelativePath(String relativePath) {
-    // 相对路径格式: "已解析/RJ1003058/track.vtt"
     final parts = relativePath.split('/');
     if (parts.length < 2) return null;
-    // 检查第二级目录名
     final match = _workIdRegex.firstMatch(parts[1]);
     if (match != null) {
       return int.tryParse(match.group(1)!);

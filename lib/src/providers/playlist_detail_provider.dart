@@ -87,7 +87,6 @@ class PlaylistDetailNotifier extends StateNotifier<PlaylistDetailState> {
     }
 
     try {
-      // 并行加载元数据和作品列表
       final results = await Future.wait([
         _apiService.getPlaylistMetadata(playlistId),
         _apiService.getPlaylistWorks(
@@ -197,14 +196,11 @@ class PlaylistDetailNotifier extends StateNotifier<PlaylistDetailState> {
 
     try {
       if (isOwner) {
-        // 如果是系统播放列表，不允许删除
         if (playlist.isSystemPlaylist) {
           throw Exception('系统播放列表不能删除');
         }
-        // 使用删除API删除自己创建的播放列表
         await _apiService.deletePlaylist(playlist.id);
       } else {
-        // 使用取消收藏API删除别人的播放列表
         await _apiService.removeLikePlaylist(playlist.id);
       }
     } catch (e) {
@@ -230,7 +226,6 @@ class PlaylistDetailNotifier extends StateNotifier<PlaylistDetailState> {
         description: description,
       );
 
-      // 更新元数据
       final updatedMetadata = Playlist.fromJson(response);
       state = state.copyWith(
         metadata: updatedMetadata,
@@ -255,7 +250,6 @@ class PlaylistDetailNotifier extends StateNotifier<PlaylistDetailState> {
         works: workIds,
       );
 
-      // 刷新列表以显示新添加的作品
       await refresh();
     } catch (e) {
       rethrow;
@@ -266,13 +260,11 @@ class PlaylistDetailNotifier extends StateNotifier<PlaylistDetailState> {
   Future<void> removeWork(int workId) async {
     if (state.metadata == null) return;
 
-    // 乐观更新：先从本地列表中移除
     final previousWorks = state.works;
     final previousTotalCount = state.totalCount;
 
     final updatedWorks = state.works.where((w) => w.id != workId).toList();
 
-    // 如果列表没有变化（说明没找到），则不进行后续操作
     if (updatedWorks.length == previousWorks.length) return;
 
     state = state.copyWith(
@@ -286,10 +278,7 @@ class PlaylistDetailNotifier extends StateNotifier<PlaylistDetailState> {
         works: [workId],
       );
 
-      // 移除成功，不需要刷新整个列表，因为本地已经更新了
-      // 这样可以避免重新加载导致的等待
     } catch (e) {
-      // 失败回滚
       state = state.copyWith(
         works: previousWorks,
         totalCount: previousTotalCount,

@@ -30,10 +30,6 @@ class AudioPlayerService {
 
   AudioPlayerService._();
 
-  // ═══════════════════════════════════════════════════════════════
-  // Fields
-  // ═══════════════════════════════════════════════════════════════
-
   final AudioPlayer _player = AudioPlayer();
   final List<AudioTrack> _queue = [];
   int _currentIndex = 0;
@@ -47,28 +43,23 @@ class AudioPlayerService {
     '.lrc', '.srt', '.vtt', '.ass', '.ssa',
   ];
 
-  // macOS specific
   bool _completionHandled = false;
   Timer? _completionCheckTimer;
   DateTime _lastStateUpdate = DateTime(2000);
 
-  // Windows SMTC
   SMTCWindows? _smtc;
   StreamSubscription? _smtcSubscription;
 
-  // Privacy mode
   bool _privacyEnabled = false;
   bool _privacyBlurCover = true;
   bool _privacyMaskTitle = true;
   String _privacyCustomTitle = '正在播放音频';
 
-  // Crossfade
   Duration _crossfadeDuration = Duration.zero;
   double _originalVolume = 1.0;
   bool _isCrossfading = false;
   bool _crossfadeCancelled = false;
 
-  // ReplayGain & Volume Normalization
   final ReplayGainService _replayGainService = ReplayGainService.instance;
   final VolumeNormalizationService _volumeNormalizationService =
       VolumeNormalizationService.instance;
@@ -77,13 +68,9 @@ class AudioPlayerService {
   AudioFormatInfo? _lastAudioFormat;
   AudioFormatInfo? get lastAudioFormat => _lastAudioFormat;
 
-  // Exclusive audio mode
   final ExclusiveAudioService _exclusiveService = ExclusiveAudioService.instance;
   bool _exclusiveModeEnabled = false;
 
-  // Hi-Res audio playback (ExoPlayer for high sample rate files)
-
-  // ── USB DAC / libusb ──
   final UsbDacAudioManager _usbDacManager = UsbDacAudioManager.instance;
   bool _libusbDacActive = false;
   StreamSubscription<UsbDacManagerState>? _libusbStateSub;
@@ -101,7 +88,6 @@ class AudioPlayerService {
   /// The USB DAC manager — exposed for sink-selection logging.
   UsbDacAudioManager get usbDacManager => _usbDacManager;
 
-  // Hi-Res audio playback (ExoPlayer for high sample rate files)
   final HiResAudioService _hiResService = HiResAudioService.instance;
   bool _hiResEnabled = false;
   bool _hiResActive = false;
@@ -118,7 +104,6 @@ class AudioPlayerService {
   StreamSubscription<int>? _nativeBufferedPositionSub;
   StreamSubscription<bool>? _trackEndedSub;
 
-  // Unified position & duration streams
   final StreamController<Duration> _unifiedPositionController =
       StreamController<Duration>.broadcast();
   final StreamController<Duration?> _unifiedDurationController =
@@ -136,10 +121,6 @@ class AudioPlayerService {
       StreamController<bool>.broadcast();
   final StreamController<AudioFormatInfo?> _audioFormatController =
       StreamController<AudioFormatInfo?>.broadcast();
-
-  // ═══════════════════════════════════════════════════════════════
-  // Initialization
-  // ═══════════════════════════════════════════════════════════════
 
   Future<void> initialize() async {
     _audioHandler = await AudioService.init(
@@ -161,7 +142,6 @@ class AudioPlayerService {
 
     _updatePlaybackState();
 
-    // Windows SMTC
     if (Platform.isWindows) {
       try {
         _smtc = SMTCWindows(
@@ -191,9 +171,6 @@ class AudioPlayerService {
 
     _setupPlayerListeners();
 
-    // Listen for libusb DAC state changes and update the audio routing.
-    // When libusb is active, we need to route ALL audio through the hi-res
-    // ExoPlayer with LibusbAudioSink for true bit-perfect USB DAC output.
     _libusbStateSub = _usbDacManager.stateStream.listen((state) async {
       final wasActive = _libusbDacActive;
       _libusbDacActive = state.dacActive;
@@ -207,16 +184,13 @@ class AudioPlayerService {
           tag: 'Audio');
 
       if (state.dacActive && !wasActive) {
-        // libusb just became active — switch to libusb sink
         _log.info('[LIBUSB] >>> dacActive transitioned false→true — switching to LibusbAudioSink',
             tag: 'Audio');
 
-        // Disable AAudio sink (libusb has priority)
         await _hiResService.setUseAaudioSink(false);
         await _hiResService.setUseLibusbSink(true);
         await _hiResService.setBitPerfectMode(true);
 
-        // If currently playing, restart through libusb path
         if (_player.playing || _hiResActive) {
           final track = currentTrack;
           if (track != null) {
@@ -324,10 +298,6 @@ class AudioPlayerService {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // MediaItem (notification / lock screen)
-  // ═══════════════════════════════════════════════════════════════
-
   Future<void> _updateMediaItem(
     AudioTrack track, {
     bool privacyEnabled = false,
@@ -374,10 +344,6 @@ class AudioPlayerService {
 
     _updatePlaybackState();
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Track loading
-  // ═══════════════════════════════════════════════════════════════
 
   Future<void> _loadTrack(AudioTrack track) async {
     _log.info('_loadTrack: title="${track.title}"', tag: 'Audio');
@@ -451,10 +417,6 @@ class AudioPlayerService {
       _applyAudioGain(track);
     }
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Hi-Res Audio
-  // ═══════════════════════════════════════════════════════════════
 
   Future<bool> _shouldUseHiResForTrack(AudioTrack track) async {
     if (!_hiResEnabled) return false;
@@ -558,7 +520,6 @@ class AudioPlayerService {
     _hiResErrorSub = _hiResService.errorStream.listen((message) {
       if (!_hiResActive) return;
       _log.error('[HiRes] Player error: $message', tag: 'Audio');
-      // Fallback to just_audio on hi-res error
       _hiResActive = false;
       _hiResActiveController.add(false);
       final savedEnabled = _hiResEnabled;
@@ -594,10 +555,6 @@ class AudioPlayerService {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Audio format detection
-  // ═══════════════════════════════════════════════════════════════
-
   Future<void> _detectAudioFormat(AudioTrack track) async {
     final info = await _detectAudioFormatDirect(track);
     _lastAudioFormat = info;
@@ -607,10 +564,6 @@ class AudioPlayerService {
   Future<AudioFormatInfo?> _detectAudioFormatDirect(AudioTrack track) async {
     return AudioFormatGainService.detectFormatDirect(track);
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Playback controls
-  // ═══════════════════════════════════════════════════════════════
 
   Future<void> play() async {
     if (_hiResActive) {
@@ -690,10 +643,6 @@ class AudioPlayerService {
     final newPos = current - duration;
     await seek(newPos < Duration.zero ? Duration.zero : newPos);
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Queue management
-  // ═══════════════════════════════════════════════════════════════
 
   Future<void> updateQueue(List<AudioTrack> tracks, {int startIndex = 0}) async {
     _queue.clear();
@@ -902,10 +851,6 @@ class AudioPlayerService {
     _nativeBufferedPositionSub?.cancel(); _nativeBufferedPositionSub = null;
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Crossfade
-  // ═══════════════════════════════════════════════════════════════
-
   Future<void> setCrossfadeDuration(Duration duration) async {
     _crossfadeDuration = duration;
     _log.info('Crossfade duration set to: ${duration.inMilliseconds}ms', tag: 'Audio');
@@ -1009,10 +954,6 @@ class AudioPlayerService {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Audio Gain (ReplayGain + Volume Normalization)
-  // ═══════════════════════════════════════════════════════════════
-
   ReplayGainData? get currentReplayGain => _replayGainService.currentGain;
   double get currentVolumeNormalizationMultiplier =>
       _volumeNormalizationService.currentMultiplier;
@@ -1082,10 +1023,6 @@ class AudioPlayerService {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Platform configuration
-  // ═══════════════════════════════════════════════════════════════
-
   Future<void> updateAudioSessionConfig(bool enablePassthrough) async {
     if (Platform.isWindows || Platform.isMacOS) {
       await MpvConfigService.configure();
@@ -1128,7 +1065,6 @@ class AudioPlayerService {
 
   Future<void> setExclusiveMode(bool enabled) async {
     if (Platform.isAndroid) {
-      // ── Android: AAudio exclusive mode + libusb USB DAC ──
       if (enabled) {
         final success = await _exclusiveService.enable();
         _exclusiveModeEnabled = success;
@@ -1137,18 +1073,6 @@ class AudioPlayerService {
           await _hiResService.setBitPerfectMode(true);
           await _player.setVolume(1.0);
 
-          // ── Initialize libusb unconditionally ──
-          // When exclusive mode is enabled, we proactively start the libusb
-          // driver MANDIRI (tidak perlu nunggu isDacConnected yang cuma true
-          // setelah driver terkoneksi — chicken-and-egg).
-          //
-          // Alur:
-          //   1. setAutoDacEnabled(true) → getDevices() → jika ada USB DAC
-          //      fisik, requestPermission → connect → start.
-          //   2. Kalau libusb streaming (dacActive=true), _libusbStateSub
-          //      otomatis switch dari AaudioAudioSink ke LibusbAudioSink.
-          //   3. Kalau tidak ada USB DAC fisik, getDevices() return [] →
-          //      no-op, AAudio fallback jalan normal.
           _log.info('[LIBUSB] Exclusive Mode ON — '
               'initiating libusb USB DAC (jika ada perangkat fisik)',
               tag: 'Audio');
@@ -1161,10 +1085,6 @@ class AudioPlayerService {
         await _hiResService.setUseAaudioSink(false);
         await _hiResService.setBitPerfectMode(false);
 
-        // ── Disable libusb only if we auto-enabled it ──
-        // If the user had USB DAC Routing independently enabled (not through
-        // Exclusive Mode), we should NOT disable it here. Only clean up the
-        // auto-enabled path to avoid conflicts with the user's explicit setting.
         if (_autoEnabledLibusb) {
           _log.info('[LIBUSB] Exclusive Mode OFF — disabling auto-enabled USB DAC Routing',
               tag: 'Audio');
@@ -1213,10 +1133,6 @@ class AudioPlayerService {
 
   AudioHandler? get audioHandler => _audioHandler;
 
-  // ═══════════════════════════════════════════════════════════════
-  // macOS completion check timer
-  // ═══════════════════════════════════════════════════════════════
-
   void _startCompletionCheckTimer() {
     if (!Platform.isMacOS) return;
     _completionCheckTimer?.cancel();
@@ -1235,10 +1151,6 @@ class AudioPlayerService {
       }
     });
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Temp file helpers
-  // ═══════════════════════════════════════════════════════════════
 
   Future<void> _cleanupTempPlaybackFile() async {
     if (_tempPlaybackFilePath == null) return;
@@ -1295,10 +1207,6 @@ class AudioPlayerService {
     return dir;
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Streams & Getters
-  // ═══════════════════════════════════════════════════════════════
-
   Stream<PlayerState> get playerStateStream => _unifiedPlayerStateController.stream;
   Stream<Duration> get positionStream => _unifiedPositionController.stream;
   Stream<Duration?> get durationStream => _unifiedDurationController.stream;
@@ -1326,10 +1234,6 @@ class AudioPlayerService {
   Stream<bool> get hiResActiveStream => _hiResActiveController.stream;
   bool get hasNext => _currentIndex < _queue.length - 1;
   bool get hasPrevious => _currentIndex > 0;
-
-  // ═══════════════════════════════════════════════════════════════
-  // Disposal
-  // ═══════════════════════════════════════════════════════════════
 
   Future<void> dispose() async {
     _cancelCrossfade();

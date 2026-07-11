@@ -3,9 +3,6 @@ import 'package:kikoeru_flutter/src/services/download_service.dart';
 import 'package:kikoeru_flutter/src/models/download_task.dart';
 
 void main() {
-  // ============================================================
-  // Natural Sort Comparator (naturalCompare)
-  // ============================================================
   group('Natural Sort', () {
     test('sorts single-digit numbers before double-digit', () {
       final items = ['10.mp3', '2.mp3', '1.mp3'];
@@ -62,9 +59,6 @@ void main() {
     });
   });
 
-  // ============================================================
-  // DownloadTask Model Tests
-  // ============================================================
   group('DownloadTask Model', () {
     test('creates default task with pending status', () {
       final task = DownloadTask(
@@ -134,7 +128,6 @@ void main() {
       expect(updated.status, DownloadStatus.downloading);
       expect(updated.downloadedBytes, 25000);
       expect(updated.totalBytes, 100000);
-      // Unchanged fields
       expect(updated.id, task.id);
       expect(updated.workId, task.workId);
       expect(updated.fileName, task.fileName);
@@ -221,9 +214,6 @@ void main() {
     });
   });
 
-  // ============================================================
-  // DownloadStatus Enum
-  // ============================================================
   group('DownloadStatus', () {
     test('all status values are defined', () {
       expect(DownloadStatus.values, hasLength(6));

@@ -18,15 +18,12 @@ class SubtitleLibraryService {
   static const String _libraryFolderName = 'subtitle_library';
   static const String _cacheFileName = 'library_cache.json';
 
-  // Windows 路径长度限制 (保留一些余量)
   static const int _maxPathLength = 240;
 
-  // 自动分配目录名称
   static const String parsedFolderName = '已解析';
   static const String unknownFolderName = '未知作品';
   static const String savedFolderName = '已保存';
 
-  // 数据库初始化标志
   static bool _dbInitialized = false;
   static Future<void>? _dbInitFuture;
 
@@ -40,10 +37,8 @@ class SubtitleLibraryService {
     final lowerSubtitle = subtitleFileName.toLowerCase();
     final lowerAudio = audioFileName.toLowerCase();
 
-    // 常见字幕扩展名
     final textExtensions = ['.vtt', '.srt', '.txt', '.lrc'];
 
-    // 1. 检查是否是字幕文件，并获取去掉字幕后缀后的部分
     String? subtitleContentName;
     for (final ext in textExtensions) {
       if (lowerSubtitle.endsWith(ext)) {
@@ -57,19 +52,14 @@ class SubtitleLibraryService {
       return (false, 0.0);
     }
 
-    // 2. 获取音频文件的基础名称（去掉扩展名）
     final audioBaseName = removeAudioExtension(lowerAudio);
 
-    // 3. 获取字幕文件的基础名称（尝试去掉音频扩展名）
     final subtitleBaseName = removeAudioExtension(subtitleContentName);
 
-    // 4. 比较基础名称
     if (audioBaseName == subtitleBaseName) {
       return (true, 1.0);
     }
 
-    // 5. 尝试模糊匹配
-    // 5.1 归一化处理（去除括号内容、特殊字符等）
     final normalizedAudio = _normalizeForMatching(audioBaseName);
     final normalizedSubtitle = _normalizeForMatching(subtitleBaseName);
 
@@ -77,18 +67,13 @@ class SubtitleLibraryService {
       return (false, 0.0);
     }
 
-    // 如果归一化后相等，直接匹配
     if (normalizedAudio == normalizedSubtitle) {
       return (true, 1.0);
     }
 
-    // 5.2 计算相似度（Levenshtein距离）
     final similarity =
         _calculateSimilarity(normalizedAudio, normalizedSubtitle);
 
-    // 阈值设定：
-    // 对于短文件名（<10字符），要求更高相似度（0.9）
-    // 对于长文件名，允许一定容错（0.85）
     final threshold = normalizedAudio.length < 10 ? 0.9 : 0.85;
 
     return (similarity >= threshold, similarity);
@@ -107,15 +92,11 @@ class SubtitleLibraryService {
   static String _normalizeForMatching(String fileName) {
     var result = fileName;
 
-    // 1. 去除括号及其内容 (包括全角和半角)
-    // 例如: "Track1(SEなし)" -> "Track1"
-    result = result.replaceAll(RegExp(r'\（.*?\）'), ''); // 全角括号
-    result = result.replaceAll(RegExp(r'\(.*?\)'), ''); // 半角括号
-    result = result.replaceAll(RegExp(r'\[.*?\]'), ''); // 方括号
-    result = result.replaceAll(RegExp(r'【.*?】'), ''); // 实心方括号
+    result = result.replaceAll(RegExp(r'\（.*?\）'), '');
+    result = result.replaceAll(RegExp(r'\(.*?\)'), '');
+    result = result.replaceAll(RegExp(r'\[.*?\]'), '');
+    result = result.replaceAll(RegExp(r'【.*?】'), '');
 
-    // 2. 去除常见的无意义后缀
-    // 例如: "_SE无", "_NoSE"
     final suffixesToRemove = [
       '_se无',
       '_se',
@@ -142,8 +123,6 @@ class SubtitleLibraryService {
       }
     }
 
-    // 3. 去除标点符号和特殊字符，只保留字母、数字和CJK字符
-    // 这一步可以解决 "5," vs "5" 的问题
     result = result.replaceAll(
         RegExp(r'[^\w\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff]'), '');
 
@@ -233,13 +212,11 @@ class SubtitleLibraryService {
     try {
       final libraryDir = await getSubtitleLibraryDirectory();
 
-      // 删除旧版 JSON 缓存（如果存在）
       final cacheFile = File('${libraryDir.path}/$_cacheFileName');
       if (await cacheFile.exists()) {
         await cacheFile.delete();
       }
 
-      // 重建数据库
       await _rebuildDatabase(libraryDir);
     } catch (e) {
       _log.error('重建索引失败: $e', tag: 'SubtitleLibrary');
@@ -255,7 +232,6 @@ class SubtitleLibraryService {
   /// 确保数据库已初始化并完成迁移
   static Future<void> _ensureDatabase() async {
     if (_dbInitialized) return;
-    // 防止并发重复初始化
     _dbInitFuture ??= _initDatabase();
     await _dbInitFuture;
   }
@@ -265,14 +241,12 @@ class SubtitleLibraryService {
 
     final libraryDir = await getSubtitleLibraryDirectory();
 
-    // 先执行旧格式文件夹迁移（纯文件系统操作）
     await _migrateOldFormatFolders(libraryDir);
 
     final version =
         await SubtitleDatabase.instance.getMeta('migration_version');
 
     if (version == null) {
-      // 首次运行：尝试从 JSON 缓存快速迁移
       final cacheFile = File('${libraryDir.path}/$_cacheFileName');
       if (await cacheFile.exists()) {
         try {
@@ -286,7 +260,6 @@ class SubtitleLibraryService {
             await SubtitleDatabase.instance.insertFiles(records);
             _log.info('JSON 迁移完成: ${records.length} 条记录', tag: 'SubtitleLibrary');
           } else {
-            // JSON 为空，扫描文件系统
             await _rebuildDatabase(libraryDir);
           }
           await cacheFile.delete();
@@ -295,7 +268,6 @@ class SubtitleLibraryService {
           await _rebuildDatabase(libraryDir);
         }
       } else {
-        // 无 JSON 缓存，扫描文件系统
         final fileCount =
             await SubtitleDatabase.instance.getFileCount();
         if (fileCount == 0) {
@@ -332,7 +304,6 @@ class SubtitleLibraryService {
       await for (final entity in dir.list(followLinks: false)) {
         if (entity is Directory) {
           final folderName = entity.path.split(Platform.pathSeparator).last;
-          // 跳过缓存文件和隐藏文件夹
           if (folderName.startsWith('.')) continue;
           await _scanDirectoryForRecords(entity, rootPath, records);
         } else if (entity is File) {
@@ -356,7 +327,6 @@ class SubtitleLibraryService {
                 normalizedName: _computeNormalizedName(fileName),
               ));
             } catch (e) {
-              // 跳过无法读取的文件
             }
           }
         }
@@ -377,18 +347,15 @@ class SubtitleLibraryService {
     final libraryDir = await getSubtitleLibraryDirectory();
     final libraryRoot = libraryDir.path;
 
-    // 将绝对路径转换为相对路径前缀
     final relativePrefix = directoryPath.length > libraryRoot.length
         ? _toRelativePath(directoryPath.substring(libraryRoot.length + 1))
         : '';
 
-    // 删除该目录下的旧记录
     if (relativePrefix.isNotEmpty) {
       await SubtitleDatabase.instance
           .deleteByRelativePathPrefix(relativePrefix);
     }
 
-    // 如果目录仍存在，重新扫描并插入
     final dir = Directory(directoryPath);
     if (await dir.exists()) {
       final records = <SubtitleFileRecord>[];
@@ -464,7 +431,6 @@ class SubtitleLibraryService {
 
   /// 预计算归一化文件名（用于匹配加速）
   static String _computeNormalizedName(String fileName) {
-    // 去掉字幕扩展名
     final textExtensions = ['.vtt', '.srt', '.txt', '.lrc'];
     String baseName = fileName.toLowerCase();
     for (final ext in textExtensions) {
@@ -482,7 +448,6 @@ class SubtitleLibraryService {
     List<Map<String, dynamic>> records,
     String libraryRootPath,
   ) {
-    // 使用嵌套 Map 构建树结构
     final rootChildren = <String, dynamic>{};
 
     for (final record in records) {
@@ -492,7 +457,6 @@ class SubtitleLibraryService {
       Map<String, dynamic> current = rootChildren;
       var currentFullPath = libraryRootPath;
 
-      // 遍历路径的每一级目录
       for (int i = 0; i < parts.length - 1; i++) {
         currentFullPath =
             '$currentFullPath${Platform.pathSeparator}${parts[i]}';
@@ -510,7 +474,6 @@ class SubtitleLibraryService {
             as Map<String, dynamic>)['_children'] as Map<String, dynamic>;
       }
 
-      // 添加文件叶节点
       final fileName = parts.last;
       current[fileName] = <String, dynamic>{
         '_meta': {
@@ -555,7 +518,6 @@ class SubtitleLibraryService {
       }
     }
 
-    // 排序：文件夹在前，然后按名称排序
     items.sort((a, b) {
       if (a['type'] == 'folder' && b['type'] != 'folder') return -1;
       if (a['type'] != 'folder' && b['type'] == 'folder') return 1;
@@ -570,7 +532,6 @@ class SubtitleLibraryService {
     final downloadDir = await DownloadPathService.getDownloadDirectory();
     final libraryDir = Directory('${downloadDir.path}/$_libraryFolderName');
 
-    // 如果不存在则自动创建
     if (!await libraryDir.exists()) {
       await libraryDir.create(recursive: true);
       _log.info('创建字幕库目录: ${libraryDir.path}', tag: 'SubtitleLibrary');
@@ -615,7 +576,6 @@ class SubtitleLibraryService {
 
       final libraryDir = await getSubtitleLibraryDirectory();
 
-      // 创建"已保存"文件夹
       final savedDir = Directory('${libraryDir.path}/$savedFolderName');
       if (!await savedDir.exists()) {
         await savedDir.create(recursive: true);
@@ -632,7 +592,6 @@ class SubtitleLibraryService {
         final sourceFile = File(platformFile.path!);
         final fileName = platformFile.name;
 
-        // 验证是否是字幕文件
         if (!FileIconUtils.isLyricFile(fileName)) {
           errorCount++;
           errorFiles.add('$fileName (不是字幕文件)');
@@ -642,7 +601,6 @@ class SubtitleLibraryService {
         try {
           final destFile = File('${savedDir.path}/$fileName');
 
-          // 如果文件已存在，添加序号
           String finalFileName = fileName;
           int counter = 1;
           File finalDestFile = destFile;
@@ -666,7 +624,6 @@ class SubtitleLibraryService {
         }
       }
 
-      // 刷新"已保存"文件夹缓存
       final savedDirPath = '${libraryDir.path}/$savedFolderName';
       await _refreshDirectoriesAfterChange({savedDirPath});
 
@@ -730,13 +687,11 @@ class SubtitleLibraryService {
 
       onProgress?.call('正在扫描文件夹结构...');
 
-      // 检查根目录本身是否匹配规则（例如用户选择的就是 RJ123456 文件夹）
       final rootFolderName = sourceDir.path.split(Platform.pathSeparator).last;
       Map<String, int> result;
       final Set<String> modifiedPaths = {};
 
       if (_matchFolderPattern(rootFolderName)) {
-        // 根目录匹配规则：将整个目录作为一个作品导入到"已解析"
         onProgress?.call('正在处理: $rootFolderName');
 
         final folderName = _normalizeFolderName(rootFolderName);
@@ -744,7 +699,6 @@ class SubtitleLibraryService {
         final targetDir =
             Directory('${libraryDir.path}/$targetCategory/$folderName');
 
-        // 检查目标路径长度
         if (targetDir.path.length > _maxPathLength) {
           return ImportResult(
             success: false,
@@ -752,7 +706,6 @@ class SubtitleLibraryService {
           );
         }
 
-        // 检查目标文件夹是否已存在，如果存在则合并（复制并替换）
         if (await targetDir.exists()) {
           _log.info('检测到同名文件夹，合并并替换同名文件: $folderName', tag: 'SubtitleLibrary');
           result = await _mergeAndCopyFolder(sourceDir, targetDir,
@@ -771,7 +724,6 @@ class SubtitleLibraryService {
           _log.info('已解析根目录文件夹: $folderName, 字幕文件: ${result['successCount']}', tag: 'SubtitleLibrary');
         }
       } else {
-        // 根目录不匹配规则：递归处理子目录
         result = await _processFolderRecursively(
           sourceDir,
           sourceDir,
@@ -808,13 +760,11 @@ class SubtitleLibraryService {
         message += '\n失败 $totalError 个';
       }
 
-      // 刷新相关文件夹缓存
       if (modifiedPaths.isNotEmpty) {
         onProgress?.call('正在刷新缓存...');
         await _refreshDirectoriesAfterChange(modifiedPaths,
             onProgress: onProgress);
       } else {
-        // 如果没有收集到具体路径（异常情况），回退到刷新整个分类
         final parsedDirPath = '${libraryDir.path}/$parsedFolderName';
         final unknownDirPath = '${libraryDir.path}/$unknownFolderName';
         onProgress?.call('正在刷新缓存...');
@@ -863,8 +813,7 @@ class SubtitleLibraryService {
 
       final archiveFile = File(platformFile.path!);
 
-      // 检查文件大小（限制 16GB）
-      const maxArchiveSize = 16 * 1024 * 1024 * 1024; // 16GB
+      const maxArchiveSize = 16 * 1024 * 1024 * 1024;
       final fileSize = await archiveFile.length();
       if (fileSize > maxArchiveSize) {
         final sizeInGB = (fileSize / (1024 * 1024 * 1024)).toStringAsFixed(2);
@@ -878,7 +827,6 @@ class SubtitleLibraryService {
 
       final libraryDir = await getSubtitleLibraryDirectory();
 
-      // 先验证压缩包格式
       try {
         if (platformFile.extension == 'zip') {
           ZipDecoder().decodeBytes(bytes, verify: false);
@@ -895,30 +843,23 @@ class SubtitleLibraryService {
         );
       }
 
-      // 创建临时目录用于解压
       final tempDir = Directory(
           '${libraryDir.path}/.temp_${DateTime.now().millisecondsSinceEpoch}');
       await tempDir.create(recursive: true);
 
-      // 创建导入统计器
       final stats = _ImportStats();
       final Set<String> modifiedPaths = {};
 
       try {
-        // 智能判断是否需要为根压缩包创建文件夹
-        // 如果压缩包名符合 RJ 号格式，且内容不是已经包含在同名文件夹中，则创建文件夹
         final zipName = platformFile.name;
         final zipNameWithoutExt = zipName.replaceAll(
             RegExp(r'\.(zip|rar|7z)$', caseSensitive: false), '');
 
         String relativePath = '';
 
-        // 只有当压缩包名符合 RJ 号格式时才进行智能判断
         if (_matchFolderPattern(zipNameWithoutExt)) {
           Archive? rootArchive;
           try {
-            // 重新解码一次用于检查结构（虽然有性能损耗，但为了正确性是值得的）
-            // 注意：这里假设是 ZIP，前面已经检查过
             if (platformFile.extension == 'zip') {
               rootArchive = ZipDecoder().decodeBytes(bytes, verify: false);
             }
@@ -936,7 +877,6 @@ class SubtitleLibraryService {
           }
         }
 
-        // 先解压到临时目录
         onProgress?.call('正在解压压缩包...');
         _log.info('解压到临时目录: ${tempDir.path}', tag: 'SubtitleLibrary');
         await _processArchiveBytes(
@@ -949,7 +889,6 @@ class SubtitleLibraryService {
           onProgress: onProgress,
         );
 
-        // 递归处理临时目录，按规则分配到目标位置
         onProgress?.call('正在分类和移动文件...');
         final result = await _processFolderRecursively(
           tempDir,
@@ -959,7 +898,6 @@ class SubtitleLibraryService {
           modifiedPaths: modifiedPaths,
         );
 
-        // 更新统计信息
         stats.successCount = result['successCount'] ?? 0;
         stats.errorCount = result['errorCount'] ?? 0;
         stats.skippedCount = result['skippedCount'] ?? 0;
@@ -968,7 +906,6 @@ class SubtitleLibraryService {
 
         _log.info('已解析: $parsedCount 个文件夹, 未知作品: $unknownCount 个文件夹', tag: 'SubtitleLibrary');
       } finally {
-        // 清理临时目录
         onProgress?.call('正在清理临时文件...');
         try {
           if (await tempDir.exists()) {
@@ -981,7 +918,6 @@ class SubtitleLibraryService {
       }
 
       if (stats.successCount == 0) {
-        // 根据错误信息生成更详细的提示
         String message = '压缩包中没有找到字幕文件';
         if (stats.sizeErrorCount > 0) {
           message += '\n有 ${stats.sizeErrorCount} 个文件因过大被跳过';
@@ -1001,13 +937,11 @@ class SubtitleLibraryService {
         );
       }
 
-      // 刷新相关文件夹缓存
       if (modifiedPaths.isNotEmpty) {
         onProgress?.call('正在刷新缓存...');
         await _refreshDirectoriesAfterChange(modifiedPaths,
             onProgress: onProgress);
       } else {
-        // 如果没有收集到具体路径（异常情况），回退到刷新整个分类
         final parsedDirPath = '${libraryDir.path}/$parsedFolderName';
         final unknownDirPath = '${libraryDir.path}/$unknownFolderName';
         onProgress?.call('正在刷新缓存...');
@@ -1050,7 +984,6 @@ class SubtitleLibraryService {
     required int depth,
     Function(String)? onProgress,
   }) async {
-    // 防止无限递归：最大深度限制
     const maxDepth = 10;
     if (depth > maxDepth) {
       _log.warning('压缩包嵌套深度超过 $maxDepth 层，停止解压', tag: 'SubtitleLibrary');
@@ -1059,8 +992,7 @@ class SubtitleLibraryService {
       return;
     }
 
-    // 内存保护：单个嵌套压缩包大小限制 (1GB)
-    const maxFileSize = 1024 * 1024 * 1024; // 1GB
+    const maxFileSize = 1024 * 1024 * 1024;
     if (bytes.length > maxFileSize) {
       final sizeInMB = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
       _log.warning('嵌套压缩包过大 ($sizeInMB MB)，跳过', tag: 'SubtitleLibrary');
@@ -1069,7 +1001,6 @@ class SubtitleLibraryService {
       return;
     }
 
-    // 解压
     Archive? archive;
     try {
       if (extension == 'zip') {
@@ -1086,11 +1017,9 @@ class SubtitleLibraryService {
       return;
     }
 
-    // 处理压缩包中的文件
     for (final file in archive.files) {
       if (!file.isFile) continue;
 
-      // 尝试修复文件名编码（处理 GBK 编码的中文文件名）
       String decodedName = file.name;
       try {
         final nameBytes = latin1.encode(file.name);
@@ -1104,7 +1033,6 @@ class SubtitleLibraryService {
           ? fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase()
           : '';
 
-      // 获取文件内容
       List<int>? content;
       try {
         content = file.content as List<int>?;
@@ -1113,7 +1041,6 @@ class SubtitleLibraryService {
           continue;
         }
 
-        // 内存保护：限制单个文件内容大小 (500MB)
         const maxContentSize = 500 * 1024 * 1024;
         if (content.length > maxContentSize) {
           final sizeInMB = (content.length / (1024 * 1024)).toStringAsFixed(1);
@@ -1128,12 +1055,10 @@ class SubtitleLibraryService {
         continue;
       }
 
-      // 判断是否是嵌套的压缩包
       if (fileExtension == 'zip') {
         _log.info('发现嵌套压缩包 (depth=${depth + 1}): $decodedName', tag: 'SubtitleLibrary');
         stats.nestedArchiveCount++;
 
-        // 先解析嵌套压缩包以判断是否需要创建文件夹
         Archive? nestedArchive;
         try {
           nestedArchive = ZipDecoder().decodeBytes(content, verify: false);
@@ -1144,22 +1069,19 @@ class SubtitleLibraryService {
           continue;
         }
 
-        // 智能判断是否需要为嵌套压缩包创建文件夹
         final zipNameWithoutExt =
             decodedName.replaceAll(RegExp(r'\.zip$', caseSensitive: false), '');
         final shouldCreateFolder =
             _shouldCreateNewFolder(nestedArchive, zipNameWithoutExt);
 
-        // 根据智能判断决定相对路径
         final nestedRelativePath = shouldCreateFolder
             ? (relativePath.isEmpty
                 ? zipNameWithoutExt
                 : '$relativePath/$zipNameWithoutExt')
-            : relativePath; // 不创建文件夹时使用当前相对路径
+            : relativePath;
 
         _log.info('嵌套压缩包${shouldCreateFolder ? "需要创建文件夹" : "直接解压"}: $zipNameWithoutExt', tag: 'SubtitleLibrary');
 
-        // 递归处理嵌套压缩包
         await _processArchiveBytes(
           content,
           'zip',
@@ -1172,14 +1094,12 @@ class SubtitleLibraryService {
         continue;
       }
 
-      // 处理字幕文件
       if (FileIconUtils.isLyricFile(fileName)) {
         try {
           final fullRelativePath =
               relativePath.isEmpty ? decodedName : '$relativePath/$decodedName';
           var targetFilePath = '$targetBasePath/$fullRelativePath';
 
-          // 检查路径长度，如果过长则缩短
           if (targetFilePath.length > _maxPathLength) {
             targetFilePath = _shortenPath(targetFilePath, fileName);
             if (targetFilePath.isEmpty) {
@@ -1193,7 +1113,6 @@ class SubtitleLibraryService {
 
           await targetFile.parent.create(recursive: true);
 
-          // 如果目标文件已存在，直接覆盖
           if (await targetFile.exists()) {
             _log.info('替换同名文件: $fileName', tag: 'SubtitleLibrary');
           }
@@ -1201,7 +1120,6 @@ class SubtitleLibraryService {
           await targetFile.writeAsBytes(content);
           stats.successCount++;
 
-          // 每10个文件显示一次进度
           if (stats.successCount % 10 == 0) {
             onProgress?.call('已解压 ${stats.successCount} 个字幕文件...');
           }
@@ -1228,16 +1146,13 @@ class SubtitleLibraryService {
       return [];
     }
 
-    // 确保数据库已初始化
     await _ensureDatabase();
 
-    // 强制刷新：先迁移旧格式，再重建数据库
     if (forceRefresh) {
       await _migrateOldFormatFolders(libraryDir);
       await _rebuildDatabase(libraryDir);
     }
 
-    // 从数据库查询所有记录并构建树
     final records = await SubtitleDatabase.instance.getAllFiles();
     return _buildTreeFromRecords(records, libraryDir.path);
   }
@@ -1252,7 +1167,6 @@ class SubtitleLibraryService {
     if (directoryPaths.isEmpty) return;
 
     try {
-      // 如果变更目录过多，整体重建
       if (directoryPaths.length > 50) {
         _log.warning('变更文件夹数量过多 (${directoryPaths.length})，切换为全量重建', tag: 'SubtitleLibrary');
         onProgress?.call('正在重建索引...');
@@ -1331,18 +1245,15 @@ class SubtitleLibraryService {
       final fileName = sourcePath.split(Platform.pathSeparator).last;
       final newPath = '$targetFolderPath${Platform.pathSeparator}$fileName';
 
-      // 检查目标路径是否与源路径相同
       if (sourcePath == newPath) {
-        return true; // 无需移动
+        return true;
       }
 
-      // 检查目标是否已存在
       final targetExists = await FileSystemEntity.isFile(newPath) ||
           await FileSystemEntity.isDirectory(newPath);
 
       if (entity == FileSystemEntityType.file) {
         if (targetExists && await FileSystemEntity.isFile(newPath)) {
-          // 文件冲突：添加序号
           final nameWithoutExt = fileName.contains('.')
               ? fileName.substring(0, fileName.lastIndexOf('.'))
               : fileName;
@@ -1366,12 +1277,10 @@ class SubtitleLibraryService {
         }
       } else if (entity == FileSystemEntityType.directory) {
         if (targetExists && await FileSystemEntity.isDirectory(newPath)) {
-          // 文件夹冲突：合并内容
           _log.info('检测到同名文件夹，开始合并: $sourcePath -> $newPath', tag: 'SubtitleLibrary');
           await _mergeFolders(sourcePath, newPath);
           _log.info('文件夹已合并: $sourcePath -> $newPath', tag: 'SubtitleLibrary');
         } else {
-          // 目标不存在或是文件，直接重命名
           await Directory(sourcePath).rename(newPath);
           _log.info('文件夹已移动: $sourcePath -> $newPath', tag: 'SubtitleLibrary');
         }
@@ -1400,20 +1309,17 @@ class SubtitleLibraryService {
       await targetDir.create(recursive: true);
     }
 
-    // 遍历源文件夹中的所有内容
     await for (final entity in sourceDir.list()) {
       final fileName = entity.path.split(Platform.pathSeparator).last;
       final targetPath = '${targetDir.path}${Platform.pathSeparator}$fileName';
 
       if (entity is File) {
-        // 处理文件：直接替换
         if (await File(targetPath).exists()) {
           await File(targetPath).delete();
           _log.info('替换同名文件: $fileName', tag: 'SubtitleLibrary');
         }
         await entity.rename(targetPath);
       } else if (entity is Directory) {
-        // 处理子文件夹（递归合并）
         if (await Directory(targetPath).exists()) {
           await _mergeFolders(entity.path, targetPath);
         } else {
@@ -1422,7 +1328,6 @@ class SubtitleLibraryService {
       }
     }
 
-    // 删除源文件夹（应该已经为空）
     if (await sourceDir.exists()) {
       try {
         await sourceDir.delete();
@@ -1459,7 +1364,6 @@ class SubtitleLibraryService {
                 entity.path.substring(sourceDir.path.length + 1);
             var targetFilePath = '${targetDir.path}/$relativePath';
 
-            // 检查路径长度，如果过长则缩短
             if (targetFilePath.length > _maxPathLength) {
               targetFilePath = _shortenPath(targetFilePath, fileName);
               if (targetFilePath.isEmpty) {
@@ -1472,7 +1376,6 @@ class SubtitleLibraryService {
             final targetFile = File(targetFilePath);
             await targetFile.parent.create(recursive: true);
 
-            // 如果目标文件已存在，直接替换
             if (await targetFile.exists()) {
               _log.info('替换同名文件: $fileName', tag: 'SubtitleLibrary');
             }
@@ -1480,7 +1383,6 @@ class SubtitleLibraryService {
             await entity.copy(targetFile.path);
             successCount++;
 
-            // 每10个文件显示一次进度
             if (successCount % 10 == 0) {
               onProgress?.call('已处理 $successCount 个字幕文件...');
             }
@@ -1527,7 +1429,6 @@ class SubtitleLibraryService {
       _log.error('读取子文件夹失败: $parentPath, 错误: $e', tag: 'SubtitleLibrary');
     }
 
-    // 按名称排序
     folders
         .sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
 
@@ -1545,7 +1446,6 @@ class SubtitleLibraryService {
 
     final folders = <Map<String, dynamic>>[];
 
-    // 添加根目录选项
     folders.add({
       'name': '根目录',
       'path': libraryDir.path,
@@ -1578,14 +1478,12 @@ class SubtitleLibraryService {
       );
     }
 
-    // 确保数据库已初始化
     await _ensureDatabase();
 
     if (forceRefresh) {
       await _rebuildDatabase(libraryDir);
     }
 
-    // 从数据库查询统计
     final raw = await SubtitleDatabase.instance.getStatsRaw();
     final totalFiles = raw['totalFiles'] ?? 0;
     final totalSize = raw['totalSize'] ?? 0;
@@ -1604,14 +1502,12 @@ class SubtitleLibraryService {
     try {
       final parts = fullPath.split(Platform.pathSeparator);
       if (parts.length <= 2) {
-        return ''; // 无法再缩短
+        return '';
       }
 
-      // 保留根路径和文件名，缩短中间部分
       final rootPart = parts[0];
       final middleParts = parts.sublist(1, parts.length - 1);
 
-      // 缩短每个中间目录名到最多10个字符
       final shortenedMiddle = middleParts.map((part) {
         if (part.length > 10) {
           return part.substring(0, 10);
@@ -1622,9 +1518,7 @@ class SubtitleLibraryService {
       final newPath =
           [rootPart, ...shortenedMiddle, fileName].join(Platform.pathSeparator);
 
-      // 如果还是太长，进一步缩短
       if (newPath.length > _maxPathLength) {
-        // 只保留根路径和文件名
         return [rootPart, parts[1], fileName].join(Platform.pathSeparator);
       }
 
@@ -1651,13 +1545,11 @@ class SubtitleLibraryService {
     int unknownCount = 0;
 
     try {
-      // 获取当前目录下的所有直接子项
       final List<FileSystemEntity> entities = [];
       await for (final entity in currentDir.list(followLinks: false)) {
         entities.add(entity);
       }
 
-      // 分类子项
       final List<Directory> subDirs = [];
       final List<File> files = [];
 
@@ -1669,22 +1561,17 @@ class SubtitleLibraryService {
         }
       }
 
-      // 如果当前目录有子目录，递归处理它们
       for (final subDir in subDirs) {
         final originalFolderName =
             subDir.path.split(Platform.pathSeparator).last;
 
-        // 检查子目录名是否匹配规则
         if (_matchFolderPattern(originalFolderName)) {
-          // 标准化文件夹名
           final folderName = _normalizeFolderName(originalFolderName);
 
-          // 匹配规则：整个子目录移动到"已解析"
           const targetCategory = parsedFolderName;
           final targetDir =
               Directory('${libraryDir.path}/$targetCategory/$folderName');
 
-          // 检查目标路径长度
           if (targetDir.path.length > _maxPathLength) {
             _log.warning('目标路径过长，跳过文件夹: $folderName (${targetDir.path.length} 字符)', tag: 'SubtitleLibrary');
             errorCount++;
@@ -1693,7 +1580,6 @@ class SubtitleLibraryService {
 
           onProgress?.call('正在处理: $folderName');
 
-          // 检查目标文件夹是否已存在，如果存在则合并（复制并替换）
           if (await targetDir.exists()) {
             _log.info('检测到同名文件夹，合并并替换同名文件: $folderName', tag: 'SubtitleLibrary');
             final result = await _mergeAndCopyFolder(subDir, targetDir,
@@ -1719,7 +1605,6 @@ class SubtitleLibraryService {
             _log.info('已解析文件夹: $folderName, 字幕文件: ${result['successCount']}', tag: 'SubtitleLibrary');
           }
         } else {
-          // 不匹配规则：递归检查子目录内部
           final subResult = await _processFolderRecursively(
             subDir,
             rootDir,
@@ -1733,16 +1618,14 @@ class SubtitleLibraryService {
           parsedCount += subResult['parsedCount'] ?? 0;
           unknownCount += subResult['unknownCount'] ?? 0;
 
-          // 如果子目录没有匹配的子文件夹，但有字幕文件，放入"未知作品"
           if ((subResult['parsedCount'] ?? 0) == 0) {
             final hasSubtitles = await _hasSubtitleFiles(subDir);
             if (hasSubtitles) {
-              final folderName = originalFolderName; // 未知作品不需要标准化
+              final folderName = originalFolderName;
               const targetCategory = unknownFolderName;
               final targetDir =
                   Directory('${libraryDir.path}/$targetCategory/$folderName');
 
-              // 检查目标路径长度
               if (targetDir.path.length > _maxPathLength) {
                 _log.warning('目标路径过长，跳过文件夹: $folderName (${targetDir.path.length} 字符)', tag: 'SubtitleLibrary');
                 errorCount++;
@@ -1751,7 +1634,6 @@ class SubtitleLibraryService {
 
               onProgress?.call('正在处理: $folderName');
 
-              // 检查目标文件夹是否已存在，如果存在则合并（复制并替换）
               if (await targetDir.exists()) {
                 _log.info('检测到同名文件夹，合并并替换同名文件: $folderName', tag: 'SubtitleLibrary');
                 final result = await _mergeAndCopyFolder(subDir, targetDir,
@@ -1780,7 +1662,6 @@ class SubtitleLibraryService {
         }
       }
 
-      // 如果当前目录有直接的字幕文件（根目录散落的文件）
       if (files.isNotEmpty && currentDir.path == rootDir.path) {
         for (final file in files) {
           final fileName = file.path.split(Platform.pathSeparator).last;
@@ -1792,7 +1673,6 @@ class SubtitleLibraryService {
 
               var targetFilePath = '${targetDir.path}/$fileName';
 
-              // 检查路径长度
               if (targetFilePath.length > _maxPathLength) {
                 targetFilePath = _shortenPath(targetFilePath, fileName);
                 if (targetFilePath.isEmpty) {
@@ -1873,7 +1753,6 @@ class SubtitleLibraryService {
                 entity.path.substring(sourceDir.path.length + 1);
             var targetFilePath = '${targetDir.path}/$relativePath';
 
-            // 检查路径长度，如果过长则缩短
             if (targetFilePath.length > _maxPathLength) {
               targetFilePath = _shortenPath(targetFilePath, fileName);
               if (targetFilePath.isEmpty) {
@@ -1887,7 +1766,6 @@ class SubtitleLibraryService {
 
             await targetFile.parent.create(recursive: true);
 
-            // 如果目标文件已存在，直接覆盖
             if (await targetFile.exists()) {
               _log.info('替换同名文件: $fileName', tag: 'SubtitleLibrary');
             }
@@ -1895,7 +1773,6 @@ class SubtitleLibraryService {
             await entity.copy(targetFile.path);
             successCount++;
 
-            // 每10个文件显示一次进度
             if (successCount % 10 == 0) {
               onProgress?.call('已处理 $successCount 个字幕文件...');
             }
@@ -1921,8 +1798,8 @@ class SubtitleLibraryService {
   /// 支持：RJ/BJ/VJ + 6-8位数字，或纯6-8位数字（不区分大小写）
   static bool _matchFolderPattern(String folderName) {
     final patterns = [
-      RegExp(r'^[RrBbVv][Jj]\d{6,8}$'), // RJ/BJ/VJ + 6-8位数字
-      RegExp(r'^\d{6,8}$'), // 纯6-8位数字
+      RegExp(r'^[RrBbVv][Jj]\d{6,8}$'),
+      RegExp(r'^\d{6,8}$'),
     ];
 
     return patterns.any((pattern) => pattern.hasMatch(folderName));
@@ -1935,19 +1812,16 @@ class SubtitleLibraryService {
       final parsedFolderPath = '${libraryDir.path}/$parsedFolderName';
       final parsedFolder = Directory(parsedFolderPath);
 
-      // 确保"已解析"文件夹存在
       if (!await parsedFolder.exists()) {
         await parsedFolder.create(recursive: true);
       }
 
       int migratedCount = 0;
 
-      // 扫描根目录的直接子文件夹
       await for (final entity in libraryDir.list(followLinks: false)) {
         if (entity is Directory) {
           final folderName = entity.path.split(Platform.pathSeparator).last;
 
-          // 跳过系统文件夹
           if (folderName == parsedFolderName ||
               folderName == unknownFolderName ||
               folderName == savedFolderName ||
@@ -1955,9 +1829,7 @@ class SubtitleLibraryService {
             continue;
           }
 
-          // 检查是否匹配旧格式（RJ/BJ/VJ + 数字，或纯数字）
           if (_matchFolderPattern(folderName)) {
-            // 标准化文件夹名
             final normalizedName = _normalizeFolderName(folderName);
             final targetPath = '$parsedFolderPath/$normalizedName';
 
@@ -1965,7 +1837,6 @@ class SubtitleLibraryService {
 
             try {
               if (await Directory(targetPath).exists()) {
-                // 同名文件夹已存在，合并内容
                 await _mergeFolders(entity.path, targetPath);
               } else {
                 await entity.rename(targetPath);
@@ -1992,14 +1863,12 @@ class SubtitleLibraryService {
   /// 2. 如果是纯6-8位数字，添加 RJ 前缀
   /// 3. 其他情况保持不变
   static String _normalizeFolderName(String folderName) {
-    // 检查是否是纯数字（6-8位）
     final pureNumberPattern = RegExp(r'^\d{6,8}$');
     if (pureNumberPattern.hasMatch(folderName)) {
       _log.info('标准化文件夹名: $folderName -> RJ$folderName', tag: 'SubtitleLibrary');
       return 'RJ$folderName';
     }
 
-    // 检查是否是小写的 rj/bj/vj 开头
     final lowercasePattern =
         RegExp(r'^([rbv])j(\d{6,8})$', caseSensitive: false);
     final match = lowercasePattern.firstMatch(folderName);
@@ -2013,7 +1882,6 @@ class SubtitleLibraryService {
       return normalized;
     }
 
-    // 不需要标准化
     return folderName;
   }
 
@@ -2023,41 +1891,32 @@ class SubtitleLibraryService {
   /// 2. 如果根目录只有一个文件夹，但文件夹名与ZIP名不同，也需要创建
   /// 3. 如果根目录只有一个文件夹，且文件夹名与ZIP名相同，不需要创建
   static bool _shouldCreateNewFolder(Archive archive, String zipName) {
-    // 统计根目录的项目
     final rootItems = <String>{};
 
     for (final file in archive.files) {
       if (!file.isFile && file.name.isEmpty) continue;
 
-      // 获取根目录项（第一个路径分隔符之前的部分）
       final parts = file.name.split('/');
       if (parts.isEmpty) continue;
 
-      // 如果是根目录的文件或文件夹
       if (parts.length == 1 && parts[0].isNotEmpty) {
-        // 根目录有文件
         rootItems.add(parts[0]);
       } else if (parts.length > 1 && parts[0].isNotEmpty) {
-        // 根目录有文件夹
         rootItems.add(parts[0]);
       }
     }
 
-    // 如果有多个项目，需要创建文件夹
     if (rootItems.length != 1) {
       return true;
     }
 
-    // 只有一个项目，检查是否与ZIP名相同
     final singleItem = rootItems.first;
 
-    // 如果文件夹名与ZIP名不同，需要创建文件夹
     if (singleItem != zipName) {
       _log.info('压缩包内文件夹名 "$singleItem" 与 ZIP 名 "$zipName" 不同，创建文件夹', tag: 'SubtitleLibrary');
       return true;
     }
 
-    // 文件夹名与ZIP名相同，不需要创建
     _log.info('压缩包内文件夹名与 ZIP 名相同，直接解压', tag: 'SubtitleLibrary');
     return false;
   }
@@ -2075,7 +1934,6 @@ class SubtitleLibraryService {
       }
 
       final folderName = dir.path.split(RegExp(r'[/\\]')).last;
-      // 避免显示顶层临时目录名，只显示实际的内容文件夹
       if (!folderName.startsWith('.temp_')) {
         onProgress?.call('正在清理临时文件: $folderName');
       }
@@ -2132,8 +1990,8 @@ class _ImportStats {
   int successCount = 0;
   int errorCount = 0;
   int skippedCount = 0;
-  int nestedArchiveCount = 0; // 嵌套压缩包数量
-  int sizeErrorCount = 0; // 因文件过大被跳过的数量
-  int depthErrorCount = 0; // 因嵌套过深被跳过的数量
-  int decodeErrorCount = 0; // 解压失败的数量
+  int nestedArchiveCount = 0;
+  int sizeErrorCount = 0;
+  int depthErrorCount = 0;
+  int decodeErrorCount = 0;
 }

@@ -3,7 +3,6 @@
 /// Collected from [AudioPlayerService], [EqualizerService], [HiResAudioService],
 /// and various Riverpod providers to display a Poweramp-style Audio Info panel.
 class AudioInfoData {
-  // ── Source ──
   final String? fileName;
   final String? format;
   final Duration? duration;
@@ -12,10 +11,8 @@ class AudioInfoData {
   final int? channels;
   final int? bitrate;
 
-  // ── Decoder ──
   final String decoder;
 
-  // ── DSP ──
   final bool equalizerEnabled;
   final String? equalizerPreset;
   final Duration crossfadeDuration;
@@ -27,23 +24,19 @@ class AudioInfoData {
   final double? replayGainValue;
   final bool volumeNormalizationEnabled;
 
-  // ── Resampler ──
   final int? originalSampleRate;
   final int? outputSampleRate;
   final bool resamplerActive;
 
-  // ── Output ──
   final String output;
   final bool exclusiveMode;
   final bool? bitPerfect;
 
-  // ── Device ──
   final String? deviceName;
   final String? usbDacName;
   final String? usbDacVid;
   final String? usbDacPid;
 
-  // ── USB DAC ──
   final bool usbDacConnected;
   final String? usbDacDeviceName;
   final String? usbDacVendorId;
@@ -52,10 +45,8 @@ class AudioInfoData {
   final bool usbDacExclusiveMode;
   final String? usbDacStreamingState;
 
-  // ── Status ──
   final bool androidMixerBypassed;
 
-  // ── Technical ──
   final int? audioSessionId;
   final String playerState;
   final Duration currentPosition;

@@ -79,7 +79,6 @@ class SnackBarUtil {
     Duration duration = const Duration(seconds: 3),
   }) {
     final colorScheme = Theme.of(context).colorScheme;
-    // 使用 tertiary 或 secondary 作为警告色
     final warningColor = colorScheme.tertiary;
     final onWarningColor = colorScheme.onTertiary;
 

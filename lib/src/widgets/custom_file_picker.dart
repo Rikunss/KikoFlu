@@ -24,8 +24,6 @@ class CustomFilePicker {
   static Future<bool> requestStoragePermission() async {
     if (!Platform.isAndroid) return true;
 
-    // Try requesting MANAGE_EXTERNAL_STORAGE even on Android 13+
-    // Many devices (especially MIUI) still honor this.
     var status = await Permission.manageExternalStorage.status;
     if (!status.isGranted) {
       status = await Permission.manageExternalStorage.request();
@@ -42,7 +40,6 @@ class CustomFilePicker {
     String title = '',
     String? initialPath,
   }) async {
-    // Request permission first
     final hasPermission = await requestStoragePermission();
     if (!hasPermission) {
       if (!context.mounted) return null;
@@ -50,7 +47,6 @@ class CustomFilePicker {
       return null;
     }
 
-    // Determine initial path
     String rootPath = initialPath ?? _getDefaultRoot();
     final dir = Directory(rootPath);
     if (!await dir.exists()) {
@@ -80,7 +76,6 @@ class CustomFilePicker {
     String? initialPath,
     List<String> allowedExtensions = const [],
   }) async {
-    // Request permission first
     final hasPermission = await requestStoragePermission();
     if (!hasPermission) {
       if (!context.mounted) return null;
@@ -88,7 +83,6 @@ class CustomFilePicker {
       return null;
     }
 
-    // Determine initial path
     String rootPath = initialPath ?? _getDefaultRoot();
     final dir = Directory(rootPath);
     if (!await dir.exists()) {
@@ -111,7 +105,6 @@ class CustomFilePicker {
   /// Get the default root directory for browsing.
   static String _getDefaultRoot() {
     if (!Platform.isAndroid) return '/';
-    // Common internal storage paths on Android
     const candidates = [
       '/storage/emulated/0',
       '/sdcard',
@@ -153,10 +146,6 @@ class CustomFilePicker {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// Internal dialog widget — redesigned with Material 3
-// ═══════════════════════════════════════════════════════════════════
 
 class _BreadcrumbInfo {
   final String label;
@@ -203,13 +192,10 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
   bool _showSearch = false;
   bool _showHiddenFiles = false;
 
-  // Path history for back navigation
   final List<String> _pathHistory = [];
 
-  // Pre-cached modified dates for list items
   final Map<String, DateTime> _modifiedDates = {};
 
-  // File selection (only used when mode == file)
   String? _selectedFilePath;
 
   @override
@@ -225,7 +211,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     super.dispose();
   }
 
-  // ── Directory loading ──
   Future<void> _loadDirectory(String path) async {
     setState(() {
       _isLoading = true;
@@ -248,10 +233,8 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
 
       final entities = await dir.list(followLinks: false).toList();
 
-      // Cache modified dates
       _modifiedDates.clear();
 
-      // Sort: folders first, then alphabetically
       entities.sort((a, b) {
         final aIsDir = a is Directory;
         final bIsDir = b is Directory;
@@ -279,7 +262,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     }
   }
 
-  // ── Navigation ──
   void _navigateTo(String path) {
     _pathHistory.add(_currentPath);
     _currentPath = path;
@@ -295,7 +277,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
 
   bool get _canGoBack => _pathHistory.isNotEmpty;
 
-  // ── Helpers ──
   String _getDisplayName(FileSystemEntity entity) {
     final name = p.basename(entity.path);
     return name.isEmpty ? '/' : name;
@@ -303,9 +284,7 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
 
   bool _isHidden(FileSystemEntity entity) {
     final name = p.basename(entity.path);
-    // Skip hidden dotfiles unless user toggled show hidden
     if (name.startsWith('.') && !_showHiddenFiles) return true;
-    // These system dirs are locked on Android 11+ and can't be browsed anyway
     if (name == 'data' && entity.path.contains('/Android/')) return true;
     if (name == 'obb' && entity.path.contains('/Android/')) return true;
     return false;
@@ -313,8 +292,8 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
 
   /// Returns `true` for files that should be visible based on allowed extensions.
   bool _isAllowedFile(FileSystemEntity entity) {
-    if (entity is! File) return true; // directories are always visible
-    if (widget.allowedExtensions.isEmpty) return true; // no filter
+    if (entity is! File) return true;
+    if (widget.allowedExtensions.isEmpty) return true;
     final ext = p.extension(entity.path).toLowerCase();
     return widget.allowedExtensions.contains(ext);
   }
@@ -327,7 +306,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
         .toList();
     final crumbs = <_BreadcrumbInfo>[];
     for (int i = 0; i < segments.length; i++) {
-      // On Android, fix the leading slash
       String label = segments[i];
       if (Platform.isAndroid && i == 0) {
         if (segments[i] == 'storage') {
@@ -379,7 +357,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     ];
   }
 
-  // ── Actions ──
   Future<void> _createNewFolder() async {
     final controller = TextEditingController();
     final name = await showDialog<String>(
@@ -422,7 +399,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     }
   }
 
-  // ── Filtered entries for search ──
   List<FileSystemEntity> get _filteredEntries {
     final q = _searchQuery.toLowerCase();
     return _entries.where((e) {
@@ -435,7 +411,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     }).toList();
   }
 
-  // ── Count items in subdirectories (non-recursive, synchronous) ──
   int _countItems(String dirPath) {
     try {
       final dir = Directory(dirPath);
@@ -446,7 +421,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     }
   }
 
-  // ── Build ──
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -468,17 +442,13 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Header with breadcrumb ──
             _buildHeader(cs, tt),
 
-            // ── Quick access (only visible near root) ──
             if (isRoot && _entries.isNotEmpty && !_isLoading && _error == null)
               _buildQuickAccess(cs, tt),
 
-            // ── Search bar ──
             if (_showSearch) _buildSearchBar(cs, tt),
 
-            // ── Content ──
             SizedBox(
               height: MediaQuery.of(context).size.height * 0.55,
               child: AnimatedSwitcher(
@@ -493,7 +463,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
               ),
             ),
 
-            // ── Footer ──
             _buildFooter(cs, tt),
           ],
         ),
@@ -512,10 +481,8 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Top row: title + action buttons
           Row(
             children: [
-              // Back button
               if (_canGoBack)
                 Padding(
                   padding: const EdgeInsets.only(right: 4),
@@ -526,7 +493,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
                     cs: cs,
                   ),
                 ),
-              // Title
               Expanded(
                 child: widget.dialogTitle.isNotEmpty
                     ? Text(
@@ -535,7 +501,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
                       )
                     : const SizedBox.shrink(),
               ),
-              // Show/hide hidden files
               _IconButtonSmall(
                 icon: _showHiddenFiles
                     ? Icons.visibility_rounded
@@ -545,21 +510,18 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
                 cs: cs,
                 activeColor: _showHiddenFiles ? cs.primary : null,
               ),
-              // Refresh
               _IconButtonSmall(
                 icon: Icons.refresh_rounded,
                 onPressed: () => _loadDirectory(_currentPath),
                 tooltip: 'Refresh',
                 cs: cs,
               ),
-              // Search toggle
               _IconButtonSmall(
                 icon: _showSearch ? Icons.search_off_rounded : Icons.search_rounded,
                 onPressed: () => setState(() => _showSearch = !_showSearch),
                 tooltip: 'Search',
                 cs: cs,
               ),
-              // Close
               _IconButtonSmall(
                 icon: Icons.close_rounded,
                 onPressed: () => Navigator.pop(context),
@@ -568,7 +530,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
               ),
             ],
           ),
-          // Breadcrumb row
           const SizedBox(height: 6),
           SizedBox(
             height: 28,
@@ -713,7 +674,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
       ),
       child: Row(
         children: [
-          // Create folder
           _IconButtonSmall(
             icon: Icons.create_new_folder_rounded,
             onPressed: _createNewFolder,
@@ -721,7 +681,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
             cs: cs,
           ),
           const SizedBox(width: 8),
-          // Count badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
@@ -734,7 +693,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
             ),
           ),
           const Spacer(),
-          // Select button
           FilledButton.icon(
             onPressed: widget.mode == CustomPickerMode.file && _selectedFilePath == null
                 ? null
@@ -757,7 +715,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     );
   }
 
-  // ── Loading skeleton ──
   Widget _buildSkeleton(ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -790,7 +747,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     );
   }
 
-  // ── Error state ──
   Widget _buildError(ColorScheme cs, TextTheme tt) {
     return Center(key: const ValueKey('error'),
       child: Padding(
@@ -830,7 +786,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     );
   }
 
-  // ── Empty state ──
   Widget _buildEmpty(ColorScheme cs, TextTheme tt) {
     return Center(key: const ValueKey('empty'),
       child: Padding(
@@ -875,7 +830,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     );
   }
 
-  // ── File list ──
   Widget _buildList(ColorScheme cs, TextTheme tt) {
     final items = _filteredEntries;
     return ListView.builder(
@@ -890,7 +844,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
         final isFileSelected = widget.mode == CustomPickerMode.file &&
             _selectedFilePath == entity.path;
 
-        // Count sub-items for folders
         int subCount = 0;
         if (isDir) {
           subCount = _countItems(entity.path);
@@ -918,7 +871,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 child: Row(
                   children: [
-                    // Icon with container
                     Container(
                       width: 36, height: 36,
                       decoration: BoxDecoration(
@@ -938,7 +890,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Name + info
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -963,7 +914,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
                         ],
                       ),
                     ),
-                    // Chevron for folders
                     if (isDir)
                       Container(
                         width: 24, height: 24,
@@ -991,10 +941,6 @@ class _CustomFilePickerDialogState extends State<_CustomFilePickerDialog> {
     return name.toLowerCase() == 'download' || name.toLowerCase() == 'downloads';
   }
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// Reusable small icon button
-// ═══════════════════════════════════════════════════════════════════
 
 class _IconButtonSmall extends StatelessWidget {
   final IconData icon;
@@ -1035,10 +981,6 @@ class _IconButtonSmall extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// Quick access chip
-// ═══════════════════════════════════════════════════════════════════
 
 class _QuickAccessChip extends StatelessWidget {
   final String label;

@@ -46,7 +46,6 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
     });
 
     try {
-      // 如果点击已投的票，则取消投票
       final newStatus = _currentTag.myVote == targetStatus ? 0 : targetStatus;
 
       final apiService = ref.read(kikoeruApiServiceProvider);
@@ -56,7 +55,6 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
         status: newStatus,
       );
 
-      // 投票成功，更新本地状态
       if (mounted) {
         setState(() {
           final oldUpvote = _currentTag.upvote ?? 0;
@@ -64,14 +62,12 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
           int newUpvote = oldUpvote;
           int newDownvote = oldDownvote;
 
-          // 先移除旧投票的影响
           if (_currentTag.myVote == 1) {
             newUpvote = oldUpvote - 1;
           } else if (_currentTag.myVote == 2) {
             newDownvote = oldDownvote - 1;
           }
 
-          // 再添加新投票的影响
           if (newStatus == 1) {
             newUpvote = newUpvote + 1;
           } else if (newStatus == 2) {
@@ -89,10 +85,8 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
           _isVoting = false;
         });
 
-        // 通知父组件更新
         widget.onVoteChanged(_currentTag);
 
-        // 显示提示
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -136,7 +130,6 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 投票支持按钮
           _buildVoteButton(
             targetStatus: 1,
             icon: Icons.thumb_up,
@@ -145,7 +138,6 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
             activeColor: Colors.green,
           ),
           const SizedBox(height: 12),
-          // 投票反对按钮
           _buildVoteButton(
             targetStatus: 2,
             icon: Icons.thumb_down,
@@ -154,7 +146,6 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
             activeColor: Colors.red,
           ),
           const SizedBox(height: 12),
-          // 屏蔽标签按钮
           _buildBlockTagButton(),
         ],
       ),
@@ -248,14 +239,12 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
   Widget _buildBlockTagButton() {
     return InkWell(
       onTap: () {
-        // 获取 notifier 和 messenger，避免在 dispose 后使用 ref 和 context
         final notifier = ref.read(blockedItemsProvider.notifier);
         final messenger = ScaffoldMessenger.of(context);
         final tagName = _currentTag.name;
         final blockedMessage = S.of(context).tagBlockedWithName(tagName);
         final undoLabel = S.of(context).undo;
 
-        // 添加到屏蔽列表
         notifier.addTag(tagName);
         Navigator.pop(context);
 
@@ -274,7 +263,6 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
           ),
         );
 
-        // 强制在3秒后关闭，解决桌面端鼠标悬停导致不消失的问题
         Future.delayed(const Duration(seconds: 3), () {
           try {
             controller.close();

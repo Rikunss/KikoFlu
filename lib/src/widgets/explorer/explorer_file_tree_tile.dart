@@ -24,9 +24,8 @@ class ExplorerFileTreeTile extends StatelessWidget {
   final List<Map<String, dynamic>>? children;
   final String? itemPath;
 
-  // Callbacks
-  final VoidCallback? onToggle; // Folder toggle; for files, use the specific action callbacks
-  final VoidCallback? onTapFile; // Called when tapping a non-folder item
+  final VoidCallback? onToggle;
+  final VoidCallback? onTapFile;
   final VoidCallback? onPlayAudio;
   final VoidCallback? onPlayVideo;
   final VoidCallback? onPreviewImage;
@@ -92,7 +91,6 @@ class ExplorerFileTreeTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Expand/collapse icon
             if (isFolder)
               Icon(
                 isExpanded
@@ -103,7 +101,6 @@ class ExplorerFileTreeTile extends StatelessWidget {
             else
               const SizedBox(width: 20),
             const SizedBox(width: 8),
-            // File icon with badges
             SizedBox(
               width: 24,
               height: 24,
@@ -114,7 +111,6 @@ class ExplorerFileTreeTile extends StatelessWidget {
                     color: FileIconUtils.getFileIconColorFromMap(item),
                     size: 24,
                   ),
-                  // Downloaded badge
                   if (!isFolder && isDownloaded)
                     Positioned(
                       right: 0,
@@ -131,7 +127,6 @@ class ExplorerFileTreeTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                  // Subtitle match badge
                   if (hasSubtitleMatch)
                     Positioned(
                       left: 0,
@@ -152,7 +147,6 @@ class ExplorerFileTreeTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // File name + metadata
             Expanded(
               child: Opacity(
                 opacity: (!isFolder && isDownloaded) ? 0.5 : 1.0,
@@ -202,7 +196,6 @@ class ExplorerFileTreeTile extends StatelessWidget {
                 ),
               ),
             ),
-            // Action buttons
             _buildActions(context),
           ],
         ),
@@ -265,7 +258,6 @@ class ExplorerFileTreeTile extends StatelessWidget {
       );
     }
 
-    // For non-file items that might have other actions...
     if (onDelete != null) {
       return IconButton(
         onPressed: onDelete,
@@ -276,7 +268,6 @@ class ExplorerFileTreeTile extends StatelessWidget {
       );
     }
 
-    // Folder: show children count
     if (isFolder && children != null) {
       return Text(
         childrenCountLabel ?? S.of(context).nItems(children!.length),

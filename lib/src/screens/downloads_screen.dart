@@ -98,10 +98,6 @@ class _WorkGroup {
   const _WorkGroup(this.workId, this.tasks);
 }
 
-// ====================================================================
-//  MAIN SCREEN
-// ====================================================================
-
 class DownloadsScreen extends ConsumerStatefulWidget {
   const DownloadsScreen({super.key});
 
@@ -403,10 +399,7 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
     return task.workMetadata?['local_import_path'] != null;
   }
 
-  // ── Helpers ──
-
   List<DownloadTask> _filteredTasks(List<DownloadTask> all) {
-    // First apply status filter
     List<DownloadTask> byStatus;
     switch (widget.filter) {
       case _DownloadFilter.active:
@@ -419,7 +412,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
         byStatus = all;
     }
 
-    // Then apply source filter
     if (widget.sourceFilter != _SourceFilter.all) {
       final targetImported = widget.sourceFilter == _SourceFilter.imported;
       byStatus = byStatus.where((t) => _isImported(t) == targetImported).toList();
@@ -505,8 +497,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
     }).toList();
   }
 
-  // ── AnimatedList diff helpers ──
-
   List<_WorkGroup> _computeGroups(List<DownloadTask> allTasks) {
     final filtered = _filteredTasks(allTasks);
     final groups = _groupByWork(filtered)
@@ -533,7 +523,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
     final oldIds = _groups.map((g) => g.workId).toSet();
     final newIds = newGroups.map((g) => g.workId).toSet();
 
-    // Remove groups that are no longer in the filtered list
     for (int i = _groups.length - 1; i >= 0; i--) {          if (!newIds.contains(_groups[i].workId)) {
         final removed = _groups[i];
         _groups.removeAt(i);
@@ -548,7 +537,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
       }
     }
 
-    // Insert new groups in the correct positions
     for (int i = 0; i < newGroups.length; i++) {
       if (!oldIds.contains(newGroups[i].workId)) {
         _groups.insert(i, newGroups[i]);
@@ -556,9 +544,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
       }
     }
 
-    // 🔥 CRITICAL FIX: Update task data for existing groups (progress/status changes)
-    // Without this, progress updates from downloads and conversions are never
-    // reflected in the UI until the user navigates away and back.
     for (int i = 0; i < _groups.length; i++) {
       final match = newGroups.where((g) => g.workId == _groups[i].workId);
       if (match.isNotEmpty) {
@@ -566,7 +551,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
       }
     }
 
-    // Ensure the list is fully rebuilt with latest data
     setState(() {});
   }
 
@@ -609,7 +593,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            // "All" chip (always visible to clear filter)
             _buildFilterChip(
               label: 'All',
               icon: Icons.filter_alt_off_rounded,
@@ -619,7 +602,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
             ),
             const SizedBox(width: 6),
 
-            // Circle filter chip
             if (options['circles']!.isNotEmpty)
               _buildFilterDropdownChip(
                 label: 'Circle',
@@ -629,7 +611,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
                 cs: cs,
               ),
 
-            // VA filter chip
             if (options['vas']!.isNotEmpty)
               _buildFilterDropdownChip(
                 label: 'VA',
@@ -639,7 +620,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
                 cs: cs,
               ),
 
-            // Tag filter chip
             if (options['tags']!.isNotEmpty)
               _buildFilterDropdownChip(
                 label: 'Tag',
@@ -649,7 +629,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
                 cs: cs,
               ),
 
-            // Active filter badge
             if (hasActiveFilter) ...[
               const SizedBox(width: 4),
               Container(
@@ -839,19 +818,16 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
     final cs = Theme.of(context).colorScheme;
     final allTasks = DownloadService.instance.tasks;
 
-    // Compute stats
     final totalCount = allTasks.length;
     final doneCount = allTasks.where((t) => t.status == DownloadStatus.completed).length;
     final activeCount = allTasks.where((t) => t.status == DownloadStatus.downloading || t.status == DownloadStatus.converting || t.status == DownloadStatus.pending).length;
     final failedCount = allTasks.where((t) => t.status == DownloadStatus.failed).length;
 
-    // Source counts
     final importedCount = allTasks.where((t) => _isImported(t)).length;
     final downloadedCount = allTasks.length - importedCount;
 
     return Column(
       children: [
-        // ── Summary Stats Card ──
         _SummaryStats(
           activeCount: activeCount,
           doneCount: doneCount,
@@ -859,7 +835,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
           totalCount: totalCount,
         ),
 
-        // ── Filter Chips ──
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: SingleChildScrollView(
@@ -878,15 +853,12 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
           ),
         ),
 
-        // ── Source Tabs ──
         _buildSourceTabs(cs: cs, importedCount: importedCount, downloadedCount: downloadedCount),
 
-        // ── Filter Bar (Circle / VA / Tag) ──
         _buildFilterBar(Map<int, List<DownloadTask>>.fromEntries(
           _groups.map((g) => MapEntry(g.workId, g.tasks)),
         )),
 
-        // ── Animated Task List ──
         Expanded(
           child: _isLoading && allTasks.isEmpty
               ? _ShimmerSkeleton()
@@ -923,7 +895,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
   }
 
   Widget _buildEmptyState(ColorScheme cs, BuildContext context) {
-    // Build contextual empty state based on active filters
     final hasMetaFilter = widget.filterType != _FilterType.all;
     final hasSourceFilter = widget.sourceFilter != _SourceFilter.all;
     final hasStatusFilter = widget.filter != _DownloadFilter.all;
@@ -933,7 +904,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
     Color iconColor;
     String? message;
 
-    // Priority: metadata filter → source filter → status filter → default
     if (hasMetaFilter) {
       final filterLabel = switch (widget.filterType) {
         _FilterType.circle => 'circle',
@@ -992,7 +962,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
       message = 'Start browsing and download\nyour favorite audio works.';
     }
 
-    // Compute a unique key so AnimatedSwitcher detects changes
     final emptyKey = ValueKey('dl_${widget.filter.name}_${widget.sourceFilter.name}_${widget.filterType.name}_${widget.filterValue}_${message ?? ''}');
 
     return Center(
@@ -1146,9 +1115,7 @@ class _ShimmerSkeletonState extends State<_ShimmerSkeleton>
         final offset = _controller.value;
         return Stack(
           children: [
-            // Skeleton content
             child!,
-            // Shimmer sweep overlay
             Positioned.fill(
               child: IgnorePointer(
                 child: Container(
@@ -1209,7 +1176,6 @@ class _ShimmerCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header row: icon + title
             Row(
               children: [
                 Container(
@@ -1233,7 +1199,6 @@ class _ShimmerCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // Subtitle chips row
             Row(
               children: [
                 _chip(baseColor: baseColor, width: 56),
@@ -1244,7 +1209,6 @@ class _ShimmerCard extends StatelessWidget {
               ],
             ),
 
-            // Task tile placeholders
             if (showTasks) ...[
             buildTaskSkeleton(),
             const SizedBox(height: 2),
@@ -1273,7 +1237,6 @@ class _ShimmerCard extends StatelessWidget {
       padding: const EdgeInsets.only(top: 12),
       child: Row(
         children: [
-          // File icon placeholder
           Container(
             width: 36, height: 36,
             decoration: BoxDecoration(
@@ -1282,7 +1245,6 @@ class _ShimmerCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          // Text lines
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1446,7 +1408,6 @@ class _SourceTabChip extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            // Count badge
             if (count > 0)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
@@ -1543,7 +1504,6 @@ class _WorkCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    // Compute overall progress
     final totalProgress = tasks.fold(0.0, (sum, t) => sum + t.progress) / tasks.length;
     final activeCount = tasks.where((t) => t.status == DownloadStatus.downloading || t.status == DownloadStatus.converting).length;
     final failedCount = tasks.where((t) => t.status == DownloadStatus.failed).length;
@@ -1574,7 +1534,6 @@ class _WorkCard extends StatelessWidget {
               const SizedBox(height: 2),
               Row(
                 children: [
-                  // Source badge
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                     decoration: BoxDecoration(
@@ -1744,7 +1703,6 @@ class _TaskTile extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // File type icon container
                 Container(
                   width: 36,
                   height: 36,
@@ -1756,12 +1714,10 @@ class _TaskTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
 
-                // Middle content
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Filename row
                       Row(
                         children: [
                           Expanded(
@@ -1776,7 +1732,6 @@ class _TaskTile extends StatelessWidget {
                               ),
                             ),
                           ),
-                          // Format badge
                           if (ext.isNotEmpty && !isPending)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
@@ -1793,7 +1748,6 @@ class _TaskTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
 
-                      // Status row
                       if (isCompleted) ...[
                         Row(
                           children: [
@@ -1873,7 +1827,6 @@ class _TaskTile extends StatelessWidget {
                         ),
                       ],
 
-                      // Progress bar
                       if ((isDownloading || isConverting || isPaused) && task.progress > 0)
                         Padding(
                           padding: const EdgeInsets.only(top: 6),
@@ -1933,7 +1886,6 @@ class _TaskTile extends StatelessWidget {
                   ),
                 ),
 
-                // Trailing actions
                 if (isDownloading)
                   IconButton(
                     icon: Icon(Icons.pause, size: 18, color: cs.onSurfaceVariant),

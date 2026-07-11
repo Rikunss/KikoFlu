@@ -49,7 +49,5 @@ class HomeWidgetService {
   /// Called when a widget background action is triggered.
   @pragma('vm:entry-point')
   static Future<void> backgroundCallback(Uri? uri) async {
-    // Actions are handled via intents sent to MainActivity
-    // on the Dart side through the MethodChannel
   }
 }

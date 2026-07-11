@@ -21,34 +21,25 @@ class ExplorerFileTree extends StatelessWidget {
   final String Function(String originalName)? displayNameTransform;
   final String Function(Map<String, dynamic> item)? getTitle;
 
-  // Folder toggle
   final void Function(String itemPath)? onToggle;
 
-  // File tap — dispatches to correct action based on type
   final void Function(Map<String, dynamic> item, String parentPath)? onTapFile;
 
-  // Audio playback
   final void Function(Map<String, dynamic> item, String parentPath)? onPlayAudio;
   final void Function(Map<String, dynamic> item, String parentPath)? onPlayVideo;
 
-  // Preview
   final void Function(Map<String, dynamic> item)? onPreviewImage;
   final void Function(Map<String, dynamic> item)? onPreviewText;
   final void Function(Map<String, dynamic> item)? onPreviewPdf;
 
-  // Subtitle
   final void Function(Map<String, dynamic> item)? onLoadSubtitle;
 
-  // Delete (offline only)
   final void Function(Map<String, dynamic> item, String parentPath)? onDelete;
 
-  // Called for each item before rendering — used for on-demand translation
   final void Function(String originalName)? onItemRendered;
 
-  // Duration display
   final String Function(Map<String, dynamic> item)? formatItemDuration;
 
-  // File size display (offline only) — async, returns future
   final Future<int?> Function(Map<String, dynamic> item, String parentPath)? fileSizeFuture;
 
   const ExplorerFileTree({
@@ -101,12 +92,10 @@ class ExplorerFileTree extends StatelessWidget {
     final isExpanded = expandedFolders.contains(itemPath);
     final hash = item['hash'] as String?;
 
-    // Determine badge states
     final isDownloaded = hash != null && (downloadedFiles[hash] ?? false);
     final hasSubtitle = FileIconUtils.isAudioFile(item) &&
         audioWithLibrarySubtitles.contains(originalTitle);
 
-    // Duration label
     String? durationLabel;
     if (formatItemDuration != null) {
       durationLabel = formatItemDuration!(item);
@@ -115,23 +104,19 @@ class ExplorerFileTree extends StatelessWidget {
       durationLabel = formatDuration(item['duration']);
     }
 
-    // Trigger onItemRendered for on-demand translation
     onItemRendered?.call(originalTitle);
 
-    // File size label
     String? fileSizeLabel;
     Future<int?> Function()? tileFileSizeFuture;
     if (fileSizeFuture != null) {
       tileFileSizeFuture = () => fileSizeFuture!(item, parentPath);
     }
 
-    // Children count label
     String? childrenCountLabel;
     if (isFolder && children != null) {
       childrenCountLabel = S.of(context).nItems(children.length);
     }
 
-    // Build tile
     final tile = ExplorerFileTreeTile(
       item: item,
       title: title,
@@ -157,7 +142,6 @@ class ExplorerFileTree extends StatelessWidget {
       onDelete: onDelete != null ? () => onDelete!(item, parentPath) : null,
     );
 
-    // If expanded folder, include children recursively
     if (isFolder && isExpanded && children != null && children.isNotEmpty) {
       final subTree = ExplorerFileTree(
         items: children,

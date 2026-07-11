@@ -22,7 +22,6 @@ class _PrivacyModeSettingsScreenState
   @override
   void initState() {
     super.initState();
-    // 延迟加载，确保 ref 可用
     Future.microtask(() {
       if (mounted) {
         final settings = ref.read(privacyModeSettingsProvider);
@@ -91,7 +90,6 @@ class _PrivacyModeSettingsScreenState
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 说明卡片
           Card(
             color: colorScheme.primaryContainer,
             child: Padding(
@@ -131,7 +129,6 @@ class _PrivacyModeSettingsScreenState
           ),
           const SizedBox(height: 16),
 
-          // 主开关
           Card(
             child: SwitchListTile(
               secondary: Icon(
@@ -154,11 +151,9 @@ class _PrivacyModeSettingsScreenState
           ),
           const SizedBox(height: 16),
 
-          // 详细设置
           Card(
             child: Column(
               children: [
-                // 标题说明
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
@@ -187,7 +182,6 @@ class _PrivacyModeSettingsScreenState
                   ),
                 ),
 
-                // 通知封面模糊
                 SwitchListTile(
                   secondary: Icon(
                     Icons.notifications_outlined,
@@ -206,7 +200,6 @@ class _PrivacyModeSettingsScreenState
                 ),
                 Divider(color: colorScheme.outlineVariant),
 
-                // 应用内封面模糊
                 SwitchListTile(
                   secondary: Icon(
                     Icons.blur_on,
@@ -225,7 +218,6 @@ class _PrivacyModeSettingsScreenState
                 ),
                 Divider(color: colorScheme.outlineVariant),
 
-                // 标题替换
                 SwitchListTile(
                   secondary: Icon(
                     Icons.text_fields,
@@ -244,7 +236,6 @@ class _PrivacyModeSettingsScreenState
                 ),
                 Divider(color: colorScheme.outlineVariant),
 
-                // 自定义标题
                 ListTile(
                   enabled: settings.enabled && settings.maskTitle,
                   leading: Icon(
@@ -265,7 +256,6 @@ class _PrivacyModeSettingsScreenState
           ),
           const SizedBox(height: 16),
 
-          // 效果举例
           Card(
             color: colorScheme.surfaceContainerHighest,
             child: Padding(

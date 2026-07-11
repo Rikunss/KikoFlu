@@ -25,7 +25,6 @@ class PlaylistDialog extends ConsumerWidget {
     ));
     final audioState = ref.watch(audioPlayerControllerProvider);
 
-    // Get current queue synchronously as fallback
     final audioService = ref.read(audioPlayerServiceProvider);
     final currentQueue = audioService.queue;
 
@@ -47,7 +46,6 @@ class PlaylistDialog extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
                 child: Column(
@@ -165,7 +163,6 @@ class PlaylistDialog extends ConsumerWidget {
                 ),
               ),
               const Divider(height: 1),
-              // Playlist
               Expanded(
                 child: Builder(
                   builder: (context) {
@@ -194,9 +191,7 @@ class PlaylistDialog extends ConsumerWidget {
                         final isCurrentTrack =
                             currentTrack.valueOrNull?.id == track.id;
 
-                        // Build work cover URL（优先使用本地文件）
                         String? workCoverUrl;
-                        // 优先使用 track.artworkUrl（可能是本地文件 file://）
                         if (track.artworkUrl != null &&
                             track.artworkUrl!.startsWith('file://')) {
                           workCoverUrl = track.artworkUrl;

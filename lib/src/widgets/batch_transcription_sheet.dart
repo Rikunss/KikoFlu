@@ -77,7 +77,6 @@ class _BatchTranscriptionSheetState
           ),
           child: Column(
             children: [
-              // ── Drag handle ──
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 4),
                 child: Container(
@@ -90,7 +89,6 @@ class _BatchTranscriptionSheetState
                 ),
               ),
 
-              // ── Header ──
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -113,18 +111,15 @@ class _BatchTranscriptionSheetState
               ),
               const Divider(height: 1),
 
-              // ── Content ──
               Expanded(
                 child: ListView(
                   controller: scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                   children: [
-                    // Overall progress bar
                     _buildOverallProgress(state, cs, tt),
 
                     const SizedBox(height: 16),
 
-                    // Current file indicator
                     if (state.status == BatchJobStatus.running &&
                         state.currentIndex >= 0 &&
                         state.currentIndex < state.files.length) ...[
@@ -132,14 +127,12 @@ class _BatchTranscriptionSheetState
                       const SizedBox(height: 16),
                     ],
 
-                    // Summary stats
                     if (state.status == BatchJobStatus.completed ||
                         state.status == BatchJobStatus.cancelled) ...[
                       _buildSummary(state, cs, tt),
                       const SizedBox(height: 16),
                     ],
 
-                    // File list header
                     Row(
                       children: [
                         Icon(Icons.list, size: 16, color: cs.onSurfaceVariant),
@@ -177,7 +170,6 @@ class _BatchTranscriptionSheetState
                     ),
                     const SizedBox(height: 8),
 
-                    // File list items
                     if (state.files.isEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 24),
@@ -198,7 +190,6 @@ class _BatchTranscriptionSheetState
 
                     const SizedBox(height: 12),
 
-                    // Bottom action button
                     _buildBottomAction(state, cs, tt),
                   ],
                 ),
@@ -463,10 +454,8 @@ class _BatchTranscriptionSheetState
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
           children: [
-            // Status icon
             _fileStatusIcon(file.status, cs, isCurrent),
             const SizedBox(width: 12),
-            // File name
             Expanded(
               child: Text(
                 file.displayName,
@@ -481,7 +470,6 @@ class _BatchTranscriptionSheetState
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            // Error tooltip
             if (file.errorMessage != null)
               IconButton(
                 onPressed: () => _showError(context, file.errorMessage!),

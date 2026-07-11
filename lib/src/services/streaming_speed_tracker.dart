@@ -70,7 +70,6 @@ class StreamingSpeedTracker {
   static StreamingSpeedTracker get instance =>
       _instance ??= StreamingSpeedTracker._();
 
-  // ── State ──
   final StreamController<StreamingSpeedState> _stateController =
       StreamController<StreamingSpeedState>.broadcast();
 
@@ -102,16 +101,11 @@ class StreamingSpeedTracker {
     if (_trackSub != null) return;
     _log.info('[SpeedTracker] Started', tag: 'SpeedTracker');
 
-    // Initialize with the current track FIRST — if a track is already playing,
-    // the stream subscription below won't fire for the initial value because
-    // [_currentTrackController] is a broadcast stream that only emits NEW values.
-    // Without this, [_isStreaming] stays false and the badge never appears.
     final currentTrack = AudioPlayerService.instance.currentTrack;
     if (currentTrack != null) {
       _onTrackChanged(currentTrack);
     }
 
-    // Subscribe to future track changes
     _trackSub = AudioPlayerService.instance.currentTrackStream
         .listen(_onTrackChanged);
     _sampleTimer = Timer.periodic(const Duration(seconds: 1), _sample);
@@ -138,15 +132,12 @@ class StreamingSpeedTracker {
     _stateController.close();
   }
 
-  // ── Private ──
-
   void _onTrackChanged(AudioTrack? track) {
     _emaSpeedKbps = 0;
     _prevBufferSecs = 0;
     _prevSampleTime = null;
     _fullBufferReached = false;
 
-    // Determine if this track qualifies as "streaming"
     if (track == null || track.url.isEmpty) {
       _isStreaming = false;
       _emitState();
@@ -162,7 +153,6 @@ class StreamingSpeedTracker {
 
     _isStreaming = true;
 
-    // Read bitrate from cached audio format info
     final format = AudioPlayerService.instance.lastAudioFormat;
     _bitrateKbps = format?.estimatedBitrateKbps;
 
@@ -185,12 +175,10 @@ class StreamingSpeedTracker {
     final duration = service.duration;
     final track = service.currentTrack;
 
-    // If track was removed mid-streaming, reset
     if (track == null || !_isStreaming) return;
 
     final bufferedSecs = bufferedPos.inMilliseconds / 1000.0;
 
-    // ── Full buffer check ──
     if (duration != null &&
         bufferedPos >= duration - const Duration(milliseconds: 3000)) {
       _fullBufferReached = true;
@@ -198,7 +186,6 @@ class StreamingSpeedTracker {
       return;
     }
 
-    // Only calculate meaningful deltas while playing (buffer is being consumed)
     final isPlaying = service.playing;
     if (!isPlaying) {
       _prevSampleTime = null;
@@ -212,21 +199,17 @@ class StreamingSpeedTracker {
       final bufferDelta = bufferedSecs - _prevBufferSecs;
 
       if (timeDelta > 0 && bufferDelta >= 0) {
-        final growthRate = bufferDelta / timeDelta; // e.g. 3.2
+        final growthRate = bufferDelta / timeDelta;
 
         if (_bitrateKbps != null && _bitrateKbps! > 0) {
-          // Estimate download speed: growthRate × bitrate
           final instantSpeed = growthRate * _bitrateKbps!;
 
-          // EMA smoothing (α = 0.3 for responsiveness)
           if (_emaSpeedKbps <= 0) {
             _emaSpeedKbps = instantSpeed;
           } else {
             _emaSpeedKbps = _emaSpeedKbps * 0.7 + instantSpeed * 0.3;
           }
         } else {
-          // No bitrate — show growth ratio encoded as "speed"
-          // e.g. growthRate 3.2 → _emaSpeedKbps = 3200 (shown as "3.2×")
           final instantRatio = growthRate * 1000;
           if (_emaSpeedKbps <= 0) {
             _emaSpeedKbps = instantRatio;
@@ -250,7 +233,7 @@ class StreamingSpeedTracker {
     } else if (_fullBufferReached) {
       state = SpeedIndicatorState.cached;
     } else if (_emaSpeedKbps > 0) {
-      final kbps = _bitrateKbps ?? 1000; // fallback for ratio mode
+      final kbps = _bitrateKbps ?? 1000;
       if (_emaSpeedKbps < kbps * 1.2) {
         state = SpeedIndicatorState.slow;
       } else {
@@ -262,7 +245,6 @@ class StreamingSpeedTracker {
 
     _cachedState = state;
 
-    // Detect player buffering state — overrides other states
     final ps = AudioPlayerService.instance.playerState;
     if (ps.processingState == ProcessingState.buffering &&
         _isStreaming && !_fullBufferReached) {
@@ -272,7 +254,7 @@ class StreamingSpeedTracker {
 
     final speedVal = _bitrateKbps != null && _bitrateKbps! > 0
         ? _emaSpeedKbps.round()
-        : (_emaSpeedKbps / 1000).round(); // ratio mode
+        : (_emaSpeedKbps / 1000).round();
 
     _stateController.add(StreamingSpeedState(
       state: state,
@@ -280,8 +262,6 @@ class StreamingSpeedTracker {
     ));
   }
 }
-
-// ── Riverpod Provider ──
 
 /// Reactive provider that exposes the current streaming speed state.
 /// Rebuilds whenever the tracker emits a new sample.

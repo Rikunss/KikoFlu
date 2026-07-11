@@ -9,10 +9,6 @@ import '../providers/my_reviews_provider.dart';
 import '../providers/player_buttons_provider.dart';
 import '../providers/floating_lyric_style_provider.dart';
 
-// ============================================================
-// SearchType
-// ============================================================
-
 extension SearchTypeL10n on SearchType {
   String localizedLabel(BuildContext context) {
     final s = S.of(context);
@@ -37,10 +33,6 @@ extension SearchTypeL10n on SearchType {
   }
 }
 
-// ============================================================
-// AgeRating
-// ============================================================
-
 extension AgeRatingL10n on AgeRating {
   String localizedLabel(BuildContext context) {
     final s = S.of(context);
@@ -52,10 +44,6 @@ extension AgeRatingL10n on AgeRating {
     };
   }
 }
-
-// ============================================================
-// SortOrder
-// ============================================================
 
 extension SortOrderL10n on SortOrder {
   String localizedLabel(BuildContext context) {
@@ -78,10 +66,6 @@ extension SortOrderL10n on SortOrder {
   }
 }
 
-// ============================================================
-// SortDirection
-// ============================================================
-
 extension SortDirectionL10n on SortDirection {
   String localizedLabel(BuildContext context) {
     final s = S.of(context);
@@ -91,10 +75,6 @@ extension SortDirectionL10n on SortDirection {
     };
   }
 }
-
-// ============================================================
-// DisplayMode
-// ============================================================
 
 extension DisplayModeL10n on DisplayMode {
   String localizedLabel(BuildContext context) {
@@ -107,10 +87,6 @@ extension DisplayModeL10n on DisplayMode {
   }
 }
 
-// ============================================================
-// SubtitleLibraryPriority
-// ============================================================
-
 extension SubtitleLibraryPriorityL10n on SubtitleLibraryPriority {
   String localizedName(BuildContext context) {
     final s = S.of(context);
@@ -121,10 +97,6 @@ extension SubtitleLibraryPriorityL10n on SubtitleLibraryPriority {
   }
 }
 
-// ============================================================
-// TranslationSource
-// ============================================================
-
 extension TranslationSourceL10n on TranslationSource {
   String localizedName(BuildContext context) {
     final s = S.of(context);
@@ -134,10 +106,6 @@ extension TranslationSourceL10n on TranslationSource {
     };
   }
 }
-
-// ============================================================
-// MyReviewFilter
-// ============================================================
 
 extension MyReviewFilterL10n on MyReviewFilter {
   String localizedLabel(BuildContext context) {
@@ -152,10 +120,6 @@ extension MyReviewFilterL10n on MyReviewFilter {
     };
   }
 }
-
-// ============================================================
-// PlaylistPrivacy
-// ============================================================
 
 extension PlaylistPrivacyL10n on PlaylistPrivacy {
   String localizedLabel(BuildContext context) {
@@ -177,10 +141,6 @@ extension PlaylistPrivacyL10n on PlaylistPrivacy {
   }
 }
 
-// ============================================================
-// SalesRange
-// ============================================================
-
 extension SalesRangeL10n on SalesRange {
   String localizedLabel(BuildContext context) {
     final s = S.of(context);
@@ -190,10 +150,6 @@ extension SalesRangeL10n on SalesRange {
     };
   }
 }
-
-// ============================================================
-// PlayerButtonType
-// ============================================================
 
 extension PlayerButtonTypeL10n on PlayerButtonType {
   String localizedLabel(BuildContext context) {
@@ -214,10 +170,6 @@ extension PlayerButtonTypeL10n on PlayerButtonType {
     };
   }
 }
-
-// ============================================================
-// FloatingLyricStylePreset
-// ============================================================
 
 extension FloatingLyricStylePresetL10n on FloatingLyricStylePreset {
   String localizedName(BuildContext context) {

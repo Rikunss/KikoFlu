@@ -103,12 +103,10 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
       String fileName;
 
       if (widget.localPath != null && File(widget.localPath!).existsSync()) {
-        // 本地图片
         imageBytes = await File(widget.localPath!).readAsBytes();
         fileName =
             'cover_${widget.identifier ?? DateTime.now().millisecondsSinceEpoch}.jpg';
       } else if (widget.imageUrl != null) {
-        // 网络图片
         final response = await Dio().get<List<int>>(
           widget.imageUrl!,
           options: Options(
@@ -123,7 +121,6 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
         throw Exception(S.of(context).noImageAvailable);
       }
 
-      // 根据平台选择保存方式
       if (Platform.isAndroid || Platform.isIOS) {
         await _saveToGallery(imageBytes, fileName);
       } else {
@@ -142,7 +139,6 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
   }
 
   Future<void> _saveToGallery(Uint8List bytes, String fileName) async {
-    // 请求权限
     if (Platform.isAndroid) {
       final status = await Permission.photos.request();
       if (!status.isGranted) {
@@ -174,7 +170,6 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
   }
 
   Future<void> _saveToFile(Uint8List bytes, String fileName) async {
-    // 桌面端：让用户选择保存位置
     final result = await FilePicker.saveFile(
       dialogTitle: S.of(context).saveCoverImage,
       fileName: fileName,
@@ -265,7 +260,6 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // 图片区域
             Center(
               child: GestureDetector(
                 onDoubleTap: _handleDoubleTap,
@@ -278,7 +272,6 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
               ),
             ),
 
-            // 顶部工具栏              if (_showControls)
               Positioned(
                 top: 0,
                 left: 0,
@@ -301,7 +294,6 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // 关闭按钮
                           IconButton(
                             icon: const Icon(Icons.close, color: Colors.white),
                             onPressed: () {
@@ -309,7 +301,6 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
                               Navigator.of(context).pop();
                             },
                           ),
-                          // 保存按钮
                           IconButton(
                             icon: _isSaving
                                 ? const SizedBox(
@@ -337,7 +328,6 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
                 ),
               ),
 
-            // 底部提示
             if (_showControls)
               Positioned(
                 bottom: 0,

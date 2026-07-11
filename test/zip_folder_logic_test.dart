@@ -4,20 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 /// 测试智能路径判断逻辑
 /// 模拟 _shouldCreateNewFolder 的逻辑
 bool shouldCreateNewFolder(List<String> rootItems, String zipName) {
-  // 如果有多个项目，需要创建文件夹
   if (rootItems.length != 1) {
     return true;
   }
 
-  // 只有一个项目，检查是否与ZIP名相同
   final singleItem = rootItems.first;
 
-  // 如果文件夹名与ZIP名不同，需要创建文件夹
   if (singleItem != zipName) {
     return true;
   }
 
-  // 文件夹名与ZIP名相同，不需要创建
   return false;
 }
 
@@ -52,7 +48,6 @@ void main() {
       const zipName = 'RJ123456';
 
       expect(shouldCreateNewFolder(rootItems, zipName), false);
-      // 结果: 直接解压到 已解析/RJ123456/
     });
 
     test('实际场景2: RJ123456.zip包含data文件夹', () {
@@ -60,7 +55,6 @@ void main() {
       const zipName = 'RJ123456';
 
       expect(shouldCreateNewFolder(rootItems, zipName), true);
-      // 结果: 创建 已解析/RJ123456/data/
     });
 
     test('实际场景3: collection.zip包含多个文件夹', () {
@@ -68,7 +62,6 @@ void main() {
       const zipName = 'collection';
 
       expect(shouldCreateNewFolder(rootItems, zipName), true);
-      // 结果: 创建 未知作品/collection/ 然后递归处理内部
     });
 
     test('实际场景4: RJ123456.zip包含Album文件夹', () {
@@ -76,7 +69,6 @@ void main() {
       const zipName = 'RJ123456';
 
       expect(shouldCreateNewFolder(rootItems, zipName), true);
-      // 结果: 创建 已解析/RJ123456/Album/
     });
 
     test('实际场景5: MyMusic.zip包含MyMusic文件夹', () {
@@ -84,7 +76,6 @@ void main() {
       const zipName = 'MyMusic';
 
       expect(shouldCreateNewFolder(rootItems, zipName), false);
-      // 结果: 直接解压到 未知作品/MyMusic/
     });
 
     test('边界情况: 空根目录', () {
@@ -106,10 +97,6 @@ void main() {
 
   group('完整导入流程模拟', () {
     test('场景A: 标准RJ压缩包', () {
-      // RJ123456.zip
-      //   └── RJ123456/
-      //       ├── track1.lrc
-      //       └── track2.srt
 
       final rootItems = ['RJ123456'];
       const zipName = 'RJ123456';
@@ -120,9 +107,6 @@ void main() {
     });
 
     test('场景B: 包含子文件夹的RJ压缩包', () {
-      // RJ234567.zip
-      //   └── Audio/
-      //       └── track.lrc
 
       final rootItems = ['Audio'];
       const zipName = 'RJ234567';
@@ -133,10 +117,6 @@ void main() {
     });
 
     test('场景C: 多个RJ的集合包', () {
-      // Collection.zip
-      //   ├── RJ111111/
-      //   ├── RJ222222/
-      //   └── RJ333333/
 
       final rootItems = ['RJ111111', 'RJ222222', 'RJ333333'];
       const zipName = 'Collection';

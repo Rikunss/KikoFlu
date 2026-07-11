@@ -34,7 +34,6 @@ class _SeriesSectionState extends ConsumerState<SeriesSection>
       duration: const Duration(milliseconds: 1200),
     );
 
-    // Lazy load after first frame to not block detail page rendering
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final notifier =
           ref.read(seriesWorksProvider(widget.work.id).notifier);
@@ -62,7 +61,6 @@ class _SeriesSectionState extends ConsumerState<SeriesSection>
 
   @override
   Widget build(BuildContext context) {
-    // Don't show if work has no circle
     final circleName = widget.work.name;
     if (circleName == null || circleName.isEmpty) {
       return const SizedBox.shrink();
@@ -71,7 +69,6 @@ class _SeriesSectionState extends ConsumerState<SeriesSection>
     final state = ref.watch(seriesWorksProvider(widget.work.id));
     _syncShimmer(state.isLoading);
 
-    // Loading shimmer
     if (state.isLoading) {
       return _buildSection(
         context,
@@ -89,7 +86,6 @@ class _SeriesSectionState extends ConsumerState<SeriesSection>
       );
     }
 
-    // No results or error: hide
     if (state.works.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -241,7 +237,6 @@ class _SeriesCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Cover
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: SizedBox(
@@ -251,7 +246,6 @@ class _SeriesCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 6),
-            // Title
             Text(
               work.title,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -262,7 +256,6 @@ class _SeriesCard extends ConsumerWidget {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 2),
-            // Rating
             if (work.rateAverage != null && work.rateAverage! > 0)
               Row(
                 children: [

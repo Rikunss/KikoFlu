@@ -7,13 +7,13 @@ import 'theme_provider.dart';
 
 /// 悬浮字幕样式设置
 class FloatingLyricStyle {
-  final double fontSize; // 字体大小 (10-28)
-  final double opacity; // 背景不透明度 (0.0-1.0)
-  final Color textColor; // 文字颜色
-  final Color backgroundColor; // 背景颜色
-  final double cornerRadius; // 圆角半径 (0-24)
-  final double paddingHorizontal; // 水平内边距 (12-40)
-  final double paddingVertical; // 垂直内边距 (6-20)
+  final double fontSize;
+  final double opacity;
+  final Color textColor;
+  final Color backgroundColor;
+  final double cornerRadius;
+  final double paddingHorizontal;
+  final double paddingVertical;
 
   const FloatingLyricStyle({
     this.fontSize = 14.0,
@@ -45,7 +45,6 @@ class FloatingLyricStyle {
     );
   }
 
-  // 转换为 Map 用于保存
   Map<String, dynamic> toMap() {
     return {
       'fontSize': fontSize,
@@ -58,7 +57,6 @@ class FloatingLyricStyle {
     };
   }
 
-  // 从 Map 恢复
   factory FloatingLyricStyle.fromMap(Map<String, dynamic> map) {
     return FloatingLyricStyle(
       fontSize: map['fontSize']?.toDouble() ?? 14.0,
@@ -72,12 +70,10 @@ class FloatingLyricStyle {
     );
   }
 
-  // 获取背景颜色（带透明度）
   Color get backgroundColorWithOpacity {
     return backgroundColor.withValues(alpha: opacity);
   }
 
-  // 获取 ARGB 格式的颜色值（用于原生代码）
   int get textColorArgb => textColor.toARGB32();
 
   int get backgroundColorArgb {
@@ -189,7 +185,6 @@ class FloatingLyricStyleNotifier extends StateNotifier<FloatingLyricStyle>
       paddingVertical: paddingVertical,
     );
 
-    // 应用到悬浮窗
     _applyStyle();
   }
 
@@ -281,7 +276,6 @@ class FloatingLyricStyleNotifier extends StateNotifier<FloatingLyricStyle>
 
     await _save(saveColors: false);
 
-    // 清除颜色设置，使其跟随主题
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('${_keyPrefix}textColor');
     await prefs.remove('${_keyPrefix}backgroundColor');
@@ -299,7 +293,6 @@ class FloatingLyricStyleNotifier extends StateNotifier<FloatingLyricStyle>
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('${_keyPrefix}textColor');
       await prefs.remove('${_keyPrefix}backgroundColor');
-      // 确保使用当前主题颜色
       await _updateColorsFromThemeIfDefault();
     } else {
       await _save(saveColors: true);
@@ -311,12 +304,12 @@ class FloatingLyricStyleNotifier extends StateNotifier<FloatingLyricStyle>
 
 /// 预设样式
 enum FloatingLyricStylePreset {
-  dynamic, // 动态
-  classic, // 经典
-  modern, // 现代
-  minimal, // 极简
-  vibrant, // 鲜艳
-  elegant, // 优雅
+  dynamic,
+  classic,
+  modern,
+  minimal,
+  vibrant,
+  elegant,
 }
 
 extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
@@ -357,7 +350,6 @@ extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
   FloatingLyricStyle getStyle([BuildContext? context]) {
     switch (this) {
       case FloatingLyricStylePreset.dynamic:
-        // 动态主题：使用系统主题色
         if (context != null) {
           final theme = Theme.of(context);
           final colorScheme = theme.colorScheme;
@@ -373,12 +365,11 @@ extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
             paddingVertical: 10.0,
           );
         }
-        // 如果没有context，使用中性配色
         return const FloatingLyricStyle(
           fontSize: 14.0,
           opacity: 0.88,
           textColor: Colors.white,
-          backgroundColor: Color(0xFF2196F3), // Material Blue
+          backgroundColor: Color(0xFF2196F3),
           cornerRadius: 16.0,
           paddingHorizontal: 20.0,
           paddingVertical: 10.0,
@@ -398,7 +389,7 @@ extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
           fontSize: 16.0,
           opacity: 0.90,
           textColor: Colors.white,
-          backgroundColor: Color(0xFF1A237E), // 深蓝紫
+          backgroundColor: Color(0xFF1A237E),
           cornerRadius: 20.0,
           paddingHorizontal: 24.0,
           paddingVertical: 12.0,
@@ -418,7 +409,7 @@ extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
           fontSize: 15.0,
           opacity: 0.92,
           textColor: Colors.white,
-          backgroundColor: Color(0xFFE91E63), // 粉红
+          backgroundColor: Color(0xFFE91E63),
           cornerRadius: 18.0,
           paddingHorizontal: 22.0,
           paddingVertical: 11.0,
@@ -428,7 +419,7 @@ extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
           fontSize: 14.0,
           opacity: 0.88,
           textColor: Color(0xFFE3F2FD),
-          backgroundColor: Color(0xFF0D47A1), // 深蓝
+          backgroundColor: Color(0xFF0D47A1),
           cornerRadius: 16.0,
           paddingHorizontal: 20.0,
           paddingVertical: 10.0,

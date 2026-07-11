@@ -21,16 +21,13 @@ class UpdateService {
   /// Returns update info if a new version is available, null otherwise
   Future<UpdateInfo?> checkForUpdates({bool force = false}) async {
     try {
-      // Get current version
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
 
-      // Check if we should skip the check (recently checked)
       if (!force) {
         final prefs = await SharedPreferences.getInstance();
         final lastCheckTime = prefs.getInt(_keyLastCheckTime) ?? 0;
         final now = DateTime.now().millisecondsSinceEpoch;
-        // Skip if checked within last hour
         if (now - lastCheckTime < 3600000) {
           final lastCheckedVersion = prefs.getString(_keyLastCheckedVersion);
           if (lastCheckedVersion != null &&
@@ -46,7 +43,6 @@ class UpdateService {
         }
       }
 
-      // Make API request with timeout
       final response = await _dio.get(
         _githubApiUrl,
         options: Options(
@@ -62,8 +58,6 @@ class UpdateService {
         final data = response.data;
         final tagName = data['tag_name'] as String? ?? '';
 
-        // Extract version from tag_name (remove 'v' prefix and anything after '(')
-        // Examples: 'v1.0.6' -> '1.0.6', 'v1.0.6(1024)' -> '1.0.6', '1.0.6' -> '1.0.6'
         String latestVersion = tagName
             .replaceFirst('v', '')
             .replaceFirst(RegExp(r'\(.*\)'), '')
@@ -73,13 +67,11 @@ class UpdateService {
           return null;
         }
 
-        // Save check time and version
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_keyLastCheckedVersion, latestVersion);
         await prefs.setInt(
             _keyLastCheckTime, DateTime.now().millisecondsSinceEpoch);
 
-        // Compare versions
         final hasNewVersion =
             _compareVersions(currentVersion, latestVersion) < 0;
 
@@ -91,8 +83,6 @@ class UpdateService {
         );
       }
     } catch (e) {
-      // Silent failure - no user notification
-      // Could log for debugging purposes if needed
     }
     return null;
   }
@@ -109,11 +99,9 @@ class UpdateService {
         return false;
       }
 
-      // Get current version
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
 
-      // Show red dot if there's a new version and it hasn't been notified
       return _compareVersions(currentVersion, lastCheckedVersion) < 0 &&
           lastCheckedVersion != lastNotifiedVersion;
     } catch (e) {
@@ -130,7 +118,6 @@ class UpdateService {
         await prefs.setString(_keyLastNotifiedVersion, lastCheckedVersion);
       }
     } catch (e) {
-      // Silent failure
     }
   }
 
@@ -162,7 +149,6 @@ class UpdateService {
       await prefs.remove(_keyLastNotifiedVersion);
       await prefs.remove(_keyLastCheckTime);
     } catch (e) {
-      // Silent failure
     }
   }
 }

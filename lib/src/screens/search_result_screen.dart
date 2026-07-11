@@ -71,7 +71,6 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
     super.initState();
     LogService.instance.debug(
         '[SearchResult] Screen initialized with keyword: ${widget.keyword}, type: ${widget.searchTypeLabel}');
-    // Load initial data
     WidgetsBinding.instance.addPostFrameCallback((_) {
       LogService.instance.debug(
           '[SearchResult] Starting search with params: ${widget.searchParams}');
@@ -102,7 +101,7 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
     final state = ref.read(searchResultProvider);
     showDialog(
       context: context,
-      barrierDismissible: !Platform.isIOS, // iOS 上防止点击外部区域意外关闭
+      barrierDismissible: !Platform.isIOS,
       builder: (context) => CommonSortDialog(
         currentOption: state.sortOption,
         currentDirection: state.sortDirection,
@@ -142,7 +141,6 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen to pageSize changes to update search page size
     ref.listen(pageSizeProvider, (previous, next) {
       if (previous != next) {
         ref.read(searchResultProvider.notifier).updatePageSize(next);
@@ -209,7 +207,6 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
         ),
         body: Column(
           children: [
-            // 搜索信息行
             Container(
               width: double.infinity,
               padding: EdgeInsets.symmetric(
@@ -230,7 +227,6 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
                 child: _buildSearchInfo(context, searchState, colorScheme),
               ),
             ),
-            // 搜索结果内容
             Expanded(
               child: _buildBody(searchState, colorScheme, textTheme),
             ),
@@ -241,25 +237,21 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
   }
 
   Widget _buildSearchInfo(BuildContext context, SearchResultState searchState, ColorScheme colorScheme) {
-    // 检查是否有详细的搜索条件
     final conditions = widget.searchParams?['conditions'] as List?;
     final minRate = widget.searchParams?['minRate'] as num?;
     final ageRating = widget.searchParams?['ageRating'] as String?;
     final salesRange = widget.searchParams?['salesRange'] as String?;
 
-    // 如果有详细条件，显示为芯片
     if (conditions != null && conditions.isNotEmpty) {
       return Wrap(
         spacing: 8,
         runSpacing: 8,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          // 搜索条件芯片
           ...conditions.map((condition) {
             final type = condition['type'] as String;
             final value = condition['value'] as String;
             final isExclude = condition['isExclude'] as bool? ?? false;
-            // RJ号需要添加RJ前缀显示
             final isRjNumber = RegExp(r'^\d+$').hasMatch(value);
             final displayValue = isRjNumber ? 'RJ$value' : value;
 
@@ -283,7 +275,6 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
             );
           }),
 
-          // 高级筛选条件芯片
           if (minRate != null && minRate > 0)
             Chip(
               avatar: const Icon(Icons.star, size: 16),
@@ -321,7 +312,6 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
               side: BorderSide.none,
             ),
 
-          // 结果统计
           if (searchState.totalCount > 0)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -337,7 +327,6 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
       );
     }
 
-    // 原有的简单显示方式（兼容旧逻辑）
     String searchInfo = widget.keyword;
     if (widget.searchTypeLabel != null) {
       searchInfo = '${widget.searchTypeLabel}: $searchInfo';
@@ -512,7 +501,6 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
         await ref
             .read(searchResultProvider.notifier)
             .goToPage(searchState.currentPage + 1);
-        // 等待一帧后滚动到顶部，确保内容已加载
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _scrollToTop();
         });
@@ -691,12 +679,10 @@ class _SkeletonWorkCardState extends State<_SkeletonWorkCard>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Cover placeholder — AnimatedWidget, only this rebuilds per frame
           _SkeletonShimmerContainer(
             listenable: _animation,
             baseColor: baseColor,
           ),
-          // Info placeholder
           Padding(
             padding: const EdgeInsets.all(12),
             child: Column(

@@ -36,13 +36,11 @@ class ConversionNotificationService {
       ),
     );
 
-    // Request notification permission on Android 13+
     try {
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.requestNotificationsPermission();
     } catch (_) {
-      // Permission request failed silently — notification may not show
     }
 
     _initialized = true;
@@ -105,7 +103,6 @@ class ConversionNotificationService {
         ),
       ),
     );
-    // Auto-dismiss after 2 seconds
     await Future<void>.delayed(const Duration(seconds: 2));
     await dismiss();
   }

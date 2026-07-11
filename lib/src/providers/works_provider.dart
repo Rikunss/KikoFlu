@@ -9,7 +9,6 @@ import 'settings_provider.dart';
 import '../models/sort_options.dart';
 import 'subtitle_library_provider.dart';
 
-// Display mode - 展示模式
 enum DisplayMode {
   all('all', '全部作品'),
   popular('popular', '热门推荐'),
@@ -20,11 +19,10 @@ enum DisplayMode {
   final String label;
 }
 
-// Layout types - 参考原始代码的三种布局
 enum LayoutType {
-  list, // 列表布局
-  smallGrid, // 小网格布局 (3列)
-  bigGrid // 大网格布局 (2列)
+  list,
+  smallGrid,
+  bigGrid
 }
 
 class WorksModeSnapshot extends Equatable {      static const _noValue = Object();
@@ -84,26 +82,24 @@ class WorksModeSnapshot extends Equatable {      static const _noValue = Object(
       ];
 }
 
-// Works state
 class WorksState extends Equatable {
   final LayoutType layoutType;
   final SortOrder sortOption;
   final SortDirection sortDirection;
   final DisplayMode displayMode;
-  final int subtitleFilter; // 0: 全部, 1: 仅带字幕
-  final int basePageSize; // 用户设置的基础分页大小
+  final int subtitleFilter;
+  final int basePageSize;
   final Map<DisplayMode, WorksModeSnapshot> modeStates;
 
-  // 实际使用的分页大小（字幕筛选时翻倍）
   int get pageSize => subtitleFilter == 1 ? basePageSize * 2 : basePageSize;
 
   WorksState({
-    this.layoutType = LayoutType.bigGrid, // 默认大网格布局
+    this.layoutType = LayoutType.bigGrid,
     this.sortOption = SortOrder.release,
     this.sortDirection = SortDirection.desc,
-    this.displayMode = DisplayMode.all, // 默认显示全部作品
-    this.subtitleFilter = 0, // 默认显示全部
-    this.basePageSize = 40, // 全部模式每页40条
+    this.displayMode = DisplayMode.all,
+    this.subtitleFilter = 0,
+    this.basePageSize = 40,
     Map<DisplayMode, WorksModeSnapshot>? modeStates,
   }) : modeStates = modeStates ?? _createInitialModeStates();
 
@@ -157,7 +153,6 @@ class WorksState extends Equatable {
       ];
 }
 
-// Works notifier
 class WorksNotifier extends StateNotifier<WorksState> {
   final KikoeruApiService _apiService;
   final Ref _ref;
@@ -231,9 +226,7 @@ class WorksNotifier extends StateNotifier<WorksState> {
       final sortOption = state.sortOption;
       final sortDirection = state.sortDirection;
 
-      // 当字幕筛选开启时，不发送 subtitle 参数给服务器，而是在前端过滤
-      // 这样可以同时显示服务器有字幕 和 本地字幕库有字幕的作品
-      const serverSubtitleParam = 0; // 始终请求所有作品，前端过滤
+      const serverSubtitleParam = 0;
 
       if (mode == DisplayMode.popular) {
         response = await _apiService.getPopularWorks(
@@ -330,31 +323,26 @@ class WorksNotifier extends StateNotifier<WorksState> {
     if (resetPage) {
       await loadWorks(targetPage: 1);
     } else {
-      // 保持当前页刷新，无论是哪种模式
       await loadWorks(targetPage: state.currentPage);
     }
   }
 
-  // 跳转到指定页(仅全部模式)
   Future<void> goToPage(int page) async {
     if (state.displayMode != DisplayMode.all) return;
     if (page < 1) return;
 
-    // 检查页码是否超出范围
     final maxPage = (state.totalCount / state.pageSize).ceil();
     if (page > maxPage && maxPage > 0) return;
 
     await loadWorks(targetPage: page);
   }
 
-  // 下一页(仅全部模式)
   Future<void> nextPage() async {
     if (state.displayMode != DisplayMode.all) return;
     if (!state.hasMore || state.isLoading) return;
     await loadWorks(targetPage: state.currentPage + 1);
   }
 
-  // 上一页(仅全部模式)
   Future<void> previousPage() async {
     if (state.displayMode != DisplayMode.all) return;
     if (state.currentPage <= 1 || state.isLoading) return;
@@ -406,7 +394,6 @@ class WorksNotifier extends StateNotifier<WorksState> {
     _updateActiveModeState((modeState) => modeState.copyWith(error: null));
   }
 
-  // Switch between all works and popular works
   void setDisplayMode(DisplayMode mode) {
     if (state.displayMode == mode) return;
 
@@ -423,22 +410,15 @@ class WorksNotifier extends StateNotifier<WorksState> {
 
   bool get isSubtitleFilterActive => state.subtitleFilter == 1;
 
-  // Toggle subtitle filter
   void toggleSubtitleFilter() {
     final currentPage = state.currentPage;
     final oldFilter = state.subtitleFilter;
     final newFilter = oldFilter == 0 ? 1 : 0;
 
-    // 计算新的页码
-    // 开启筛选时：分页大小翻倍，所以页码需要调整
-    // 例如：原来第3页(每页40条，显示81-120条) -> 开启后第2页(每页80条，显示81-160条)
-    // 关闭筛选时：反向计算
     int newPage;
     if (newFilter == 1) {
-      // 开启字幕筛选：页码减半（向上取整）
       newPage = ((currentPage + 1) / 2).ceil();
     } else {
-      // 关闭字幕筛选：页码翻倍减1（保持大致位置）
       newPage = (currentPage * 2) - 1;
     }
     newPage = newPage.clamp(1, 9999);
@@ -457,12 +437,10 @@ class WorksNotifier extends StateNotifier<WorksState> {
   }
 
   List<Work> _filterWorks(List<Work> works, BlockedItemsState blockedItems) {
-    // 获取本地字幕库的作品ID
     final localSubtitleIds = _ref.read(subtitleLibraryProvider);
     final subtitleFilter = state.subtitleFilter;
 
     return works.where((work) {
-      // 字幕筛选：如果开启，只保留服务器有字幕 或 本地字幕库有字幕的作品
       if (subtitleFilter == 1) {
         final hasServerSubtitle = work.hasSubtitle == true;
         final hasLocalSubtitle = localSubtitleIds.contains(work.id);
@@ -471,19 +449,16 @@ class WorksNotifier extends StateNotifier<WorksState> {
         }
       }
 
-      // Check tags
       if (work.tags != null) {
         for (final tag in work.tags!) {
           if (blockedItems.tags.contains(tag.name)) return false;
         }
       }
-      // Check CVs
       if (work.vas != null) {
         for (final va in work.vas!) {
           if (blockedItems.cvs.contains(va.name)) return false;
         }
       }
-      // Check Circle
       if (work.name != null && blockedItems.circles.contains(work.name)) {
         return false;
       }
@@ -492,7 +467,6 @@ class WorksNotifier extends StateNotifier<WorksState> {
   }
 }
 
-// Provider
 final worksProvider = StateNotifierProvider<WorksNotifier, WorksState>((ref) {
   final apiService = ref.watch(kikoeruApiServiceProvider);
   final pageSize = ref.read(pageSizeProvider);
@@ -519,9 +493,7 @@ final worksProvider = StateNotifierProvider<WorksNotifier, WorksState>((ref) {
     }
   });
 
-  // 监听用户切换，自动刷新作品列表
   ref.listen(currentUserProvider, (previous, next) {
-    // 只有当用户真正变化时才刷新（用户名或服务器地址不同）
     final prevUser = previous;
     final nextUser = next;
     if (prevUser?.name != nextUser?.name || prevUser?.host != nextUser?.host) {
@@ -530,14 +502,12 @@ final worksProvider = StateNotifierProvider<WorksNotifier, WorksState>((ref) {
     }
   });
 
-  // 监听屏蔽列表变化，重新过滤
   ref.listen(blockedItemsProvider, (previous, next) {
     if (previous != next) {
       notifier.reapplyFilters();
     }
   });
 
-  // 监听本地字幕库变化，当字幕筛选开启时重新过滤
   ref.listen(subtitleLibraryProvider, (previous, next) {
     if (previous != next && notifier.isSubtitleFilterActive) {
       notifier.reapplyFilters();

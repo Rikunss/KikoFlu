@@ -34,7 +34,6 @@ class RatingDetailPopup extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 标题
             Row(
               children: [
                 Container(
@@ -61,7 +60,6 @@ class RatingDetailPopup extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // 平均分和总评分数
             Card(
               elevation: 0,
               color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
@@ -115,13 +113,11 @@ class RatingDetailPopup extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // 评分分布
             ...sortedDetails.map<Widget>((detail) {
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
-                    // 星级
                     SizedBox(
                       width: 24,
                       child: Text(
@@ -135,7 +131,6 @@ class RatingDetailPopup extends StatelessWidget {
                     const Icon(Icons.star, color: Colors.amber, size: 16),
                     const SizedBox(width: 8),
 
-                    // 进度条
                     Expanded(
                       child: Stack(
                         children: [
@@ -166,7 +161,6 @@ class RatingDetailPopup extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
 
-                    // 比例和数量
                     SizedBox(
                       width: 80,
                       child: Text(

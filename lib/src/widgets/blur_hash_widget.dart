@@ -53,8 +53,6 @@ class _BlurHashWidgetState extends State<BlurHashWidget> {
 
   Future<void> _load() async {
     try {
-      // Decode blurhash + encode JPEG di Isolate terpisah
-      // agar tidak memblokade main thread saat rendering 40+ kartu
       final jpgBytes = await compute(_decodeBlurHashInIsolate, widget.hash);
 
       if (jpgBytes == null) {

@@ -242,7 +242,6 @@ class _LogScreenState extends State<LogScreen> {
       ),
       body: Column(
         children: [
-          // ── Tag Filter Chips ──
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             color: colorScheme.surfaceContainerHighest,
@@ -277,7 +276,6 @@ class _LogScreenState extends State<LogScreen> {
               ),
             ),
           ),
-          // ── Status Bar ──
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             color: colorScheme.surface,
@@ -333,7 +331,6 @@ class _LogScreenState extends State<LogScreen> {
               ],
             ),
           ),
-          // ── Log List ──
           Expanded(
             child: _filteredLogs.isEmpty
                 ? Center(
@@ -400,8 +397,8 @@ class _LogEntryTile extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final time =
-        '${entry.timestamp.hour.toString().padLeft(2, '0')}:' //
-        '${entry.timestamp.minute.toString().padLeft(2, '0')}:' //
+        '${entry.timestamp.hour.toString().padLeft(2, '0')}:'
+        '${entry.timestamp.minute.toString().padLeft(2, '0')}:'
         '${entry.timestamp.second.toString().padLeft(2, '0')}';
 
     return InkWell(
@@ -414,7 +411,6 @@ class _LogEntryTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Time
             Text(
               time,
               style: theme.textTheme.bodySmall?.copyWith(
@@ -424,7 +420,6 @@ class _LogEntryTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            // Level badge
             Container(
               width: 16,
               alignment: Alignment.center,
@@ -439,7 +434,6 @@ class _LogEntryTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            // Tag + Message
             Expanded(
               child: Text.rich(
                 TextSpan(

@@ -8,8 +8,6 @@ import 'log_service.dart';
 
 final _log = LogService.instance;
 
-// ── Top-level isolate helpers (required by Isolate.run) ──
-
 /// Runs HTTP Range request for audio format detection in an isolate so
 /// network I/O doesn't block the main thread during track loading.
 /// Local/cached file reads stay on the main thread (faster than isolate overhead).
@@ -17,7 +15,7 @@ Future<AudioFormatInfo?> _detectFormatInIsolate(String streamUrl) async {
   try {
     return await AudioFormatInfo.fromStreamUrl(streamUrl);
   } catch (_) {
-    return null; // caller falls back to fromUrl()
+    return null;
   }
 }
 
@@ -29,7 +27,7 @@ Future<ReplayGainData?> _analyzeGainInIsolate(String filePath) async {
   try {
     return await ReplayGainService.instance.analyzeFile(filePath);
   } catch (_) {
-    return null; // caller falls back to defaults
+    return null;
   }
 }
 
@@ -46,7 +44,6 @@ class AudioFormatGainService {
   /// **Slow path:** HTTP Range requests run in an isolate.
   /// **Fallback:** URL extension parsing (no I/O).
   static Future<AudioFormatInfo?> detectFormatDirect(AudioTrack track) async {
-    // ── Fast path: local or cached file (main thread, ~1ms) ──
     try {
       if (track.url.startsWith('file://')) {
         final localPath = track.url.substring(7);
@@ -63,7 +60,6 @@ class AudioFormatGainService {
       _log.error('Failed to detect audio format from file: $e', tag: 'Audio');
     }
 
-    // ── Slow path: HTTP Range request (isolate to avoid blocking UI) ──
     try {
       final result = await Isolate.run(
         () => _detectFormatInIsolate(track.url),
@@ -76,7 +72,6 @@ class AudioFormatGainService {
       );
     }
 
-    // ── Fallback: URL-based extension detection (no I/O) ──
     return AudioFormatInfo.fromUrl(track.url);
   }
 

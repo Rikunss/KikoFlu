@@ -23,7 +23,7 @@ class FileSelectionDialog extends ConsumerStatefulWidget {
 
 class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
   final _treeKey = GlobalKey<FileTreeSelectorState>();
-  final Set<String> _downloadedFiles = {}; // hash -> downloaded
+  final Set<String> _downloadedFiles = {};
   bool _isCheckingDownloads = true;
 
   @override
@@ -36,7 +36,6 @@ class _FileSelectionDialogState extends ConsumerState<FileSelectionDialog> {
     final downloadService = DownloadService.instance;
     final hashesToCheck = <String>[];
 
-    // Collect all file hashes from the work tree
     void collectHashes(List<AudioFile> files) {
       for (final file in files) {
         if (file.type == 'file' && file.hash != null) {

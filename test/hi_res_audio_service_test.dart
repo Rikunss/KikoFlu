@@ -2,14 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kikoeru_flutter/src/services/hi_res_audio_service.dart';
 
 void main() {
-  // Initialize the test binding for MethodChannel support
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // ============================================================
-
-  // ============================================================
-  // UsbAudioDevice Model
-  // ============================================================
   group('UsbAudioDevice', () {
     test('fromMap parses correctly', () {
       final device = UsbAudioDevice.fromMap({
@@ -70,9 +64,6 @@ void main() {
     });
   });
 
-  // ============================================================
-  // UsbRoutingState Model
-  // ============================================================
   group('UsbRoutingState', () {
     test('default state is not routed', () {
       const state = UsbRoutingState();
@@ -94,9 +85,6 @@ void main() {
     });
   });
 
-  // ============================================================
-  // UsbDacAutoRoutedEvent Model
-  // ============================================================
   group('UsbDacAutoRoutedEvent', () {
     test('default values', () {
       const event = UsbDacAutoRoutedEvent();
@@ -118,9 +106,6 @@ void main() {
     });
   });
 
-  // ============================================================
-  // HiResFormatInfo Model
-  // ============================================================
   group('HiResFormatInfo', () {
     test('default state', () {
       const info = HiResFormatInfo();
@@ -144,9 +129,6 @@ void main() {
     });
   });
 
-  // ============================================================
-  // HiResAudioService — Stream Controller Logic
-  // ============================================================
   group('HiResAudioService Stream State', () {
     late HiResAudioService service;
 
@@ -154,10 +136,6 @@ void main() {
       service = HiResAudioService.instance;
     });
 
-    // Note: HiResAudioService is a singleton that uses MethodChannel.
-      // We can't easily mock the MethodChannel, but we can verify
-      // the stream controllers are set up and the initial state is correct.
-    
     test('initial state is idle', () {
       expect(service.isPlaying, false);
       expect(service.isUsbRouted, false);
@@ -170,9 +148,6 @@ void main() {
     });
   });
 
-  // ============================================================
-  // USB Audio Device Helper Tests
-  // ============================================================
   group('USB Audio Device Enumeration', () {
     test('fromMap handles all device type strings', () {
       final typeTests = [

@@ -54,9 +54,6 @@ class DownloadCoverProcessor {
     required void Function(Map<String, dynamic> metadata) onMetadataUpdated,
   }) async {
     try {
-      // Recursively scan the entire import directory tree (including
-      // subdirectories) to find the first image. Many works store their
-      // cover image in a subfolder, not at the root.
       final entities = await importDir.list(recursive: true).toList();
       entities.sort((a, b) {
         final aName = a.path.split(Platform.pathSeparator).last;
@@ -65,7 +62,6 @@ class DownloadCoverProcessor {
       });
 
       for (final entity in entities) {
-        // Skip directories; we only care about files
         if (entity is! File) continue;
         final fName = entity.path.split(Platform.pathSeparator).last.toLowerCase();
         if (fName.endsWith('.jpg') || fName.endsWith('.jpeg') ||
@@ -77,7 +73,6 @@ class DownloadCoverProcessor {
             maxDimension: 720,
           );
 
-          // Update the metadata file to include localCoverPath
           final metadataFile = File('$workDirPath/work_metadata.json');
           if (await metadataFile.exists()) {
             try {
@@ -92,7 +87,7 @@ class DownloadCoverProcessor {
           }
 
           _log.info('Cover image resized and saved as JPEG: $fName (max 720px)', tag: 'Download');
-          break; // use the first image found
+          break;
         }
       }
     } catch (e) {
@@ -118,22 +113,17 @@ class DownloadCoverProcessor {
     final sourceFile = File(sourcePath);
     if (!await sourceFile.exists()) return;
 
-    // Read the source file bytes
     final Uint8List bytes = await sourceFile.readAsBytes();
 
-    // Decode the image using the pure-Dart image package first
     img.Image? result = img.decodeImage(bytes);
 
     if (result == null) {
-      // Pure-Dart decoder failed — try the platform decoder (dart:ui) which
-      // handles more formats (CMYK JPEG, certain PNG types, animated WebP
-      // static frame, etc.).
       _log.warning('Pure-Dart decoder failed, trying platform decoder: $sourcePath',
           tag: 'Download');
       try {
         final codec = await ui.instantiateImageCodec(
           bytes,
-          targetWidth: maxDimension * 2, // decode at ~2x for quality headroom
+          targetWidth: maxDimension * 2,
         );
         final frame = await codec.getNextFrame();
         final rgbaData = await frame.image.toByteData(
@@ -162,7 +152,6 @@ class DownloadCoverProcessor {
       return;
     }
 
-    // Resize if needed (maintaining aspect ratio)
     if (result.width > maxDimension || result.height > maxDimension) {
       result = img.copyResize(result,
         width: result.width > result.height ? maxDimension : null,
@@ -170,8 +159,7 @@ class DownloadCoverProcessor {
       );
     }
 
-    // Encode as JPEG — start at quality 85, then step down if still too large
-    const maxBytes = 500 * 1024; // 500KB safety limit for Impeller
+    const maxBytes = 500 * 1024;
     int quality = 85;
     Uint8List jpegBytes;
 

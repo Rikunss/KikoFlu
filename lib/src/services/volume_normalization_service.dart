@@ -61,19 +61,13 @@ class VolumeNormalizationService {
       return 1.0;
     }
 
-    // If we have a ReplayGain peak, use it for accurate normalization
     if (replayGainPeak != null && replayGainPeak > 0) {
-      // Normalize so that peak reaches -1 dBFS (allow 1 dB headroom)
       final targetPeak = _dbToLinear(-1.0);
       _currentMultiplier = (targetPeak / replayGainPeak).clamp(0.5, 2.0);
       return _currentMultiplier;
     }
 
-    // Fallback: estimate based on bit depth
     if (bitDepth != null) {
-      // Assume mastering headroom:
-      // 16-bit: mastered to ~-12 dBFS average → boost to hit -14 target (need -2 dB)
-      // 24-bit: mastered to ~-18 dBFS average → boost to hit -14 target (need +4 dB)
       final double assumedLevel;
       switch (bitDepth) {
         case 16:
@@ -90,7 +84,6 @@ class VolumeNormalizationService {
       return _currentMultiplier;
     }
 
-    // Try to detect bit depth from file using AudioFormatInfo if path is available
     if (filePath != null) {
       final formatInfo = await AudioFormatInfo.fromFile(filePath);
       final detectedBitDepth = formatInfo.bitDepth;
@@ -102,8 +95,7 @@ class VolumeNormalizationService {
       }
     }
 
-    // No data available: use a small boost to avoid silence
-    _currentMultiplier = 1.15; // ~1.2 dB boost
+    _currentMultiplier = 1.15;
     return _currentMultiplier;
   }
 

@@ -10,13 +10,13 @@ final _log = LogService.instance;
 
 /// 历史写入触发原因
 enum FlushReason {
-  checkpoint, // 周期性 5 秒 checkpoint
-  seekCommitted, // 用户 seek 提交
-  paused, // 暂停
-  stopped, // 停止
-  trackChanged, // 切歌
-  appBackground, // 应用进入后台
-  dispose, // 服务销毁
+  checkpoint,
+  seekCommitted,
+  paused,
+  stopped,
+  trackChanged,
+  appBackground,
+  dispose,
 }
 
 /// 播放历史服务 - 负责播放历史的写入、节流和即时落盘
@@ -34,7 +34,6 @@ class PlaybackHistoryService {
 
   PlaybackHistoryService._();
 
-  // --- 当前播放会话 snapshot ---
   int? _currentWorkId;
   AudioTrack? _currentTrack;
   int _playlistIndex = 0;
@@ -44,7 +43,6 @@ class PlaybackHistoryService {
   Work? _currentWork;
   bool _dirty = false;
 
-  // --- Cumulative listening time tracking ---
   /// Timestamp of the last checkpoint tick while playing. Used to compute
   /// wall-clock delta for cumulative listening time.
   DateTime? _lastCheckpointTime;
@@ -53,27 +51,23 @@ class PlaybackHistoryService {
   /// Reset on track change. Added to the DB's [totalListenedMs] on each persist.
   int _sessionListenedMs = 0;
 
-  // --- Subscriptions ---
   StreamSubscription? _positionSubscription;
   StreamSubscription? _trackSubscription;
   Timer? _checkpointTimer;
 
-  // --- 历史更新通知 ---
   final StreamController<int?> _historyUpdatedController =
       StreamController<int?>.broadcast();
 
   /// 当历史记录被更新时发出通知，携带 workId
   Stream<int?> get historyUpdatedStream => _historyUpdatedController.stream;
 
-  // --- Work 解析回调 ---
   /// 用于从 API 获取 Work 对象的回调（由外部注入，避免服务层直接依赖 API）
   Future<Work> Function(int workId)? onFetchWork;
 
   /// 绑定播放器服务，启动监听
   void attachPlayer(AudioPlayerService playerService) {
-    detach(); // 先清理旧监听
+    detach();
 
-    // 监听轨道变化
     _trackSubscription =
         playerService.currentTrackStream.listen((track) {
       if (track != null && track.workId != null) {
@@ -81,13 +75,10 @@ class PlaybackHistoryService {
       }
     });
 
-    // 启动 5 秒 checkpoint 定时器
     _checkpointTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       _onCheckpointTick(playerService);
     });
   }
-
-
 
   /// 周期性 checkpoint: measure wall-clock delta for cumulative listening
   /// time, then persist if position moved enough.
@@ -96,20 +87,14 @@ class PlaybackHistoryService {
 
     final now = DateTime.now();
 
-    // --- Cumulative listening time: wall-clock delta between ticks ---
-    // Only accumulate when actively playing.
     if (playerService.playing) {
       if (_lastCheckpointTime != null) {
         final deltaMs = now.difference(_lastCheckpointTime!).inMilliseconds;
-        // Cap at 15s to guard against edge cases (e.g., device sleep, timer coalescing)
         _sessionListenedMs += deltaMs.clamp(0, 15000);
       }
     }
-    // Always update checkpoint time, even when paused/sleeping, so the
-    // next delta does NOT include pause/sleep time.
     _lastCheckpointTime = now;
 
-    // --- Position-based persist check (only when playing) ---
     if (!playerService.playing) return;
 
     final positionMs = playerService.position.inMilliseconds;
@@ -123,16 +108,13 @@ class PlaybackHistoryService {
   /// 当轨道切换时，先 flush 上一首的进度，再更新会话
   Future<void> _onTrackChanged(
       AudioTrack track, AudioPlayerService playerService) async {
-    // flush 上一首的状态
     if (_dirty && _currentWork != null) {
       await _persistNow(FlushReason.trackChanged);
     }
 
-    // Reset session listening accumulator for the new track
     _sessionListenedMs = 0;
     _lastCheckpointTime = null;
 
-    // 更新会话 snapshot
     _currentTrack = track;
     _currentWorkId = track.workId;
     _playlistIndex = playerService.currentIndex;
@@ -142,10 +124,8 @@ class PlaybackHistoryService {
     _lastCheckpointTime = DateTime.now();
     _dirty = true;
 
-    // 获取 Work 数据
     await _ensureWork(track.workId!);
 
-    // 新轨道立即写一次
     if (_currentWork != null) {
       await _persistNow(FlushReason.trackChanged);
     }
@@ -153,17 +133,14 @@ class PlaybackHistoryService {
 
   /// 确保有 Work 对象（先从 DB 查，再从 API 拉）
   Future<void> _ensureWork(int workId) async {
-    // 如果当前已有且 id 匹配，直接用
     if (_currentWork != null && _currentWork!.id == workId) return;
 
-    // 从 DB 获取
     final dbRecord = await HistoryDatabase.instance.getHistoryByWorkId(workId);
     if (dbRecord != null) {
       _currentWork = dbRecord.work;
       return;
     }
 
-    // 用回调从 API 获取
     if (onFetchWork != null) {
       try {
         _currentWork = await onFetchWork!(workId);
@@ -173,10 +150,6 @@ class PlaybackHistoryService {
       }
     }
   }
-
-  // ==========================================================================
-  // 公共 API：由外部在关键事件时调用
-  // ==========================================================================
 
   /// seek 提交后调用，立即落盘
   Future<void> onSeekCommitted(Duration position) async {
@@ -211,16 +184,11 @@ class PlaybackHistoryService {
     await _persistNow(reason);
   }
 
-  // ==========================================================================
-  // 核心持久化
-  // ==========================================================================
-
   Future<void> _persistNow(FlushReason reason) async {
     if (!_dirty || _currentWork == null) return;
 
     final now = DateTime.now();
 
-    // Read existing record from DB to preserve cumulative listening time
     int accumulatedMs = _sessionListenedMs;
     try {
       final existing =
@@ -246,10 +214,9 @@ class PlaybackHistoryService {
     try {
       await HistoryDatabase.instance.addOrUpdate(record);
       _lastPersistedPositionMs = _lastKnownPositionMs;
-      _sessionListenedMs = 0; // reset session accumulator after persist
+      _sessionListenedMs = 0;
       _dirty = false;
 
-      // 通知外部历史已更新
       _historyUpdatedController.add(_currentWorkId);
     } catch (e) {
       _log.error('Failed to persist ($reason): $e', tag: 'PlaybackHistoryService');
@@ -275,10 +242,6 @@ class PlaybackHistoryService {
     await _historyUpdatedController.close();
     _instance = null;
   }
-
-  // ==========================================================================
-  // 测试支持
-  // ==========================================================================
 
   /// 仅用于测试：重置单例
   static void resetForTest() {

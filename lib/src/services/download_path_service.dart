@@ -21,7 +21,6 @@ class DownloadPathService {
       if (await dir.exists()) {
         return dir;
       }
-      // 自定义路径不存在，清除并使用默认路径
       await clearCustomPath();
     }
 
@@ -60,7 +59,6 @@ class DownloadPathService {
   ///
   /// [context] is required on Android to show the custom file picker dialog.
   static Future<String?> pickCustomDirectory({BuildContext? context}) async {
-    // 根据平台不同处理
     if (Platform.isAndroid) {
       return await _pickDirectoryAndroid(context: context);
     } else if (Platform.isIOS) {
@@ -85,13 +83,11 @@ class DownloadPathService {
           tag: 'DownloadPath');
       return null;
     }
-    // Request storage permission first, then show custom file picker
     return CustomFilePicker.pickDirectory(context: context);
   }
 
   /// iOS 平台选择目录
   static Future<String?> _pickDirectoryIOS() async {
-    // iOS 使用文档选择器
     final result = await FilePicker.getDirectoryPath();
     return result;
   }
@@ -102,14 +98,11 @@ class DownloadPathService {
     return result;
   }
 
-
-
   /// 设置自定义下载路径并迁移文件
   /// 返回迁移结果消息
   static Future<MigrationResult> setCustomPath(String newPath) async {
     final newDir = Directory(newPath);
 
-    // 确保新目录存在
     if (!await newDir.exists()) {
       try {
         await newDir.create(recursive: true);
@@ -121,10 +114,8 @@ class DownloadPathService {
       }
     }
 
-    // 获取当前下载目录
     final oldDir = await getDownloadDirectory();
 
-    // 如果新旧路径相同，不需要迁移
     if (oldDir.path == newPath) {
       return MigrationResult(
         success: true,
@@ -132,11 +123,9 @@ class DownloadPathService {
       );
     }
 
-    // 执行文件迁移
     final migrationResult = await _migrateFiles(oldDir, newDir);
 
     if (migrationResult.success) {
-      // 保存新路径
       await StorageService.setString(_customPathKey, newPath);
     }
 
@@ -173,7 +162,6 @@ class DownloadPathService {
     Directory newDir,
   ) async {
     try {
-      // 检查旧目录是否存在
       if (!await oldDir.exists()) {
         return MigrationResult(
           success: true,
@@ -187,20 +175,16 @@ class DownloadPathService {
       int errorCount = 0;
       final List<String> skippedItems = [];
 
-      // 只遍历旧目录的第一层（不递归）
       await for (final entity in oldDir.list(followLinks: false)) {
         if (entity is Directory) {
-          // 获取文件夹名称
           final folderName = entity.path.split(Platform.pathSeparator).last;
           final workId = int.tryParse(folderName);
 
-          // 迁移以数字命名的文件夹（作品文件夹）或字幕库文件夹
           if (workId != null || folderName == 'subtitle_library') {
             try {
               final newWorkDir = Directory('${newDir.path}/$folderName');
               await newWorkDir.create(recursive: true);
 
-              // 递归复制该作品文件夹的所有内容
               int folderFileCount = 0;
               await for (final fileEntity
                   in entity.list(recursive: true, followLinks: false)) {
@@ -231,7 +215,6 @@ class DownloadPathService {
                 _log.info('已迁移作品文件夹 $folderName: $folderFileCount 个文件', tag: 'DownloadPath');
               }
 
-              // 迁移成功后删除原文件夹
               try {
                 await entity.delete(recursive: true);
               } catch (e) {
@@ -243,13 +226,11 @@ class DownloadPathService {
               errorCount++;
             }
           } else {
-            // 跳过非数字命名且不是字幕库的文件夹（可能是用户的其他文件）
             skippedCount++;
             skippedItems.add(folderName);
             _log.debug('跳过文件夹: $folderName', tag: 'DownloadPath');
           }
         } else if (entity is File) {
-          // 跳过下载目录根目录下的文件（可能是用户的其他文件）
           final fileName = entity.path.split(Platform.pathSeparator).last;
           skippedCount++;
           skippedItems.add(fileName);
@@ -257,7 +238,6 @@ class DownloadPathService {
         }
       }
 
-      // 检查旧目录是否为空，只有为空时才删除
       bool isOldDirEmpty = true;
       try {
         final remainingEntities = await oldDir.list().toList();
@@ -269,7 +249,6 @@ class DownloadPathService {
             _log.info('已删除空的旧目录', tag: 'DownloadPath');
           } catch (e) {
             _log.error('删除空目录失败: $e', tag: 'DownloadPath');
-            // 不影响迁移结果
           }
         } else {
           _log.info('旧目录中还有 ${remainingEntities.length} 个项目，保留目录', tag: 'DownloadPath');
@@ -308,8 +287,6 @@ class DownloadPathService {
 
   /// 检查平台是否支持自定义路径
   static bool isPlatformSupported() {
-    // iOS 在沙盒限制下不建议支持自定义路径
-    // 但可以通过文档选择器访问
     return Platform.isWindows ||
         Platform.isMacOS ||
         Platform.isAndroid ||

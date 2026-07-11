@@ -96,11 +96,9 @@ class _WaveformSeekerState extends State<WaveformSeeker>
 
   /// Generate smooth, natural-looking waveform amplitudes (0.0–1.0).
   static List<double> _generateWaveform(int count) {
-    // Fixed seed keeps the visual stable; re-generated on widget recreation.
     final random = math.Random(42);
     final raw = List.generate(count, (_) => 0.2 + random.nextDouble() * 0.8);
 
-    // Smooth with a 3-point moving average (2 passes).
     final smoothed = List<double>.from(raw);
     for (int pass = 0; pass < 2; pass++) {
       for (int i = 1; i < smoothed.length - 1; i++) {
@@ -114,16 +112,13 @@ class _WaveformSeekerState extends State<WaveformSeeker>
   /// Smoothly interpolate the progress value for butter-smooth animation.
   double _getAnimatedValue() {
     final raw = _isDragging ? _dragValue : widget.value;
-    // Lerp toward target for smooth transitions.
     _smoothValue += (raw - _smoothValue) * 0.18;
-    // Clamp to prevent overshoot on extreme jumps (track change).
     return _smoothValue.clamp(0.0, 1.0);
   }
 
   /// Pulse intensity (0.3–1.0) for the thumb glow ring — breathes while playing.
   double _pulseValue(double animTime) {
     if (!widget.isPlaying) return 0.0;
-    // Gentle sin wave: ~0.67 cycles per 3-second loop ≈ 0.45 Hz / 2.2 s period
     return (math.sin(animTime * math.pi * 2) + 1.0) / 2.0;
   }
 
@@ -166,7 +161,6 @@ class _WaveformSeekerState extends State<WaveformSeeker>
         builder: (context, constraints) {
           final width = constraints.maxWidth;
 
-          // Pre-compute the floating label dimensions (only changes on drag)
           final labelText = _formatDuration(
             Duration(
               milliseconds: (_dragValue * widget.duration.inMilliseconds)
@@ -193,8 +187,6 @@ class _WaveformSeekerState extends State<WaveformSeeker>
             key: _stackKey,
             clipBehavior: Clip.none,
             children: [
-              // Gesture + Waveform — AnimatedBuilder isolates animation ticks
-              // from the outer LayoutBuilder, preventing full rebuild every frame.
               AnimatedBuilder(
                 animation: _animCtrl,
                 builder: (context, child) {
@@ -245,7 +237,6 @@ class _WaveformSeekerState extends State<WaveformSeeker>
                 },
               ),
 
-              // Floating time label (shown only during drag)
               if (_isDragging)
                 _buildFloatingLabel(
                   displayValue: _getAnimatedValue(),
@@ -304,10 +295,6 @@ class _WaveformSeekerState extends State<WaveformSeeker>
   }
 }
 
-// =============================================================================
-// WaveformPainter — draws bars + thumb
-// =============================================================================
-
 class WaveformPainter extends CustomPainter {
   final List<double> data;
   final double progress;
@@ -318,12 +305,12 @@ class WaveformPainter extends CustomPainter {
 
   /// Fallback rainbow gradient — used when no artwork colours are available.
   static const List<Color> _fallbackGradient = [
-    Color(0xFFFF4D4D),  // red
-    Color(0xFFFF9F1C),  // orange
-    Color(0xFFFFD726),  // yellow
-    Color(0xFF2ECC71),  // green
-    Color(0xFF00BCD4),  // cyan
-    Color(0xFF7C4DFF),  // purple
+    Color(0xFFFF4D4D),
+    Color(0xFFFF9F1C),
+    Color(0xFFFFD726),
+    Color(0xFF2ECC71),
+    Color(0xFF00BCD4),
+    Color(0xFF7C4DFF),
   ];
 
   WaveformPainter({
@@ -359,16 +346,13 @@ class WaveformPainter extends CustomPainter {
     final effectiveProgress = progress.clamp(0.0, 1.0);
     final cutoffX = effectiveProgress * size.width;
 
-    // Draw bars
     for (int i = 0; i < data.length; i++) {
-      // Apply wave oscillation to bars near the play head
       final wave = i < barWave.length ? barWave[i] : 0.0;
       final barHeight =
           (data[i] + wave).clamp(0.05, 1.0) * maxBarHeight;
       final x = i * barWidth + gap / 2;
       final barCenterX = x + drawWidth / 2;
 
-      // Determine if this bar is active or inactive
       final isActive = barCenterX <= cutoffX;
       final barColor = isActive
           ? _gradientColor(barCenterX / size.width)
@@ -392,12 +376,10 @@ class WaveformPainter extends CustomPainter {
       );
     }
 
-    // Draw thumb indicator at progress position
     if (effectiveProgress > 0.0 && effectiveProgress < 1.0) {
       final thumbX = effectiveProgress * size.width;
       final thumbColor = _gradientColor(effectiveProgress);
 
-      // Thumb dot
       canvas.drawCircle(
         Offset(thumbX, midY),
         6,
@@ -406,7 +388,6 @@ class WaveformPainter extends CustomPainter {
           ..style = PaintingStyle.fill,
       );
 
-      // Pulsing glow ring — radius oscillates with pulseValue
       final glowRadius = 8.0 + pulseValue * 6.0;
       final glowAlpha = (0.15 + pulseValue * 0.25).clamp(0.0, 1.0);
       canvas.drawCircle(

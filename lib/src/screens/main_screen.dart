@@ -183,8 +183,6 @@ class _OfflineToastState extends ConsumerState<_OfflineToast>
   }
 }
 
-
-
 /// Extracted MiniPlayer area that floats above bottom navigation.
 ///
 /// Wrapped in horizontal padding + bottom spacing for the floating pill look.
@@ -203,7 +201,6 @@ class _MiniPlayerArea extends ConsumerWidget {
       error: (_, __) => false,
     );
 
-    // Collapse to 0 height when fullscreen is active — smooth.
     return AnimatedCrossFade(
       firstChild: const MiniPlayer(),
       secondChild: const SizedBox.shrink(),
@@ -244,7 +241,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   int _previousIndex = 0;
   static const int _settingsTabIndex = 3;
 
-  // 使用 PageStorageBucket 来保存页面状态
   final PageStorageBucket _bucket = PageStorageBucket();
 
   late final List<Widget> _screens;
@@ -262,9 +258,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       MyScreen(key: PageStorageKey('my_screen')),
       SettingsScreen(key: PageStorageKey('settings_screen')),
     ];
-    // Cache per-screen RepaintBoundary + HeroMode wrappers.
-    // Each tab gets its own compositing layer so repaints in one
-    // tab don't affect the others (IndexedStack keeps all alive).
     _heroWrappedScreens = List.generate(_screens.length, (index) {
       return RepaintBoundary(
         child: HeroMode(
@@ -323,7 +316,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
     final showUpdateBadge = ref.watch(showUpdateRedDotProvider);
-    // Memoize nav items to avoid recreating on every build
     if (_cachedNavItems == null || _lastShowUpdateBadge != showUpdateBadge) {
       _cachedNavItems = _buildNavItems(context, showUpdateBadge);
       _lastShowUpdateBadge = showUpdateBadge;
@@ -333,7 +325,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final isFullscreenActive = ref.watch(isFullscreenPlayerActiveProvider);
 
     if (isLandscape) {
-      // 横屏布局：使用自定义 NavigationRail 风格
       final colorScheme = Theme.of(context).colorScheme;
       final mq = MediaQuery.of(context);
 
@@ -350,7 +341,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                     : colorScheme.primary)
                 : colorScheme.onSurfaceVariant;
 
-            // Crossfade icon: outlined → filled
             Widget iconWidget = SizedBox(
               width: 24,
               height: 24,
@@ -496,7 +486,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     );
   }
 
-    // 竖屏布局
     return PopScope(
       canPop: _currentIndex != _settingsTabIndex,
       onPopInvokedWithResult: (didPop, _) {
@@ -556,7 +545,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                       alignment: Alignment.center,
                       clipBehavior: Clip.none,
                       children: [
-                        // Sliding pill indicator — centered on content
                         AnimatedPositioned(
                           duration: animDur,
                           curve: Curves.easeOutCubic,
@@ -573,7 +561,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                             ),
                           ),
                         ),
-                        // Gradient top accent line
                         Positioned(
                           top: 0,
                           left: 0,
@@ -593,7 +580,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                             ),
                           ),
                         ),
-                        // Items row
                         Row(
                           children: List.generate(count, (i) {
                             final item = navItems[i];
@@ -607,7 +593,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                                     ? Colors.white.withValues(alpha: 0.45)
                                     : colorScheme.onSurfaceVariant.withValues(alpha: 0.7));
 
-                            // Icon with crossfade between outlined & filled
                             Widget iconWidget = SizedBox(
                               width: 24,
                               height: 24,
@@ -666,7 +651,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 },
               );
 
-              // ── Wrap nav bar in floating pill container ──
               navBar = Container(
                 margin: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(

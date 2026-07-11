@@ -180,7 +180,6 @@ class _PlayNextSelectionDialogState extends State<PlayNextSelectionDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -223,7 +222,6 @@ class _PlayNextSelectionDialogState extends State<PlayNextSelectionDialog> {
               ),
             ),
 
-            // Toolbar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
@@ -250,7 +248,6 @@ class _PlayNextSelectionDialogState extends State<PlayNextSelectionDialog> {
               ),
             ),
 
-            // File list
             Flexible(
               child: widget.audioFiles.isEmpty
                   ? _buildEmptyState(context)
@@ -264,7 +261,6 @@ class _PlayNextSelectionDialogState extends State<PlayNextSelectionDialog> {
 
             const Divider(height: 1),
 
-            // Action buttons
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(

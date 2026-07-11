@@ -75,7 +75,6 @@ class PlaylistCard extends ConsumerWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Cover image
               Container(
                 width: 96,
                 height: 96,
@@ -116,7 +115,6 @@ class PlaylistCard extends ConsumerWidget {
                 ),
               ),
 
-              // Info area
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -124,7 +122,6 @@ class PlaylistCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Title row
                       Row(
                         children: [
                           Expanded(
@@ -139,7 +136,6 @@ class PlaylistCard extends ConsumerWidget {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          // Privacy badge
                           Container(
                             padding: const EdgeInsets.all(3),
                             decoration: BoxDecoration(
@@ -157,7 +153,6 @@ class PlaylistCard extends ConsumerWidget {
 
                       const SizedBox(height: 6),
 
-                      // Username + works count
                       Row(
                         children: [
                           Icon(
@@ -204,7 +199,6 @@ class PlaylistCard extends ConsumerWidget {
                         ],
                       ),
 
-                      // Bottom info row: play count + relative time
                       Row(
                         children: [
                           if (playlist.playbackCount > 0) ...[
@@ -239,7 +233,6 @@ class PlaylistCard extends ConsumerWidget {
                         ],
                       ),
 
-                      // Description (if present)
                       if (playlist.description.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -258,7 +251,6 @@ class PlaylistCard extends ConsumerWidget {
                 ),
               ),
 
-              // Delete or chevron
               Padding(
                 padding: const EdgeInsets.only(right: 4),
                 child: onDelete != null

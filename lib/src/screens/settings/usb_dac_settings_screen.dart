@@ -63,7 +63,6 @@ class _UsbDacSettingsScreenState
         _log.info('USB DAC connected: $deviceName', tag: 'USB');
         setState(() {
           _usbDacConnected = true;
-          // Use deviceName from HiResAudio (no "USB-Audio - " prefix)
           _autoTargetDevice = deviceName;
         });
       } else if (!hasDac && _usbDacConnected) {
@@ -78,7 +77,6 @@ class _UsbDacSettingsScreenState
     });
     _usbAttachedSub = _exclusive.usbAttachedStream.listen((name) {
       if (mounted) {
-        // Strip "USB-Audio - " prefix if present to match HiResAudio format
         final cleanName = name.startsWith('USB-Audio - ')
             ? name.substring('USB-Audio - '.length)
             : name;
@@ -163,10 +161,6 @@ class _UsbDacSettingsScreenState
     );
   }
 
-  // ──────────────────────────────────────────────
-  // AppBar
-  // ──────────────────────────────────────────────
-
   Widget _buildAppBar(S s) {
     final cs = Theme.of(context).colorScheme;
     return SliverAppBar(
@@ -207,10 +201,6 @@ class _UsbDacSettingsScreenState
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Connection Card
-  // ──────────────────────────────────────────────
 
   Widget _buildConnectionCard(S s) {
     final theme = Theme.of(context);
@@ -316,10 +306,6 @@ class _UsbDacSettingsScreenState
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Audio Signal Path (Compact Card Row)
-  // ──────────────────────────────────────────────
 
   Widget _buildAudioPathFlow(S s) {
     final theme = Theme.of(context);
@@ -442,10 +428,6 @@ class _UsbDacSettingsScreenState
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Feature Toggles
-  // ──────────────────────────────────────────────
 
   Widget _buildFeatureToggles(S s) {
     final cs = Theme.of(context).colorScheme;
@@ -573,8 +555,6 @@ class _UsbDacSettingsScreenState
                 await _toggleExclusiveMode(false, silent: true);
               }
 
-              // Inisialisasi/hentikan libusb USB DAC driver
-              // requestPermission() → connect() → start() (atau disconnect)
               await _audioService.usbDacManager.setAutoDacEnabled(v);
 
               if (!mounted) return;
@@ -615,10 +595,6 @@ class _UsbDacSettingsScreenState
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Test Section
-  // ──────────────────────────────────────────────
 
   Widget _buildTestSection(S s) {
     final theme = Theme.of(context);
@@ -685,10 +661,6 @@ class _UsbDacSettingsScreenState
     );
   }
 
-  // ──────────────────────────────────────────────
-  // Info Banner
-  // ──────────────────────────────────────────────
-
   Widget _buildInfoBanner(S s) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
@@ -740,10 +712,6 @@ class _UsbDacSettingsScreenState
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Bottom Sheet Info
-  // ──────────────────────────────────────────────
 
   void _showInfoSheet(BuildContext context, S s, {required bool isAAudio}) {
     final theme = Theme.of(context);
@@ -824,12 +792,6 @@ class _UsbDacSettingsScreenState
     );
   }
 
-  // ──────────────────────────────────────────────
-  // Actions
-  // ──────────────────────────────────────────────
-
-
-
   Future<void> _toggleExclusiveMode(bool enable, {bool silent = false}) async {
     await _audioService.setExclusiveMode(enable);
     if (!mounted) return;
@@ -903,10 +865,6 @@ class _UsbDacSettingsScreenState
     if (mounted) SnackBarUtil.showInfo(context, result);
   }
 }
-
-// ═══════════════════════════════════════════════
-// Private Helper Widgets
-// ═══════════════════════════════════════════════
 
 class _AudioStage {
   final IconData icon;

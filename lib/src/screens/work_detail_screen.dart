@@ -51,27 +51,24 @@ class WorkDetailScreen extends ConsumerStatefulWidget {
 class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
   Work? _detailedWork;
   String? _errorMessage;
-  bool _showHDImage = false; // 控制是否显示高清图片
-  ImageProvider? _hdImageProvider; // 预加载的高清图片
-  String? _currentProgress; // 当前收藏状态
-  int? _currentRating; // 当前评分
-  bool _isUpdatingProgress = false; // 是否正在更新状态
-  bool _isOpeningFileSelection = false; // iOS上防止快速重复点击造成对话框立即关闭
-  bool _isOpeningProgressDialog = false; // 防止标记状态对话框重复快速打开
+  bool _showHDImage = false;
+  ImageProvider? _hdImageProvider;
+  String? _currentProgress;
+  int? _currentRating;
+  bool _isUpdatingProgress = false;
+  bool _isOpeningFileSelection = false;
+  bool _isOpeningProgressDialog = false;
 
-  // 翻译相关状态
-  String? _translatedTitle; // 翻译后的标题
-  bool _showTranslation = false; // 是否显示翻译
-  bool _isTranslating = false; // 是否正在翻译
+  String? _translatedTitle;
+  bool _showTranslation = false;
+  bool _isTranslating = false;
 
   @override
   void initState() {
     super.initState();
-    // 初始化收藏状态（从传入的work中获取）
     _currentProgress = widget.work.progress;
     _currentRating = widget.work.userRating;
     _loadWorkDetail();
-    // Hero 动画结束后开始预加载高清图
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) {
         _preloadHDImage();
@@ -79,7 +76,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     });
   }
 
-  // 预加载高清图片，完全加载后再切换
   Future<void> _preloadHDImage() async {
     final authState = ref.read(authProvider);
     final host = authState.host ?? '';
@@ -91,9 +87,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     final imageProvider = NetworkImage(imageUrl);
 
     try {
-      // 预加载图片到内存
       await precacheImage(imageProvider, context);
-      // 图片完全加载后才切换显示
       if (mounted) {
         setState(() {
           _hdImageProvider = imageProvider;
@@ -101,18 +95,15 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
         });
       }
     } catch (e) {
-      // 预加载失败，保持使用缓存图片
       LogService.instance.warning('HD image preload failed: $e', tag: 'UI');
     }
   }
 
-  // 翻译标题
   Future<void> _translateTitle() async {
     if (_isTranslating) return;
 
     final work = _detailedWork ?? widget.work;
 
-    // 如果已有翻译，直接切换显示
     if (_translatedTitle != null) {
       setState(() {
         _showTranslation = !_showTranslation;
@@ -153,7 +144,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     }
   }
 
-  // 复制文本到剪贴板并显示提示
   Future<void> _copyToClipboard(String text, String label) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (mounted) {
@@ -167,7 +157,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     }
   }
 
-  // 显示标签投票信息
   void _showTagInfo(Tag tag) {
     showDialog(
       context: context,
@@ -175,10 +164,8 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
         tag: tag,
         workId: widget.work.id,
         onVoteChanged: (updatedTag) {
-          // 投票成功后更新本地状态
           if (mounted) {
             setState(() {
-              // 更新 _detailedWork 中的 tag
               if (_detailedWork != null && _detailedWork!.tags != null) {
                 final tagIndex = _detailedWork!.tags!
                     .indexWhere((t) => t.id == updatedTag.id);
@@ -196,7 +183,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     );
   }
 
-  // 显示添加标签对话框
   void _showAddTagDialog() {
     showDialog(
       context: context,
@@ -204,25 +190,21 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
         workId: widget.work.id,
         existingTags: _detailedWork?.tags ?? widget.work.tags ?? [],
         onTagsAdded: () {
-          // 添加成功后刷新作品详情
           _loadWorkDetail();
         },
       ),
     );
   }
 
-  // 在外部浏览器打开原始链接
   Future<void> _openSourceUrl(String url) async {
     try {
       final uri = Uri.parse(url);
-      // 直接尝试在外部浏览器打开，不依赖 canLaunchUrl 检查
       final launched = await launchUrl(
         uri,
         mode: LaunchMode.externalApplication,
       );
 
       if (!launched && mounted) {
-        // 如果外部应用模式失败，尝试平台默认方式
         final fallbackLaunched = await launchUrl(
           uri,
           mode: LaunchMode.platformDefault,
@@ -252,9 +234,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     }
   }
 
-  // 显示文件选择对话框
   Future<void> _showFileSelectionDialog() async {
-    // 防抖: 避免 iOS 上快速双击导致同一路由被重复创建又立即被关闭
     if (_isOpeningFileSelection) return;
     _isOpeningFileSelection = true;
 
@@ -338,13 +318,11 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     );
   }
 
-  // 将 API 返回的文件列表转换为 AudioFile 对象
   List<AudioFile> _convertToAudioFiles(List<dynamic> files) {
     final authState = ref.read(authProvider);
     final host = authState.host ?? '';
     final token = authState.token ?? '';
 
-    // 标准化 host URL
     String normalizedHost = host;
     if (host.isNotEmpty &&
         !host.startsWith('http://') &&
@@ -358,7 +336,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
       final hash = file['hash'] as String?;
       final size = file['size'] as int?;
 
-      // 构建下载 URL — priority: mediaDownloadUrl (raw) > mediaStreamUrl (stream) > constructed
       String? downloadUrl;
       if (file['mediaDownloadUrl'] != null &&
           file['mediaDownloadUrl'].toString().isNotEmpty) {
@@ -377,11 +354,10 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
         children = _convertToAudioFiles(file['children'] as List<dynamic>);
       }
 
-      // API 返回的 type 是 'audio' 而不是 'file'
       return AudioFile(
         title: title,
         hash: hash,
-        type: type == 'folder' ? 'folder' : 'file', // 将 'audio' 等类型统一转为 'file'
+        type: type == 'folder' ? 'folder' : 'file',
         children: children,
         size: size,
         mediaDownloadUrl: downloadUrl,
@@ -402,7 +378,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
       if (mounted) {
         setState(() {
           _detailedWork = detailedWork;
-          // 更新收藏状态（从API响应中获取最新状态）
           _currentProgress = detailedWork.progress;
           _currentRating = detailedWork.userRating;
         });
@@ -416,7 +391,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     }
   }
 
-  // 下拉刷新：强制从网络获取最新数据
   Future<void> _refreshWorkDetail() async {
     try {
       setState(() {
@@ -425,12 +399,10 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
 
       final apiService = ref.read(kikoeruApiServiceProvider);
 
-      // 先清除缓存，确保获取最新数据
       final prefs = await StorageService.getPrefs();
       await prefs.remove('work_detail_${widget.work.id}');
       await prefs.remove('work_detail_time_${widget.work.id}');
 
-      // 从网络获取最新数据
       final response = await apiService.getWork(widget.work.id);
       final detailedWork = Work.fromJson(response);
 
@@ -441,7 +413,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
           _currentRating = detailedWork.userRating;
         });
 
-        // 显示刷新成功提示
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(S.of(context).refreshComplete),
@@ -468,9 +439,8 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     }
   }
 
-  // 显示收藏状态选择对话框
   Future<void> _showProgressDialog() async {
-    if (_isOpeningProgressDialog) return; // 防抖避免 iOS 双击导致立即关闭
+    if (_isOpeningProgressDialog) return;
     _isOpeningProgressDialog = true;
 
     final manager = WorkBookmarkManager(ref: ref, context: context);
@@ -481,7 +451,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
       currentRating: _currentRating,
       workTitle: widget.work.title,
       onChanged: (newProgress, newRating) {
-        // 更新本地状态
         if (mounted) {
           setState(() {
             _currentProgress = newProgress;
@@ -495,7 +464,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     _isOpeningProgressDialog = false;
   }
 
-  // 显示评分详情弹窗
   Future<void> _showRatingDetailDialog(Work work) async {
     if (work.rateCountDetail == null || work.rateCountDetail!.isEmpty) return;
     if (work.rateAverage == null || work.rateCount == null) return;
@@ -521,13 +489,12 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     final mediaQuerySize = MediaQuery.of(context).size;
     final orientation = MediaQuery.orientationOf(context);
 
-    // 根据主题亮度设置状态栏图标颜色
     final brightness = theme.brightness;
     final systemOverlayStyle = SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: brightness == Brightness.light
-          ? Brightness.dark // 浅色模式用深色图标
-          : Brightness.light, // 深色模式用浅色图标
+          ? Brightness.dark
+          : Brightness.light,
       systemNavigationBarColor: Colors.transparent,
     );
 
@@ -536,7 +503,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
         floatingActionButton: const DownloadFab(),
         appBar: ScrollableAppBar(
           systemOverlayStyle: systemOverlayStyle,
-          // RJ号作为标题,支持长按复制
           title: GestureDetector(
             onLongPress: () =>
                 _copyToClipboard(formatRJCode(widget.work.id), S.of(context).rjNumberLabel),
@@ -551,7 +517,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           actions: [
-            // 下载按钮
             IconButton(
               icon: const Icon(Icons.download),
               onPressed: () {
@@ -560,7 +525,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
               },
               tooltip: S.of(context).download,
             ),
-            // 收藏状态按钮 - 带图标和文字 (AnimatedSwitcher)
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: AnimatedSwitcher(
@@ -654,10 +618,8 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     final isLandscape =
         orientation == Orientation.landscape;
 
-    // 使用已有的work信息（来自列表），详细信息加载后再更新
     final work = _detailedWork ?? widget.work;
 
-    // 封面图片组件
     final effectiveHeroTag = widget.heroTag ?? 'work_cover_${widget.work.id}';
     final coverWidget = GestureDetector(
       onLongPress: () {
@@ -699,7 +661,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                 child: Stack(
                   fit: StackFit.passthrough,
                   children: [
-                    // 底层：缓存图片，始终显示
                     CachedNetworkImage(
                       imageUrl: work.getCoverImageUrl(host, token: token),
                       cacheKey: 'work_cover_${widget.work.id}',
@@ -722,16 +683,14 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                         ),
                       ),
                     ),
-                    // 顶层：高清图，加载完成后覆盖
                     if (_showHDImage && _hdImageProvider != null)
                       Image(
                         image: _hdImageProvider!,
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) {
-                          return const SizedBox.shrink(); // 出错时不显示，保持底层缓存图
+                          return const SizedBox.shrink();
                         },
                       ),
-                    // Gradient overlay for subtitle badge readability
                     if (ref.watch(workDetailDisplayProvider).showSubtitleTag &&
                         work.hasSubtitle == true)
                       Positioned(
@@ -752,7 +711,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                           ),
                         ),
                       ),
-                    // 字幕标签 - 浮动在右下角
                     if (ref.watch(workDetailDisplayProvider).showSubtitleTag &&
                         work.hasSubtitle == true)
                       Positioned(
@@ -795,13 +753,11 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
       ),
     );
 
-    // 信息内容组件
     final infoWidget = Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 标题（可长按复制）+ 内联字幕图标（紧跟标题最后一个字，不换行）
           Consumer(
             builder: (context, ref, _) {
               final displaySettings = ref.watch(workDetailDisplayProvider);
@@ -839,7 +795,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                             ),
                           ),
                         ),
-                      // 翻译按钮
                       if (displaySettings.showTranslateButton)
                         WidgetSpan(
                           alignment: PlaceholderAlignment.middle,
@@ -886,7 +841,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
           ),
           const SizedBox(height: 8),
 
-          // 显示加载状态或错误信息 — Premium Card
           if (_errorMessage != null)
             Card(
               elevation: 0,
@@ -945,11 +899,9 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
               ),
             ),
 
-          // 评分信息 价格和销售信息
           Consumer(
             builder: (context, ref, _) {
               final displaySettings = ref.watch(workDetailDisplayProvider);
-              // Check if any metadata is visible
               final showPrice = displaySettings.showPrice && work.price != null;
               final showDuration = displaySettings.showDuration &&
                   work.duration != null &&
@@ -977,7 +929,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                     runSpacing: 8,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      // 评分信息 - 根据设置显示
                       if (displaySettings.showRating)
                         MouseRegion(
                           cursor: work.rateCountDetail != null &&
@@ -1016,7 +967,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  // 括号内包含数字和感叹号图标
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -1034,7 +984,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                                           fontSize: 12,
                                         ),
                                       ),
-                                      // 如果有详情数据，显示信息图标
                                       if (work.rateCountDetail != null &&
                                           work.rateCountDetail!.isNotEmpty)
                                         Icon(
@@ -1057,7 +1006,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                           ),
                         ),
 
-                      // 我的评分 - 仅当有评分时显示
                       if (_currentRating != null)
                         InkWell(
                           onTap: _showProgressDialog,
@@ -1099,7 +1047,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                           ),
                         ),
 
-                      // 价格信息
                       if (showPrice)
                         Text(
                           S.of(context).priceInYen(work.price!),
@@ -1110,7 +1057,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                               ),
                         ),
 
-                      // 时长信息
                       if (showDuration)
                         Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1129,7 +1075,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                           ],
                         ),
 
-                      // 销售数量信息
                       if (showSales)
                         Text(
                           S.of(context).soldCount(
@@ -1148,7 +1093,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
 
           const SizedBox(height: 16),
 
-          // 社团和声优信息 — Premium Card
           if ((work.name != null && work.name!.isNotEmpty) ||
               (work.vas != null && work.vas!.isNotEmpty))
             Card(
@@ -1179,13 +1123,10 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                     ),
                     const SizedBox(height: 10),
 
-
-            // 社团和声优放在同一行
             Wrap(
               spacing: 4,
               runSpacing: 4,
               children: [
-                // 社团名称标签
                 if (work.name != null &&
                     work.name!.isNotEmpty &&
                     work.circleId != null)
@@ -1203,7 +1144,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                     ),
                   ),
 
-                // 声优列表
                 if (work.vas != null && work.vas!.isNotEmpty)
                   ...work.vas!.map((va) {
                     return MouseRegion(
@@ -1227,7 +1167,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
               ),
             ),
 
-          // 标签信息 — Premium Card
           if (work.tags != null && work.tags!.isNotEmpty)
             Card(
               elevation: 0,
@@ -1265,7 +1204,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                           cursor: SystemMouseCursors.click,
                           child: GestureDetector(
                             onSecondaryTapDown: (details) {
-                              // 桌面端右键支持
                               _showTagInfo(tag);
                             },
                             child: TagChip(
@@ -1279,7 +1217,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                             ),
                           ),
                         )),
-                // 添加标签按钮
                 MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
@@ -1307,7 +1244,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                 ),
               ),
             ) else ...[
-            // 如果没有标签，也显示添加按钮
             GestureDetector(
               onTap: _showAddTagDialog,
               child: Container(
@@ -1342,7 +1278,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
 
           const SizedBox(height: 8),
 
-          // 发布日期
           Consumer(
             builder: (context, ref, _) {
               final displaySettings = ref.watch(workDetailDisplayProvider);
@@ -1390,7 +1325,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
             },
           ),
 
-          // 其他语言版本
           if (work.otherLanguageEditions != null &&
               work.otherLanguageEditions!.isNotEmpty)
             Card(
@@ -1426,7 +1360,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                       children: work.otherLanguageEditions!.map((edition) {
                         return InkWell(
                           onTap: () {
-                            // 导航到其他语言版本的作品详情页
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (context) => WorkDetailScreen(
@@ -1478,10 +1411,8 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
               ),
             ),
 
-          // 文件浏览器组件 - 移除固定高度，让它自由展开
           FileExplorerWidget(work: work),
 
-          // 相关推荐
           const SizedBox(height: 4),
           SeriesSection(work: work),
           RecommendationSection(work: work),
@@ -1489,20 +1420,16 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
       ),
     );
 
-    // 根据屏幕方向返回不同布局
     if (isLandscape) {
-      // 横屏布局：左右分栏 - 左侧封面固定，右侧信息可滚动
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 左侧：封面（固定不滚动）
           Expanded(
             flex: 2,
             child: Center(
               child: coverWidget,
             ),
           ),
-          // 右侧：信息（可滚动，带下拉刷新）
           Expanded(
             flex: 3,
             child: RefreshIndicator(
@@ -1517,7 +1444,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
         ],
       );
     } else {
-      // 竖屏布局：上下排列
       return RefreshIndicator(
         onRefresh: _refreshWorkDetail,
         child: SingleChildScrollView(
@@ -1545,7 +1471,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
     }
   }
 
-  // 格式化时长(秒 -> 时:分:秒 或 分:秒)
   String _formatDuration(int seconds) {
     final hours = seconds ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;

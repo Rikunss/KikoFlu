@@ -37,9 +37,7 @@ class _RecommendationSectionState
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
-    // Don't start repeat() yet — wait until shimmer is actually shown
 
-    // 延迟加载，不阻塞详情页渲染
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final notifier =
           ref.read(recommendationProvider(widget.work.id).notifier);
@@ -78,10 +76,8 @@ class _RecommendationSectionState
 
     final state = ref.watch(recommendationProvider(widget.work.id));
 
-    // Start/stop shimmer based on loading state
     _syncShimmer(state.isLoading);
 
-    // 加载中：显示占位骨架
     if (state.isLoading) {
       return _buildSection(
         context,
@@ -98,7 +94,6 @@ class _RecommendationSectionState
       );
     }
 
-    // 没有推荐 或 出错：不显示
     if (state.recommendations.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -178,7 +173,6 @@ class _RecommendationSectionState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 封面占位
             Container(
               width: 120,
               height: 120,
@@ -189,7 +183,6 @@ class _RecommendationSectionState
               ),
             ),
             const SizedBox(height: 8),
-            // 标题占位
             Container(
               height: 14,
               width: 100,
@@ -244,7 +237,6 @@ class _RecommendationCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 封面
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: SizedBox(
@@ -254,7 +246,6 @@ class _RecommendationCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 6),
-            // 标题
             Text(
               work.title,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -265,7 +256,6 @@ class _RecommendationCard extends ConsumerWidget {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 2),
-            // 评分
             if (work.rateAverage != null && work.rateAverage! > 0)
               Row(
                 children: [
@@ -298,7 +288,6 @@ class _RecommendationCard extends ConsumerWidget {
     }
 
     final url = work.getCoverImageUrl(host, token: token);
-    // Fallback ke blurhash dari service jika server tidak menyediakan
     final blurHash = work.blurHash ??
         BlurHashService.instance.getBlurHash(work.id);
 
@@ -317,8 +306,6 @@ class _RecommendationCard extends ConsumerWidget {
           placeholder: (context, _) => _buildPlaceholder(context, blurHash: blurHash),
           errorWidget: (context, _, __) => _buildPlaceholder(context, blurHash: blurHash),
           imageBuilder: (context, imageProvider) {
-            // Trigger blurhash generation di background jika server tidak menyediakan
-            // Cek cache lokal dulu agar tidak duplikasi dengan batch trigger
             if (work.blurHash == null &&
                 !BlurHashService.instance.hasBlurHash(work.id)) {
               BlurHashService.instance.generateIfNeeded(work.id, url);

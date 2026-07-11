@@ -26,13 +26,11 @@ class PlayerCoverWidget extends StatelessWidget {
     this.onSwipeRight,
   });
 
-  // 判断是否为本地文件路径
   bool _isLocalFile(String? url) {
     if (url == null) return false;
     return url.startsWith('file://');
   }
 
-  // 从 file:// URL 获取本地文件路径
   String _getLocalPath(String fileUrl) {
     return fileUrl.replaceFirst('file://', '');
   }
@@ -42,8 +40,7 @@ class PlayerCoverWidget extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       onHorizontalDragEnd: (details) {
-        // Swipe left/right detection with velocity threshold
-        const threshold = 400.0; // pixels/sec minimum velocity
+        const threshold = 400.0;
         if (details.primaryVelocity == null) return;
         if (details.primaryVelocity! < -threshold) {
           HapticFeedback.lightImpact();
@@ -83,7 +80,6 @@ class PlayerCoverWidget extends StatelessWidget {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            // Cover image
                             _isLocalFile(workCoverUrl ?? track.artworkUrl)
                                 ? Image.file(
                                     File(_getLocalPath(
@@ -103,7 +99,6 @@ class PlayerCoverWidget extends StatelessWidget {
                                 : CachedNetworkImage(
                                     imageUrl: (workCoverUrl ?? track.artworkUrl)!,
                                     httpHeaders: CookieService.coverHttpHeaders(),
-                                    // 使用workId作为cacheKey，与作品详情页保持一致，避免token变化导致重新下载
                                     cacheKey: track.workId != null
                                         ? 'work_cover_${track.workId}'
                                         : null,
@@ -127,7 +122,6 @@ class PlayerCoverWidget extends StatelessWidget {
                                       );
                                     },
                                   ),
-                            // Gradient overlay at bottom for immersive blend
                             Positioned(
                               left: 0,
                               right: 0,

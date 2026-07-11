@@ -37,7 +37,6 @@ class _DownloadsStorageScreenState
   void initState() {
     super.initState();
     _refreshCacheInfo();
-    // Trigger runtime encoder detection (Android) so dropdown shows available formats.
     unawaited(
       AudioConversionService.instance.checkAllEncoders().then((_) {
         if (mounted) setState(() {});
@@ -69,7 +68,6 @@ class _DownloadsStorageScreenState
 
   @override
   Widget build(BuildContext context) {
-    // Listen for cache refresh triggers from other parts of the app
     ref.listen<int>(
       settingsCacheRefreshTriggerProvider,
       (_, __) => _refreshCacheInfo(),
@@ -89,25 +87,20 @@ class _DownloadsStorageScreenState
                   children: [
                     const SizedBox(height: 8),
 
-                    // ── WAV Conversion Format Selector ──
                     _buildConversionCard(context, ref),
                     const SizedBox(height: 16),
 
-                    // ── Download Path ──
                     _buildDownloadPathCard(context, ref),
                     const SizedBox(height: 16),
 
-                    // ── Storage Usage Breakdown ──
                     _buildStorageBreakdown(context),
                     const SizedBox(height: 16),
 
-                    // ── Cache Limit Slider ──
                     _CacheLimitSlider(
                       onCacheChanged: _refreshCacheInfo,
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Clear Cache Actions ──
                     _buildClearCacheCard(context),
                     const SizedBox(height: 32),
                   ],
@@ -120,10 +113,6 @@ class _DownloadsStorageScreenState
     );
   }
 
-  // ──────────────────────────────────────────────
-  // WAV Conversion Format Selector
-  // ──────────────────────────────────────────────
-
   Widget _buildConversionCard(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -131,13 +120,11 @@ class _DownloadsStorageScreenState
     final currentFormat = ref.watch(wavConversionFormatProvider);
     final platform = Theme.of(context).platform;
 
-    // Determine which formats are available on this platform
     const allFormats = WavConversionFormat.values;
     final unsupportedFormats = allFormats
         .where((f) => !AudioConversionService.instance.isFormatSupportedOnPlatform(f))
         .toList();
 
-    // Describe the conversion engine
     String engineText;
     if (!kIsWeb && (platform == TargetPlatform.windows ||
         platform == TargetPlatform.macOS ||
@@ -163,7 +150,6 @@ class _DownloadsStorageScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header row
             Row(
               children: [
                 CircleAvatar(
@@ -196,7 +182,6 @@ class _DownloadsStorageScreenState
             ),
             const SizedBox(height: 16),
 
-            // Format dropdown
             Container(
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest,
@@ -321,7 +306,6 @@ class _DownloadsStorageScreenState
               ),
             ),
 
-            // Engine badge + unsupported note
             const SizedBox(height: 12),
             Row(
               children: [
@@ -402,10 +386,6 @@ class _DownloadsStorageScreenState
     }
   }
 
-  // ──────────────────────────────────────────────
-  // Download Path Card
-  // ──────────────────────────────────────────────
-
   Widget _buildDownloadPathCard(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -440,10 +420,6 @@ class _DownloadsStorageScreenState
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Storage Usage Breakdown
-  // ──────────────────────────────────────────────
 
   Widget _buildStorageBreakdown(BuildContext context) {
     final theme = Theme.of(context);
@@ -618,10 +594,6 @@ class _DownloadsStorageScreenState
     );
   }
 
-  // ──────────────────────────────────────────────
-  // Clear Cache Card
-  // ──────────────────────────────────────────────
-
   Widget _buildClearCacheCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -763,10 +735,6 @@ class _DownloadsStorageScreenState
     );
   }
 }
-
-// ──────────────────────────────────────────────
-// Cache Limit Slider (standalone widget)
-// ──────────────────────────────────────────────
 
 class _CacheLimitSlider extends StatefulWidget {
   final VoidCallback onCacheChanged;

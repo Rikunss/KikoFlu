@@ -80,13 +80,11 @@ class _LocalFileBrowserScreenState
       await for (final entity in downloadDir.list()) {
         if (entity is! Directory) continue;
 
-        // Only process directories with numeric names (work IDs)
         final folderName =
             entity.path.split(Platform.pathSeparator).last;
         final workId = int.tryParse(folderName);
         if (workId == null) continue;
 
-        // Read metadata
         final metadataFile = File('${entity.path}/work_metadata.json');
         Map<String, dynamic>? metadata;
         String title = 'RJ$workId';
@@ -101,7 +99,6 @@ class _LocalFileBrowserScreenState
           }
         }
 
-        // Count files (excluding metadata and cover) — use concurrent counting
         int fileCount = 0;
         int totalBytes = 0;
         try {
@@ -128,7 +125,6 @@ class _LocalFileBrowserScreenState
             }
           }
         } catch (_) {
-          // If listing fails, skip file counting for this work
         }
 
         if (metadata == null) {
@@ -152,7 +148,6 @@ class _LocalFileBrowserScreenState
         ));
       }
 
-      // Sort by workId descending (newest first)
       entries.sort((a, b) => b.workId.compareTo(a.workId));
 
       setState(() {
@@ -173,7 +168,6 @@ class _LocalFileBrowserScreenState
       final sanitized = sanitizeMetadata(entry.metadata!);
       final work = Work.fromJson(sanitized);
 
-      // Extract localImportPath from raw metadata for imported works
       final localImportPath = entry.metadata!['local_import_path'] as String?;
 
       if (!mounted) return;
@@ -192,8 +186,6 @@ class _LocalFileBrowserScreenState
           context, S.of(context).openWorkDetailFailed(e.toString()));
     }
   }
-
-
 
   String _formatBytes(int bytes) {
     if (bytes <= 0) return '';
@@ -347,7 +339,6 @@ class _WorkFolderTile extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              // Folder icon or cover thumbnail
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: SizedBox(
@@ -364,7 +355,6 @@ class _WorkFolderTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              // Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

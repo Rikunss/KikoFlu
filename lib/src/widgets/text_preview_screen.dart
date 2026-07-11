@@ -53,7 +53,7 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
   bool _isEditMode = false;
   late TextEditingController _textController;
   late TextEditingController _translatedTextController;
-  String _detectedEncoding = 'UTF-8'; // 记录检测到的原始编码
+  String _detectedEncoding = 'UTF-8';
 
   @override
   void initState() {
@@ -150,7 +150,6 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
   }
 
   Future<void> _saveToLocal() async {
-    // 获取当前显示的内容（可能是编辑后的）
     final contentToSave = _getCurrentContent();
     final s = S.of(context);
     if (contentToSave == null || contentToSave.isEmpty) {
@@ -161,14 +160,12 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
     }
 
     try {
-      // 生成文件名
       String fileName = widget.title;
       if (!fileName.contains('.')) {
         fileName = '$fileName.txt';
       }
 
       if (Platform.isIOS) {
-        // iOS: 通过分享面板保存
         final tempDir = await getTemporaryDirectory();
         final tempFile = File('${tempDir.path}/$fileName');
         final bytes = _encodeString(contentToSave);
@@ -189,12 +186,10 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
           }
         }
       } else {
-        // 其他平台: 选择目录后写入
         final directoryPath = await FilePicker.getDirectoryPath();
         if (directoryPath == null) return;
         if (!mounted) return;
 
-        // 检查文件是否已存在，如果存在则添加序号
         String finalPath = path.join(directoryPath, fileName);
         int counter = 1;
         while (await File(finalPath).exists()) {
@@ -205,7 +200,6 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
           counter++;
         }
 
-        // 写入文件
         final file = File(finalPath);
         final bytes = _encodeString(contentToSave);
         await file.writeAsBytes(bytes);
@@ -223,7 +217,6 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
   }
 
   Future<void> _saveToSubtitleLibrary() async {
-    // 获取当前显示的内容（可能是编辑后的）
     final contentToSave = _getCurrentContent();
     final s2 = S.of(context);
     if (contentToSave == null || contentToSave.isEmpty) {
@@ -234,24 +227,20 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
     }
 
     try {
-      // 获取字幕库目录
       final libraryDir =
           await SubtitleLibraryService.getSubtitleLibraryDirectory();
 
-      // 创建“已保存”目录
       final savedDir = Directory(
           path.join(libraryDir.path, SubtitleLibraryService.savedFolderName));
       if (!await savedDir.exists()) {
         await savedDir.create();
       }
 
-      // 生成文件名
       String fileName = widget.title;
       if (!fileName.contains('.')) {
         fileName = '$fileName.txt';
       }
 
-      // 检查文件是否已存在，如果存在则添加序号
       String finalPath = path.join(savedDir.path, fileName);
       int counter = 1;
       while (await File(finalPath).exists()) {
@@ -261,19 +250,14 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
         counter++;
       }
 
-      // 写入文件
       final file = File(finalPath);
-      // 使用原始编码保存，保持编码一致性
       final bytes = _encodeString(contentToSave);
       await file.writeAsBytes(bytes);
 
-      // 局部刷新缓存以便字幕库更新该目录
       await SubtitleLibraryService.refreshDirectoryCache(savedDir.path);
 
-      // 触发字幕库重载回调
       widget.onSavedToLibrary?.call();
 
-      // 等待下一帧再显示成功提示
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -305,13 +289,11 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
     });
 
     try {
-      // 优先检查是否是本地文件（file:// 协议）
       if (widget.textUrl.startsWith('file://')) {
-        final localPath = widget.textUrl.substring(7); // 移除 'file://' 前缀
+        final localPath = widget.textUrl.substring(7);
         final localFile = File(localPath);
 
         if (await localFile.exists()) {
-          // 使用智能编码检测读取文件
           final content = await _readFileWithEncoding(localFile);
           setState(() {
             _content = content;
@@ -334,7 +316,7 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
         final cachedContent = await CacheService.getCachedTextContent(
           workId: widget.workId!,
           hash: widget.hash!,
-          fileName: null, // TextPreviewScreen doesn't track fileName
+          fileName: null,
         );
 
         if (cachedContent != null) {
@@ -351,14 +333,13 @@ class _TextPreviewScreenState extends State<TextPreviewScreen> {
       final response = await dio.get(
         widget.textUrl,
         options: Options(
-          responseType: ResponseType.bytes, // 改为获取字节数据
+          responseType: ResponseType.bytes,
           receiveTimeout: const Duration(seconds: 30),
           headers: CookieService.serverCookieHeaders,
         ),
       );
 
       if (response.statusCode == 200) {
-        // 使用智能编码检测解码
         final bytes = response.data as List<int>;
         final content = _decodeBytes(bytes);
 

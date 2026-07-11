@@ -42,7 +42,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
   ScrollController get _currentScrollController =>
       _controllerFor(ref.read(worksProvider).displayMode);
 
-  // 防抖相关（仅用于热门/推荐模式的自动加载）
   final ScrollThrottler _scrollThrottler = ScrollThrottler(positionThreshold: 10);
   bool _isLoadingMore = false;
   bool _batchTriggered = false;
@@ -53,17 +52,15 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
   };
 
   @override
-  bool get wantKeepAlive => true; // 保持状态不被销毁
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    // Create scroll controllers for all modes
     for (final mode in DisplayMode.values) {
       final controller = _controllerFor(mode);
       controller.addListener(() => _onScrollForMode(mode));
     }
-    // 只在首次加载时获取数据，如果已有数据则不重新加载
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final worksState = ref.read(worksProvider);
       if (worksState.works.isEmpty) {
@@ -97,7 +94,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
       _scrollPositions[worksState.displayMode] = currentPosition;
       final isNearBottom = currentPosition >= maxScrollExtent - 50;
 
-      // 热门/推荐模式:自动加载更多（全部模式不需要处理，因为分页控件始终显示）
       if (worksState.displayMode != DisplayMode.all) {
         if (isNearBottom &&
             !worksState.isLoading &&
@@ -156,7 +152,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
     if (velocity.abs() < 500) return;
 
     if (velocity < 0) {
-      // Swipe Left (Next Tab)
       if (currentMode == DisplayMode.all) {
         _saveScrollPosition(DisplayMode.all);
         ref.read(worksProvider.notifier).setDisplayMode(DisplayMode.popular);
@@ -165,7 +160,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
         ref.read(worksProvider.notifier).setDisplayMode(DisplayMode.recommended);
       }
     } else {
-      // Swipe Right (Previous Tab)
       if (currentMode == DisplayMode.recommended) {
         _saveScrollPosition(DisplayMode.recommended);
         ref.read(worksProvider.notifier).setDisplayMode(DisplayMode.popular);
@@ -178,13 +172,12 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // 必须调用以保持状态
+    super.build(context);
     ref.listen<DisplayMode>(
       worksProvider.select((s) => s.displayMode),
       (previous, next) {
         if (!mounted || previous == null || previous == next) return;
 
-        // Save scroll position for the mode we are leaving
         _saveScrollPosition(previous);
 
         final prevIndex = DisplayMode.values.indexOf(previous);
@@ -197,7 +190,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
         _restoreScrollPosition(next);
       },
     );
-    // Trigger batch blurhash generation when works first load or after account switch
     ref.listen<List<Work>>(
       worksProvider.select((s) => s.works),
       (previous, next) {
@@ -210,8 +202,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
       },
     );
 
-    // Reset batch trigger when user switches account
-    // Batch will be re-triggered by works listener above when new works load
     ref.listen<User?>(
       currentUserProvider,
       (previous, next) {
@@ -272,9 +262,7 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final tt = theme.textTheme;
-    // 错误状态或空状态 - 统一显示
     if (worksState.works.isEmpty) {
-      // 如果有错误，显示错误信息
       if (worksState.error != null) {
         return Center(
           child: Column(
@@ -309,7 +297,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
         );
       }
 
-      // 加载中
       if (worksState.isLoading) {
         return Center(
           child: Column(
@@ -323,7 +310,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
         );
       }
 
-      // 空状态
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -352,7 +338,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
       child: Stack(
         children: [
           _buildLayoutView(worksState),
-          // 全局加载动画 - 在有数据且正在刷新时显示
           if (worksState.isLoading && worksState.works.isNotEmpty)
             const Positioned(
               top: 0,
@@ -369,7 +354,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
   }
 
   Widget _buildLayoutView(WorksState worksState) {
-    // Cache MediaQuery sekali untuk menghindari lookup berulang
     final size = MediaQuery.of(context).size;
     final orientation = MediaQuery.orientationOf(context);
 
@@ -413,10 +397,9 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
             childCount: worksState.works.length +
                 (!isAllMode && worksState.hasMore ? 1 : 0),
             itemBuilder: (context, index) {
-              // 热门/推荐模式:在底部显示加载指示器
               if (!isAllMode && index == worksState.works.length) {
                 return const SizedBox(
-                  height: 100, // 统一加载指示器高度
+                  height: 100,
                   child: Center(child: CircularProgressIndicator()),
                 );
               }
@@ -433,7 +416,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
           ),
         ),
 
-        // 热门/推荐模式:到底提示
         if (!isAllMode && worksState.isLastPage)
           SliverToBoxAdapter(
             child: Container(
@@ -473,7 +455,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
             ),
           ),
 
-        // 全部模式:分页控件(集成在瀑布流中) - 始终显示
         if (isAllMode)
           SliverPadding(
             padding: EdgeInsets.fromLTRB(padding, spacing, padding, 24),
@@ -520,7 +501,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
       return OverscrollNextPageDetector(
         onNextPage: () async {
           await ref.read(worksProvider.notifier).nextPage();
-          // 等待一帧后滚动到顶部，确保内容已加载
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _scrollToTop();
           });
@@ -548,7 +528,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {
-                // 热门/推荐模式:加载指示器
                 if (!isAllMode &&
                     index == worksState.works.length &&
                     worksState.hasMore) {
@@ -560,7 +539,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
                   );
                 }
 
-                // 热门/推荐模式:到底提示
                 if (!isAllMode &&
                     index == worksState.works.length &&
                     worksState.isLastPage) {
@@ -594,22 +572,21 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
                   child: EnhancedWorkCard(
                     key: ValueKey(work.id),
                     work: work,
-                    crossAxisCount: 1, // 列表视图
+                    crossAxisCount: 1,
                   ),
                 );
               },
               childCount: worksState.works.length +
                   (!isAllMode && worksState.hasMore ? 1 : 0) +
                   (!isAllMode && worksState.isLastPage ? 1 : 0),
-              addRepaintBoundaries: false, // 已手动包裹 RepaintBoundary，避免双重开销
+              addRepaintBoundaries: false,
             ),
           ),
         ),
 
-        // 全部模式:分页控件(集成在列表中) - 始终显示
         if (isAllMode)
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 24), // 统一左右padding为8
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
             sliver: SliverToBoxAdapter(
               child: PaginationBar(
                 currentPage: worksState.currentPage,
@@ -639,7 +616,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
       return OverscrollNextPageDetector(
         onNextPage: () async {
           await ref.read(worksProvider.notifier).nextPage();
-          // 等待一帧后滚动到顶部，确保内容已加载
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _scrollToTop();
           });
@@ -670,12 +646,11 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
 
       if (host.isEmpty || worksState.works.isEmpty) return;
 
-      // Generate blurhash for first 20 works
       const batchSize = 20;
       final batch = worksState.works.take(batchSize).toList();
 
       final items = batch
-          .where((w) => w.blurHash == null) // Skip if server already provides
+          .where((w) => w.blurHash == null)
           .map((w) => (
                 workId: w.id,
                 imageUrl: w.getCoverImageUrl(host, token: token),
@@ -689,7 +664,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
     });
   }
 
-  // 滚动到顶部
   void _scrollToTop() {
     final controller = _currentScrollController;
     if (controller.hasClients) {
@@ -726,7 +700,6 @@ class _WorksAppBarControls extends ConsumerWidget {
 
     return Row(
       children: [
-        // First column: scrollable mode buttons
         Expanded(
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -734,14 +707,12 @@ class _WorksAppBarControls extends ConsumerWidget {
             child: _buildModeButtons(context, ref, displayMode),
           ),
         ),
-        // Separator
         Container(
           height: 28,
           width: 1,
           color: cs.outlineVariant.withValues(alpha: 0.5),
           margin: const EdgeInsets.symmetric(horizontal: 2),
         ),
-        // Layout toggle
         IconButton(
           icon: _getLayoutIcon(layoutType),
           iconSize: 22,
@@ -750,7 +721,6 @@ class _WorksAppBarControls extends ConsumerWidget {
           onPressed: () => ref.read(worksProvider.notifier).toggleLayoutType(),
           tooltip: _getLayoutTooltip(context, layoutType),
         ),
-        // Subtitle filter toggle
         IconButton(
           icon: Icon(
             subtitleFilter == 1
@@ -768,7 +738,6 @@ class _WorksAppBarControls extends ConsumerWidget {
               ? S.of(context).showAllWorks
               : S.of(context).showOnlySubtitled,
         ),
-        // Sort button
         Padding(
           padding: EdgeInsets.only(right: horizontalPadding - 6),
           child: IconButton(

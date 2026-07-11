@@ -38,7 +38,7 @@ class SeriesWorksNotifier extends StateNotifier<SeriesWorksState> {
   /// Load works from the same circle as [work].
   /// Searches by circle name, then filters out the current work.
   Future<void> loadCircleWorks(Work work) async {
-    final circleName = work.name; // circleTitle getter returns name ?? ''
+    final circleName = work.name;
     if (circleName == null || circleName.isEmpty || work.circleId == null) {
       state = const SeriesWorksState();
       return;
@@ -50,7 +50,6 @@ class SeriesWorksNotifier extends StateNotifier<SeriesWorksState> {
     try {
       final apiService = ref.read(kikoeruApiServiceProvider);
 
-      // Search by circle name to find works from the same circle
       final data = await apiService.searchWorks(
         keyword: '\$circle:$circleName\$',
         page: 1,
@@ -62,7 +61,6 @@ class SeriesWorksNotifier extends StateNotifier<SeriesWorksState> {
       final worksList = data['works'] as List? ?? [];
       final allWorks = worksList.map((json) => Work.fromJson(json)).toList();
 
-      // Filter out the current work and limit to reasonable count
       final filtered = allWorks
           .where((w) => w.id != work.id)
           .take(12)

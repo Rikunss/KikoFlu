@@ -159,7 +159,6 @@ class _AudioInfoSheetContentState extends ConsumerState<_AudioInfoSheetContent>
 
     return Column(
       children: [
-        // ── Drag Handle ──
         Padding(
           padding: const EdgeInsets.only(top: 8, bottom: 4),
           child: Center(
@@ -174,13 +173,11 @@ class _AudioInfoSheetContentState extends ConsumerState<_AudioInfoSheetContent>
           ),
         ),
 
-        // ── Scrollable Content ──
         Expanded(
           child: CustomScrollView(
             controller: widget.scrollController,
             physics: const ClampingScrollPhysics(),
             slivers: [
-              // ── Parallax Header ──
               SliverToBoxAdapter(
                 child: _AnimatedEntry(
                   animation: _sectionAnims[0],
@@ -192,7 +189,6 @@ class _AudioInfoSheetContentState extends ConsumerState<_AudioInfoSheetContent>
 
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-              // ── File Section ──
               SliverToBoxAdapter(
                 child: _AnimatedEntry(
                   animation: _sectionAnims[1],
@@ -202,7 +198,6 @@ class _AudioInfoSheetContentState extends ConsumerState<_AudioInfoSheetContent>
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
-              // ── Audio Chain Section ──
               SliverToBoxAdapter(
                 child: _AnimatedEntry(
                   animation: _sectionAnims[2],
@@ -212,7 +207,6 @@ class _AudioInfoSheetContentState extends ConsumerState<_AudioInfoSheetContent>
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
-              // ── DSP Section ──
               SliverToBoxAdapter(
                 child: _AnimatedEntry(
                   animation: _sectionAnims[3],
@@ -222,7 +216,6 @@ class _AudioInfoSheetContentState extends ConsumerState<_AudioInfoSheetContent>
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
-              // ── Status Section ──
               SliverToBoxAdapter(
                 child: _AnimatedEntry(
                   animation: _sectionAnims[4],
@@ -232,7 +225,6 @@ class _AudioInfoSheetContentState extends ConsumerState<_AudioInfoSheetContent>
 
               const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-              // ── Footer ──
               SliverToBoxAdapter(
                 child: _AnimatedEntry(
                   animation: _sectionAnims[5],
@@ -248,10 +240,6 @@ class _AudioInfoSheetContentState extends ConsumerState<_AudioInfoSheetContent>
     );
   }
 }
-
-// ═══════════════════════════════════════════════
-// Animated Entry Wrapper
-// ═══════════════════════════════════════════════
 
 class _AnimatedEntry extends StatelessWidget {
   final Animation<double> animation;
@@ -276,10 +264,6 @@ class _AnimatedEntry extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-// Modern Header with Parallax + Gradient
-// ═══════════════════════════════════════════════
-
 class _ModernHeader extends StatelessWidget {
   final double scrollOffset;
 
@@ -290,7 +274,6 @@ class _ModernHeader extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    // Parallax effect: subtle opacity shift as user scrolls
     final headerOpacity = (1.0 - (scrollOffset / 100)).clamp(0.6, 1.0);
     final headerTranslate = (scrollOffset * 0.3).clamp(0.0, 30.0);
 
@@ -319,7 +302,6 @@ class _ModernHeader extends StatelessWidget {
             ),
             child: Row(
               children: [
-                // Icon with glow
                 Container(
                   width: 44,
                   height: 44,
@@ -363,7 +345,6 @@ class _ModernHeader extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Close button
                 Container(
                   width: 36,
                   height: 36,
@@ -390,10 +371,6 @@ class _ModernHeader extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════
-// Section Card base — glassmorphism container
-// ═══════════════════════════════════════════════
 
 class _SectionCard extends StatelessWidget {
   final IconData icon;
@@ -443,7 +420,6 @@ class _SectionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Accent top border
             Container(
               height: 3,
               decoration: BoxDecoration(
@@ -455,7 +431,6 @@ class _SectionCard extends StatelessWidget {
                 ),
               ),
             ),
-            // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
               child: Row(
@@ -480,7 +455,6 @@ class _SectionCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Content
             ...children,
             const SizedBox(height: 6),
           ],
@@ -490,10 +464,6 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-// File section — watches currentTrackProvider, durationProvider,
-// audioFormatInfoProvider.
-// ═══════════════════════════════════════════════
 class _FileSectionCard extends ConsumerWidget {
   const _FileSectionCard();
 
@@ -552,7 +522,6 @@ class _FileSectionCard extends ConsumerWidget {
               ),
             ),
           ),
-        // Format pills row
         Padding(
           padding: const EdgeInsets.fromLTRB(10, 6, 10, 2),
           child: Wrap(
@@ -607,10 +576,6 @@ class _FileSectionCard extends ConsumerWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-// Audio Chain section — watches only exclusiveAudioStateProvider.
-// USB DAC and chain flow providers are isolated in sub-Consumers.
-// ═══════════════════════════════════════════════
 class _AudioChainSectionCard extends ConsumerWidget {
   const _AudioChainSectionCard();
 
@@ -652,9 +617,7 @@ class _AudioChainSectionCard extends ConsumerWidget {
       tt: tt,
       accentColor: cs.primary,
       children: [
-        // Flow visualization — isolated ConsumerWidget
         const _ChainFlowSection(),
-        // USB DAC info — separate Consumer so USB plug/unplug doesn't rebuild the whole chain card
         Consumer(
           builder: (context, ref, child) {
             final dacNameAsync = ref.watch(activeUsbDacNameProvider);
@@ -690,7 +653,6 @@ class _AudioChainSectionCard extends ConsumerWidget {
           },
         ),
         const SizedBox(height: 4),
-        // Audio mode
         _InfoRow(
           label: 'Audio Mode',
           value: aaudioFormatDesc,
@@ -701,7 +663,6 @@ class _AudioChainSectionCard extends ConsumerWidget {
                   ? cs.primary
                   : null,
         ),
-        // Bit-perfect indicator with glow
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 4, 14, 6),
           child: _BitPerfectIndicator(cs: cs, tt: tt),
@@ -730,7 +691,6 @@ class _ChainFlowSection extends ConsumerWidget {
       loading: () => '',
       error: (_, __) => '',
     );
-    // libusb USB DAC state
     final routingAsync = ref.watch(hiResUsbRoutingProvider);
     final hiResRouting = routingAsync.when(
       data: (r) => r,
@@ -944,9 +904,6 @@ class _ChainStage {
   });
 }
 
-// ═══════════════════════════════════════════════
-// DSP section — watches audioPlayerControllerProvider.
-// ═══════════════════════════════════════════════
 class _DspSectionCard extends ConsumerWidget {
   const _DspSectionCard();
 
@@ -1000,7 +957,6 @@ class _DspSectionCard extends ConsumerWidget {
           cs: cs, tt: tt,
         ),
         const SizedBox(height: 4),
-        // Divider with gradient
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Container(
@@ -1016,7 +972,6 @@ class _DspSectionCard extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 4),
-        // Volume · Speed
         _DspDetailRow(
           icon: Icons.speed,
           label: 'Volume · Speed',
@@ -1029,7 +984,6 @@ class _DspSectionCard extends ConsumerWidget {
             cs: cs, tt: tt,
           ),
         ),
-        // Repeat · Shuffle
         _DspDetailRow(
           icon: Icons.repeat,
           label: 'Repeat · Shuffle',
@@ -1087,9 +1041,6 @@ class _DspDetailRow extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-// Status section — watches exclusiveAudioStateProvider + playerStateProvider.
-// ═══════════════════════════════════════════════
 class _StatusSectionCard extends ConsumerWidget {
   const _StatusSectionCard();
 
@@ -1149,7 +1100,6 @@ class _StatusSectionCard extends ConsumerWidget {
       tt: tt,
       accentColor: const Color(0xFF4CAF50),
       children: [
-        // Player state with pulsing dot
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
           child: Row(
@@ -1272,9 +1222,6 @@ class _PulsingDotState extends State<_PulsingDot>
   }
 }
 
-// ═══════════════════════════════════════════════
-// Footer
-// ═══════════════════════════════════════════════
 class _InfoFooter extends StatelessWidget {
   const _InfoFooter();
 
@@ -1312,10 +1259,6 @@ class _InfoFooter extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-// Utility functions
-// ═══════════════════════════════════════════════
-
 String _fmtDuration(Duration d) {
   final h = d.inHours;
   final m = d.inMinutes.remainder(60);
@@ -1331,9 +1274,6 @@ String _formatPresetName(String id) {
   return id == 'custom' ? 'Custom' : id;
 }
 
-// ═══════════════════════════════════════════════
-// System Volume — sub-widget with periodic refresh
-// ═══════════════════════════════════════════════
 class _SystemVolumeWidget extends ConsumerStatefulWidget {
   final double volume;
   final double speed;
@@ -1415,10 +1355,6 @@ class _SystemVolumeWidgetState extends ConsumerState<_SystemVolumeWidget> {
     };
   }
 }
-
-// ═══════════════════════════════════════════════
-// Shared UI Components
-// ═══════════════════════════════════════════════
 
 class _InfoRow extends StatelessWidget {
   final String label;
@@ -1621,9 +1557,6 @@ class _FormatPill extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-// Bit-Perfect Indicator
-// ═══════════════════════════════════════════════
 class _BitPerfectIndicator extends ConsumerWidget {
   final ColorScheme cs;
   final TextTheme tt;
@@ -1729,9 +1662,6 @@ class _BitPerfectIndicator extends ConsumerWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-// AAudio Status Row
-// ═══════════════════════════════════════════════
 class _AAudioStatusRow extends ConsumerWidget {
   final ColorScheme cs;
   final TextTheme tt;

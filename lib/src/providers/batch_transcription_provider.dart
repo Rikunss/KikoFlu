@@ -152,7 +152,6 @@ class BatchTranscriptionNotifier
 
     _batchCompleter = Completer<void>();
 
-    // Acquire wakelock
     try {
       await WakelockPlus.enable();
     } catch (e) {
@@ -160,7 +159,6 @@ class BatchTranscriptionNotifier
           tag: 'AI');
     }
 
-    // Initialize notification service
     try {
       await BatchTranscriptionNotificationService.instance.initialize();
     } catch (e) {
@@ -168,13 +166,11 @@ class BatchTranscriptionNotifier
           '[BatchTranscription] Failed to init notification: $e', tag: 'AI');
     }
 
-    // Process files sequentially
     for (int i = 0; i < state.files.length; i++) {
       if (_cancelled) break;
 
       final batchFile = state.files[i];
 
-      // Update state: mark as transcribing
       final updatedFiles = List<BatchFile>.from(state.files);
       updatedFiles[i] = batchFile.copyWith(status: BatchFileStatus.transcribing);
       state = state.copyWith(
@@ -182,7 +178,6 @@ class BatchTranscriptionNotifier
         currentIndex: i,
       );
 
-      // Show notification
       try {
         await BatchTranscriptionNotificationService.instance.showProgress(
           currentIndex: i,
@@ -193,7 +188,6 @@ class BatchTranscriptionNotifier
         LogService.instance.warning('[BatchTranscriptionNotifier] error: $e', tag: 'BatchTranscription');
       }
 
-      // Transcribe
       final aiService = _ref.read(aiModelServiceProvider);
 
       try {
@@ -233,7 +227,6 @@ class BatchTranscriptionNotifier
             tag: 'AI',
           );
 
-          // Show file error notification
           try {
             await BatchTranscriptionNotificationService.instance.showFileFailed(
               fileName: batchFile.displayName,
@@ -259,7 +252,6 @@ class BatchTranscriptionNotifier
           tag: 'AI',
         );
 
-        // Show file error notification
         try {
             await BatchTranscriptionNotificationService.instance.showFileFailed(
               fileName: batchFile.displayName,
@@ -271,14 +263,12 @@ class BatchTranscriptionNotifier
       }
     }
 
-    // Release wakelock
     try {
       await WakelockPlus.disable();
     } catch (e) {
       LogService.instance.warning('[BatchTranscriptionNotifier] error: $e', tag: 'BatchTranscription');
     }
 
-    // Complete
     if (_cancelled) {
       state = state.copyWith(
         status: BatchJobStatus.cancelled,
@@ -318,7 +308,7 @@ class BatchTranscriptionNotifier
 
   /// Clear the completed/cancelled state and return to idle.
   void clear() {
-    if (state.status == BatchJobStatus.running) return; // don't clear while running
+    if (state.status == BatchJobStatus.running) return;
     state = const BatchTranscriptionState();
   }
 }

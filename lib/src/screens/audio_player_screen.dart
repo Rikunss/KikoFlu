@@ -320,7 +320,6 @@ class _PortraitLyricViewState extends ConsumerState<_PortraitLyricView> {
 
   @override
   void dispose() {
-    // Restore system UI if still in locked mode
     if (_isLyricLocked) {
       SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.manual,
@@ -428,7 +427,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   Future<void> _onGenerateAiLyrics() async {
     if (_isTranscribing) return;
 
-    // Get current track and audio path first
     final track = ref.read(currentTrackProvider).valueOrNull;
     if (track == null) return;
     final audioPath = _getLocalAudioPath(track);
@@ -444,7 +442,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       return;
     }
 
-    // Check which models are installed
     final aiService = ref.read(aiModelServiceProvider);
     final settings = ref.read(aiSettingsProvider);
 
@@ -467,7 +464,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       return;
     }
 
-    // Determine initial model — prefer the one from settings if it's installed
     WhisperModel initialModel;
     try {
       initialModel = WhisperModel.values.firstWhere(
@@ -480,7 +476,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       initialModel = installedConfigs.first.model;
     }
 
-    // Show model picker dialog
     if (!mounted) return;
     final config = await showAIModelPickerDialog(
       context,
@@ -492,7 +487,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
     if (config == null || !mounted) return;
 
-    // Start transcribing with chosen settings
     setState(() => _isTranscribing = true);
     try {
       final lrcPath = await aiService.generateLrc(
@@ -575,7 +569,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     final hasShown = prefs.getBool('swipe_dismiss_hint_shown') ?? false;
     if (!hasShown) {
       await prefs.setBool('swipe_dismiss_hint_shown', true);
-      // Delay to let the route enter animation settle
       await Future.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
       setState(() => _showSwipeHint = true);
@@ -603,7 +596,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   /// is instant. Iterates at most 2 pages (40 works) — covers the vast
   /// majority of users without excessive API calls.
   Future<void> _checkFavoriteStatus(int workId) async {
-    // Check in-memory cache first.
     if (_favoriteCache.containsKey(workId)) {
       final cached = _favoriteCache[workId]!;
       if (mounted && cached != _isFavorited) {
@@ -624,12 +616,10 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
           }
           return;
         }
-        // Server returned fewer items than pageSize — no more pages.
         if (worksList.length < 20) break;
       }
       _favoriteCache[workId] = false;
     } catch (_) {
-      // Silently fail — heart stays unfilled.
     }
   }
 
@@ -723,9 +713,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     final coverUrl = _buildWorkCoverUrl(workId, artworkUrl) ?? artworkUrl;
     if (coverUrl == null) return;
 
-    // Pre-load from CachedNetworkImage's disk cache using the same cacheKey
-    // so we don't download the same image twice (once for the blur background,
-    // once for colour extraction).
     Uint8List? preloadedBytes;
     if (workId != null && !coverUrl.startsWith('file://')) {
       try {
@@ -735,7 +722,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
           preloadedBytes = await cached.file.readAsBytes();
         }
       } catch (_) {
-        // Cache miss — extractor will download via HTTP.
       }
     }
 
@@ -764,17 +750,12 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
         : '$normalizedHost/api/cover/$workId';
   }
 
-  // ── Drag-to-dismiss handlers ──
   void _handleDragStart(DragStartDetails details) {
     _isDragging = true;
     final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
     if (isLandscape) {
       final screenWidth = MediaQuery.sizeOf(context).width;
-      // Top zone (drag handle + top bar ~80px) — always allow dismiss
-      // so the drag handle pill at center-top works regardless of x position.
       final isInTopZone = details.localPosition.dy < 80;
-      // Left side (cover + controls) uses flex: 2 out of total flex: 5 = 40%.
-      // Use 42% to allow a small buffer around the divider.
       final isOnCoverSide = details.localPosition.dx < screenWidth * 0.42;
       _isValidDismissDrag = isInTopZone || isOnCoverSide;
     } else {
@@ -800,13 +781,10 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     final threshold = screenHeight * 0.25;
 
     if (_dragOffset > threshold || (details.primaryVelocity ?? 0) > 500) {
-      // Dismiss: signal the mini player to start sliding up in sync
-      // with the route's slide-down reverse animation.
       ref.read(isFullscreenPlayerActiveProvider.notifier).state = false;
       setState(() => _dragOffset = 0);
       Navigator.maybeOf(context)?.pop();
     } else {
-      // Snap back to position 0
       _dismissCtrl
         ..value = (_dragOffset / screenHeight).clamp(0.0, 1.0)
         ..reverse();
@@ -870,25 +848,10 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     final service = ref.read(audioPlayerServiceProvider);
     _seekCompletionSub = service.positionStream.listen((pos) {
       if (currentGen != _seekGeneration) return;
-      // Use absolute proximity check (≤200ms) so backward seeks also
-      // trigger completion. The old forward-only check (pos >= target)
-      // caused backward tap-to-seek to immediately fire (current position
-      // > target), clearing _seekingPosition before the audio actually
-      // arrived — making the lyric display fall back to a stale position.
       if ((pos - target).abs() <= const Duration(milliseconds: 200)) {
         _seekCompletionSub?.cancel();
         _seekCompletionSub = null;
         if (mounted) {
-          // Defer clearing _seekingPosition to the next frame so
-          // FullLyricDisplay.didUpdateWidget sees the transition from
-          // null → value and can force _autoScroll=true + reset
-          // _lastAutoScrollIndex. Without this deferral, the position
-          // stream fires synchronously (from seek()) and clears
-          // _seekingPosition before the first frame renders, making
-          // didUpdateWidget always see null on both old and new.
-          //
-          // This ensures seekbar seek gets the same treatment as
-          // tap-to-seek (_onLyricTap) for auto-scroll re-enablement.
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted || currentGen != _seekGeneration) return;
             setState(() { _isSeekingManually = false; _seekingPosition = null; });
@@ -897,7 +860,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       }
     });
 
-    // Safety fallback: clear after 2s even if the stream never updates.
     Future.delayed(const Duration(seconds: 2), () {
       if (currentGen != _seekGeneration) return;
       _seekCompletionSub?.cancel();
@@ -921,22 +883,16 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     final currentTrack = ref.watch(currentTrackProvider);
     final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
-    // Auto-subtitle loader (side-effect read, doesn't rebuild)
     ref.watch(lyricAutoLoaderProvider);
-    ref.watch(audioFormatInfoProvider); // keep the format info alive
+    ref.watch(audioFormatInfoProvider);
 
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    // Guard: only call platform channel once since the player always uses
-    // a dark canvas (Colors.black / #111111). The status bar style never
-    // changes after initial setup — calling it on every build() causes
-    // unnecessary platform channel round-trips.
     if (!_systemUiStyleSet) {
       _systemUiStyleSet = true;
       SystemChrome.setSystemUIOverlayStyle(_darkSystemUi);
     }
 
-    // Compute drag progress for dismiss animation
     final screenHeight = MediaQuery.sizeOf(context).height;
     final dragProgress = (_dragOffset / screenHeight).clamp(0.0, 1.0);
     final dragOpacity = 1.0 - dragProgress * 0.5;
@@ -954,14 +910,11 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
           child: Opacity(
             opacity: dragOpacity,
             child: Stack(children: [
-              // Blurred cover background (full-screen)
               if (currentTrack.valueOrNull != null)
                 _buildBlurredBackground(currentTrack.valueOrNull!),
 
-              // Dark gradient overlay for readability
               _buildGradientOverlay(),
 
-              // Extra dim overlay when viewing lyrics — animated fade
               Positioned.fill(
                 child: AnimatedOpacity(
                   opacity: _showLyricView ? 1.0 : 0.0,
@@ -973,14 +926,11 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ),
               ),
 
-              // Safe area content
               SafeArea(
                 child: isLandscape
                     ? _buildLandscapeLayout(context, currentTrack, theme, cs)
                     : _buildPortraitLayout(context, currentTrack, theme, cs),
               ),
-
-
 
             ]),
           ),
@@ -1063,7 +1013,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
             ),
           ),
           const Spacer(),
-          // AI Generate Lyrics — only visible for local audio files
           if (localAudioPath != null)
             IconButton(
               onPressed: _isTranscribing ? null : _onGenerateAiLyrics,
@@ -1149,11 +1098,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     final showBlur = ref.watch(showBlurredBackgroundProvider);
 
     if (!showBlur) {
-      // Always use a dark background regardless of theme, since all text/UI
-      // in the fullscreen player is designed around a dark canvas (white text,
-      // semi-transparent white controls, etc.). Theme-derived colors like
-      // surfaceContainerHighest are too light in light mode, making the text
-      // unreadable.
       return Positioned.fill(
         child: Container(
           color: const Color(0xFF111111),
@@ -1177,12 +1121,11 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       imageWidget = CachedNetworkImage(
         imageUrl: coverUrl,
         fit: BoxFit.cover,
-        memCacheWidth: 720, // lower resolution for background blur
+        memCacheWidth: 720,
         cacheKey: track.workId != null
             ? 'work_cover_${track.workId}'
             : null,
         imageBuilder: (context, imageProvider) {
-          // Cover loaded — trigger gradient extraction if not yet done.
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (track.workId != null &&
                 _extractedCoverForWorkId != track.workId) {
@@ -1197,15 +1140,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       );
     }
 
-    // Apply blur directly to the cover image via ImageFiltered instead of
-    // using BackdropFilter. ImageFiltered avoids the expensive offscreen
-    // render pass that BackdropFilter requires every frame — the blur is
-    // applied as a paint-level operation directly on the image, which is
-    // significantly more GPU-friendly and reduces frame render time.
-    //
-    // Wrapped in RepaintBoundary to avoid an Impeller validation error when
-    // the parent Opacity widget (drag-to-dismiss animation) tries to pass
-    // inherited opacity to ImageFiltered, which doesn't support it.
     return Positioned.fill(
       child: RepaintBoundary(
         child: ClipRect(
@@ -1232,14 +1166,14 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
             end: Alignment.bottomCenter,
             colors: showBlur
                 ? const [
-                    Color(0xD0000000), // dark top
-                    Color(0x44000000), // transparent mid
-                    Color(0xB3000000), // darker bottom
+                    Color(0xD0000000),
+                    Color(0x44000000),
+                    Color(0xB3000000),
                   ]
                 : const [
-                    Color(0xCC000000), // dark top (80%)
-                    Color(0x66000000), // mid (40%)
-                    Color(0xAA000000), // darker bottom (67%)
+                    Color(0xCC000000),
+                    Color(0x66000000),
+                    Color(0xAA000000),
                   ],
             stops: const [0.0, 0.3, 1.0],
           ),
@@ -1263,15 +1197,11 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
         final workCoverUrl = _buildWorkCoverUrl(track.workId, track.artworkUrl);
 
         return Column(children: [
-          // Drag handle — swipe-to-dismiss cue
           _buildDragHandle(),
-          // One-time swipe hint
           if (_showSwipeHint)
             _buildSwipeHint(),
-          // Top bar overlay
           _buildTopBar(context),
 
-          // Main content area with animated transition
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 350),
@@ -1303,7 +1233,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
             ),
           ),
 
-          // Track info (always visible, even in lyric view)
           if (!_showLyricView) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -1324,7 +1253,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Favorite heart button
                     if (track.workId != null)
                       _buildFavoriteButton(track.workId!),
                   ],
@@ -1341,7 +1269,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     overflow: TextOverflow.ellipsis,
                   ),
               const SizedBox(height: 4),
-              // Audio format info + USB DAC badge
               Consumer(
                 builder: (context, ref, child) {
                   final audioFormat = ref.watch(audioFormatInfoProvider);
@@ -1380,7 +1307,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
               ]),
             ),
             const SizedBox(height: 8),
-            // Lyric preview (tappable) — only rebuilds when lyric presence changes
             Consumer(builder: (context, ref, child) {
               final hasLyrics = ref.watch(
                 lyricControllerProvider.select((s) => s.lyrics.isNotEmpty),
@@ -1396,10 +1322,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
           const SizedBox(height: 8),
 
-          // Controls — force dark theme since the player background
-          // is always dark (Colors.black / #111111). Without this override,
-          // icons/text using onSurface/onSurfaceVariant would be dark/invisible
-          // in light mode.
           Theme(
             data: theme.copyWith(
               colorScheme: ColorScheme.fromSeed(
@@ -1520,7 +1442,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
           _buildTopBar(context),
           Expanded(
             child: Row(children: [
-              // Left: Cover + info + controls
               Expanded(
                 flex: 2,
                 child: LayoutBuilder(
@@ -1532,7 +1453,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Cover with rotation
                         ConstrainedBox(
                           constraints: BoxConstraints(
                             maxHeight: coverSize,
@@ -1591,7 +1511,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                             overflow: TextOverflow.ellipsis),
                         ],
                         const SizedBox(height: 4),
-                        // Audio format info + USB DAC badge
                         Consumer(
                           builder: (context, ref, child) {
                             final audioFormat = ref.watch(audioFormatInfoProvider);
@@ -1661,9 +1580,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   },
                 ),
               ),
-              // Divider
               Container(width: 1, color: Colors.white.withValues(alpha: 0.15)),
-              // Right: Lyrics
               Expanded(
                 flex: 3,
                 child: Consumer(builder: (context, ref, child) {
@@ -1846,7 +1763,6 @@ class _OutputDevicePillState extends ConsumerState<_OutputDevicePill>
     final deviceTypeAsync = ref.watch(activeOutputDeviceProvider);
     return deviceTypeAsync.when(
       data: (type) {
-        // Trigger brief glow on device type change (skip initial mount)
         if (type != _lastDeviceType && _lastDeviceType.isNotEmpty && mounted) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) _glowCtrl.forward(from: 0.0);
@@ -1949,7 +1865,6 @@ class _StreamingSpeedBadgeState extends ConsumerState<_StreamingSpeedBadge> {
 
         final cs = Theme.of(context).colorScheme;
 
-        // Determine color based on state
         final (Color bg, Color fg) = switch (state.state) {
           SpeedIndicatorState.streaming => (
             Colors.green.withValues(alpha: 0.35),
@@ -1975,7 +1890,6 @@ class _StreamingSpeedBadgeState extends ConsumerState<_StreamingSpeedBadge> {
           _ => state.displaySpeed,
         };
 
-        // Short pulse animation when transitioning from inactive → active
         final isNew = _lastState == null ||
             (_lastState == SpeedIndicatorState.hidden &&
                 state.state != SpeedIndicatorState.hidden);
@@ -2067,7 +1981,6 @@ class _AudioInfoBadgeInPlayer extends StatelessWidget {
         if (info == null) return const SizedBox.shrink();
         final cs = Theme.of(context).colorScheme;
 
-        // Pills: codec, bitDepth, sampleRate, bitrate (if available)
         final pills = <Widget>[
           _InfoPill(
             label: info.codec.toUpperCase(),

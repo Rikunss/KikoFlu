@@ -47,7 +47,6 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
 
   @override
   void dispose() {
-    // 不删除任何文件,让临时文件作为缓存使用
     super.dispose();
   }
 
@@ -59,9 +58,8 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
     final s = S.of(context);
 
     try {
-      // 优先检查是否是本地文件（file:// 协议）
       if (widget.pdfUrl.startsWith('file://')) {
-        final localPath = widget.pdfUrl.substring(7); // 移除 'file://' 前缀
+        final localPath = widget.pdfUrl.substring(7);
         final localFile = File(localPath);
 
         if (await localFile.exists()) {
@@ -299,7 +297,6 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri);
                 } else {
-                  // Fallback for Windows if canLaunchUrl fails for file URI
                   if (Platform.isWindows) {
                     await Process.run('explorer', [_localFilePath!]);
                   } else if (Platform.isLinux) {

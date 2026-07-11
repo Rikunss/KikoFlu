@@ -13,7 +13,6 @@ import '../services/account_database.dart';
 import '../services/log_service.dart';
 import '../utils/server_utils.dart';
 
-// Auth state
 class AuthState extends Equatable {
   final User? currentUser;
   final String? token;
@@ -61,7 +60,6 @@ class AuthState extends Equatable {
       [currentUser, token, host, isLoading, error, isLoggedIn, sessionExpired];
 }
 
-// Auth notifier
 class AuthNotifier extends StateNotifier<AuthState> {
   final KikoeruApiService _apiService;
 
@@ -73,22 +71,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Timer? _offlineRetryTimer;
 
   AuthNotifier(this._apiService) : super(const AuthState()) {
-    // Wire up global 401/403 handler from the API service interceptor.
     _apiService.onUnauthorized = _handleUnauthorized;
     _loadCurrentUser();
   }
 
   Future<void> _loadCurrentUser() async {
-    // Yield to event loop so the initial AuthState(currentUser: null)
-    // gets rendered by the widget tree BEFORE any synchronous state
-    // changes (e.g. restoring cached guest credentials).
-    // This ensures the LoginScreen is always visible on the first frame.
     await Future<void>.delayed(Duration.zero);
 
     try {
       LogService.instance.debug('[Auth] Loading current user...', tag: 'Network');
 
-      // First try to load from storage (faster)
       final token = await StorageService.getStringAsync('auth_token');
       final host = StorageService.getString('server_host');
       final userJson = StorageService.getMap('current_user');
@@ -112,24 +104,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isLoggedIn: true,
         );
 
-        // Validate token by fetching user info
         try {
           LogService.instance.debug('[Auth] Validating token...', tag: 'Network');
           await _refreshUserInfo();
           LogService.instance.debug('[Auth] Token is valid, user logged in successfully', tag: 'Network');
-          return; // Token is valid, we're done
+          return;
         } catch (e) {
           LogService.instance.warning('[Auth] Token validation failed: $e', tag: 'Network');
-          // Token is invalid, try to re-login with saved account
         }
       }
 
-      // If no valid token, try to load from database and re-login
       LogService.instance.debug('[Auth] Checking database for active account...', tag: 'Network');
       final activeAccount = await AccountDatabase.instance.getActiveAccount();
 
       if (activeAccount != null) {
-        // Silently re-login with saved credentials
         LogService.instance.debug(
             '[Auth] Found active account in database: ${activeAccount.username}', tag: 'Network');
         LogService.instance.debug('[Auth] Re-logging in with saved account...', tag: 'Network');
@@ -141,7 +129,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           activeAccount.password,
           activeAccount.host,
           activeAccount.serverCookie,
-          silent: true, // Don't show loading state
+          silent: true,
         );
 
         if (success) {
@@ -150,18 +138,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
           return;
         } else {
           LogService.instance.warning('[Auth] Re-login failed due to network or server issue', tag: 'Network');
-          // 网络问题导致登录失败，但我们有缓存的账户信息
-          // 允许用户以离线模式进入应用（可以使用本地下载内容）
           LogService.instance.warning('[Auth] Entering offline mode with cached account', tag: 'Network');
 
-          // 使用缓存的账户信息设置基本状态
           _apiService.init('', activeAccount.host);
 
           state = state.copyWith(
             currentUser: User(
               name: activeAccount.username,
               group: 'guest',
-              loggedIn: false, // 标记为未完全登录（离线模式）
+              loggedIn: false,
               host: activeAccount.host,
               password: activeAccount.password,
               token: '',
@@ -169,12 +154,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
             ),
             host: activeAccount.host,
             token: '',
-            isLoggedIn: false, // 离线模式
+            isLoggedIn: false,
             error: '网络连接失败，以离线模式启动',
           );
 
           LogService.instance.debug('[Auth] Offline mode activated', tag: 'Network');
-          // Start periodic retry to check when connection is back
           _startOfflineRetryTimer();
           return;
         }
@@ -182,13 +166,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         LogService.instance.debug('[Auth] No active account found in database', tag: 'Network');
       }
 
-      // If all fails, logout
       LogService.instance.debug('[Auth] No valid authentication found, logging out', tag: 'Network');
       await logout();
     } catch (e) {
       LogService.instance.error('[Auth] Failed to load saved auth: $e', tag: 'Network');
 
-      // 在异常情况下，也尝试检查是否有缓存账户
       try {
         final activeAccount = await AccountDatabase.instance.getActiveAccount();
         if (activeAccount != null) {
@@ -230,7 +212,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? serverCookie, {
     bool silent = false,
   }) async {
-    // Clear session expired flag on a fresh login attempt
     if (state.sessionExpired) {
       state = state.copyWith(sessionExpired: false);
     }
@@ -245,15 +226,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       LogService.instance.debug(
           '[Auth] Login attempt - username: $username, host: $host, silent: $silent', tag: 'Network');
 
-      // 删除主机地址末尾的斜杠，以免请求资源时出现地址错误
       if (host.endsWith("/")) {
         host = host.substring(0, host.length - 1);
       }
 
-      // Initialize API service with empty token first
       _apiService.init('', host);
 
-      // Attempt login
       final response = await _apiService.login(username, password, host);
 
       final token = response['token'] as String?;
@@ -263,33 +241,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       LogService.instance.debug('[Auth] Login successful, received token', tag: 'Network');
 
-      // Normalize host URL to include protocol
       final normalizedHost = ServerUtils.normalizeHost(host);
 
       LogService.instance.debug('[Auth] Normalized host: $normalizedHost', tag: 'Network');
 
-      // Update API service with real token and normalized host
       _apiService.init(token, normalizedHost);
 
-      // Get user info from login response or fetch it separately
       Map<String, dynamic> userInfo;
       if (response['user'] != null) {
-        // Use user info from login response
         userInfo = response;
       } else {
-        // Fetch user info separately
         userInfo = await _apiService.getUserInfo();
       }
 
       final user = User.fromJson(userInfo);
 
-      // For official servers, verify the loggedIn field to ensure proper authentication
-      // For self-hosted servers, skip this check as they may not return this field
       if (ServerUtils.isOfficialServer(normalizedHost) && !user.loggedIn) {
         throw Exception('Login failed: User not logged in');
       }
 
-      // Create complete user object with credentials and token (using normalized host)
       final authenticatedUser = user.copyWith(
         password: password,
         host: normalizedHost,
@@ -298,12 +268,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         lastUpdateTime: DateTime.now(),
       );
 
-      // Save to storage (using normalized host)
       await StorageService.setString('auth_token', token);
       await StorageService.setString('server_host', normalizedHost);
       await StorageService.setMap('current_user', authenticatedUser.toJson());
 
-      // Save or update account in database
       try {
         final existingAccounts =
             await AccountDatabase.instance.getAllAccounts();
@@ -320,7 +288,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
 
         if (existingAccount.id != null) {
-          // Update existing account
           await AccountDatabase.instance.updateAccount(
             existingAccount.copyWith(
               password: password,
@@ -330,7 +297,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
             ),
           );
         } else {
-          // Create new account
           await AccountDatabase.instance.createAccount(
             Account(
               username: username,
@@ -378,10 +344,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await CookieService.setCookie(serverCookie);
 
     try {
-      // Initialize API service
       _apiService.init('', host);
 
-      // Attempt registration
       final response = await _apiService.register(username, password, host);
 
       final token = response['token'] as String?;
@@ -389,31 +353,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
         throw Exception('No token received from server');
       }
 
-      // Normalize host URL to include protocol
       final normalizedHost = ServerUtils.normalizeHost(host);
 
-      // Update API service with token and normalized host
       _apiService.init(token, normalizedHost);
 
-      // Get user info from registration response or fetch it separately
       Map<String, dynamic> userInfo;
       if (response['user'] != null) {
-        // Use user info from registration response
         userInfo = response;
       } else {
-        // Fetch user info separately
         userInfo = await _apiService.getUserInfo();
       }
 
       final user = User.fromJson(userInfo);
 
-      // For official servers, verify the loggedIn field to ensure proper authentication
-      // For self-hosted servers, skip this check as they may not return this field
       if (ServerUtils.isOfficialServer(normalizedHost) && !user.loggedIn) {
         throw Exception('Registration failed: User not logged in');
       }
 
-      // Create complete user object with credentials and token (using normalized host)
       final authenticatedUser = user.copyWith(
         password: password,
         host: normalizedHost,
@@ -422,12 +378,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         lastUpdateTime: DateTime.now(),
       );
 
-      // Save to storage (using normalized host)
       await StorageService.setString('auth_token', token);
       await StorageService.setString('server_host', normalizedHost);
       await StorageService.setMap('current_user', authenticatedUser.toJson());
 
-      // Save account to database
       try {
         await AccountDatabase.instance.createAccount(
           Account(
@@ -470,7 +424,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 errorMessage = json['error'];
               }
             } catch (_) {
-              // JSON decode error — ignore, errorMessage already set from HTTP body
             }
           }
         }
@@ -489,8 +442,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final userInfo = await _apiService.getUserInfo();
       final user = User.fromJson(userInfo);
 
-      // For official servers, verify the loggedIn field
-      // For self-hosted servers, skip this check as they may not return this field
       if (ServerUtils.isOfficialServer(state.host) && !user.loggedIn) {
         throw Exception('User not logged in');
       }
@@ -500,17 +451,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(currentUser: user);
     } catch (e) {
       LogService.instance.error('[Auth] Failed to refresh user info: $e', tag: 'Network');
-      // Rethrow the exception so caller can handle it
       rethrow;
     }
   }
 
   Future<void> updateHost(String host) async {
     if (state.token != null) {
-      // Normalize host URL to include protocol
       final normalizedHost = ServerUtils.normalizeHost(host);
 
-      // 更新host时同步serverCookie配置
       final cookie = state.currentUser?.serverCookie;
       await CookieService.setCookie(cookie);
 
@@ -530,7 +478,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       try {
         LogService.instance.warning('[Auth] Session expired (401/403), logging out', tag: 'Network');
 
-        // Mark session as expired in state first so the UI can react.
         state = state.copyWith(sessionExpired: true);
 
         await logout();
@@ -596,7 +543,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
           try {
             users.add(User.fromJson(userData));
           } catch (e) {
-            // Invalid user data, remove it
             await StorageService.removeUser(key);
           }
         }
@@ -615,7 +561,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final key = 'user_${user.name}_${user.host}';
     await StorageService.removeUser(key);
 
-    // If removing current user, logout
     if (state.currentUser == user) {
       await logout();
     }
@@ -636,7 +581,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       const Duration(seconds: 30),
       (_) async {
         try {
-          // Only retry if still in offline-like state (not logged in but has cached data)
           if (state.currentUser != null && !state.isLoggedIn && !state.isLoading) {
             LogService.instance.debug('[Auth] Offline retry: checking connection...', tag: 'Network');
             await retryConnection();
@@ -658,7 +602,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   @override
   void dispose() {
     _stopOfflineRetryTimer();
-    // Unregister the callback so the API service doesn't call into a disposed notifier.
     _apiService.onUnauthorized = null;
     super.dispose();
   }
@@ -668,13 +611,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 }
 
-// Providers
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final apiService = ref.watch(kikoeruApiServiceProvider);
   return AuthNotifier(apiService);
 });
 
-// Convenience providers
 final isLoggedInProvider = Provider<bool>((ref) {
   return ref.watch(authProvider).isLoggedIn;
 });

@@ -43,16 +43,12 @@ class DownloadService {
   /// WAV → FLAC/ALAC conversion hook.
   final DownloadConversionHook conversionHook;
 
-  // ── Download queue state ─────────────────────────────────────────
-
   final Map<String, CancelToken> _cancelTokens = {};
   final Dio _dio = Dio();
 
   static const int _maxConcurrentDownloads = 20;
   int _activeDownloadCount = 0;
   bool _isProcessingQueue = false;
-
-  // ── Forwarded streams & properties ───────────────────────────────
 
   /// Stream of task lists.
   Stream<List<DownloadTask>> get tasksStream => persistence.tasksStream;
@@ -73,8 +69,6 @@ class DownloadService {
   /// Whether any tasks are currently downloading.
   bool get hasActiveDownloads => persistence.hasActiveDownloads;
 
-  // ── Cover processing delegation ──────────────────────────────────
-
   /// Mark a work's cover as being processed.
   void addProcessingCover(int workId) =>
       coverProcessor.addProcessingCover(workId);
@@ -83,13 +77,9 @@ class DownloadService {
   void removeProcessingCover(int workId) =>
       coverProcessor.removeProcessingCover(workId);
 
-  // ── Natural sort (public static, used in tests) ──────────────────
-
   /// Human-friendly natural sort comparator.
   static int naturalCompare(String a, String b) =>
       DownloadTaskPersistence.naturalCompare(a, b);
-
-  // ── Initialization ───────────────────────────────────────────────
 
   /// Lightweight init: only load tasks from SharedPreferences.
   Future<void> initialize() async {
@@ -116,13 +106,9 @@ class DownloadService {
     }
   }
 
-  // ── Directory helpers ────────────────────────────────────────────
-
   /// Get the download root directory.
   Future<Directory> getDownloadDirectory() =>
       persistence.getDownloadDirectory();
-
-  // ── Task management API ──────────────────────────────────────────
 
   /// Get work metadata (from memory first, then disk).
   Future<Map<String, dynamic>?> getWorkMetadata(int workId) =>
@@ -140,8 +126,6 @@ class DownloadService {
   Future<void> reloadMetadataFromDisk() =>
       persistence.reloadMetadataFromDisk();
 
-  // ── Add task ─────────────────────────────────────────────────────
-
   /// Add a download task. If the file is already cached, imports it
   /// immediately. Otherwise enqueues for download.
   Future<DownloadTask> addTask({
@@ -155,7 +139,6 @@ class DownloadService {
     String? coverUrl,
     String? relativePath,
   }) async {
-    // Check for existing task
     final existing = persistence.tasks.firstWhere(
       (t) => t.hash == hash && t.workId == workId,
       orElse: () => DownloadTask(
@@ -181,7 +164,6 @@ class DownloadService {
       return existing;
     }
 
-    // Check cache
     if (hash != null && hash.isNotEmpty) {
       final cachedFile = await CacheService.getCachedAudioFile(hash);
       if (cachedFile != null) {
@@ -243,8 +225,6 @@ class DownloadService {
     return task;
   }
 
-  // ── Queue management ─────────────────────────────────────────────
-
   Future<void> _processQueue() async {
     if (_isProcessingQueue) return;
     _isProcessingQueue = true;
@@ -294,7 +274,6 @@ class DownloadService {
     _cancelTokens[task.id] = cancelToken;
 
     try {
-      // Check cache first
       if (task.hash != null && task.hash!.isNotEmpty) {
         final fileType = task.fileName.split('.').last.toLowerCase();
         final cachedPath = await CacheService.getCachedFileResource(
@@ -320,7 +299,6 @@ class DownloadService {
         }
       }
 
-      // Download from network
       int lastUpdateTime = 0;
       const updateInterval = 500;
       int? firstReportedTotal;
@@ -368,7 +346,6 @@ class DownloadService {
       await tempFile.rename(filePath);
       _log.info('下载完成: ${task.fileName}', tag: 'Download');
 
-      // ── WAV → FLAC/ALAC conversion ──
       String? convertedPath;
       if (filePath.toLowerCase().endsWith('.wav')) {
         final result = await conversionHook.convertIfWav(
@@ -380,7 +357,6 @@ class DownloadService {
         convertedPath = result.convertedPath;
       }
 
-      // Finalize task
       final currentTask = persistence.findTaskById(task.id);
       var updatedTask = currentTask.copyWith(
         status: DownloadStatus.completed,
@@ -433,8 +409,6 @@ class DownloadService {
       _cancelTokens.remove(task.id);
     }
   }
-
-  // ── Pause / Resume / Delete ──────────────────────────────────────
 
   /// Pause a download task.
   Future<void> pauseTask(String taskId) async {
@@ -558,8 +532,6 @@ class DownloadService {
     }
   }
 
-  // ── Local import ─────────────────────────────────────────────────
-
   /// Import a local folder as a new work (reference only — no file copy).
   Future<int> importLocalWork({
     required String folderPath,
@@ -570,7 +542,6 @@ class DownloadService {
       throw Exception('Folder not found: $folderPath');
     }
 
-    // Check for existing import with the same folder path
     int? existingWorkId;
     for (final task in persistence.tasks) {
       final importPath = task.workMetadata?['local_import_path'] as String?;
@@ -587,7 +558,6 @@ class DownloadService {
 
     final workId = existingWorkId ?? -DateTime.now().millisecondsSinceEpoch;
 
-    // Clean up old data if reusing workId
     if (existingWorkId != null) {
       persistence.removeWhere((t) => t.workId == existingWorkId);
       persistence.notifyChanged();
@@ -610,7 +580,6 @@ class DownloadService {
     final workDir = Directory('${downloadDir.path}/$workId');
     await workDir.create(recursive: true);
 
-    // Scan folder for files
     final List<dynamic> children = [];
     int totalFiles = 0;
 
@@ -725,7 +694,6 @@ class DownloadService {
     await persistence.flush();
     persistence.notifyChanged();
 
-    // Process cover in background
     addProcessingCover(workId);
     coverProcessor.processCoverForImport(
       workId: workId,
@@ -802,8 +770,6 @@ class DownloadService {
     await persistence.reloadMetadataFromDisk();
     return createdIds;
   }
-
-  // ── Cleanup ──────────────────────────────────────────────────────
 
   /// Dispose all resources.
   Future<void> dispose() async {

@@ -52,9 +52,7 @@ class _VolumeControlState extends State<VolumeControl> {
   @override
   void didUpdateWidget(VolumeControl oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 当音量变化时，更新 Overlay
     if (oldWidget.volume != widget.volume && _overlayEntry != null) {
-      // 延迟到当前构建周期完成后再更新 Overlay，避免在构建期间调用 markNeedsBuild
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _overlayEntry?.markNeedsBuild();
       });
@@ -85,7 +83,6 @@ class _VolumeControlState extends State<VolumeControl> {
               onExit: (_) {
                 if (mounted) {
                   setState(() => _isHovering = false);
-                  // 延迟移除，给用户时间移回按钮
                   Future.delayed(const Duration(milliseconds: 100), () {
                     if (!_isHovering && mounted) {
                       _removeOverlay();
@@ -99,14 +96,12 @@ class _VolumeControlState extends State<VolumeControl> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 音量图标指示
                     Icon(
                       _getVolumeIcon(widget.volume),
                       size: 20,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(height: 8),
-                    // 垂直滑动条
                     Expanded(
                       child: RotatedBox(
                         quarterTurns: -1,
@@ -124,7 +119,6 @@ class _VolumeControlState extends State<VolumeControl> {
                             value: widget.volume.clamp(0.0, 1.0),
                             onChanged: widget.onVolumeChanged,
                             onChangeEnd: (value) {
-                              // 拖动结束时调用回调
                               widget.onVolumeChangeEnd?.call();
                             },
                             min: 0.0,
@@ -134,7 +128,6 @@ class _VolumeControlState extends State<VolumeControl> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // 音量百分比文字
                     Text(
                       '${(widget.volume * 100).round()}%',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -171,21 +164,17 @@ class _VolumeControlState extends State<VolumeControl> {
 
   /// 检查是否为桌面端平台（Windows/macOS/Linux/Web）
   bool get _isDesktopPlatform {
-    // Web 平台
     if (kIsWeb) return true;
 
-    // 桌面操作系统
     try {
       return Platform.isWindows || Platform.isMacOS || Platform.isLinux;
     } catch (e) {
-      // 如果 Platform 不可用（如在 Web 上），返回 true
       return true;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 只在桌面端平台显示（Windows/macOS/Linux/Web）
     if (!_isDesktopPlatform) {
       return const SizedBox.shrink();
     }
@@ -201,7 +190,6 @@ class _VolumeControlState extends State<VolumeControl> {
           if (mounted) {
             setState(() => _isHovering = false);
           }
-          // 延迟检查，给用户时间移动到滑动条上
           Future.delayed(const Duration(milliseconds: 100), () {
             if (!_isHovering && mounted) {
               _removeOverlay();
@@ -210,7 +198,6 @@ class _VolumeControlState extends State<VolumeControl> {
         },
         child: IconButton(
           onPressed: () {
-            // 点击切换静音/恢复
             if (widget.volume > 0) {
               widget.onVolumeChanged(0.0);
             } else {

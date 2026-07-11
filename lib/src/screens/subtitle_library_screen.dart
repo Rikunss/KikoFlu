@@ -365,7 +365,6 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Step 1
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _stepCircle(context, '1'),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -377,7 +376,6 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
                 ])),
               ]),
               const SizedBox(height: 16),
-              // Step 2
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _stepCircle(context, '2'),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -404,7 +402,6 @@ class _SubtitleLibraryScreenState extends ConsumerState<SubtitleLibraryScreen> {
                 ])),
               ]),
               const SizedBox(height: 16),
-              // Step 3
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _stepCircle(context, '3'),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

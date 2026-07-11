@@ -54,7 +54,6 @@ class _BookmarksSheetState extends ConsumerState<BookmarksSheet> {
           ),
           child: Column(
             children: [
-              // Drag handle
               Padding(
                 padding: const EdgeInsets.only(top: 12, bottom: 8),
                 child: Container(
@@ -66,7 +65,6 @@ class _BookmarksSheetState extends ConsumerState<BookmarksSheet> {
                   ),
                 ),
               ),
-              // Header
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -93,7 +91,6 @@ class _BookmarksSheetState extends ConsumerState<BookmarksSheet> {
                 ),
               ),
               const Divider(),
-              // Bookmark list or empty state
               Expanded(
                 child: bookmarks.isEmpty
                     ? _buildEmptyState(context, theme, s, currentTrack)

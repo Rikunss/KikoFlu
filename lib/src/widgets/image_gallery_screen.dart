@@ -110,13 +110,11 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
 
       List<int> imageBytes;
 
-      // 检查是否是本地文件
       if (imageUrl.startsWith('file://')) {
-        final localPath = imageUrl.substring(7); // 移除 'file://' 前缀
+        final localPath = imageUrl.substring(7);
         final localFile = File(localPath);
         imageBytes = await localFile.readAsBytes();
       } else {
-        // 网络图片，使用 Dio 下载
         final response = await Dio().get(
           imageUrl,
           options: Options(

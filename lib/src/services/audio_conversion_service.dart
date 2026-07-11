@@ -5,7 +5,6 @@ import 'package:flutter/services.dart' show MethodChannel;
 
 import 'log_service.dart';
 
-// FFmpegKit for Android — bundles static FFmpeg binaries
 import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
 import 'package:ffmpeg_kit_flutter_new_min/session.dart';
@@ -49,7 +48,6 @@ class AudioConversionService {
 
   static const _channel = MethodChannel('com.kikoeru.flutter/audio_conversion');
 
-
   /// Returns the file extension for a given format.
   String extensionFor(WavConversionFormat format) => format.extension;
 
@@ -66,17 +64,13 @@ class AudioConversionService {
     return result;
   }
 
-  // Cache for runtime encoder availability (Android only).
   final Map<String, bool> _encoderCache = {};
 
   /// Returns true if the given format can be converted on the current platform.
   bool isFormatSupportedOnPlatform(WavConversionFormat format) {
     if (format == WavConversionFormat.none) return true;
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true; // system ffmpeg
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
     if (Platform.isAndroid) {
-      // Android: bundled ffmpeg-kit (min variant) supports:
-      //   ✓ FLAC, ALAC, AAC, MP3 (built-in FFmpeg encoders)
-      //   ✗ Opus (needs libopus — only in audio/full variant)
       return format == WavConversionFormat.opus ? false : true;
     }
     if (Platform.isIOS) {
@@ -126,14 +120,12 @@ class AudioConversionService {
         return null;
       }
 
-      // Only convert .wav files
       if (!wavPath.toLowerCase().endsWith('.wav')) {
         return null;
       }
 
       final outPath = outputPath(wavPath, format);
 
-      // Remove stale output file from a previous failed conversion attempt
       final outFile = File(outPath);
       if (await outFile.exists()) {
         try { await outFile.delete(); } catch (e) {
@@ -159,8 +151,6 @@ class AudioConversionService {
     }
   }
 
-  // ── Desktop: system ffmpeg ──
-
   List<String> _ffmpegArgsFor(String formatName, String input, String output) {
     switch (formatName) {
       case 'flac':
@@ -168,14 +158,13 @@ class AudioConversionService {
       case 'opus':
         return ['-i', input, '-c:a', 'libopus', '-b:a', '128k', '-y', output];
       case 'mp3':
-        // Use native FFmpeg mp3 encoder (libmp3lame not available in min variant)
         return ['-i', input, '-c:a', 'mp3', '-b:a', '320k', '-y', output];
       case 'alac':
         return ['-i', input, '-c:a', 'alac', '-f', 'mp4', '-y', output];
       case 'aac':
         return ['-i', input, '-c:a', 'aac', '-b:a', '256k', '-y', output];
       default:
-        return ['-i', input, '-y', output]; // passthrough fallback
+        return ['-i', input, '-y', output];
     }
   }
 
@@ -185,7 +174,6 @@ class AudioConversionService {
     WavConversionFormat format,
     void Function(double progress, {String? eta})? onProgress,
   ) async {
-    // Try common ffmpeg executable names
     const candidates = ['ffmpeg', 'ffmpeg.exe'];
     String? ffmpegPath;
 
@@ -235,7 +223,6 @@ class AudioConversionService {
         tag: 'AudioConv',
       );
 
-      // Delete original WAV
       try {
         await File(input).delete();
         _log.info('[AudioConversion] Deleted original WAV', tag: 'AudioConv');
@@ -253,8 +240,6 @@ class AudioConversionService {
   /// Quote a path argument if it contains spaces, to be safe for shell-less cmd string.
   String _quotePath(String p) => p.contains(' ') ? '"$p"' : p;
 
-  // ── Android: bundled ffmpeg-kit ──
-
   Future<String?> _convertAndroid(
     String input,
     String output,
@@ -263,13 +248,9 @@ class AudioConversionService {
   ) async {
     final formatName = format.value;
     try {
-      // Build ffmpeg command string with proper path quoting.
-      // Note: ffmpeg-kit takes a single string (not args list), so we must
-      // quote paths that contain spaces to prevent them from being split.
       final args = _ffmpegArgsFor(formatName, input, output);
       final cmd = args.map((a) => _quotePath(a)).join(' ');
 
-      // Get input file size for progress estimation
       final inputFile = File(input);
       final inputLength = await inputFile.length();
       if (inputLength <= 0) {
@@ -280,7 +261,6 @@ class AudioConversionService {
       final startTime = DateTime.now();
       String? lastEta;
 
-      // Use Completer to await the async session
       final completer = Completer<Session>();
 
       FFmpegKit.executeAsync(
@@ -288,10 +268,9 @@ class AudioConversionService {
         (session) {
           if (!completer.isCompleted) completer.complete(session);
         },
-        (log) {}, // log callback — no-op
+        (log) {},
         (statistics) {
           if (onProgress == null) return;
-          // Use size-based progress (bytes processed vs input file size)
           final size = statistics.getSize();
           if (size > 0) {
             final progress = (size / inputLength).clamp(0.0, 1.0);
@@ -305,16 +284,13 @@ class AudioConversionService {
         },
       );
 
-      // Wait for session to complete
       final session = await completer.future;
       final returnCode = await session.getReturnCode();
 
-      // Always send 100% on completion
       onProgress?.call(1.0, eta: 'Complete');
 
       if (ReturnCode.isSuccess(returnCode) && await File(output).exists()) {
         _log.info('[AudioConversion] Android $formatName success via ffmpeg-kit', tag: 'AudioConv');
-        // Delete original WAV on success
         try { await inputFile.delete(); } catch (e) {
           _log.warning('[AudioConversion] Failed to delete input WAV: $e', tag: 'AudioConv');
         }
@@ -352,15 +328,13 @@ class AudioConversionService {
     }
   }
 
-  // ── iOS: AVFoundation (ALAC / AAC) ──
-
   Future<String?> _convertIos(
     String input,
     String output,
     WavConversionFormat format,
     void Function(double progress, {String? eta})? onProgress,
   ) async {
-    final formatName = format.value; // "alac" or "aac"
+    final formatName = format.value;
     try {
       final result = await _channel.invokeMethod<String>('convertWav', {
         'inputPath': input,

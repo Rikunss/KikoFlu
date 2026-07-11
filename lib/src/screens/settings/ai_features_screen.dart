@@ -76,10 +76,8 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
       _isChecking = true;
     });
 
-    // Persist model choice
     await ref.read(aiSettingsProvider.notifier).setSelectedModel(newModel);
 
-    // Check status of the newly selected model
     await _refreshStatus();
   }
 
@@ -91,7 +89,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
     final config = getConfigByModelName(_currentModel);
     final displayName = config?.displayName ?? _currentModel;
 
-    // Start fresh
     notifier.reset();
     notifier.updateProgress(
       status: AiDownloadStatus.downloading,
@@ -101,7 +98,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
       totalBytes: config?.approximateSizeBytes ?? 0,
     );
 
-    // Show initial notification
     _notifyProgress(displayName, 0.0, 0, config?.approximateSizeBytes ?? 0);
 
     try {
@@ -131,7 +127,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
         },
       );
 
-      // Download completed (not paused/cancelled)
       if (ref.read(aiDownloadProvider).status != AiDownloadStatus.paused &&
           ref.read(aiDownloadProvider).status != AiDownloadStatus.idle) {
         await ref
@@ -151,7 +146,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
         }
       }
     } catch (e) {
-      // Ignore cancelled state — no need to show error
       if (ref.read(aiDownloadProvider).status == AiDownloadStatus.idle) return;
       notifier.markFailed(e.toString());
       _notifyFailed(displayName, e.toString());
@@ -167,7 +161,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
   Future<void> _resumeDownload() async {
     final state = ref.read(aiDownloadProvider);
     if (state.modelName == null) {
-      // No persisted download — start fresh
       await _startDownload();
       return;
     }
@@ -178,7 +171,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
       status: AiDownloadStatus.downloading,
     );
 
-    // Re-show notification on resume
     _notifyProgress(displayName, state.progress, state.receivedBytes,
         state.totalBytes);
 
@@ -208,7 +200,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
         },
       );
 
-      // Download completed (not paused/cancelled)
       if (ref.read(aiDownloadProvider).status != AiDownloadStatus.paused &&
           ref.read(aiDownloadProvider).status != AiDownloadStatus.idle) {
         await ref
@@ -228,7 +219,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
         }
       }
     } catch (e) {
-      // Ignore cancelled state — no need to show error
       if (ref.read(aiDownloadProvider).status == AiDownloadStatus.idle) return;
       notifier.markFailed(e.toString());
       _notifyFailed(displayName, e.toString());
@@ -280,10 +270,8 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
     final dlState = ref.read(aiDownloadProvider);
 
     if (dlState.status == AiDownloadStatus.downloading) {
-      // Download loop is running — set flag, loop handles cleanup
       notifier.requestCancel();
     } else {
-      // Paused/failed — clean up partial file directly
       if (dlState.modelName != null) {
         final model = _whisperModelFromName(dlState.modelName!);
         await AIModelService.instance.cleanupPartialDownload(model: model);
@@ -334,11 +322,10 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
         allowedExtensions: ['.bin'],
       );
 
-      if (filePath == null) return; // user cancelled
+      if (filePath == null) return;
 
       final model = _whisperModelFromName(_currentModel);
 
-      // Show loading state
       if (mounted) {
         SnackBarUtil.showInfo(context, 'Importing $displayName…');
       }
@@ -348,7 +335,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
         model: model,
       );
 
-      // Mark as downloaded in settings
       final fileSize = File(filePath).lengthSync();
       await ref
           .read(aiSettingsProvider.notifier)
@@ -368,9 +354,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
       }
     }
   }
-
-  // ── Notification helpers ─────────────────────────────────────────
-  // Platform check lives inside the service, not here.
 
   void _notifyProgress(
       String displayName, double progress, int received, int total) {
@@ -429,8 +412,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
         title: Text(s.aiFeatures),
         centerTitle: false,
         actions: [
-          // Show a global download indicator in the app bar so the user
-          // can see download progress even after navigating away.
           if (isDownloading || isPaused || isFailed)
             Padding(
               padding: const EdgeInsets.only(right: 4),
@@ -471,7 +452,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ── Info Card ──
           Card(
             elevation: 0,
             color: colorScheme.surfaceContainerLow,
@@ -514,7 +494,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
 
           const SizedBox(height: 16),
 
-          // ── Model Selection Card ──
           Card(
             elevation: 0,
             color: colorScheme.surfaceContainerLow,
@@ -541,7 +520,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Model dropdown
                   DropdownButtonFormField<String>(
                     initialValue: _currentModel,
                     decoration: InputDecoration(
@@ -562,12 +540,10 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ── Model Spec Table ──
                   _buildModelSpecTable(theme, colorScheme, config),
 
                   const SizedBox(height: 16),
 
-                  // ── Min Spec Warning ──
                   if (config != null && config.approximateSizeBytes > 500 * 1024 * 1024)
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -599,7 +575,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
 
           const SizedBox(height: 16),
 
-          // ── Model Status Card ──
           Card(
             elevation: 0,
             color: colorScheme.surfaceContainerLow,
@@ -627,7 +602,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
                       ),
                     )
                   else ...[
-                    // Status row
                     _buildInfoRow(
                       context,
                       Icons.inventory_2_outlined,
@@ -641,7 +615,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Current model
                     _buildInfoRow(
                       context,
                       Icons.model_training,
@@ -651,7 +624,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Model size if downloaded
                     if (_modelSize != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -666,7 +638,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
 
                     const SizedBox(height: 8),
 
-                    // ── Download progress indicator ──
                     if (isDownloading || isPaused || isFailed) ...[
                       LinearProgressIndicator(
                         value: isDownloading ? dlState.progress : null,
@@ -705,7 +676,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
                       const SizedBox(height: 16),
                     ],
 
-                    // ── Primary action button ──
                     if (isDownloading)
                       Column(
                         mainAxisSize: MainAxisSize.min,
@@ -772,7 +742,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          // ── Alternative download methods ──
                           _buildAlternativeDownloadRow(theme, colorScheme, s),
                         ],
                       )
@@ -797,17 +766,14 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
 
           const SizedBox(height: 24),
 
-          // ── All Models Comparison Table ──
           _buildAllModelsComparison(theme, colorScheme),
 
           const SizedBox(height: 24),
 
-          // ── Transcription Threads Config ──
           _buildThreadsCard(theme, colorScheme),
 
           const SizedBox(height: 16),
 
-          // ── Usage Guide ──
           Card(
             elevation: 0,
             color: colorScheme.surfaceContainerLow,
@@ -850,9 +816,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
   }
 
   List<DropdownMenuItem<String>> _buildModelDropdownItems() {
-    // Only show multilingual models suitable for Japanese transcription
-    // Note: using single-line Row (not Column) to avoid bottom overflow
-    // inside the fixed-height DropdownMenuItem.
     const models = [
       ('tiny', 'Tiny', '~75 MB'),
       ('base', 'Base (Recommended)', '~150 MB'),
@@ -1015,7 +978,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Thread count label and value
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1047,7 +1009,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Slider
             Slider(
               value: threads.toDouble(),
               min: 1,
@@ -1061,16 +1022,13 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
               },
             ),
 
-            // Info / warning text
             _buildThreadsInfo(theme, colorScheme, threads),
 
-            // Speed estimate table
             const SizedBox(height: 12),
             _buildSpeedEstimate(theme, colorScheme, threads),
 
             const SizedBox(height: 4),
 
-            // ── Word-Level Timestamps Toggle ──
             const Divider(),
             const SizedBox(height: 4),
             Row(
@@ -1251,7 +1209,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Table header
             Container(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
               decoration: BoxDecoration(
@@ -1269,7 +1226,6 @@ class _AIFeaturesScreenState extends ConsumerState<AIFeaturesScreen> {
               ),
             ),
 
-            // Table rows
             ...aiModelConfigs.map((cfg) {
               final isSelected = cfg.model.name == _currentModel;
               return Container(

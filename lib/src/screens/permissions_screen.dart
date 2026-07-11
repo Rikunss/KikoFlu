@@ -31,11 +31,9 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
     });
 
     try {
-      // 检查通知权限
       final notificationStatus = await Permission.notification.status;
       _notificationGranted = notificationStatus.isGranted;
 
-      // 检查电池优化豁免权限（后台运行）
       final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
       _ignoreBatteryOptimizationsGranted = batteryStatus.isGranted;
     } catch (e) {
@@ -106,7 +104,6 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             onPressed: () async {
               Navigator.of(context).pop();
               await openAppSettings();
-              // 用户从设置返回后重新检查权限
               if (mounted) {
                 await _checkPermissions();
               }
@@ -122,7 +119,6 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    // 非安卓平台显示提示信息
     if (!Platform.isAndroid) {
       return Scaffold(
         appBar: AppBar(
@@ -171,7 +167,6 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // 权限说明
                 Card(
                   color: cs.surfaceContainerHighest,
                   child: Padding(
@@ -213,7 +208,6 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // 通知权限
                 Card(
                   child: ListTile(
                     leading: Icon(
@@ -239,7 +233,6 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                // 后台运行权限
                 Card(
                   child: ListTile(
                     leading: Icon(

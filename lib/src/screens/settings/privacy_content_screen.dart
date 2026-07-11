@@ -153,15 +153,12 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
                   children: [
                     const SizedBox(height: 8),
 
-                    // ── Privacy Mode Master Switch ──
                     _buildMasterSwitch(context, settings, s),
                     const SizedBox(height: 16),
 
-                    // ── Privacy Details ──
                     _buildPrivacyDetails(context, settings, s),
                     const SizedBox(height: 16),
 
-                    // ── App Lock (wrapped in Consumer for reliable rebuild) ──
                     Consumer(
                       builder: (context, ref, _) {
                         return _buildAppLockCard(
@@ -173,7 +170,6 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Blocked Items ──
                     _buildBlockedItemsCard(context, s),
                     const SizedBox(height: 32),
                   ],
@@ -185,10 +181,6 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Privacy Mode — Info + Master Switch
-  // ──────────────────────────────────────────────
 
   Widget _buildMasterSwitch(
       BuildContext context, PrivacyModeSettings settings, S s) {
@@ -249,7 +241,6 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            // Info description
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -279,10 +270,6 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Privacy Details — Blur + Title Mask
-  // ──────────────────────────────────────────────
 
   Widget _buildPrivacyDetails(
       BuildContext context, PrivacyModeSettings settings, S s) {
@@ -401,10 +388,6 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
     );
   }
 
-  // ──────────────────────────────────────────────
-  // App Lock Card
-  // ──────────────────────────────────────────────
-
   Widget _buildAppLockCard(
       BuildContext context, S s, AppLockSettingsState appLockState) {
     final theme = Theme.of(context);
@@ -440,7 +423,6 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
             onChanged: (value) async {
               HapticFeedback.lightImpact();
               if (value) {
-                // Open setup sheet
                 if (!context.mounted) return;
                 final result = await showModalBottomSheet<bool>(
                   context: context,
@@ -452,13 +434,10 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
                   builder: (_) => const LockScreenSetupSheet(),
                 );
                 if (result == true && mounted) {
-                  // Re-read from service since we don't know if biometric
-                  // was enabled inside the setup sheet.
                   ref.read(appLockSettingsProvider.notifier)
                       .setFromService();
                 }
               } else {
-                // Disable — confirm first
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
@@ -513,10 +492,6 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
                 HapticFeedback.lightImpact();
                 try {
                   if (value) {
-                    // Try biometric directly. On some devices (e.g. MIUI)
-                    // canUseBiometric() hangs/times out even though biometric
-                    // IS available. So we skip the availability check and let
-                    // the OS handle the biometric dialog.
                     final success = await AppLockService.instance
                         .authenticateBiometric(
                       reason: s.appLockBiometricEnableReason,
@@ -529,7 +504,6 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
                       }
                     }
                   } else {
-                    // Turn OFF — no auth needed, just update storage
                     await AppLockService.instance.setBiometricEnabled(false);
                     if (mounted) {
                       ref.read(appLockSettingsProvider.notifier)
@@ -591,10 +565,6 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
     );
   }
 
-  // ──────────────────────────────────────────────
-  // Blocked Items Card
-  // ──────────────────────────────────────────────
-
   Widget _buildBlockedItemsCard(BuildContext context, S s) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -627,10 +597,6 @@ class _PrivacyContentScreenState extends ConsumerState<PrivacyContentScreen> {
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Auto-lock Timeout
-  // ──────────────────────────────────────────────
 
   String _autoLockLabel(S s, int minutes) {
     return switch (minutes) {
@@ -714,7 +680,6 @@ class _AutoLockTimeoutSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Drag handle
             Container(
               width: 32,
               height: 4,

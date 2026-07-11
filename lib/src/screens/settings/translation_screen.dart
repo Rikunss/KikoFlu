@@ -38,7 +38,6 @@ class _TranslationScreenState extends ConsumerState<TranslationScreen> {
     _promptController = TextEditingController(text: settings.prompt);
     _concurrency = settings.concurrency.toDouble();
 
-    // Schedule loading default prompt after locale is available
     Future.microtask(() {
       if (mounted && _promptController.text.isEmpty) {
         final locale = Localizations.localeOf(context);
@@ -94,19 +93,15 @@ class _TranslationScreenState extends ConsumerState<TranslationScreen> {
                   children: [
                     const SizedBox(height: 8),
 
-                    // ── Translation Source ──
                     _buildSourceCard(context, ref, currentSource, s),
                     const SizedBox(height: 16),
 
-                    // ── Auto-translate Lyrics ──
                     _buildAutoTranslateCard(context, s),
                     const SizedBox(height: 16),
 
-                    // ── LLM Configuration ──
                     if (currentSource == TranslationSource.llm) ...[
                       _buildLLMForm(context, s),
                       const SizedBox(height: 24),
-                      // Save button
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
@@ -130,10 +125,6 @@ class _TranslationScreenState extends ConsumerState<TranslationScreen> {
       ),
     );
   }
-
-  // ──────────────────────────────────────────────
-  // Auto-translate Lyrics Card
-  // ──────────────────────────────────────────────
 
   Widget _buildAutoTranslateCard(BuildContext context, S s) {
     final theme = Theme.of(context);
@@ -185,10 +176,6 @@ class _TranslationScreenState extends ConsumerState<TranslationScreen> {
     );
   }
 
-  // ──────────────────────────────────────────────
-  // Translation Source Card
-  // ──────────────────────────────────────────────
-
   Widget _buildSourceCard(
     BuildContext context,
     WidgetRef ref,
@@ -207,7 +194,6 @@ class _TranslationScreenState extends ConsumerState<TranslationScreen> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          // Header
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
             child: Row(
@@ -228,7 +214,6 @@ class _TranslationScreenState extends ConsumerState<TranslationScreen> {
             ),
           ),
 
-          // Source options
           RadioGroup<TranslationSource>(
             groupValue: currentSource,
             onChanged: (TranslationSource? value) {
@@ -387,10 +372,6 @@ class _TranslationScreenState extends ConsumerState<TranslationScreen> {
     );
   }
 
-  // ──────────────────────────────────────────────
-  // LLM Configuration Form
-  // ──────────────────────────────────────────────
-
   Widget _buildLLMForm(BuildContext context, S s) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -399,7 +380,6 @@ class _TranslationScreenState extends ConsumerState<TranslationScreen> {
       key: _formKey,
       child: Column(
         children: [
-          // LLM Form Label
           Padding(
             padding: const EdgeInsets.only(left: 16, bottom: 8),
             child: Row(
@@ -420,7 +400,6 @@ class _TranslationScreenState extends ConsumerState<TranslationScreen> {
             ),
           ),
 
-          // API Endpoint Card
           Card(
             elevation: 0,
             color: colorScheme.surfaceContainerLow,
@@ -483,7 +462,6 @@ class _TranslationScreenState extends ConsumerState<TranslationScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  // Concurrency slider
                   Row(
                     children: [
                       Text(s.concurrencyCount,
@@ -531,7 +509,6 @@ class _TranslationScreenState extends ConsumerState<TranslationScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Prompt Card
           Card(
             elevation: 0,
             color: colorScheme.surfaceContainerLow,

@@ -46,13 +46,9 @@ abstract class KikoeruApiStrategy {
   /// Whether this strategy handles the official ASMR.one server.
   bool get isOfficial;
 
-  // ── Authentication ──
-
   Future<Map<String, dynamic>> login(String username, String password);
   Future<Map<String, dynamic>> register(String username, String password);
   Future<Map<String, dynamic>> getUserInfo();
-
-  // ── Works ──
 
   Future<Map<String, dynamic>> getWorks({
     int page = 1,
@@ -113,8 +109,6 @@ abstract class KikoeruApiStrategy {
     bool includeTranslationWorks = true,
   });
 
-  // ── Reviews ──
-
   Future<Map<String, dynamic>> getWorkReviews(int workId, {
     int page = 1,
     int pageSize = 20,
@@ -137,14 +131,10 @@ abstract class KikoeruApiStrategy {
 
   Future<void> deleteReview(int workId);
 
-  // ── Favorites ──
-
   Future<Map<String, dynamic>> getFavorites({
     int page = 1,
     int pageSize = 20,
   });
-
-  // ── Shared utility ──
 
   /// Fetches multiple server pages and combines them into one logical page.
   ///

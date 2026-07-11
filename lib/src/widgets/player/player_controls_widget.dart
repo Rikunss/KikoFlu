@@ -84,7 +84,6 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
   /// rebuilds on every 200ms tick — the Row wrapper stays stable.
   Widget _buildSeekSection(BuildContext context) {
     return Column(children: [
-      // Progress slider
       Consumer(
         builder: (context, ref, child) {
           final progress = ref.watch(playbackProgressProvider);
@@ -113,7 +112,6 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           );
         },
       ),
-      // Time labels — leaf ConsumerWidgets avoid rebuilding both Texts on every 200ms tick
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         child: Row(
@@ -339,7 +337,6 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           },
         );
       case PlayerButtonType.volume:
-        // 使用局部变量跟踪当前音量值以实现实时反馈
         final currentVolume = ref.read(audioPlayerControllerProvider).volume;
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -370,7 +367,6 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                         ref
                             .read(audioPlayerControllerProvider.notifier)
                             .setVolume(value);
-                        // 触发菜单重建以更新显示
                         if (setState != null) {
                           setState(() {});
                         }
@@ -527,7 +523,7 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
         );
       case PlayerButtonType.speed:
         return SizedBox(
-          height: isLandscape ? 40 : 62, // 固定高度确保对齐
+          height: isLandscape ? 40 : 62,
           child: Align(
             alignment: Alignment.center,
             child: Column(
@@ -748,7 +744,6 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
       children: [
         _buildSeekSection(context),
         SizedBox(height: widget.isLandscape ? 20 : 16),
-        // Main controls
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -761,7 +756,6 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
               icon: const Icon(Icons.skip_previous),
               iconSize: iconSize,
             ),
-            // -10s seek button (always visible)
             IconButton(
               onPressed: () {
                 ref
@@ -799,7 +793,6 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                 );
               },
             ),
-            // +10s seek button (always visible)
             IconButton(
               onPressed: () {
                 ref
@@ -830,7 +823,6 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
           ],
         ),
         SizedBox(height: widget.isLandscape ? 16 : 12),
-        // Additional controls
         Consumer(
           builder: (context, ref, child) {
             final isDesktop = !Platform.isAndroid && !Platform.isIOS;
@@ -839,9 +831,6 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                 : ref.watch(playerButtonsConfigMobileProvider);
             final visibleButtons = config.getVisibleButtons(isDesktop);
 
-            // Filter out seekBackward/seekForward from config visible buttons
-            // since they are ALREADY always visible in the main controls row above.
-            // Showing them in both places creates 4 seek buttons (duplication).
             final dedupedButtons = visibleButtons.where(
               (b) => b != PlayerButtonType.seekBackward &&
                      b != PlayerButtonType.seekForward,
@@ -854,7 +843,6 @@ class _PlayerControlsWidgetState extends ConsumerState<PlayerControlsWidget> {
                     .map((type) =>
                         _buildButton(context, ref, colorScheme, type, widget.isLandscape))
                     ,
-                // More menu button (always visible)
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

@@ -80,7 +80,7 @@ class SearchHistoryState {
 /// 搜索历史 Notifier
 class SearchHistoryNotifier extends StateNotifier<SearchHistoryState> {
   static const String _preferenceKey = 'search_history';
-  static const int _maxHistoryItems = 20; // 最多保存20条记录
+  static const int _maxHistoryItems = 20;
 
   SearchHistoryNotifier() : super(const SearchHistoryState(isLoading: true)) {
     _loadHistory();
@@ -114,7 +114,6 @@ class SearchHistoryNotifier extends StateNotifier<SearchHistoryState> {
       final jsonList = state.items.map((e) => e.toJson()).toList();
       await prefs.setString(_preferenceKey, json.encode(jsonList));
     } catch (e) {
-      // 保存失败静默处理
     }
   }
 
@@ -124,7 +123,6 @@ class SearchHistoryNotifier extends StateNotifier<SearchHistoryState> {
     required String displayText,
     Map<String, dynamic>? searchParams,
   }) async {
-    // 创建新记录
     final newItem = SearchHistoryItem(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       keyword: keyword,
@@ -133,14 +131,11 @@ class SearchHistoryNotifier extends StateNotifier<SearchHistoryState> {
       searchParams: searchParams,
     );
 
-    // 移除相同关键词的旧记录
     final updatedItems =
         state.items.where((item) => item.keyword != keyword).toList();
 
-    // 添加新记录到开头
     updatedItems.insert(0, newItem);
 
-    // 限制历史记录数量
     if (updatedItems.length > _maxHistoryItems) {
       updatedItems.removeRange(_maxHistoryItems, updatedItems.length);
     }

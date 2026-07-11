@@ -61,10 +61,8 @@ class _AccountManagementScreenState
     if (confirm != true) return;
 
     try {
-      // Switch account in database
       await AccountDatabase.instance.setActiveAccount(account.id!);
 
-      // Login with the account
       final success = await ref.read(authProvider.notifier).login(
             account.username,
             account.password,
@@ -91,7 +89,6 @@ class _AccountManagementScreenState
   }
 
   Future<void> _addAccount() async {
-    // Navigate to login screen in "add account" mode
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -99,7 +96,6 @@ class _AccountManagementScreenState
       ),
     );
 
-    // Reload accounts if successfully added
     if (result == true) {
       await _loadAccounts();
     }
@@ -297,7 +293,6 @@ class _AccountManagementScreenState
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              // Active/Inactive icon container
               Container(
                 width: 40,
                 height: 40,
@@ -315,7 +310,6 @@ class _AccountManagementScreenState
                 ),
               ),
               const SizedBox(width: 14),
-              // Username + host info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,7 +365,6 @@ class _AccountManagementScreenState
                 ),
               ),
               const SizedBox(width: 8),
-              // Popup menu
               PopupMenuButton<String>(
                 icon: Icon(
                   Icons.more_vert,

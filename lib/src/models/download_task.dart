@@ -10,7 +10,7 @@ enum DownloadStatus {
 }
 
 class DownloadTask extends Equatable {
-  final String id; // 使用 hash 作为唯一标识
+  final String id;
   final int workId;
   final String workTitle;
   final String fileName;
@@ -22,8 +22,8 @@ class DownloadTask extends Equatable {
   final String? error;
   final DateTime createdAt;
   final DateTime? completedAt;
-  final Map<String, dynamic>? workMetadata; // 作品详情元数据，用于离线预览
-  final String? eta; // Estimated time remaining (ephemeral, for conversion progress UI)
+  final Map<String, dynamic>? workMetadata;
+  final String? eta;
 
   const DownloadTask({
     required this.id,
@@ -95,7 +95,6 @@ class DownloadTask extends Equatable {
       'error': error,
       'createdAt': createdAt.toIso8601String(),
       'completedAt': completedAt?.toIso8601String(),
-      // workMetadata 不序列化到 SharedPreferences，会从硬盘的 work_metadata.json 加载
     };
   }
 
@@ -118,7 +117,6 @@ class DownloadTask extends Equatable {
       completedAt: json['completedAt'] != null
           ? DateTime.parse(json['completedAt'] as String)
           : null,
-      // workMetadata 不从 SharedPreferences 加载，会在启动时从硬盘同步
       workMetadata: null,
     );
   }

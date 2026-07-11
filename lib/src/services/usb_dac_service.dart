@@ -171,12 +171,9 @@ class UsbDacService {
         _connected = true;
         _canReconnect = false;
         _deviceName = (args['deviceName'] as String?) ?? 'USB DAC';
-        // Only set active=true if streaming was already started.
-        // This event fires after connect() succeeds but BEFORE start().
-        // The start() method will emit .active=true separately.
         _stateController.add(UsbDacState(
           connected: true,
-          active: _active, // preserve current streaming state
+          active: _active,
           deviceName: _deviceName,
           sampleRate: (args['sampleRate'] as int?) ?? 0,
           channelCount: (args['channelCount'] as int?) ?? 0,
@@ -186,7 +183,6 @@ class UsbDacService {
         break;
       case 'onDeviceDisconnected':
         final args = call.arguments;
-        // Store disconnect metadata BEFORE clearing state
         _canReconnect = (args is Map) && (args['canReconnect'] == true);
         _connected = false;
         _active = false;
@@ -213,7 +209,6 @@ class UsbDacService {
             .toList();
         _log.info('USB device list refreshed: ${devices.length} device(s) (permission may have updated metadata)',
             tag: 'UsbDac');
-        // Log permission status for each device
         for (final d in devices) {
           _log.info('  └ #${d.deviceId} ${d.productName} (hasPermission=${d.hasPermission}, serial=${d.serialNumber})',
               tag: 'UsbDac');

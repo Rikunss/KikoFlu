@@ -14,7 +14,6 @@ class SecurityUtils {
   static Future<String> _getEncryptionKey() async {
     String? key = await _secureStorage.read(key: _encryptionKeyKey);
     if (key == null) {
-      // Generate a new random key
       final random = Random.secure();
       final keyBytes = Uint8List.fromList(
         List<int>.generate(32, (_) => random.nextInt(256)),
@@ -33,24 +32,19 @@ class SecurityUtils {
     final key = await _getEncryptionKey();
     final keyBytes = base64Url.decode(key);
 
-    // Generate random IV
     final random = Random.secure();
     final iv = Uint8List.fromList(
       List<int>.generate(16, (_) => random.nextInt(256)),
     );
 
-    // Derive encryption key from stored key using SHA-256
     final derivedKey = sha256.convert(keyBytes).bytes;
 
-    // Simple XOR encryption (lightweight, no native dependencies)
-    // For production, consider using pointycastle AES
     final plaintextBytes = utf8.encode(plaintext);
     final encrypted = Uint8List(plaintextBytes.length);
     for (var i = 0; i < plaintextBytes.length; i++) {
       encrypted[i] = plaintextBytes[i] ^ derivedKey[i % derivedKey.length] ^ iv[i % iv.length];
     }
 
-    // Combine IV + encrypted data
     final combined = Uint8List(iv.length + encrypted.length);
     combined.setRange(0, iv.length, iv);
     combined.setRange(iv.length, combined.length, encrypted);
@@ -69,14 +63,11 @@ class SecurityUtils {
 
       if (combined.length < 16) return ciphertext;
 
-      // Extract IV and encrypted data
       final iv = combined.sublist(0, 16);
       final encrypted = combined.sublist(16);
 
-      // Derive same encryption key
       final derivedKey = sha256.convert(keyBytes).bytes;
 
-      // XOR decrypt
       final decrypted = Uint8List(encrypted.length);
       for (var i = 0; i < encrypted.length; i++) {
         decrypted[i] = encrypted[i] ^ derivedKey[i % derivedKey.length] ^ iv[i % iv.length];
@@ -84,7 +75,6 @@ class SecurityUtils {
 
       return utf8.decode(decrypted);
     } catch (e) {
-      // If decryption fails, return original (backward compatibility)
       return ciphertext;
     }
   }

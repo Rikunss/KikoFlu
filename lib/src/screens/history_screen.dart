@@ -22,7 +22,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // must call for AutomaticKeepAliveClientMixin
+    super.build(context);
 
     final history = ref.watch(historyProvider.select((s) => s.records));
     final isLoading = ref.watch(historyProvider.select((s) => s.isLoading));
@@ -32,7 +32,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       ),
     );
 
-    // Defer data loading to first visit — not in initState
     if (!_hasVisited) {
       _hasVisited = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {

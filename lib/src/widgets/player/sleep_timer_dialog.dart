@@ -23,7 +23,7 @@ class SleepTimerDialog extends ConsumerStatefulWidget {
 }
 
 class _SleepTimerDialogState extends ConsumerState<SleepTimerDialog> {
-  bool _isTimeMode = false; // false: 时长模式, true: 指定时间模式
+  bool _isTimeMode = false;
   bool _finishCurrentTrack = false;
   TimeOfDay _selectedTime = TimeOfDay.now();
 
@@ -41,7 +41,6 @@ class _SleepTimerDialogState extends ConsumerState<SleepTimerDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (timerState.isActive) ...[
-              // 当前定时器状态
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -111,7 +110,6 @@ class _SleepTimerDialogState extends ConsumerState<SleepTimerDialog> {
                 ),
               ),
               const SizedBox(height: 16),
-              // 快捷调整按钮
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -155,8 +153,6 @@ class _SleepTimerDialogState extends ConsumerState<SleepTimerDialog> {
                 ],
               ),
             ] else ...[
-              // 设置新定时器
-              // 模式切换
               SegmentedButton<bool>(
                 segments: [
                   ButtonSegment(
@@ -178,7 +174,6 @@ class _SleepTimerDialogState extends ConsumerState<SleepTimerDialog> {
                 },
               ),
               const SizedBox(height: 20),
-              // 根据模式显示不同的UI
               if (_isTimeMode) ...[
                 _buildTimePickerSection(context, ref, colorScheme, textTheme),
               ] else ...[
@@ -312,7 +307,6 @@ class _SleepTimerDialogState extends ConsumerState<SleepTimerDialog> {
               _selectedTime.minute,
             );
 
-            // 如果选择的时间已经过了，则设置为明天的这个时间
             final finalTime = targetTime.isBefore(now)
                 ? targetTime.add(const Duration(days: 1))
                 : targetTime;

@@ -11,7 +11,7 @@ class Work extends Equatable {
   @JsonKey(name: 'circle_id')
   final int? circleId;
 
-  final String? name; // circle名称
+  final String? name;
 
   final List<Va>? vas;
   final List<Tag>? tags;
@@ -38,26 +38,26 @@ class Work extends Equatable {
   final int? duration;
 
   final String?
-      progress; // 收藏状态: marked, listening, listened, replay, postponed
+      progress;
 
   @JsonKey(name: 'userRating')
-  final int? userRating; // 用户评分: 1-5星
+  final int? userRating;
 
   @JsonKey(name: 'rate_count_detail')
-  final List<RatingDetail>? rateCountDetail; // 评分详情
+  final List<RatingDetail>? rateCountDetail;
 
   final List<String>? images;
   final String? description;
   final List<AudioFile>? children;
 
   @JsonKey(name: 'blur_hash')
-  final String? blurHash; // blurhash placeholder
+  final String? blurHash;
 
   @JsonKey(name: 'source_url')
-  final String? sourceUrl; // 作品原始链接
+  final String? sourceUrl;
 
   @JsonKey(name: 'other_language_editions_in_db')
-  final List<OtherLanguageEdition>? otherLanguageEditions; // 其他语言版本
+  final List<OtherLanguageEdition>? otherLanguageEditions;
 
   /// For imported local works — path to the original folder on disk.
   /// Null for works downloaded from the server.
@@ -95,7 +95,6 @@ class Work extends Equatable {
     Map<String, dynamic> processingJson = json;
     bool isModified = false;
 
-    // 兼容 custom 服务端：如果 duration 为空，尝试从 memo.totalDuration 获取
     if (processingJson['duration'] == null || processingJson['duration'] == 0) {
       if (processingJson['memo'] != null && processingJson['memo'] is Map) {
         final memo = processingJson['memo'] as Map;
@@ -109,9 +108,6 @@ class Work extends Equatable {
       }
     }
 
-    // 兼容 custom 服务端：lyric_status 字段
-    // 仅当 has_subtitle 为 null 时才检查 lyric_status
-    // 如果 has_subtitle 明确为 false，则表示无字幕，不应被覆盖
     if (processingJson['has_subtitle'] == null) {
       final lyricStatus = processingJson['lyric_status'];
       if (lyricStatus != null &&
@@ -334,14 +330,14 @@ class Va extends Equatable {
 class Tag extends Equatable {
   final int id;
   final String name;
-  final int? upvote; // 支持投票数量
-  final int? downvote; // 反对投票数量
+  final int? upvote;
+  final int? downvote;
 
   @JsonKey(name: 'myVote')
-  final int? myVote; // 我的投票状态：0=未投票，1=支持，2=反对
+  final int? myVote;
 
   @JsonKey(name: 'voteStatus')
-  final int? voteStatus; // 标签来源：1=作品默认标签，0=用户添加的标签（仅官方服务器）
+  final int? voteStatus;
 
   const Tag({
     required this.id,

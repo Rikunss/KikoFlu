@@ -52,7 +52,6 @@ class HistoryWorkCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Gunakan select() agar kartu tidak rebuild saat field auth lain berubah
     final host = ref.watch(authProvider.select((s) => s.host ?? ''));
     final token = ref.watch(authProvider.select((s) => s.token ?? ''));
     final work = record.work;
@@ -80,7 +79,6 @@ class HistoryWorkCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Cover
             Expanded(
               child: Stack(
                 fit: StackFit.expand,
@@ -110,7 +108,6 @@ class HistoryWorkCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  // Gradient
                   Positioned(
                     left: 0,
                     right: 0,
@@ -129,7 +126,6 @@ class HistoryWorkCard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  // Play Button
                   if (record.lastTrack != null)
                     Positioned(
                       right: 8,
@@ -155,7 +151,6 @@ class HistoryWorkCard extends ConsumerWidget {
                 ],
               ),
             ),
-            // Info
             Container(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -292,7 +287,6 @@ class HistoryWorkCard extends ConsumerWidget {
 
     if (allFiles.isEmpty) return null;
 
-    // Helper: check if a file matches the last track
     bool isTargetFile(dynamic file, HistoryRecord rec) {
       if (file['type'] == 'folder') return false;
       final fileHash = file['hash'];
@@ -301,7 +295,6 @@ class HistoryWorkCard extends ConsumerWidget {
       return fileName == rec.lastTrack?.title;
     }
 
-    // Helper: extract audio files from a list
     List<dynamic> extractAudioFiles(List<dynamic> list) {
       return list.where((file) {
         if (file['type'] == 'folder') return false;
@@ -311,7 +304,6 @@ class HistoryWorkCard extends ConsumerWidget {
       }).toList();
     }
 
-    // Find sibling audio files of the last track
     List<dynamic> findSiblingAudioFiles(List<dynamic> files, HistoryRecord rec) {
       for (final file in files) {
         if (file['type'] == 'folder') {
@@ -334,7 +326,6 @@ class HistoryWorkCard extends ConsumerWidget {
 
     List<dynamic> audioFiles = findSiblingAudioFiles(allFiles, record);
 
-    // Fallback: flatten all audio files
     if (audioFiles.isEmpty) {
       List<dynamic> flatten(List<dynamic> files) {
         final result = <dynamic>[];
@@ -354,7 +345,6 @@ class HistoryWorkCard extends ConsumerWidget {
       audioFiles = flatten(allFiles);
     }
 
-    // Build AudioTracks
     final List<AudioTrack> tracks = [];
     final downloadService = DownloadService.instance;
 
@@ -435,7 +425,6 @@ class HistoryWorkCard extends ConsumerWidget {
     final tracks = await _buildTracks(record: record, context: context, ref: ref);
 
     if (tracks == null) {
-      // Fallback to single track
       if (record.lastTrack != null) {
         try {
           await AudioPlayerService.instance.updateQueue([record.lastTrack!]);
@@ -454,7 +443,6 @@ class HistoryWorkCard extends ConsumerWidget {
       return;
     }
 
-    // Find index
     final lastTrackId = record.lastTrack?.id;
     int index = 0;
     if (lastTrackId != null) {

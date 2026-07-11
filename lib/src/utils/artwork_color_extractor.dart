@@ -81,7 +81,6 @@ class ArtworkColorExtractor {
       return Uint8List(0);
     }
 
-    // Try CachedNetworkImage's disk cache first (avoids redundant HTTP download).
     try {
       final cacheFile = await DefaultCacheManager().getFileFromCache(imageUrl);
       if (cacheFile != null && await cacheFile.file.exists()) {
@@ -89,7 +88,6 @@ class ArtworkColorExtractor {
         if (bytes.isNotEmpty) return bytes;
       }
     } catch (_) {
-      // Cache miss or error — fall through to HTTP.
     }
 
     final response = await http
@@ -113,8 +111,6 @@ List<Color>? _extractColorsIsolate(_ExtractParams params) {
     final image = img.decodeImage(params.bytes);
     if (image == null) return null;
 
-    // Resize to a 1-pixel-tall strip — each column averages the vertical
-    // slice of the artwork, giving us numColors representative colours.
     final strip = img.copyResize(image, width: params.numColors, height: 1);
 
     final colors = <Color>[];
@@ -129,7 +125,6 @@ List<Color>? _extractColorsIsolate(_ExtractParams params) {
     }
     return colors;
   } catch (e) {
-    // Isolate running in separate thread — cannot use LogService
     return null;
   }
 }

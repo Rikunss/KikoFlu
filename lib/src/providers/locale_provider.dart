@@ -15,7 +15,7 @@ class LocaleNotifier extends StateNotifier<Locale?> {
     final prefs = await SharedPreferences.getInstance();
     final language = prefs.getString(_localeLanguageKey);
     if (language == null) {
-      state = null; // follow system
+      state = null;
       return;
     }
     final script = prefs.getString(_localeScriptKey);

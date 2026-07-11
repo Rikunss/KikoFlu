@@ -31,7 +31,6 @@ class CachingStreamAudioSource extends StreamAudioSource {
       request.headers.set(HttpHeaders.rangeHeader, rangeHeader);
     }
 
-    // 如果配置了服务器cookie，则添加Cookie字段
     final cookieHeaders = CookieService.serverCookieHeaders;
     if (cookieHeaders.containsKey('Cookie')) {
       request.headers.add(HttpHeaders.cookieHeader, cookieHeaders['Cookie']!);
@@ -57,7 +56,6 @@ class CachingStreamAudioSource extends StreamAudioSource {
     final tempFile = await CacheService.prepareAudioCacheTempFile(hash);
     final existingLength = await tempFile.length();
 
-    // 非顺序请求时，仅做透传，不写入缓存
     if (resolvedStart != existingLength) {
       () async {
         try {

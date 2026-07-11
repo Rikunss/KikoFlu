@@ -42,7 +42,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _navigate(Widget screen) {
-    // Unfocus search bar before navigating so it doesn't auto-focus on pop
     _searchFocusNode.unfocus();
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => screen),
@@ -56,7 +55,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final s = S.of(context);
     final isSearching = _searchQuery.isNotEmpty;
 
-    // ── Card data with search keywords ──
     final allCards = <_SettingsCardData>[
       _SettingsCardData(
         icon: Icons.music_note_rounded,
@@ -148,7 +146,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     ];
 
-    // ── Filter ──
     final filteredCards = isSearching
         ? allCards.where((c) => c.matches(_searchQuery)).toList()
         : allCards;
@@ -156,7 +153,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          // ── Large Top App Bar (MD3) ──
           SliverAppBar.large(
             title: Text(
               s.settingsTitle,
@@ -166,7 +162,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
 
-          // ── Search Bar ──
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -204,7 +199,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
 
-          // ── Dashboard Cards or No Results ──
           if (isSearching && filteredCards.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,

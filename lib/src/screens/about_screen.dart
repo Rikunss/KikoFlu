@@ -26,11 +26,9 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
     super.initState();
     _aboutFuture = _loadAboutData();
 
-    // Mark update as notified when entering this screen (hide red dot only)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final updateService = ref.read(updateServiceProvider);
       updateService.markAsNotified();
-      // Only hide red dot, keep the "New Version" badge visible
       ref.read(showUpdateRedDotProvider.notifier).state = false;
     });
   }
@@ -93,7 +91,6 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Update check card - shown at top if update available
               if (updateInfo != null && updateInfo.hasNewVersion)
                 _buildUpdateCard(context, cs, updateInfo),
               if (updateInfo != null && updateInfo.hasNewVersion)

@@ -66,7 +66,6 @@ class _DownloadPathSettingsScreenState
       return;
     }
 
-    // 检查是否有下载任务正在进行
     if (DownloadService.instance.hasActiveDownloads) {
       final count = DownloadService.instance.activeDownloadCount;
       _showSnackBar(S.of(context).activeDownloadsWarning(count), isError: true);
@@ -80,10 +79,9 @@ class _DownloadPathSettingsScreenState
 
       if (selectedPath == null) {
         setState(() => _isLoading = false);
-        return; // 用户取消选择
+        return;
       }
 
-      // 显示确认对话框
       if (mounted) {
         final confirmed = await _showMigrationConfirmDialog(selectedPath);
         if (!confirmed) {
@@ -92,7 +90,6 @@ class _DownloadPathSettingsScreenState
         }
       }
 
-      // 开始迁移
       setState(() {
         _isLoading = false;
         _isMigrating = true;
@@ -106,13 +103,10 @@ class _DownloadPathSettingsScreenState
       if (result.success) {
         await _loadPaths();
 
-        // 触发 DownloadService 重新加载
         await DownloadService.instance.reloadMetadataFromDisk();
 
-        // 触发字幕库刷新（路径已更改）
         ref.read(subtitleLibraryRefreshTriggerProvider.notifier).state++;
 
-        // 延迟显示成功消息
         if (mounted) {
           Future.microtask(() {
             if (mounted) {
@@ -121,7 +115,6 @@ class _DownloadPathSettingsScreenState
           });
         }
       } else {
-        // 延迟显示错误消息
         if (mounted) {
           Future.microtask(() {
             if (mounted) {
@@ -137,7 +130,6 @@ class _DownloadPathSettingsScreenState
         _isMigrating = false;
       });
 
-      // 延迟显示错误消息
       Future.microtask(() {
         if (mounted) {
           _showSnackBar(S.of(context).setPathFailedWithError('$e'), isError: true);
@@ -196,7 +188,6 @@ class _DownloadPathSettingsScreenState
   }
 
   Future<void> _resetToDefault() async {
-    // 检查是否有下载任务正在进行
     if (DownloadService.instance.hasActiveDownloads) {
       final count = DownloadService.instance.activeDownloadCount;
       _showSnackBar(S.of(context).activeDownloadsWarning(count), isError: true);
@@ -237,10 +228,8 @@ class _DownloadPathSettingsScreenState
 
       await _loadPaths();
 
-      // 触发重新加载
       await DownloadService.instance.reloadMetadataFromDisk();
 
-      // 延迟显示成功消息
       if (mounted) {
         final message = result.message.isNotEmpty ? result.message : S.of(context).defaultPathRestored;
         Future.microtask(() {
@@ -250,7 +239,6 @@ class _DownloadPathSettingsScreenState
         });
       }
     } catch (e) {
-      // 延迟显示错误消息
       if (mounted) {
         Future.microtask(() {
           if (mounted) {
@@ -311,7 +299,6 @@ class _DownloadPathSettingsScreenState
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // 平台提示
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -334,7 +321,6 @@ class _DownloadPathSettingsScreenState
                 ),
                 const SizedBox(height: 24),
 
-                // 当前路径
                 Text(
                   S.of(context).currentDownloadPath,
                   style: tt.titleMedium,
@@ -387,7 +373,6 @@ class _DownloadPathSettingsScreenState
                 ),
                 const SizedBox(height: 24),
 
-                // 操作按钮
                 if (DownloadPathService.isPlatformSupported()) ...[
                   FilledButton.icon(
                     onPressed:
@@ -427,7 +412,6 @@ class _DownloadPathSettingsScreenState
 
                 const SizedBox(height: 24),
 
-                // 说明文本
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),

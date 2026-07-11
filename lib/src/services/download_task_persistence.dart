@@ -28,7 +28,6 @@ class DownloadTaskPersistence {
   final StreamController<List<DownloadTask>> _tasksController =
       StreamController<List<DownloadTask>>.broadcast();
 
-  // Delayed save timer
   Timer? _saveTimer;
   bool _needsSave = false;
 
@@ -43,8 +42,6 @@ class DownloadTaskPersistence {
   /// Unmodifiable snapshot of current tasks.
   List<DownloadTask> get tasks => List.unmodifiable(_tasks);
 
-  // ── Active download count helpers ─────────────────────────────────
-
   /// Number of tasks currently downloading or pending.
   int get activeDownloadCount => _tasks
       .where((task) =>
@@ -54,8 +51,6 @@ class DownloadTaskPersistence {
 
   /// Whether any tasks are currently downloading.
   bool get hasActiveDownloads => activeDownloadCount > 0;
-
-  // ── Task CRUD ─────────────────────────────────────────────────────
 
   /// Find a task by id, or return a sentinel empty task.
   DownloadTask findTaskById(String taskId) {
@@ -103,8 +98,6 @@ class DownloadTaskPersistence {
 
   /// Iterate over tasks.
   void forEach(void Function(DownloadTask) action) => _tasks.forEach(action);
-
-  // ── Update & Save ─────────────────────────────────────────────────
 
   /// Update a task in the list and notify listeners.
   /// If [immediate] is true, saves to SharedPreferences immediately.
@@ -168,8 +161,6 @@ class DownloadTaskPersistence {
     }
   }
 
-  // ── Directory helpers ────────────────────────────────────────────
-
   /// Get the download root directory.
   Future<Directory> getDownloadDirectory() async {
     return await DownloadPathService.getDownloadDirectory();
@@ -184,8 +175,6 @@ class DownloadTaskPersistence {
     }
     return workDir.path;
   }
-
-  // ── Cover image download (metadata-related) ──────────────────────
 
   /// Download a cover image for a work.
   Future<String?> downloadCoverImage(int workId, String coverUrl) async {
@@ -203,8 +192,6 @@ class DownloadTaskPersistence {
       return null;
     }
   }
-
-  // ── Work metadata ────────────────────────────────────────────────
 
   /// Save work metadata to disk (including cover download).
   Future<void> saveWorkMetadata(
@@ -233,7 +220,6 @@ class DownloadTaskPersistence {
       if (await metadataFile.exists()) {
         final content = await metadataFile.readAsString();
         final metadata = jsonDecode(content) as Map<String, dynamic>;
-        // Migrate old absolute paths to relative paths
         if (metadata.containsKey('localCoverPath')) {
           final coverPath = metadata['localCoverPath'] as String?;
           if (coverPath != null && coverPath.contains(Platform.pathSeparator)) {
@@ -295,8 +281,6 @@ class DownloadTaskPersistence {
     return null;
   }
 
-  // ── Disk sync ────────────────────────────────────────────────────
-
   /// Fully sync tasks with disk. Scans the filesystem, removes tasks for
   /// missing files, adds new files as completed tasks.
   Future<void> reloadMetadataFromDisk() async {
@@ -311,7 +295,6 @@ class DownloadTaskPersistence {
         return;
       }
 
-      // Scan all work folders
       final workFolders = <int, Directory>{};
       await for (final entity in downloadDir.list()) {
         if (entity is Directory) {
@@ -325,7 +308,6 @@ class DownloadTaskPersistence {
 
       _log.info('发现 ${workFolders.length} 个作品文件夹', tag: 'Download');
 
-      // Step 1: Remove tasks for non-existent folders/files
       final tasksToRemove = <String>[];
       for (final task in _tasks) {
         if (task.status == DownloadStatus.completed) {
@@ -359,10 +341,8 @@ class DownloadTaskPersistence {
             '删除了 ${tasksToRemove.length} 个不存在的任务', tag: 'Download');
       }
 
-      // Step 2: Upgrade old work folders
       await _upgradeOldWorkFolders(workFolders);
 
-      // Step 3: Sync file tree for each work
       for (final entry in workFolders.entries) {
         try {
           await syncFileTreeWithDisk(entry.key, entry.value);
@@ -371,7 +351,6 @@ class DownloadTaskPersistence {
         }
       }
 
-      // Step 4: Scan for new files
       final newTasks = <DownloadTask>[];
       for (final entry in workFolders.entries) {
         final workId = entry.key;
@@ -447,7 +426,6 @@ class DownloadTaskPersistence {
         _log.info('添加了 ${newTasks.length} 个新任务', tag: 'Download');
       }
 
-      // Step 5: Update metadata for completed tasks
       for (var i = 0; i < _tasks.length; i++) {
         final task = _tasks[i];
         if (task.status == DownloadStatus.completed) {
@@ -608,8 +586,6 @@ class DownloadTaskPersistence {
     }
   }
 
-  // ── Old folder upgrade ───────────────────────────────────────────
-
   Future<void> _upgradeOldWorkFolders(Map<int, Directory> workFolders) async {
     for (final entry in workFolders.entries) {
       final workId = entry.key;
@@ -714,8 +690,6 @@ class DownloadTaskPersistence {
     }
   }
 
-  // ── Natural sort utilities ───────────────────────────────────────
-
   /// Human-friendly natural sort comparator — sorts "2.mp3" before "10.mp3".
   static int naturalCompare(String a, String b) {
     final pattern = RegExp(r'(\d+|[^\d]+)');
@@ -763,8 +737,6 @@ class DownloadTaskPersistence {
       }
     }
   }
-
-  // ── Cleanup ──────────────────────────────────────────────────────
 
   /// Ensure tasks are saved and close stream.
   Future<void> dispose() async {

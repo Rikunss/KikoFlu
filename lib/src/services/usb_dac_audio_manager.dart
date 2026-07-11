@@ -36,10 +36,8 @@ class UsbDacAudioManager {
   static UsbDacAudioManager get instance =>
       _instance ??= UsbDacAudioManager._();
 
-  // ── Dependencies ──
   final UsbDacService _usbDac = UsbDacService.instance;
 
-  // ── State ──
   bool _initialized = false;
   bool _autoDacEnabled = false;
   String _activeDeviceName = '';
@@ -51,20 +49,17 @@ class UsbDacAudioManager {
   int _lastProductId = 0;
   UsbDacState _currentDacState = const UsbDacState();
 
-  // ── Auto-Reconnect State ──
   bool _isReconnecting = false;
   int _reconnectAttempt = 0;
   static const int _maxReconnectAttempts = 10;
-  static const int _reconnectBaseDelayMs = 500;      // 0.5s first attempt
-  static const int _reconnectMaxDelayMs = 30 * 1000;  // 30s cap
+  static const int _reconnectBaseDelayMs = 500;
+  static const int _reconnectMaxDelayMs = 30 * 1000;
   Timer? _reconnectTimer;
 
-  // Stream subscriptions
   StreamSubscription<List<UsbDacDevice>>? _devicesSub;
   StreamSubscription<UsbDacState>? _stateSub;
   StreamSubscription<String>? _errorSub;
 
-  // Broadcast stream for external listeners (UI)
   final StreamController<UsbDacManagerState> _stateController =
       StreamController<UsbDacManagerState>.broadcast();
 
@@ -99,7 +94,6 @@ class UsbDacAudioManager {
 
     _log.info('UsbDacAudioManager: initializing...', tag: 'UsbDacMgr');
 
-    // Check if UsbDacService is supported
     final supported = await _usbDac.isSupported();
     if (!supported) {
       _log.warning('UsbDacAudioManager: UsbDacService not supported',
@@ -107,45 +101,28 @@ class UsbDacAudioManager {
       return;
     }
 
-    // Listen for USB device changes
     _devicesSub = _usbDac.devicesStream.listen((devices) {
       _onDevicesChanged(devices);
     });
 
-    // Listen for USB DAC state changes
     _stateSub = _usbDac.stateStream.listen((state) {
       _currentDacState = state;
       _emitState();
     });
 
-    // Listen for error events
     _errorSub = _usbDac.errorStream.listen((error) {
       _log.error('UsbDacAudioManager: $error', tag: 'UsbDacMgr');
     });
 
-    // Set _initialized = true dulu agar setAutoDacEnabled() bisa jalan
     _initialized = true;
 
-    // Cek apakah USB DAC Routing aktif di sesi sebelumnya (SharedPreferences).
-    // Jika iya, panggil setAutoDacEnabled(true) → getDevices() →
-    // requestPermission() → system dialog izin USB muncul (via libusb path).
-    //
-    // Ini menangani skenario: user colok USB DAC SEBELUM buka aplikasi.
-    // Tanpa ini, tidak ada broadcast ACTION_USB_DEVICE_ATTACHED yang terkirim,
-    // jadi UsbDacPlugin tidak tahu ada DAC yang perlu di-initialize.
-    //
-    // Key: 'bit_perfect_playback_enabled' (dari BitPerfectPlaybackNotifier)
     final prefs = await SharedPreferences.getInstance();
     final wasEnabled = prefs.getBool('bit_perfect_playback_enabled') ?? false;
     if (wasEnabled) {
       _log.info('UsbDacAudioManager: routing enabled — starting USB DAC init via libusb',
           tag: 'UsbDacMgr');
-      // Ini akan memicu system dialog USB permission (jika belum pernah di-grant)
-      // dan init driver libusb (connect + start).
-      // _activeDeviceName di-set oleh _connectToDac().
       await setAutoDacEnabled(true);
     } else {
-      // Routing OFF — initial scan tanpa auto-connect
       final devices = await _usbDac.getDevices();
       if (devices.isNotEmpty) {
         _onDevicesChanged(devices);
@@ -164,7 +141,6 @@ class UsbDacAudioManager {
 
     if (enabled) {
       _log.info('UsbDacAudioManager: auto-DAC enabled', tag: 'UsbDacMgr');
-      // Try to auto-connect if a device is available
       final devices = await _usbDac.getDevices();
       if (devices.isNotEmpty) {
         await _connectToDac(devices.first);
@@ -185,7 +161,6 @@ class UsbDacAudioManager {
   }) async {
     if (!_initialized) return false;
 
-    // First request USB permission from Android system
     final permissionGranted = await _usbDac.requestPermission(deviceId);
     if (!permissionGranted) {
       _log.error('Permission denied for USB device #$deviceId',
@@ -193,21 +168,11 @@ class UsbDacAudioManager {
       return false;
     }
 
-    // Permission granted! Jangan panggil _usbDac.connect() + _usbDac.start()
-    // karena itu akan meng-claim USB interface via libusb driver, yang mencegah
-    // decent-player UsbAudioSink mengakses device yang sama.
-    //
-    // Sebaliknya, langsung update state → trigger _libusbStateSub
-    // → setUseLibusbSink(true) → ExoPlayer recreate dengan decent-player sink
-    // → decent-player UsbAudioSink handle USB connection sendiri.
-
     _log.info('USB DAC permission granted — triggering ExoPlayer recreation via decent-player UsbAudioSink',
         tag: 'UsbDacMgr');
 
-    // Update state for reconnection tracking
     _activeDeviceId = deviceId;
     _usbDac.setLastDeviceId(deviceId);
-    // Set connected+active state to trigger _libusbStateSub
     _currentDacState = UsbDacState(
       connected: true,
       active: true,
@@ -255,8 +220,6 @@ class UsbDacAudioManager {
     );
   }
 
-  // ── Private ──
-
   void _onDevicesChanged(List<UsbDacDevice> devices) {
     _log.info('USB DAC devices changed: ${devices.length} device(s)',
         tag: 'UsbDacMgr');
@@ -265,33 +228,26 @@ class UsbDacAudioManager {
     final deviceName = devices.isNotEmpty ? devices.first.productName : '';
 
     if (hasDac && !_currentDacState.connected) {
-      // USB DAC was just plugged in (or reconnected)
       _log.info('USB DAC connected: $deviceName', tag: 'UsbDacMgr');
       _activeDeviceName = deviceName;
 
-      // Cancel any ongoing reconnect timer — we connected successfully
       _cancelReconnect();
 
-      // Auto-connect if auto-DAC mode is enabled
       if (_autoDacEnabled) {
         _connectToDac(devices.first);
       }
     } else if (!hasDac && _currentDacState.connected) {
-      // USB DAC was just unplugged
       _log.info('USB DAC disconnected', tag: 'UsbDacMgr');
       _activeDeviceName = '';
       _activeDeviceId = 0;
       _disconnectDac();
 
-      // Start auto-reconnect if enabled
       if (_autoDacEnabled && _usbDac.canReconnect) {
         _startReconnect();
       }
     } else if (hasDac && _currentDacState.connected) {
-      // Same device still connected
       _activeDeviceName = deviceName;
     } else if (hasDac && !_currentDacState.connected && _isReconnecting) {
-      // Device appeared while we were waiting to retry — try immediately
       _log.info('USB DAC appeared during reconnect backoff — connecting now', tag: 'UsbDacMgr');
       _cancelReconnect();
       _activeDeviceName = deviceName;
@@ -323,12 +279,10 @@ class UsbDacAudioManager {
     _log.info('USB DAC disconnected', tag: 'UsbDacMgr');
   }
 
-  // ── Auto-Reconnect ──
-
   /// Start auto-reconnect with exponential backoff.
   /// Called when a USB DAC disconnects while auto-DAC mode is enabled.
   void _startReconnect() {
-    if (_isReconnecting) return; // Already trying
+    if (_isReconnecting) return;
 
     _reconnectAttempt = 0;
     _isReconnecting = true;
@@ -346,7 +300,6 @@ class UsbDacAudioManager {
       return;
     }
 
-    // Exponential backoff: 500ms → 1s → 2s → 4s → ... → capped at 30s
     final delayMs = min(
       _reconnectBaseDelayMs * (1 << _reconnectAttempt),
       _reconnectMaxDelayMs,
@@ -368,12 +321,10 @@ class UsbDacAudioManager {
     _log.info('Performing reconnect attempt $_reconnectAttempt...', tag: 'UsbDacMgr');
 
     try {
-      // First, check if any audio device is connected now
       final devices = await _usbDac.getDevices();
       if (devices.isNotEmpty) {
         _log.info('Found ${devices.length} USB audio device(s) during reconnect', tag: 'UsbDacMgr');
 
-        // Try to match by VID/PID first, then fall back to first device
         UsbDacDevice? targetDevice;
         if (_lastVendorId != 0 && _lastProductId != 0) {
           targetDevice = devices.cast<UsbDacDevice?>().firstWhere(
@@ -387,15 +338,13 @@ class UsbDacAudioManager {
         _activeDeviceId = targetDevice.deviceId;
         _usbDac.setLastDeviceId(targetDevice.deviceId);
 
-        // Request permission (may fail if user hasn't granted yet)
         final permissionGranted = await _usbDac.requestPermission(targetDevice.deviceId);
         if (!permissionGranted) {
           _log.warning('Reconnect: permission denied for ${targetDevice.productName}', tag: 'UsbDacMgr');
-          _scheduleReconnect(); // Try again later
+          _scheduleReconnect();
           return;
         }
 
-        // Permission granted! Skip libusb connect/start — decent-player handles USB.
         _log.info('USB DAC auto-reconnected: ${targetDevice.productName}', tag: 'UsbDacMgr');
         _activeDeviceId = targetDevice.deviceId;
         _usbDac.setLastDeviceId(targetDevice.deviceId);
@@ -410,7 +359,6 @@ class UsbDacAudioManager {
         _cancelReconnect();
         _emitState();
       } else {
-        // No device yet — schedule next attempt
         _log.info('Reconnect: no USB audio devices found yet', tag: 'UsbDacMgr');
         _scheduleReconnect();
       }

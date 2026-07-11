@@ -41,7 +41,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   @override
   void initState() {
     super.initState();
-    // 首次加载数据
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(playlistDetailProvider(widget.playlistId).notifier).load();
     });
@@ -84,7 +83,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     final currentUserName = authState.currentUser?.name ?? '';
     final isOwner = playlist.userName == currentUserName;
 
-    // 系统播放列表不能删除
     if (playlist.isSystemPlaylist && isOwner) {
       SnackBarUtil.showError(context, S.of(context).systemPlaylistCannotDelete);
       return;
@@ -130,7 +128,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     final currentUserName = authState.currentUser?.name ?? '';
 
     try {
-      // 显示加载提示
       if (!mounted) return;
       SnackBarUtil.showLoading(context, S.of(context).deleting);
 
@@ -140,23 +137,18 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
       if (!mounted) return;
 
-      // 隐藏加载提示
       SnackBarUtil.hide(context);
 
-      // 显示成功提示并返回上一页
       SnackBarUtil.showSuccess(context, S.of(context).deleteSuccess);
 
-      // 延迟一点返回，让用户看到成功提示
       await Future.delayed(const Duration(milliseconds: 300));
       if (!mounted) return;
-      Navigator.of(context).pop(true); // 返回 true 表示已删除
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
 
-      // 隐藏加载提示
       SnackBarUtil.hide(context);
 
-      // 显示错误提示
       SnackBarUtil.showError(
           context, S.of(context).deleteFailedWithError(e.toString()));
     }
@@ -165,7 +157,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   /// 显示编辑对话框
   void _showEditDialog(metadata) {
     final tt = Theme.of(context).textTheme;
-    // 检查权限：只有作者才能编辑
     final authState = ref.read(authProvider);
     final currentUserName = authState.currentUser?.name ?? '';
     final isOwner = metadata.userName == currentUserName;
@@ -199,7 +190,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 标题栏
                     Padding(
                       padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
                       child: Row(
@@ -212,14 +202,12 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                       ),
                     ),
 
-                    // 内容区域
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 名称输入
                           TextField(
                             controller: nameController,
                             decoration: InputDecoration(
@@ -233,7 +221,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                           ),
                           const SizedBox(height: 16),
 
-                          // 隐私设置
                           DropdownButtonFormField<int>(
                             initialValue: selectedPrivacy,
                             decoration: InputDecoration(
@@ -271,7 +258,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                           ),
                           const SizedBox(height: 16),
 
-                          // 描述输入
                           TextField(
                             controller: descriptionController,
                             decoration: InputDecoration(
@@ -288,7 +274,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                       ),
                     ),
 
-                    // 操作按钮
                     Padding(
                       padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                       child: Row(
@@ -370,7 +355,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 标题栏
                     Padding(
                       padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
                       child: Row(
@@ -382,14 +366,12 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                       ),
                     ),
 
-                    // 内容区域
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 提示文本
                             Text(
                               S.of(context).addWorksInputHint,
                               style: tt.bodySmall?.copyWith(
@@ -398,7 +380,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                             ),
                             const SizedBox(height: 12),
 
-                            // 输入框
                             TextField(
                               controller: textController,
                               decoration: InputDecoration(
@@ -410,7 +391,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                               maxLines: 5,
                               autofocus: true,
                               onChanged: (text) {
-                                // 实时解析RJ号
                                 final parsed = _parseWorkIds(text);
                                 setDialogState(() {
                                   parsedWorkIds = parsed;
@@ -419,7 +399,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                             ),
                             const SizedBox(height: 8),
 
-                            // 显示解析结果
                             if (parsedWorkIds.isNotEmpty) ...[
                               const SizedBox(height: 8),
                               Container(
@@ -478,7 +457,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                         ),
                       ),
 
-                      // 操作按钮
                       Padding(
                         padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                         child: Row(
@@ -520,11 +498,9 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   List<String> _parseWorkIds(String text) {
     if (text.isEmpty) return [];
 
-    // 使用正则表达式提取所有RJ开头的作品号（不区分大小写）
     final rjPattern = RegExp(r'RJ\d+', caseSensitive: false);
     final matches = rjPattern.allMatches(text.toUpperCase());
 
-    // 去重并返回
     return matches.map((m) => m.group(0)!).toSet().toList();
   }
 
@@ -536,7 +512,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     }
 
     try {
-      // 显示加载提示
       if (!mounted) return;
       SnackBarUtil.showLoading(
           context, S.of(context).addingNWorks(workIds.length));
@@ -547,19 +522,15 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
       if (!mounted) return;
 
-      // 隐藏加载提示
       SnackBarUtil.hide(context);
 
-      // 显示成功提示
       SnackBarUtil.showSuccess(
           context, S.of(context).addedNWorksSuccess(workIds.length));
     } catch (e) {
       if (!mounted) return;
 
-      // 隐藏加载提示
       SnackBarUtil.hide(context);
 
-      // 显示错误提示
       SnackBarUtil.showError(
           context, S.of(context).addFailedWithError(e.toString()));
     }
@@ -597,8 +568,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   /// 移除作品
   Future<void> _removeWork(int workId) async {
     try {
-      // 乐观更新，UI会立即反应，不需要显示"正在移除"的阻塞式提示
-      // 这样可以避免快速操作时SnackBar堆积导致显示延迟
 
       await ref
           .read(playlistDetailProvider(widget.playlistId).notifier)
@@ -606,19 +575,15 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
       if (!mounted) return;
 
-      // 清除之前的提示，避免堆积
       SnackBarUtil.clearAll(context);
 
-      // 显示成功提示，缩短显示时间
       SnackBarUtil.showSuccess(context, S.of(context).removeSuccess,
           duration: const Duration(seconds: 1));
     } catch (e) {
       if (!mounted) return;
 
-      // 隐藏加载提示
       SnackBarUtil.hide(context);
 
-      // 显示错误提示
       SnackBarUtil.showError(
           context, S.of(context).removeFailedWithError(e.toString()));
     }
@@ -631,7 +596,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     required String description,
   }) async {
     try {
-      // 显示加载提示
       if (!mounted) return;
       SnackBarUtil.showLoading(context, S.of(context).saving);
 
@@ -645,18 +609,14 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
       if (!mounted) return;
 
-      // 隐藏加载提示
       SnackBarUtil.hide(context);
 
-      // 显示成功提示
       SnackBarUtil.showSuccess(context, S.of(context).saveSuccess);
     } catch (e) {
       if (!mounted) return;
 
-      // 隐藏加载提示
       SnackBarUtil.hide(context);
 
-      // 显示错误提示
       SnackBarUtil.showError(
           context, S.of(context).saveFailedWithError(e.toString()));
     }
@@ -713,7 +673,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
 
-    // 错误状态
     if (state.error != null && state.metadata == null) {
       return Center(
         child: Column(
@@ -750,14 +709,12 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
       );
     }
 
-    // 加载中且无数据
     if (state.isLoading && state.metadata == null) {
       return const Center(
         child: CircularProgressIndicator(),
       );
     }
 
-    // 空状态
     if (state.works.isEmpty && !state.isLoading) {
       return RefreshIndicator(
         onRefresh: () async => ref
@@ -809,7 +766,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           await ref
               .read(playlistDetailProvider(widget.playlistId).notifier)
               .nextPage();
-          // 等待一帧后滚动到顶部，确保内容已加载
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _scrollToTop();
           });
@@ -819,13 +775,10 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           cacheExtent: ScrollOptimization.cacheExtent, controller: _scrollController,
           physics: ScrollOptimization.physics,
           slivers: [
-            // 元数据信息
             if (state.metadata != null) _buildMetadataSection(state.metadata!, state),
 
-            // Listening stats
             if (state.works.isNotEmpty) _buildListeningStatsSection(state),
 
-            // 作品列表
             if (_detailLayout == LayoutType.list) ...[
               SliverPadding(
                 padding: const EdgeInsets.all(8),
@@ -848,7 +801,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                 ),
               ),
             ] else ...[
-              // Grid view
               SliverPadding(
                 padding: const EdgeInsets.all(4),
                 sliver: SliverGrid(
@@ -874,7 +826,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
               ),
             ],
 
-            // 分页控件
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
               sliver: SliverToBoxAdapter(
@@ -919,7 +870,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     final colorScheme = theme.colorScheme;
     final s = S.of(context);
 
-    // Compute aggregate data from works
     final totalDur = totalDurationFromWorks(state.works);
     final allFormats = <String>{};
     for (final work in state.works) {
@@ -929,7 +879,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     }
     final formatsStr = allFormats.isNotEmpty ? allFormats.join('+') : '';
 
-    // Date display
     final displayDate = metadata.updatedAt.isNotEmpty &&
             metadata.updatedAt != metadata.createdAt
         ? _formatDate(metadata.updatedAt)
@@ -956,7 +905,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title row with actions
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -982,14 +930,12 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              // Privacy badge
                               _buildPrivacyBadge(metadata.privacy),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    // Edit/delete actions
                     Builder(
                       builder: (context) {
                         final currentUserName = ref.watch(currentUserProvider.select((u) => u?.name ?? ''));
@@ -1026,7 +972,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   ],
                 ),
 
-                // Description
                 if (metadata.description.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -1039,7 +984,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
                 const SizedBox(height: 16),
 
-                // Stats row: works, plays, duration
                 Row(
                   children: [
                     _buildStatChip(Icons.music_note, s.nWorksCount(metadata.worksCount), colorScheme.primary),
@@ -1073,7 +1017,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
                 const SizedBox(height: 8),
 
-                // Date
                 if (displayDate.isNotEmpty)
                   Row(
                     children: [
@@ -1103,9 +1046,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     final works = state.works;
     if (works.isEmpty) return const SliverToBoxAdapter();
 
-    // --- Compute aggregates ---
-
-    // Average rating (weighted by rateCount)
     double totalWeightedRating = 0;
     int totalRatings = 0;
     for (final w in works) {
@@ -1116,13 +1056,11 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     }
     final avgRating = totalRatings > 0 ? (totalWeightedRating / totalRatings) : 0.0;
 
-    // Total dlCount (sales)
     int totalDlCount = 0;
     for (final w in works) {
       if (w.dlCount != null) totalDlCount += w.dlCount!;
     }
 
-    // Top VAs: count occurrences
     final vaCount = <String, int>{};
     for (final w in works) {
       if (w.vas != null) {
@@ -1134,7 +1072,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     final sortedVas = vaCount.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     final topVas = sortedVas.take(3).toList();
 
-    // Top tags: count occurrences
     final tagCount = <String, int>{};
     for (final w in works) {
       if (w.tags != null) {
@@ -1161,7 +1098,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
                 Row(
                   children: [
                     Icon(Icons.analytics_outlined, size: 18, color: colorScheme.primary),
@@ -1174,7 +1110,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Row 1: Avg Rating + Total Sales
                 Row(
                   children: [
                     Expanded(
@@ -1207,7 +1142,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   ],
                 ),
 
-                // Top VAs
                 if (topVas.isNotEmpty) ...[
                   const SizedBox(height: 16),                    Text(
                     s.vaLabel,
@@ -1224,7 +1158,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   ),
                 ],
 
-                // Top tags
                 if (topTags.isNotEmpty) ...[
                   const SizedBox(height: 16),                    Text(
                     s.tagLabel,
@@ -1448,12 +1381,10 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
     final httpHeaders = CookieService.coverHttpHeaders(token: token);
 
-    // Extract audio formats from work children
     final formats = work.children != null ? extractAudioFormats(work.children) : <String>{};
     final formatsList = formats.take(2).toList();
     final hasMoreFormats = formats.length > 2;
 
-    // Progress icon
     Widget? progressIcon;
     if (work.progress != null) {
       switch (work.progress) {
@@ -1470,7 +1401,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
       }
     }
 
-    // Age rating badge
     Widget? ageBadge;
     if (work.age != null && work.age!.isNotEmpty && work.age != 'general' && work.age != 'all') {
       final isAdult = work.age == 'adult' || work.age == 'r18' || work.age == 'R-18';
@@ -1510,11 +1440,9 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Top row: cover + info
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Cover
                     Hero(
                       tag: 'work_cover_${work.id}',
                       child: PrivacyBlurCover(
@@ -1543,13 +1471,11 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                     ),
                     const SizedBox(width: 10),
 
-                    // Info column
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Title
                           Text(
                             work.title,
                             style: theme.textTheme.bodyMedium?.copyWith(
@@ -1561,7 +1487,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                           ),
                           const SizedBox(height: 4),
 
-                          // RJ + Circle + Age badge row
                           Wrap(
                             spacing: 6,
                             runSpacing: 3,
@@ -1589,13 +1514,11 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
                           const SizedBox(height: 4),
 
-                          // Rating & Duration & Price row
                           Wrap(
                             spacing: 8,
                             runSpacing: 3,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              // Rating stars
                               if (work.rateAverage != null && work.rateCount != null && work.rateCount! > 0)
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -1620,7 +1543,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                                   ],
                                 ),
 
-                              // Duration
                               if (work.duration != null && work.duration! > 0)
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -1638,7 +1560,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                                   ],
                                 ),
 
-                              // Price
                               if (work.price != null && work.price! > 0)
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -1658,7 +1579,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                             ],
                           ),
 
-                          // Format badges + Subtitle + Progress row
                           if (formatsList.isNotEmpty || work.hasSubtitle == true || work.userRating != null && work.userRating! > 0 || progressIcon != null) ...[
                             const SizedBox(height: 4),
                             Wrap(
@@ -1666,7 +1586,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                               runSpacing: 3,
                               crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                // Format badges
                                 ...formatsList.map((fmt) => _buildFormatTag(fmt)),
                                 if (hasMoreFormats)
                                   Text(
@@ -1677,7 +1596,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                                     ),
                                   ),
 
-                                // Subtitle badge
                                 if (work.hasSubtitle == true)
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -1688,7 +1606,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                                     child: Icon(Icons.closed_caption, size: 12, color: Colors.teal[700]),
                                   ),
 
-                                // User rating
                                 if (work.userRating != null && work.userRating! > 0)
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -1715,7 +1632,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                                     ),
                                   ),
 
-                                // Progress icon
                                 if (progressIcon != null) progressIcon,
                               ],
                             ),
@@ -1724,7 +1640,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                       ),
                     ),
 
-                    // Remove button (owner only)
                     if (isOwner)
                       IconButton(
                         icon: const Icon(Icons.remove_circle_outline, size: 18),
@@ -1736,7 +1651,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   ],
                 ),
 
-                // VA chips
                 if (work.vas != null && work.vas!.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Wrap(
@@ -1765,7 +1679,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                     ),
                 ],
 
-                // Tag chips
                 if (work.tags != null && work.tags!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Wrap(
@@ -1799,7 +1712,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
         ),
       );
     } else {
-      // Grid layout - compact version
       return InkWell(
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (context) => WorkDetailScreen(work: work)),
@@ -1817,7 +1729,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Cover
               AspectRatio(
                 aspectRatio: 1.3,
                 child: Stack(
@@ -1840,7 +1751,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                         ),
                       ),
                     ),
-                    // RJ tag
                     Positioned(
                       top: 4, left: 4,
                       child: Container(
@@ -1855,7 +1765,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                         ),
                       ),
                     ),
-                    // CC badge
                     if (work.hasSubtitle == true)
                       Positioned(
                         bottom: 4, left: 4,
@@ -1871,7 +1780,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   ],
                 ),
               ),
-              // Info
               Padding(
                 padding: const EdgeInsets.all(6),
                 child: Column(

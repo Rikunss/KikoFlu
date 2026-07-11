@@ -18,7 +18,7 @@ class AiDownloadNotificationService {
   AiDownloadNotificationService._();
 
   static const _channelId = 'ai_model_download';
-  static const _notificationId = 1002; // different from conversion (1001)
+  static const _notificationId = 1002;
 
   final _plugin = FlutterLocalNotificationsPlugin();
 
@@ -47,7 +47,6 @@ class AiDownloadNotificationService {
       ),
     );
 
-    // Request notification permission on Android 13+
     try {
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
@@ -122,7 +121,6 @@ class AiDownloadNotificationService {
         ),
       ),
     );
-    // Auto-dismiss after 2 seconds
     await Future<void>.delayed(const Duration(seconds: 2));
     await dismiss();
   }
@@ -152,7 +150,6 @@ class AiDownloadNotificationService {
         ),
       ),
     );
-    // Keep the failure notification visible longer
     await Future<void>.delayed(const Duration(seconds: 4));
     await dismiss();
   }
@@ -172,7 +169,7 @@ class AiDownloadNotificationService {
           importance: Importance.low,
           priority: Priority.low,
           showProgress: false,
-          ongoing: true,   // stays until user resumes or cancels
+          ongoing: true,
           autoCancel: false,
           onlyAlertOnce: true,
         ),

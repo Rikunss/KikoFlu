@@ -70,17 +70,12 @@ class SubtitleLibraryFileWatcher {
     start();
   }
 
-  // ==================================================================
-  // Internal
-  // ==================================================================
-
   Future<void> _setupWatch() async {
     try {
       if (!_watching) return;
 
       final dir = await SubtitleLibraryService.getSubtitleLibraryDirectory();
       if (!await dir.exists()) {
-        // Directory doesn't exist yet — retry after a short delay
         _log.info(
           '[SubtitleWatcher] Directory not ready, retrying in 5s',
           tag: 'SubtitleWatcher',
@@ -152,10 +147,6 @@ class SubtitleLibraryFileWatcher {
   void _handleResourceLimit() {
     _resourceLimitReached = true;
 
-    // On Android, fall back to periodic scan instead of going dark.
-    // Directoy.watch(recursive: true) on Android uses inotify which
-    // registers one watch per subdirectory — large libraries hit the
-    // kernel's fs.inotify.max_user_watches limit (~8K by default).
     if (Platform.isAndroid) {
       _log.warning(
         '[SubtitleWatcher] inotify limit reached — falling back to periodic scan (30s). '
@@ -187,7 +178,6 @@ class SubtitleLibraryFileWatcher {
       tag: 'SubtitleWatcher',
     );
 
-    // Run an initial scan immediately
     _runPeriodicScan();
 
     _periodicScanTimer = Timer.periodic(
@@ -227,19 +217,14 @@ class SubtitleLibraryFileWatcher {
   }
 
   void _onFileEvent(FileSystemEvent event) {
-    // Skip move events — they're redundant with create+delete pairs
     if (event.type == FileSystemEvent.move) return;
 
     final path = event.path;
     final fileName = path.split(Platform.pathSeparator).last;
 
-    // Skip hidden files, temp download files, and non-subtitle files
     if (fileName.startsWith('.') || fileName.endsWith('.downloading')) return;
     if (!FileIconUtils.isLyricFile(fileName)) return;
 
-    // Debounce: reset timer on each event, wait 2s of silence before
-    // triggering a refresh. This avoids excessive rebuilds during bulk
-    // import operations (ZIP extraction, folder copy, etc.).
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(seconds: 2), () {
       if (!_watching) return;
