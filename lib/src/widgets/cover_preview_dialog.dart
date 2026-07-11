@@ -199,9 +199,9 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
         File(widget.localPath!),
         fit: BoxFit.contain,
         cacheWidth: 2160,
-        errorBuilder: (context, error, stackTrace) {
-          if (widget.imageUrl != null) {              return CachedNetworkImage(
+        errorBuilder: (context, error, stackTrace) {            if (widget.imageUrl != null) {              return CachedNetworkImage(
               imageUrl: widget.imageUrl!,
+              httpHeaders: CookieService.coverHttpHeaders(),
               cacheKey: 'cover_${widget.imageUrl!.hashCode}',
               fit: BoxFit.contain,
               placeholder: (context, url) => const Center(
@@ -224,6 +224,7 @@ class _CoverPreviewDialogState extends State<CoverPreviewDialog> {
     } else if (widget.imageUrl != null) {
       imageWidget = CachedNetworkImage(
         imageUrl: widget.imageUrl!,
+        httpHeaders: CookieService.coverHttpHeaders(),
         cacheKey: 'cover_${widget.imageUrl!.hashCode}',
         fit: BoxFit.contain,
         placeholder: (context, url) => const Center(

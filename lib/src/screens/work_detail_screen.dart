@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/log_service.dart';
+import '../services/cookie_service.dart';
 import '../utils/string_utils.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -702,6 +703,7 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
                     CachedNetworkImage(
                       imageUrl: work.getCoverImageUrl(host, token: token),
                       cacheKey: 'work_cover_${widget.work.id}',
+                      httpHeaders: CookieService.coverHttpHeaders(token: token),
                       fit: BoxFit.contain,
                       placeholder: (context, url) => Container(
                         height: 300,

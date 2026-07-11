@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/audio_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/playlists_provider.dart';
+import '../../services/cookie_service.dart';
 import '../../utils/snackbar_util.dart';
 import '../../models/audio_track.dart';
 import '../privacy_blur_cover.dart';
@@ -312,6 +313,7 @@ class PlaylistDialog extends ConsumerWidget {
                                                       )
                                                     : CachedNetworkImage(
                                                         imageUrl: resolvedCover,
+                                                        httpHeaders: CookieService.coverHttpHeaders(token: token),
                                                         cacheKey: track.workId != null
                                                             ? 'work_cover_${track.workId}'
                                                             : null,

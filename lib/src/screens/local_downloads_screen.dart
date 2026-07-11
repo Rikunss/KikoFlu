@@ -2085,6 +2085,7 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
       coverWidget = _buildPlaceholder(context);
     } else {
       final host = ref.watch(authProvider.select((s) => s.host));
+      final token = ref.watch(authProvider.select((s) => s.token ?? ''));
       if (widget.work != null && host != null && host.isNotEmpty) {
         coverWidget = Hero(
           tag: 'offline_work_cover_${widget.workId}',
@@ -2092,9 +2093,9 @@ class _WorkCardCoverState extends ConsumerState<_WorkCardCover>
             borderRadius: BorderRadius.circular(8),
             child: RepaintBoundary(
               child: CachedNetworkImage(
-                imageUrl: widget.work!.getCoverImageUrl(host),
+                imageUrl: widget.work!.getCoverImageUrl(host, token: token),
                 cacheKey: 'work_cover_${widget.work!.id}',
-                httpHeaders: CookieService.serverCookieHeaders,
+                httpHeaders: CookieService.coverHttpHeaders(token: token),
                 fit: BoxFit.cover,
                 memCacheWidth: cacheWidth,
                 errorWidget: (_, __, ___) => _buildPlaceholder(context),

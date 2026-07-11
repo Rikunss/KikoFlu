@@ -8,9 +8,10 @@ import '../../models/work.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/recommendation_provider.dart';
 import '../../providers/work_detail_display_provider.dart';
+import '../../services/cookie_service.dart';
+import '../../services/blurhash_service.dart';
 import '../../screens/work_detail_screen.dart';
 import '../../widgets/privacy_blur_cover.dart';
-import '../../services/blurhash_service.dart';
 import '../../../l10n/app_localizations.dart';
 
 /// 作品详情页底部的"相关推荐"横向滚动区域
@@ -307,6 +308,7 @@ class _RecommendationCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(8),
         child: CachedNetworkImage(
           imageUrl: url,
+          httpHeaders: CookieService.coverHttpHeaders(token: token),
           cacheKey: 'work_cover_${work.id}',
           memCacheWidth:
               (120 * MediaQuery.of(context).devicePixelRatio).round(),

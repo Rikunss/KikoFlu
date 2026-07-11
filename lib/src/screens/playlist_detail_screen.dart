@@ -1446,7 +1446,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     final colorScheme = theme.colorScheme;
     final s = S.of(context);
 
-    final httpHeaders = CookieService.serverCookieHeaders;
+    final httpHeaders = CookieService.coverHttpHeaders(token: token);
 
     // Extract audio formats from work children
     final formats = work.children != null ? extractAudioFormats(work.children) : <String>{};

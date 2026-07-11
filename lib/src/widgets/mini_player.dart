@@ -9,6 +9,7 @@ import '../providers/audio_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/lyric_provider.dart';
 import '../providers/exclusive_audio_provider.dart';
+import '../services/cookie_service.dart';
 import '../screens/audio_player_screen.dart';
 import 'privacy_blur_cover.dart';
 import 'volume_control.dart';
@@ -152,6 +153,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                                     context,
                                     track,
                                     workCoverUrl: workCoverUrl,
+                                    token: token,
                                   ),
                                   const SizedBox(width: 10),
                                   // Track info
@@ -349,6 +351,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     BuildContext context,
     AudioTrack track, {
     String? workCoverUrl,
+    required String token,
   }) {
     final cs = Theme.of(context).colorScheme;
     final image = Container(
@@ -376,6 +379,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                       )
                     : CachedNetworkImage(
                         imageUrl: (workCoverUrl ?? track.artworkUrl)!,
+                        httpHeaders: CookieService.coverHttpHeaders(token: token),
                         cacheKey: track.workId != null
                             ? 'work_cover_${track.workId}'
                             : null,

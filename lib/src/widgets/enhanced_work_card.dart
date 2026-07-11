@@ -827,7 +827,7 @@ class _EnhancedWorkCardState extends ConsumerState<EnhancedWorkCard> {
       targetWidth = (80 * devicePixelRatio).round(); // 列表模式封面固定宽度
     }
 
-    final httpHeaders = CookieService.serverCookieHeaders;
+    final httpHeaders = CookieService.coverHttpHeaders(token: token);
 
     // Gunakan blurhash dari server API, fallback ke hasil generate lokal
     final blurHash = widget.work.blurHash ??

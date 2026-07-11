@@ -5,6 +5,7 @@ import '../../models/work.dart';
 import '../../models/audio_track.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/kikoeru_api_service.dart';
+import '../../services/cookie_service.dart';
 import '../../providers/audio_provider.dart';
 import '../../services/download_service.dart';
 import '../../services/cache_service.dart';
@@ -649,6 +650,7 @@ class _WorkInfoPanelState extends ConsumerState<_WorkInfoPanel> {
     if (coverUrl != null) {
       return CachedNetworkImage(
         imageUrl: coverUrl,
+        httpHeaders: CookieService.coverHttpHeaders(token: token),
         fit: BoxFit.cover,
         placeholder: (_, __) => Container(color: cs.surfaceContainerHighest),
         errorWidget: (_, __, ___) => Container(

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../models/audio_track.dart';
+import '../../services/cookie_service.dart';
 import '../privacy_blur_cover.dart';
 
 /// 播放器封面组件
@@ -101,6 +102,7 @@ class PlayerCoverWidget extends StatelessWidget {
                                   )
                                 : CachedNetworkImage(
                                     imageUrl: (workCoverUrl ?? track.artworkUrl)!,
+                                    httpHeaders: CookieService.coverHttpHeaders(),
                                     // 使用workId作为cacheKey，与作品详情页保持一致，避免token变化导致重新下载
                                     cacheKey: track.workId != null
                                         ? 'work_cover_${track.workId}'

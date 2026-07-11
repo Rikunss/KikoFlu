@@ -59,7 +59,7 @@ class HistoryWorkCard extends ConsumerWidget {
 
     final cs = Theme.of(context).colorScheme;
 
-    final httpHeaders = CookieService.serverCookieHeaders;
+    final httpHeaders = CookieService.coverHttpHeaders(token: token);
 
     return Card(
       clipBehavior: Clip.antiAlias,

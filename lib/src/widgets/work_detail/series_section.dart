@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/work.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/series_works_provider.dart';
+import '../../services/cookie_service.dart';
 import '../../screens/work_detail_screen.dart';
 import '../privacy_blur_cover.dart';
 import '../../../l10n/app_localizations.dart';
@@ -301,6 +302,7 @@ class _SeriesCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(8),
         child: CachedNetworkImage(
           imageUrl: url,
+          httpHeaders: CookieService.coverHttpHeaders(token: token),
           cacheKey: 'work_cover_${work.id}',
           memCacheWidth:
               (120 * MediaQuery.of(context).devicePixelRatio).round(),

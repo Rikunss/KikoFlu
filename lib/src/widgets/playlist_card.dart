@@ -53,7 +53,7 @@ class PlaylistCard extends ConsumerWidget {
     final colorScheme = theme.colorScheme;
     final s = S.of(context);
 
-    final httpHeaders = CookieService.serverCookieHeaders;
+    final httpHeaders = CookieService.coverHttpHeaders(token: token);
     final isSystem = playlist.isSystemPlaylist;
     final relativeTime = _relativeTime(context, playlist.updatedAt.isNotEmpty ? playlist.updatedAt : playlist.createdAt);
     final privacyIcon = _privacyIcon(playlist.privacy);
