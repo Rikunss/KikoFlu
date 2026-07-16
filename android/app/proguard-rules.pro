@@ -5,6 +5,18 @@
 -keep class com.antonkarpenko.ffmpegkit.** { *; }
 
 
+# === Custom Media3 FLAC decoder (libflacJNI.so) — keep JNI classes ===
+# Loaded via Class.forName in ExoPlayerManager.kt and used by LibflacAudioRenderer.
+# Without this: R8 strips the classes → UnsatisfiedLinkError when playing FLAC.
+-keep class androidx.media3.decoder.flac.** { *; }
+
+
+# === FlacStreamMetadata — keep constructor used by JNI native code ===
+# R8 cannot trace JNI calls from libflacJNI.so, so it removes this constructor
+# thinking it's unused. Result: NoSuchMethodError in flacDecodeMetadata native.
+-keep class androidx.media3.extractor.FlacStreamMetadata { *; }
+
+
 # === Flutter engine deferred components (play core) ===
 # The Flutter engine references com.google.android.play.core classes
 # for split APK / deferred component loading. R8 removes these if missing.
