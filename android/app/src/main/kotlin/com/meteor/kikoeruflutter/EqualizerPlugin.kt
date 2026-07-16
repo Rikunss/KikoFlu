@@ -66,7 +66,6 @@ class EqualizerPlugin private constructor(private val context: Context) : Method
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
             "isSupported" -> {
-                // Android always supports Equalizer class
                 result.success(true)
             }
             "getBands" -> {
@@ -84,7 +83,6 @@ class EqualizerPlugin private constructor(private val context: Context) : Method
                         result.error("EQ_ERROR", "Failed to get bands: ${e.message}", null)
                     }
                 } else {
-                    // Return standard 10-band frequencies
                     result.success(listOf(31.0, 62.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0))
                 }
             }
@@ -106,7 +104,6 @@ class EqualizerPlugin private constructor(private val context: Context) : Method
                         val numberOfBands = eq.numberOfBands.toInt()
                         val bandLevelRange = eq.getBandLevelRange()
                         for (i in 0 until numberOfBands.coerceAtMost(gainsArg.size)) {
-                            // Convert dB to millibels (Android's Equalizer uses millibels)
                             val millibels = ((gainsArg[i] * 100).toInt())
                                 .coerceIn(bandLevelRange[0].toInt(), bandLevelRange[1].toInt())
                                 .toShort()

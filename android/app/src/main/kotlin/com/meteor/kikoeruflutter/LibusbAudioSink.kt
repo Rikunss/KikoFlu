@@ -45,7 +45,6 @@ class LibusbAudioSink : AudioSink {
 
     }
 
-    // ── State ──
     private var listener: Listener? = null
     private var sampleRate: Int = 0
     private var channelCount: Int = 2
@@ -61,13 +60,11 @@ class LibusbAudioSink : AudioSink {
         Log.i("USBPCM", "LIBUSB_SINK_CONSTRUCTED")
     }
 
-    // ── Monotonic call counters for starvation detection ──
     private var handleBufferCallCount: Long = 0      // Total handleBuffer calls (monotonic)
     private var totalFramesWritten: Long = 0          // Total frames written to native driver
     private var totalWriteTimeUs: Long = 0             // Cumulative time spent in JNI write
     private var lastHandleBufferTimestampMs: Long = 0  // Timestamp of last handleBuffer call
 
-    // ── Throttled logging accumulators (reset every THROTTLE_LOG_INTERVAL_MS) ──
     private var totalFramesSinceLastLog = 0L
     private var totalBytesSinceLastLog = 0L
     private var lastThrottleLogMs: Long = 0L
@@ -75,11 +72,9 @@ class LibusbAudioSink : AudioSink {
     private var dacDisconnectedCalls = 0
     private var writeErrorCalls = 0
 
-    // ── [FORMAT-STATS] per-second accumulators ──
     private var lastFormatStatsLogMs: Long = 0L
     private var statsFramesAtLastLog: Long = 0L
 
-    // ── AudioSink implementation ──
 
     override fun configure(
         inputFormat: Format,
@@ -116,7 +111,6 @@ class LibusbAudioSink : AudioSink {
         Log.i(TAG, "  → bytesPerFrame=$bytesPerFrame, " +
                 "configured=true, ended=false")
 
-        // ── [PCM16] trace ──
         if (pcmEncoding == C.ENCODING_PCM_16BIT) {
             Log.i(TAG, "[PCM16] configure(): sampleRate=${inputFormat.sampleRate}Hz, " +
                     "channels=$channelCount, bytesPerFrame=$bytesPerFrame, encoding=PCM_16BIT")
@@ -137,7 +131,6 @@ class LibusbAudioSink : AudioSink {
             lastThrottleLogMs = nowMs
         }
 
-        // ── Monotonic call counter + gap detection ──
         handleBufferCallCount++
         handleBufferCallsSinceLastLog++
         val gapMs = if (lastHandleBufferTimestampMs > 0) (nowMs - lastHandleBufferTimestampMs) else 0L
@@ -147,7 +140,6 @@ class LibusbAudioSink : AudioSink {
         val numFrames = if (remaining > 0 && bytesPerFrame > 0) remaining / bytesPerFrame else 0
         val alignmentRemainder = if (bytesPerFrame > 0) remaining % bytesPerFrame else 0
 
-        // ── ByteBuffer diagnostic ──
         val bufPos = buffer.position()
         val bufLim = buffer.limit()
         val bufCap = buffer.capacity()
@@ -196,7 +188,6 @@ class LibusbAudioSink : AudioSink {
 
         lastPresentationTimeUs = presentationTimeUs
 
-        // ── [PCM16] trace: confirm encoding dispatch ──
         if (pcmEncoding == C.ENCODING_PCM_16BIT) {
             Log.i(TAG, "[PCM16] handleBuffer #$handleBufferCallCount: " +
                     "dispatching to writeI16(), frames=$numFrames, bytes=$remaining, " +
@@ -206,7 +197,6 @@ class LibusbAudioSink : AudioSink {
                     "pcmEncoding=$pcmEncoding (NOT PCM_16BIT), skipping [PCM16] trace")
         }
 
-        // ── [KOTLIN-AUDIO] Trace format reaching JNI ──
         val audioEncodingName = when (pcmEncoding) {
             C.ENCODING_PCM_16BIT -> "PCM16"
             C.ENCODING_PCM_24BIT -> "PCM24"
@@ -222,7 +212,6 @@ class LibusbAudioSink : AudioSink {
                 "numFrames=$numFrames " +
                 "presentationTimeUs=${presentationTimeUs}us")
 
-        // ── Write start timestamp for latency measurement ──
         val writeStartUs = System.nanoTime() / 1000
 
         val written = when (pcmEncoding) {
@@ -234,12 +223,6 @@ class LibusbAudioSink : AudioSink {
         }
         val writtenFrames = written
 
-        // ── Advance buffer position by actually-written frames ──
-        // writeI16() uses duplicate() to read data, which does NOT advance
-        // the original buffer's position. We must advance it manually so the
-        // drain loop reads the CORRECT remaining frames, not the same ones.
-        // Without this, every short write causes: frames 0-3839 written once,
-        // frames 0-479 written AGAIN (duplicated), frames 3840-4409 LOST.
         val consumedBytes = if (written > 0) written * bytesPerFrame else 0
         if (consumedBytes > 0) {
             buffer.position(buffer.position() + consumedBytes)
@@ -281,7 +264,6 @@ class LibusbAudioSink : AudioSink {
                     C.ENCODING_PCM_24BIT -> writePcm24AsPcm16(buffer, drainPtr, drainFrames)
                     else -> writeI16(buffer, drainPtr, drainFrames)
                 }
-                // Advance buffer position for each drain write too
                 if (drainWritten > 0) {
                     buffer.position(buffer.position() + drainWritten * bytesPerFrame)
                 }
@@ -292,9 +274,6 @@ class LibusbAudioSink : AudioSink {
             Log.i(TAG, "[HB#$handleBufferCallCount] drain: drained=$drained/${remainingFrames} in $loopCount loops")
         }
 
-        // ── Per-second [FORMAT-STATS] logging (encoding-aware) ──
-        // Logs write rate, frame count, and encoding at 1-second intervals.
-        // Use this to compare PCM16 vs PCM24 vs FLOAT production rates.
         if (lastFormatStatsLogMs == 0L) lastFormatStatsLogMs = nowMs
         if (nowMs - lastFormatStatsLogMs >= FORMAT_STATS_INTERVAL_MS) {
             val elapsedSec = (nowMs - lastFormatStatsLogMs) / 1000.0
@@ -321,7 +300,6 @@ class LibusbAudioSink : AudioSink {
             statsFramesAtLastLog = totalFramesWritten
         }
 
-        // Throttled throughput logging every THROTTLE_LOG_INTERVAL_MS
         if (nowMs - lastThrottleLogMs >= THROTTLE_LOG_INTERVAL_MS) {
             val elapsedSec = (nowMs - lastThrottleLogMs) / 1000.0
             val framesPerSec = if (elapsedSec > 0) (totalFramesSinceLastLog / elapsedSec).toLong() else 0L
@@ -338,7 +316,6 @@ class LibusbAudioSink : AudioSink {
                     "dacDrains=$dacDisconnectedCalls, " +
                     "writeErrors=$writeErrorCalls")
 
-            // Reset accumulators
             totalFramesSinceLastLog = 0L
             totalBytesSinceLastLog = 0L
             handleBufferCallsSinceLastLog = 0
@@ -369,7 +346,6 @@ class LibusbAudioSink : AudioSink {
                 "framesWritten=$totalFramesWritten")
         playing = false
         ended = false
-        // Reset throttled logging on flush
         totalFramesSinceLastLog = 0L
         totalBytesSinceLastLog = 0L
         handleBufferCallsSinceLastLog = 0
@@ -386,7 +362,6 @@ class LibusbAudioSink : AudioSink {
         playing = false
         configured = false
         ended = false
-        // Reset all accumulators
         totalFramesSinceLastLog = 0L
         totalBytesSinceLastLog = 0L
         handleBufferCallsSinceLastLog = 0
@@ -488,12 +463,10 @@ class LibusbAudioSink : AudioSink {
 
     override fun disableTunneling() { /* N/A */ }
 
-    // ── Format constants ──
 
     private val FORMAT_HANDLED = 0
     private val FORMAT_UNSUPPORTED_TYPE = 1
 
-    // ── PCM write helpers ──
 
     /**
      * Write 16-bit PCM data to the USB DAC via libusb.
@@ -516,14 +489,6 @@ class LibusbAudioSink : AudioSink {
                 "consumeBytes=$consumedBytes, consumeShorts=$totalSamples")
 
         val shorts = ShortArray(totalSamples)
-        // ── CRITICAL: Use duplicate() to read without advancing original buffer position ──
-        // asShortBuffer().get() advances the ShortBuffer's position but does NOT
-        // advance the original ByteBuffer's position via duplicate(). However, calling
-        // buffer.order().asShortBuffer() directly DOES create a view that shares state
-        // with the original buffer — and advancing that view DOES advance the original!
-        // Using duplicate() ensures the original buffer's position stays untouched,
-        // allowing the drain loop in handleBuffer to retry the same data on short writes.
-        // Without this, short writes cause BufferUnderflowException in the drain loop.
         val dup = buffer.duplicate().order(ByteOrder.nativeOrder())
         val shortBuf = dup.asShortBuffer()
         val shortBufBeforePos = shortBuf.position()
@@ -554,11 +519,7 @@ class LibusbAudioSink : AudioSink {
     private fun writeFloat(buffer: ByteBuffer, ptr: Long, numFrames: Int): Int {
         val totalSamples = numFrames * channelCount
         val floatBuf = FloatArray(totalSamples)
-        // Use duplicate() to avoid advancing original buffer position — consistent with
-        // writeI16() and other write functions. Without this, handleBuffer's drain loop
-        // position advancement would double-advance and skip data when FLOAT is enabled.
         buffer.duplicate().order(ByteOrder.nativeOrder()).asFloatBuffer().get(floatBuf, 0, totalSamples)
-        // No volume gain — always bit-perfect
         val written = UsbDacPlugin.nativeWritePcmFloatStatic(ptr, floatBuf, numFrames)
         if (written < 0) {
             Log.e(TAG, "✗ writeFloat: JNI returned $written (frames=$numFrames, samples=$totalSamples)")
@@ -615,16 +576,11 @@ class LibusbAudioSink : AudioSink {
     private fun writePcm24AsPcm16(buffer: ByteBuffer, ptr: Long, numFrames: Int): Int {
         val totalSamples = numFrames * channelCount
         val shorts = ShortArray(totalSamples)
-        // Use duplicate() to avoid advancing the original buffer's position
-        // (critical for the drain loop in handleBuffer).
         val dup = buffer.duplicate().order(ByteOrder.nativeOrder())
         for (i in 0 until totalSamples) {
-            // Read 3 bytes of 24-bit LE signed sample
             val b0 = dup.get().toInt() and 0xFF   // LSB (discarded)
             val b1 = dup.get().toInt() and 0xFF   // middle byte
             val b2 = dup.get().toInt()             // MSB (signed byte, sign-extended)
-            // Truncate to 16-bit: keep b2 (MSB) and b1, drop b0 (LSB)
-            // b2 is already sign-extended by .toInt()
             shorts[i] = ((b2 shl 8) or b1).toShort()
         }
 
@@ -651,11 +607,6 @@ class LibusbAudioSink : AudioSink {
     private fun writePcm24Bit(buffer: ByteBuffer, ptr: Long, numFrames: Int): Int {
         val totalBytes = numFrames * bytesPerFrame  // bytesPerFrame already = 3 * channelCount
         val byteArray = ByteArray(totalBytes)
-        // Use duplicate() to avoid advancing the original buffer's position.
-        // This is critical because the drain loop in handleBuffer may call
-        // writePcm24Bit again with the same buffer on short write.
-        // Without duplicate(), buffer.get() advances position and causes
-        // BufferUnderflowException on retry.
         buffer.duplicate().order(ByteOrder.nativeOrder()).get(byteArray, 0, totalBytes)
 
         Log.i(TAG, "[USB-PIPELINE] writePcm24Bit: " +

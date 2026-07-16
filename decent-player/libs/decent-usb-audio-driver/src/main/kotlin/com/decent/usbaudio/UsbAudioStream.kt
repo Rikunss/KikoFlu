@@ -184,7 +184,6 @@ class UsbAudioStream(
         Log.i(TAG, "UsbAudioStream released")
     }
 
-    // JNI declarations
 
     private external fun nativeUsbAudioCreate(
             fd: Int, interfaceId: Int, endpointOut: Int, endpointFeedback: Int,

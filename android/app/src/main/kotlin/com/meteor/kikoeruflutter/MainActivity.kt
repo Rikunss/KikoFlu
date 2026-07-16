@@ -24,7 +24,6 @@ class MainActivity : AudioServiceActivity() {
     private var screenStatePlugin: ScreenStatePlugin? = null
     private var usbDacPlugin: UsbDacPlugin? = null
     
-    // Home widget action channel — used to forward widget button presses to Dart
     companion object {
         const val WIDGET_CHANNEL = "com.kikoeru.flutter/home_widget_actions"
         const val ACTION_TOGGLE_PLAYBACK = "togglePlayback"
@@ -38,28 +37,22 @@ class MainActivity : AudioServiceActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Register runtime receiver for USB_DEVICE_ATTACHED (without the manifest
-        // intent-filter, which triggers the Android chooser dialog).
-        // The DAC is NOT claimed here — only when user enables routing in settings.
         registerUsbReceiver()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Forward widget intents
         handleWidgetIntent(intent)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
-        // Handle home widget intents (sent from widget provider)
         widgetChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             WIDGET_CHANNEL
         )
         
-        // 注册悬浮字幕插件
         floatingLyricPlugin = FloatingLyricPlugin.getInstance(this)
         val channel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -68,7 +61,6 @@ class MainActivity : AudioServiceActivity() {
         floatingLyricPlugin?.attachChannel(channel)
         channel.setMethodCallHandler(floatingLyricPlugin)
 
-        // 注册 Equalizer 插件
         equalizerPlugin = EqualizerPlugin.getInstance(this)
         val eqChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -76,7 +68,6 @@ class MainActivity : AudioServiceActivity() {
         )
         eqChannel.setMethodCallHandler(equalizerPlugin)
 
-        // 注册 Hi-Res Audio 插件
         hiResAudioPlugin = HiResAudioPlugin.getInstance(this)
         val hiResChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -85,7 +76,6 @@ class MainActivity : AudioServiceActivity() {
         hiResAudioPlugin?.attachChannel(hiResChannel)
         hiResChannel.setMethodCallHandler(hiResAudioPlugin)
 
-        // 注册 Exclusive Audio 插件
         exclusiveAudioPlugin = ExclusiveAudioPlugin.getInstance(this)
         val exclusiveChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -94,17 +84,13 @@ class MainActivity : AudioServiceActivity() {
         exclusiveAudioPlugin?.attachChannel(exclusiveChannel)
         exclusiveChannel.setMethodCallHandler(exclusiveAudioPlugin)
 
-        // 注册 Screen State 插件 (screen off/on detection for auto-relock)
         screenStatePlugin = ScreenStatePlugin.getInstance(this)
         screenStatePlugin?.attachChannel(flutterEngine)
 
-        // 注册 Audio Conversion 插件 (WAV → FLAC)
         AudioConversionPlugin.register(flutterEngine)
 
-        // 注册 SAF 文件工具（用于导入 content:// URI 的文件夹）
         SafFileUtils.register(flutterEngine, this)
 
-        // 注册 USB DAC 插件 (bit-perfect USB audio output via libusb)
         usbDacPlugin = UsbDacPlugin.getInstance(this)
         usbDacPlugin?.loadNativeLibrary()
         val usbDacChannel = MethodChannel(
@@ -114,7 +100,6 @@ class MainActivity : AudioServiceActivity() {
         usbDacPlugin?.attachChannel(usbDacChannel)
         usbDacChannel.setMethodCallHandler(usbDacPlugin)
 
-        // Set up channel for App Lock Quick Settings tile
         appLockTileChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.kikoeru.flutter/app_lock_tile"
@@ -127,13 +112,8 @@ class MainActivity : AudioServiceActivity() {
         }
         registerTileReceiver()
 
-        // Forward pending widget intents
         handleWidgetIntent(intent)
 
-        // ── Check for already-connected USB DAC on startup ──
-        // Jika user sudah mencolok USB DAC sebelum membuka aplikasi,
-        // langsung minta permission (muncul system dialog) tanpa perlu
-        // colok-cabut ulang. Lihat [checkForExistingUsbDacOnStartup].
         checkForExistingUsbDacOnStartup()
     }
 
@@ -163,7 +143,6 @@ class MainActivity : AudioServiceActivity() {
                 }
             }
         }
-        // RECEIVER_EXPORTED requires API 33+; use two-arg overload on older devices
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(tileReceiver, IntentFilter(AppLockTileService.ACTION_TOGGLE), Context.RECEIVER_EXPORTED)
         } else {
@@ -216,9 +195,6 @@ class MainActivity : AudioServiceActivity() {
                 "hasPermission=$hasPermission, routingEnabled=$routingEnabled)")
 
             if (hasPermission) {
-                // Izin sudah pernah diberikan — auto-route langsung
-                // (dilakukan meski routing OFF, agar begitu user toggle ON
-                //  tidak perlu colok-cabut ulang)
                 android.util.Log.i("MainActivity",
                     "[USB] Permission already granted — auto-routing to ${device.productName}")
                 val plugin = this.hiResAudioPlugin
@@ -226,7 +202,6 @@ class MainActivity : AudioServiceActivity() {
                     plugin.autoRouteToUsbDac(device)
                 }
             } else if (routingEnabled) {
-                // Routing ON, permission belum di-grant → minta via dialog
                 android.util.Log.i("MainActivity",
                     "[USB] Routing enabled — requesting permission for ${device.productName}")
                 val usbAudioDevice = com.decent.usbaudio.UsbAudioDevice.getInstance(this)
@@ -244,12 +219,10 @@ class MainActivity : AudioServiceActivity() {
                     }
                 }
             } else {
-                // Routing OFF dan permission belum di-grant — skip
                 android.util.Log.i("MainActivity",
                     "[USB] USB DAC routing is OFF — skipping permission request for ${device.productName}")
             }
 
-            // Hanya proses device audio pertama yang ditemukan
             break
         }
     }
@@ -260,7 +233,6 @@ class MainActivity : AudioServiceActivity() {
                 val action = intent.action
                 val device = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE) ?: return
 
-                // Only handle USB Audio Class devices with an AudioStreaming interface
                 val isAudioDevice = (0 until device.interfaceCount).any { i ->
                     val iface = device.getInterface(i)
                     iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO &&
@@ -280,15 +252,12 @@ class MainActivity : AudioServiceActivity() {
                             "(hasPermission=$hasPermission, routingEnabled=$routingEnabled)")
 
                         if (hasPermission) {
-                            // Permission already granted — auto-route immediately
-                            // (regardless of routing toggle, so it's ready to use)
                             android.util.Log.i("MainActivity",
                                 "[USB] Permission already granted — auto-routing to ${device.productName}")
                             if (plugin != null) {
                                 plugin.autoRouteToUsbDac(device)
                             }
                         } else if (routingEnabled) {
-                            // Routing ON + permission not yet granted → show dialog
                             android.util.Log.i("MainActivity",
                                 "[USB] Routing enabled — requesting permission for ${device.productName}")
                             val usbAudioDevice = com.decent.usbaudio.UsbAudioDevice.getInstance(context)
@@ -303,7 +272,6 @@ class MainActivity : AudioServiceActivity() {
                                 }
                             }
                         } else {
-                            // Routing OFF + no prior permission — skip silently
                             android.util.Log.i("MainActivity",
                                 "[USB] USB DAC routing is OFF — skipping permission request for ${device.productName}")
                         }
@@ -311,8 +279,6 @@ class MainActivity : AudioServiceActivity() {
                     UsbManager.ACTION_USB_DEVICE_DETACHED -> {
                         android.util.Log.i("MainActivity",
                             "USB DAC detached: ${device.productName}")
-                        // Invalidate the cached USB device connection so the next
-                        // openDevice() gets a fresh fd for the new physical session.
                         com.decent.usbaudio.UsbAudioDevice.getInstance(context).closeDevice()
                         val plugin = this@MainActivity.hiResAudioPlugin
                         if (plugin != null) {
@@ -351,8 +317,6 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun onDestroy() {
-        // 不在 Activity 销毁时清理悬浮窗，以便在后台（如侧滑返回桌面）时保持显示
-        // floatingLyricPlugin?.cleanup()
         equalizerPlugin?.cleanup()
         hiResAudioPlugin?.cleanup()
         exclusiveAudioPlugin?.cleanup()

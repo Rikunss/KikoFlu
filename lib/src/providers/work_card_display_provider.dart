@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/log_service.dart';
 
 /// 作品卡片显示设置
 class WorkCardDisplaySettings {
@@ -70,6 +71,7 @@ class WorkCardDisplayNotifier extends StateNotifier<WorkCardDisplaySettings> {
         showSubtitleTag: prefs.getBool(_keySubtitleTag) ?? true,
       );
     } catch (e) {
+      LogService.instance.warning('[WorkCardDisplay] Failed to load settings: $e', tag: 'Settings');
     }
   }
 
@@ -119,6 +121,7 @@ class WorkCardDisplayNotifier extends StateNotifier<WorkCardDisplaySettings> {
       await prefs.setBool(_keyDuration, state.showDuration);
       await prefs.setBool(_keySubtitleTag, state.showSubtitleTag);
     } catch (e) {
+      LogService.instance.warning('[WorkCardDisplay] Failed to save settings: $e', tag: 'Settings');
     }
   }
 }

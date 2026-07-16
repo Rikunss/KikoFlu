@@ -69,11 +69,6 @@ class AaudioAudioSink(
 
     private var fallbackAudioSink: DefaultAudioSink? = null
 
-    // ── Ring buffer for pre-play() PCM data ──
-    // ExoPlayer may call handleBuffer() before play(). Since the AAudio stream
-    // is not yet started, writes would fill the buffer with nothing consuming it.
-    // To avoid this, we queue PCM data here and drain it into the AAudio stream
-    // immediately after play() calls AAudioStream_requestStart().
     private val ringBuffer = ByteArray(RING_BUFFER_CAPACITY)
     private var ringWritePos = 0
     private var ringBytes = 0
@@ -110,7 +105,6 @@ class AaudioAudioSink(
                 ExclusiveAudioPlugin.getAaudioDeviceId())
         }
 
-        // If exclusive mode failed, fallback to DefaultAudioSink for bit-perfect via native sample rate
         if (inited && ptr != 0L) {
             nativePlayerPtr = ptr
             configured = true
@@ -122,13 +116,10 @@ class AaudioAudioSink(
             val isExclusive = ExclusiveAudioPlugin.nativeIsExclusiveStatic(nativePlayerPtr)
             Log.i(TAG, "Playback AAudio stream: exclusive=$isExclusive, rate=${sampleRate}Hz, bits=${bitsPerSample}")
 
-            // Report status
             onExclusiveStatusChanged?.invoke(isExclusive)
 
-            // Register this sink (for potential USB switch)
             currentSink = this
         } else {
-            // Fallback to DefaultAudioSink - still bit-perfect if format matches hardware
             Log.w(TAG, "AAudio init failed, falling back to DefaultAudioSink for native rate")
             fallbackAudioSink?.release()
             fallbackAudioSink = DefaultAudioSink.Builder()
@@ -145,7 +136,6 @@ class AaudioAudioSink(
     }
 
     override fun handleBuffer(buffer: ByteBuffer, presentationTimeUs: Long, encodedAccessUnitCount: Int): Boolean {
-        // If AAudio native player is active, use it
         if (nativePlayerPtr != 0L) {
             val remaining = buffer.remaining()
             val bufSize = buffer.capacity()
@@ -162,37 +152,21 @@ class AaudioAudioSink(
                 return true
             }
 
-            // ── Pre-play() buffering: queue data in ring buffer ──
-            // If the AAudio stream hasn't been started yet (play() not called),
-            // writing to it would fill the buffer with no consumer draining it.
-            // Instead, copy raw PCM bytes into the ring buffer and return true
-            // (data consumed). The ring buffer will be drained into the AAudio
-            // stream immediately after play() calls AAudioStream_requestStart().
-            //
-            // If play() has been called but the ring buffer still has undrained
-            // data (from a partial drain where AAudio buffer was full), re-attempt
-            // draining now — the AAudio buffer may have freed space since the
-            // last attempt.
             if (playStarted && ringBytes > 0) {
                 drainRingBuffer()
             }
 
             if (!playStarted || ringBytes > 0) {
                 if (ringBytes + remaining > RING_BUFFER_CAPACITY) {
-                    // Ring buffer overflow — advance read position to discard oldest data
                     val discard = ringBytes + remaining - RING_BUFFER_CAPACITY
                     ringBytes -= discard
                     ringBytes = maxOf(0, ringBytes)  // defensive: prevent negative on extreme overflow
                     Log.w(TAG, "[RING-BUFFER] overflow: discarded $discard oldest bytes, " +
                             "ringBytes=$ringBytes, remaining=$remaining")
                 }
-                // Copy incoming PCM bytes into ring buffer, handling circular wraparound.
-                // Cannot use buffer.get(ringBuffer, ringWritePos, remaining) directly because
-                // ByteBuffer.get(byte[], int, int) requires offset+length <= array length.
                 val firstPart = minOf(remaining, RING_BUFFER_CAPACITY - ringWritePos)
                 buffer.get(ringBuffer, ringWritePos, firstPart)
                 if (firstPart < remaining) {
-                    // Wraparound: remaining data goes at the start of the array
                     buffer.get(ringBuffer, 0, remaining - firstPart)
                 }
                 ringWritePos = (ringWritePos + remaining) % RING_BUFFER_CAPACITY
@@ -219,12 +193,6 @@ class AaudioAudioSink(
                 return false
             }
             totalFramesWritten += written
-            // Only advance buffer by actual bytes consumed.
-            // If written < numFrames, only advance the consumed portion so ExoPlayer
-            // retries the remaining data on the next call (bug fix: was advancing by
-            // full remaining even on partial write, causing data loss).
-            // Cap at remaining to prevent position exceeding buffer limit if native
-            // returns a value larger than numFrames (unlikely defensive guard).
             val consumedBytes = minOf(written.toLong() * bytesPerFrame, remaining.toLong()).toInt()
             buffer.position(buffer.position() + consumedBytes)
             val handled = written >= numFrames
@@ -233,12 +201,10 @@ class AaudioAudioSink(
             return handled
         }
         
-        // Fallback to DefaultAudioSink if AAudio failed
         if (fallbackAudioSink != null) {
             Log.i(TAG, "[AUDIO-BUFFER] using fallbackAudioSink (nativePlayerPtr=0) — delegating to DefaultAudioSink")
             return fallbackAudioSink!!.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount)
         }
-        // Both AAudio and fallback AudioSink are unavailable — drain silently and report error
         Log.e(TAG, "[AUDIO-BUFFER] No audio sink available (AAudio=0, fallback=null) — draining buffer")
         listener?.onAudioSinkError(RuntimeException("AAudio init failed, no fallback available"))
         buffer.position(buffer.limit())
@@ -250,15 +216,9 @@ class AaudioAudioSink(
         Log.i(TAG, "[AUDIO-SINK-LIFECYCLE] play() called")
         if (nativePlayerPtr != 0L) {
             playing = true
-            // Start the AAudio stream first — this ensures the audio HAL
-            // begins consuming frames from the buffer.
             ExclusiveAudioPlugin.nativeStartPlayerStatic(nativePlayerPtr)
             playStarted = true
 
-            // Drain any PCM data that was buffered before play() was called.
-            // This data was queued in the ring buffer by handleBuffer() to avoid
-            // writing to an unstarted AAudio stream (which would buffer-fill and
-            // return 0 repeatedly).
             if (ringBytes > 0) {
                 drainRingBuffer()
             }
@@ -400,14 +360,11 @@ class AaudioAudioSink(
     override fun enableTunnelingV21() { /* N/A */ }
     override fun disableTunneling() { /* N/A */ }
 
-    // ── Write helpers ──
 
     private fun writeI16(buffer: ByteBuffer, numFrames: Int): Int {
         val totalSamples = numFrames * channelCount
         val shorts = ShortArray(totalSamples)
-        // Use duplicate to avoid mutating the original buffer's byte order or position.
         buffer.duplicate().order(ByteOrder.nativeOrder()).asShortBuffer().get(shorts)
-        // Bit-perfect mode: skip all volume gain to preserve original PCM samples
         if (!bitPerfectMode && currentVolume < 1.0f) {
             for (i in shorts.indices) {
                 shorts[i] = (shorts[i] * currentVolume).toInt().coerceIn(-32768, 32767).toShort()
@@ -421,9 +378,7 @@ class AaudioAudioSink(
     private fun writeFloat(buffer: ByteBuffer, numFrames: Int): Int {
         val totalSamples = numFrames * channelCount
         val floatBuf = FloatArray(totalSamples)
-        // Use duplicate to avoid mutating the original buffer's byte order or position.
         buffer.duplicate().order(ByteOrder.nativeOrder()).asFloatBuffer().get(floatBuf, 0, totalSamples)
-        // Bit-perfect mode: skip all volume gain to preserve original PCM samples
         if (!bitPerfectMode && currentVolume < 1.0f) {
             for (i in floatBuf.indices) {
                 floatBuf[i] = (floatBuf[i] * currentVolume).coerceIn(-1.0f, 1.0f)
@@ -439,7 +394,6 @@ class AaudioAudioSink(
         val intBuffer = buffer.duplicate().order(ByteOrder.nativeOrder()).asIntBuffer()
         val ints = IntArray(totalSamples)
         intBuffer.get(ints, 0, totalSamples)
-        // Bit-perfect mode: skip all volume gain to preserve original PCM samples
         if (bitPerfectMode) {
             val floatBuf = FloatArray(totalSamples)
             for (i in 0 until totalSamples) {
@@ -472,14 +426,11 @@ class AaudioAudioSink(
         val logLimit = minOf(16, totalSamples)
         val rawHex = StringBuilder()
         for (i in 0 until totalSamples) {
-            // Read 3 bytes from duplicate — original buffer position unchanged
             val low = dup.get().toInt() and 0xFF
             val mid = dup.get().toInt() and 0xFF
             val high = dup.get().toInt()
             val sample = (low) or (mid shl 8) or (high shl 16)
-            // Sign-extend from 24-bit to 32-bit
             val signed = if (sample and 0x800000 != 0) sample or 0xFF000000.toInt() else sample
-            // Bit-perfect mode: skip all volume gain to preserve original PCM samples
             floatBuf[i] = if (!bitPerfectMode && currentVolume < 1.0f) {
                 (signed / 8388608.0f) * currentVolume
             } else {
@@ -517,7 +468,6 @@ class AaudioAudioSink(
             val numFrames = minOf(maxFrames, DRAIN_CHUNK_FRAMES)
             val chunkBytes = numFrames * bytesPerFrame
 
-            // Copy from ring buffer into a temporary contiguous array
             val tmp = ByteArray(chunkBytes)
             val firstPart = minOf(chunkBytes, RING_BUFFER_CAPACITY - readPos)
             System.arraycopy(ringBuffer, readPos, tmp, 0, firstPart)
@@ -525,7 +475,6 @@ class AaudioAudioSink(
                 System.arraycopy(ringBuffer, 0, tmp, firstPart, chunkBytes - firstPart)
             }
 
-            // Wrap in ByteBuffer for the write helper
             val bb = ByteBuffer.wrap(tmp).order(ByteOrder.nativeOrder())
 
             val written = when (pcmEncoding) {
@@ -547,8 +496,6 @@ class AaudioAudioSink(
             totalFramesWritten += written
 
             if (written < numFrames) {
-                // AAudio buffer full — stop draining, remaining data will be
-                // picked up naturally by subsequent handleBuffer() calls
                 Log.v(TAG, "[RING-BUFFER] drain stopped early: wrote $written/$numFrames frames, " +
                         "$ringBytes bytes remain in ring buffer")
                 break
@@ -556,7 +503,6 @@ class AaudioAudioSink(
         }
         Log.i(TAG, "[RING-BUFFER] drain complete: $totalDrained frames in $drainCycles cycles, " +
                 "ringBytes=$ringBytes")
-        // Discard partial frame tail (bytes < bytesPerFrame can never form a complete frame).
         if (ringBytes > 0 && ringBytes < bytesPerFrame) {
             Log.v(TAG, "[RING-BUFFER] discarding $ringBytes partial frame bytes (bytesPerFrame=$bytesPerFrame)")
             ringBytes = 0

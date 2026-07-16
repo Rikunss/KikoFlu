@@ -91,9 +91,7 @@ class Mp3Encoder {
             try {
                 nativeClose(handle)
             } catch (_: UnsatisfiedLinkError) {
-                // ignore
             } catch (_: Throwable) {
-                // ignore
             }
             handle = 0
             inited = false

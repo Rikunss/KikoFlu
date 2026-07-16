@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/work.dart';
-import '../../providers/auth_provider.dart';
 import '../../services/kikoeru_api_service.dart';
 import '../../providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
@@ -266,7 +265,8 @@ class _TagVoteDialogState extends ConsumerState<TagVoteDialog> {
         Future.delayed(const Duration(seconds: 3), () {
           try {
             controller.close();
-          } catch (_) {}
+          } catch (_) {
+          }
         });
       },
       borderRadius: BorderRadius.circular(8),

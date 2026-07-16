@@ -32,7 +32,6 @@ class AppLockTileService : TileService() {
 
     override fun onCreate() {
         super.onCreate()
-        // Use the same default SharedPreferences file as Flutter's shared_preferences plugin
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
     }
 
@@ -47,32 +46,25 @@ class AppLockTileService : TileService() {
         val newState = !currentlyEnabled
 
         if (newState) {
-            // Enabling requires PIN to be set — if no PIN, we can't enable from tile
             val hasPin = sp.contains(KEY_PIN_HASH)
             if (!hasPin) {
-                // Can't enable from tile without PIN; show a toast or just update tile
                 updateTile()
                 return
             }
         }
 
-        // Toggle
         sp.edit().putBoolean(KEY_ENABLED, newState).apply()
         if (!newState) {
             sp.edit().putBoolean(KEY_BIOMETRIC, false).apply()
         }
 
-        // Update tile UI
         updateTile()
 
-        // Notify Flutter side via broadcast
         sendBroadcast(Intent(ACTION_TOGGLE).apply {
             putExtra(EXTRA_ENABLED, newState)
         })
 
-        // Required for tile interaction
         unlockAndRun {
-            // Toggle is done — nothing more needed here
         }
     }
 

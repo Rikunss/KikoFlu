@@ -46,16 +46,12 @@ class ExoPlayerManager(private val context: Context) {
     var currentBitDepth: Int = 0
     var currentChannels: Int = 0
 
-    // AAudio exclusive AudioSink mode
     var useAaudioSink: Boolean = false
         private set
 
-    /// When true, the AAudio AudioSink will skip digital volume gain
-    /// to preserve bit-perfect PCM output. Requires exclusive mode.
     @Volatile
     var bitPerfectMode: Boolean = false
 
-    // ── decent-player: Bit-perfect USB DAC via UsbAudioSink ──
     var useDecentSink: Boolean = false
     var currentUsbSink: UsbAudioSink? = null
     @Volatile
@@ -87,7 +83,6 @@ class ExoPlayerManager(private val context: Context) {
     private var audioBecomingNoisyReceiver: BroadcastReceiver? = null
 
     init {
-        // Detect libFLAC at runtime — decent-media3-decoder-flac provides this
         libflacAvailable = try {
             Class.forName("androidx.media3.decoder.flac.LibflacAudioRenderer")
             true
@@ -125,8 +120,6 @@ class ExoPlayerManager(private val context: Context) {
      * Only takes effect on the NEXT ExoPlayer creation.
      */
     fun setUseFfmpeg(enabled: Boolean) {
-        // ExoPlayerManager always uses FFmpeg by default
-        // This is kept for interface compatibility
         android.util.Log.i("HiResAudio", "FFmpeg decoder ${if (enabled) "enabled" else "disabled"}")
     }
 
@@ -150,7 +143,6 @@ class ExoPlayerManager(private val context: Context) {
                 .build()
 
             val baseFactory: DefaultRenderersFactory = when {
-                // Priority 1: decent-player UsbAudioSink (bit-perfect via usbdevfs)
                 useDecentSink -> {
                     android.util.Log.i("HiResAudio", "Creating ExoPlayer with UsbAudioSink + FFmpeg")
 
@@ -174,7 +166,6 @@ class ExoPlayerManager(private val context: Context) {
                         }
                     }
                 }
-                // Priority 2: AAudio exclusive AudioSink
                 useAaudioSink -> {
                     android.util.Log.i("HiResAudio", "Creating ExoPlayer with AAudio AudioSink + FFmpeg ALAC")
                     val aaudioSinkInstance = AaudioAudioSink({ sr, ch, bits, deviceId ->
@@ -201,7 +192,6 @@ class ExoPlayerManager(private val context: Context) {
                             "maxVolume" to 0,
                             "androidSdk" to android.os.Build.VERSION.SDK_INT
                         )
-                        // Post to main thread — ExoPlayer calls configure() from background thread
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             onExclusiveStatusChanged?.invoke(status)
                         }
@@ -219,19 +209,16 @@ class ExoPlayerManager(private val context: Context) {
                         }
                     }
                 }
-                // Default: standard FFmpeg pipeline
                 else -> {
                     android.util.Log.i("HiResAudio", "Creating ExoPlayer with FFmpeg ALAC")
                     DefaultRenderersFactory(context)
                 }
             }
 
-            // Enable ServiceLoader-based extension renderer discovery
             baseFactory.setExtensionRendererMode(
                 DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
             )
 
-            // Wrap base factory to prepend FfmpegAudioRenderer explicitly
             val renderersFactory = RenderersFactory { handler, _, audioListener, _, _ ->
                 android.util.Log.i("HiResAudio", "RenderersFactory.createRenderers() called — prepending FfmpegAudioRenderer")
                 val baseRenderers = baseFactory.createRenderers(
@@ -246,9 +233,6 @@ class ExoPlayerManager(private val context: Context) {
                     }
                 )
                 android.util.Log.i("HiResAudio", "Base factory returned ${baseRenderers.size} renderers")
-                // Use the same decent-player UsbAudioSink that base factory renderers got
-                // from buildAudioSink(), so the prepended FfmpegAudioRenderer also routes
-                // through the USB DAC instead of creating its own DefaultAudioSink.
                 val ffmpegSink = currentUsbSink ?: DefaultAudioSink.Builder(context).build()
                 val ffmpeg = FfmpegAudioRenderer(handler, audioListener, ffmpegSink)
                 android.util.Log.i("HiResAudio", "FfmpegAudioRenderer created (sink=UsbAudioSink), prepending at position 0")
@@ -257,21 +241,12 @@ class ExoPlayerManager(private val context: Context) {
 
             exoPlayer = ExoPlayer.Builder(context, renderersFactory)
                 .setAudioAttributes(audioAttributes, true)
-                // NOTE: We do NOT use setHandleAudioBecomingNoisy(true) here
-                // because ExoPlayer's built-in handler pauses on ALL
-                // ACTION_AUDIO_BECOMING_NOISY broadcasts indiscriminately.
-                // With USB DAC / AAudio exclusive sink, Android sometimes
-                // sends spurious noisy broadcasts when the app goes to
-                // background (false positive).
-                // Instead, we register our own conditional receiver below.
                 .build()
 
-            // Attach the decent-player UsbAudioSink to the player for USB DAC routing
             if (currentUsbSink is UsbAudioSink) {
                 (currentUsbSink as UsbAudioSink).attachToPlayer(exoPlayer!!)
             }
 
-            // Register conditional ACTION_AUDIO_BECOMING_NOISY receiver
             registerAudioBecomingNoisyReceiver()
 
             exoPlayer?.addListener(object : Player.Listener {
@@ -331,7 +306,6 @@ class ExoPlayerManager(private val context: Context) {
         return pos
     }
 
-    // ── Conditional ACTION_AUDIO_BECOMING_NOISY handler ──
 
     /**
      * Register a BroadcastReceiver for [AudioManager.ACTION_AUDIO_BECOMING_NOISY]
@@ -348,11 +322,15 @@ class ExoPlayerManager(private val context: Context) {
             override fun onReceive(ctx: Context, intent: Intent) {
                 if (intent.action != AudioManager.ACTION_AUDIO_BECOMING_NOISY) return
 
-                // ── USB DAC / AAudio exclusive sink active? → Ignore ──
-                // These audio paths bypass the Android mixer, so
-                // ACTION_AUDIO_BECOMING_NOISY is likely a false positive
-                // triggered by system re-routing when app goes to background.
                 if (useDecentSink || useAaudioSink) {
+                    if (useDecentSink && currentUsbSink?.isDeviceLost == true) {
+                        android.util.Log.i("HiResAudio",
+                            "ACTION_AUDIO_BECOMING_NOISY — " +
+                            "USB DAC device confirmed lost, pausing")
+                        exoPlayer?.pause()
+                        return
+                    }
+
                     android.util.Log.i("HiResAudio",
                         "ACTION_AUDIO_BECOMING_NOISY IGNORED — " +
                         "USB DAC (useDecentSink=$useDecentSink) or " +
@@ -360,7 +338,6 @@ class ExoPlayerManager(private val context: Context) {
                     return
                 }
 
-                // ── Normal audio path → Pause (genuine headphone unplug) ──
                 android.util.Log.i("HiResAudio",
                     "ACTION_AUDIO_BECOMING_NOISY — pausing ExoPlayer " +
                     "(normal audio path, no USB DAC/AAudio)")

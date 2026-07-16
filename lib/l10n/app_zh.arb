@@ -1239,7 +1239,6 @@
   "backupSelectImportFile": "选择备份文件",
   "backupSubtitle": "导出或恢复应用数据",
   "backupTitle": "备份与恢复",
-
   "importWork": "导入",
   "selectImportFolder": "选择要导入的文件夹",
   "importDialogTitle": "导入本地作品",
@@ -1251,7 +1250,6 @@
   "importComplete": "导入完成",
   "importFailed": "导入失败：{error}",
   "importedWorkDeleteNotSupported": "无法删除导入作品的文件，请直接在源文件夹中删除。",
-
   "importSingleFolder": "单个文件夹",
   "importSingleFolderDesc": "选择一个文件夹并设置自定义标题",
   "importMultipleFolders": "多个文件夹",
@@ -1260,5 +1258,25 @@
   "selectImportFolderMultiple": "选择包含子作品的文件夹",
   "importingMultipleWorks": "正在导入作品...",
   "importMultipleComplete": "成功导入 {count} 个作品",
-  "importPartialComplete": "已导入 {count}/{total} 个作品"
+  "importPartialComplete": "已导入 {count}/{total} 个作品",
+  "aiFeatures": "AI Features",
+  "aiFeaturesSubtitle": "AI-powered transcription & lyrics generation",
+  "aiModelNotInstalled": "AI Pack not installed",
+  "aiModelInstalled": "AI Pack installed",
+  "aiModelName": "Model: {name}",
+  "aiModelSize": "Size: {size}",
+  "aiDownloadModel": "Download Model",
+  "aiDownloadProgress": "Downloading... {percent}%",
+  "aiDeleteModel": "Delete Model",
+  "aiDeleteModelConfirm": "Are you sure you want to delete the AI model?",
+  "aiTranscribing": "Transcribing...",
+  "aiTranscribeComplete": "Transcription complete",
+  "aiTranscribeFailed": "Transcription failed: {error}",
+  "aiGenerateLyrics": "Generate AI Lyrics",
+  "aiModelRequired": "AI model not installed. Please download it first in Settings → AI Features.",
+  "aiModelDownloadRequired": "AI Pack Required",
+  "aiModelDownloadRequiredDesc": "AI Pack is not installed. Download Whisper Base Q5 ({size}) model to generate lyrics.",
+  "aiDownload": "Download",
+  "aiModelInstalledWithSize": "Installed: {name} ({size})",
+  "aiStorageUsed": "Storage Used"
 }

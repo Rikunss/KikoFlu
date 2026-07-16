@@ -146,7 +146,8 @@ class AppLockService {
       await _tileChannel
           .invokeMethod('updateAppLockTile')
           .timeout(const Duration(seconds: 2));
-    } catch (_) {
+    } catch (e) {
+      LogService.instance.warning('[AppLock] Failed to update tile: $e', tag: 'AppLock');
     }
   }
 

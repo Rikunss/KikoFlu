@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'log_service.dart';
 
 /// Manages Android system notification for WAV→FLAC conversion progress.
 ///
@@ -40,7 +41,8 @@ class ConversionNotificationService {
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.requestNotificationsPermission();
-    } catch (_) {
+    } catch (e) {
+      LogService.instance.warning('[ConversionNotification] Permission request failed: $e', tag: 'Conversion');
     }
 
     _initialized = true;

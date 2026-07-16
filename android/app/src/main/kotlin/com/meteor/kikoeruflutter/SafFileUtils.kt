@@ -59,15 +59,12 @@ class SafFileUtils {
         private fun copyFromSafUri(context: Context, safUri: String, destDirPath: String) {
             val uri = Uri.parse(safUri)
 
-            // Take persistable URI permission so we can access the tree
-            // even after the picker activity is closed.
             try {
                 context.contentResolver.takePersistableUriPermission(
                     uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             } catch (_: SecurityException) {
-                // Permission might already be granted — safe to ignore.
             }
 
             val treeDocumentFile = DocumentFile.fromTreeUri(context, uri)
@@ -84,7 +81,6 @@ class SafFileUtils {
         private fun copyFilesRecursive(context: Context, documentFile: DocumentFile, destDir: File) {
             for (child in documentFile.listFiles()) {
                 val name = child.name ?: continue
-                // Skip hidden files/folders
                 if (name.startsWith(".")) continue
 
                 if (child.isDirectory) {
@@ -101,7 +97,6 @@ class SafFileUtils {
                             }
                         }
                     } catch (e: Exception) {
-                        // Skip unreadable files
                     }
                 }
             }

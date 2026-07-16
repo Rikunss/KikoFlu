@@ -69,7 +69,6 @@ class ScreenStatePlugin private constructor(private val context: Context) {
             try {
                 context.unregisterReceiver(screenReceiver)
             } catch (_: Exception) {
-                // Already unregistered
             }
             isRegistered = false
             android.util.Log.d("ScreenStatePlugin", "Screen broadcast receiver unregistered")

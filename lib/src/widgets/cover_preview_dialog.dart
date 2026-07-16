@@ -8,7 +8,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../utils/snackbar_util.dart';
-import '../services/storage_service.dart';
 import '../services/cookie_service.dart';
 import '../../l10n/app_localizations.dart';
 

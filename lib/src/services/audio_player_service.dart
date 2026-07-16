@@ -12,14 +12,16 @@ import 'equalizer_service.dart';
 import '../utils/image_blur_util.dart';
 import '../utils/audio_format_parser.dart';
 import 'audio_format_gain_service.dart';
-import 'hi_res_audio_service.dart';
 import 'exclusive_audio_service.dart';
 import 'usb_dac_audio_manager.dart';
 import 'mpv_config_service.dart';
-import 'replay_gain_service.dart';
-import 'volume_normalization_service.dart';
 import 'log_service.dart';
 import 'audio_player_handler.dart';
+import 'audio_queue_manager.dart';
+import 'audio_hi_res_manager.dart';
+import 'audio_crossfade_manager.dart';
+import 'audio_gain_manager.dart';
+import 'replay_gain_service.dart';
 
 final _log = LogService.instance;
 
@@ -28,82 +30,53 @@ class AudioPlayerService {
   static AudioPlayerService get instance =>
       _instance ??= AudioPlayerService._();
 
-  AudioPlayerService._();
+  AudioPlayerService._() {
+    _initManagers();
+  }
 
   final AudioPlayer _player = AudioPlayer();
-  final List<AudioTrack> _queue = [];
-  int _currentIndex = 0;
   AudioHandler? _audioHandler;
-  LoopMode _appLoopMode = LoopMode.off;
   String? _tempPlaybackFilePath;
   Directory? _tempAudioDirectory;
   bool _isSwitchingTrack = false;
+  bool _completionHandled = false;
+  Timer? _completionCheckTimer;
+  DateTime _lastStateUpdate = DateTime(2000);
 
   static const List<String> _lyricExtensions = [
     '.lrc', '.srt', '.vtt', '.ass', '.ssa',
   ];
 
-  bool _completionHandled = false;
-  Timer? _completionCheckTimer;
-  DateTime _lastStateUpdate = DateTime(2000);
-
+  // ── SMTC (Windows) ──
   SMTCWindows? _smtc;
   StreamSubscription? _smtcSubscription;
 
+  // ── Privacy ──
   bool _privacyEnabled = false;
   bool _privacyBlurCover = true;
   bool _privacyMaskTitle = true;
   String _privacyCustomTitle = '正在播放音频';
 
-  Duration _crossfadeDuration = Duration.zero;
-  double _originalVolume = 1.0;
-  bool _isCrossfading = false;
-  bool _crossfadeCancelled = false;
+  // ── USB DAC ──
+  final UsbDacAudioManager _usbDacManager = UsbDacAudioManager.instance;
+  bool _libusbDacActive = false;
+  bool _dacConnected = false;
+  bool _dacResumeInFlight = false;
+  bool _autoEnabledLibusb = false;
+  int _lastSavedDacPositionMs = 0;
+  StreamSubscription<UsbDacManagerState>? _libusbStateSub;
 
-  final ReplayGainService _replayGainService = ReplayGainService.instance;
-  final VolumeNormalizationService _volumeNormalizationService =
-      VolumeNormalizationService.instance;
-  double _userBaseVolume = 1.0;
-
-  AudioFormatInfo? _lastAudioFormat;
-  AudioFormatInfo? get lastAudioFormat => _lastAudioFormat;
-
+  // ── Exclusive Mode ──
   final ExclusiveAudioService _exclusiveService = ExclusiveAudioService.instance;
   bool _exclusiveModeEnabled = false;
 
-  final UsbDacAudioManager _usbDacManager = UsbDacAudioManager.instance;
-  bool _libusbDacActive = false;
-  StreamSubscription<UsbDacManagerState>? _libusbStateSub;
+  // ── Managers ──
+  late final AudioQueueManager _queueManager;
+  late final AudioHiResManager _hiResManager;
+  late final AudioCrossfadeManager _crossfadeManager;
+  late final AudioGainManager _gainManager;
 
-  /// Whether libusb was auto-enabled by Exclusive Mode (vs user-enable via USB DAC Routing).
-  /// Used to avoid disabling USB DAC Routing when Exclusive Mode is toggled off.
-  bool _autoEnabledLibusb = false;
-
-  /// Whether the libusb USB DAC is actively streaming bit-perfect audio.
-  bool get libusbDacActive => _libusbDacActive;
-
-  /// Whether ANY bit-perfect path is active (AAudio exclusive OR libusb).
-  bool get _anyBitPerfectActive => _exclusiveModeEnabled || _libusbDacActive;
-
-  /// The USB DAC manager — exposed for sink-selection logging.
-  UsbDacAudioManager get usbDacManager => _usbDacManager;
-
-  final HiResAudioService _hiResService = HiResAudioService.instance;
-  bool _hiResEnabled = false;
-  bool _hiResActive = false;
-  final StreamController<bool> _hiResActiveController =
-      StreamController<bool>.broadcast()..add(false);
-  Duration _lastHiResPosition = Duration.zero;
-  Duration? _lastHiResDuration;
-  Duration _lastHiResBufferedPosition = Duration.zero;
-  StreamSubscription? _hiResPlaybackSub;
-  StreamSubscription? _hiResBufferingSub;
-  StreamSubscription? _hiResErrorSub;
-  StreamSubscription<int>? _nativePositionSub;
-  StreamSubscription<int>? _nativeDurationSub;
-  StreamSubscription<int>? _nativeBufferedPositionSub;
-  StreamSubscription<bool>? _trackEndedSub;
-
+  // ── Unified Streams ──
   final StreamController<Duration> _unifiedPositionController =
       StreamController<Duration>.broadcast();
   final StreamController<Duration?> _unifiedDurationController =
@@ -113,14 +86,12 @@ class AudioPlayerService {
   StreamSubscription<Duration>? _justAudioPositionSub;
   StreamSubscription<Duration?>? _justAudioDurationSub;
 
-  final StreamController<List<AudioTrack>> _queueController =
-      StreamController.broadcast();
-  final StreamController<AudioTrack?> _currentTrackController =
-      StreamController.broadcast();
   final StreamController<bool> _trackLoadingController =
       StreamController<bool>.broadcast();
   final StreamController<AudioFormatInfo?> _audioFormatController =
       StreamController<AudioFormatInfo?>.broadcast();
+
+  // ── Initialization ──
 
   Future<void> initialize() async {
     _audioHandler = await AudioService.init(
@@ -136,88 +107,103 @@ class AudioPlayerService {
     );
 
     setHiResEnabled(true);
-    if (_hiResEnabled) {
-      _log.info('[AudioPlayerService] Hi-Res ExoPlayer enabled on Android — ALAC/FLAC/WAV will use FFmpeg decoder');
+    if (_hiResManager.hiResEnabled) {
+      _log.info(
+          '[AudioPlayerService] Hi-Res ExoPlayer enabled on Android — ALAC/FLAC/WAV will use FFmpeg decoder');
     }
 
     _updatePlaybackState();
 
     if (Platform.isWindows) {
-      try {
-        _smtc = SMTCWindows(
-          config: const SMTCConfig(
-            fastForwardEnabled: false, nextEnabled: true,
-            pauseEnabled: true, playEnabled: true,
-            rewindEnabled: false, prevEnabled: true,
-            stopEnabled: true,
-          ),
-        );
-        _smtcSubscription = _smtc!.buttonPressStream.listen((button) {
-          if (_instance == null) return;
-          switch (button) {
-            case PressedButton.play: play();
-            case PressedButton.pause: pause();
-            case PressedButton.next: skipToNext();
-            case PressedButton.previous: skipToPrevious();
-            case PressedButton.stop: stop();
-            default: break;
-          }
-        });
-        _smtc!.enableSmtc();
-      } catch (e) {
-        _log.error('[AudioPlayerService] Failed to initialize SMTC: $e');
-      }
+      _initSmtc();
     }
 
     _setupPlayerListeners();
+    _setupLibusbListener();
+  }
 
-    _libusbStateSub = _usbDacManager.stateStream.listen((state) async {
-      final wasActive = _libusbDacActive;
-      _libusbDacActive = state.dacActive;
+  void _initManagers() {
+    _queueManager = AudioQueueManager(
+      onLoadTrack: (track, {int startPositionMs = 0}) =>
+          _loadTrack(track, startPositionMs: startPositionMs),
+      onPlay: () => play(),
+    );
 
-      _log.info('[LIBUSB] stateStream: '
-          'dacConnected=${state.dacConnected}, '
-          'dacActive=${state.dacActive}, '
-          'wasActive=$wasActive, '
-          'autoDacEnabled=${state.autoDacEnabled}, '
-          'device="${state.deviceName}"',
-          tag: 'Audio');
+    _hiResManager = AudioHiResManager();
+    _hiResManager.onPositionChanged = (pos) {
+      _unifiedPositionController.add(pos);
+    };
+    _hiResManager.onDurationChanged = (dur) {
+      _unifiedDurationController.add(dur);
+    };
+    _hiResManager.onBufferedPositionChanged = (_) {};
+    _hiResManager.onPlaybackStateChanged = (isPlaying) {
+      _unifiedPlayerStateController.add(PlayerState(
+        isPlaying,
+        ProcessingState.ready,
+      ));
+      _updatePlaybackState();
+    };
+    _hiResManager.onBufferingChanged = (buffering) {
+      _unifiedPlayerStateController.add(PlayerState(
+        _hiResManager.isPlaying,
+        buffering ? ProcessingState.buffering : ProcessingState.ready,
+      ));
+    };
+    _hiResManager.onFallbackLoadTrack = (
+      AudioTrack track, {
+      int startPositionMs = 0,
+    }) async {
+      await _loadTrack(track, startPositionMs: startPositionMs);
+    };
+    _hiResManager.onErrorFallbackStarted = () {};
+    _hiResManager.onTrackCompleted = () {
+      _handleTrackCompletion();
+    };
 
-      if (state.dacActive && !wasActive) {
-        _log.info('[LIBUSB] >>> dacActive transitioned false→true — switching to LibusbAudioSink',
-            tag: 'Audio');
+    _crossfadeManager = AudioCrossfadeManager(_player);
+    _gainManager = AudioGainManager(_player);
+  }
 
-        await _hiResService.setUseAaudioSink(false);
-        await _hiResService.setUseLibusbSink(true);
-        await _hiResService.setBitPerfectMode(true);
-
-        if (_player.playing || _hiResActive) {
-          final track = currentTrack;
-          if (track != null) {
-            _log.info('[LIBUSB] Playback active — restarting track through libusb', tag: 'Audio');
-            await _loadTrack(track);
-            await play();
-          }
+  void _initSmtc() {
+    try {
+      _smtc = SMTCWindows(
+        config: const SMTCConfig(
+          fastForwardEnabled: false,
+          nextEnabled: true,
+          pauseEnabled: true,
+          playEnabled: true,
+          rewindEnabled: false,
+          prevEnabled: true,
+          stopEnabled: true,
+        ),
+      );
+      _smtcSubscription = _smtc!.buttonPressStream.listen((button) {
+        if (_instance == null) return;
+        switch (button) {
+          case PressedButton.play:
+            play();
+          case PressedButton.pause:
+            pause();
+          case PressedButton.next:
+            skipToNext();
+          case PressedButton.previous:
+            skipToPrevious();
+          case PressedButton.stop:
+            stop();
+          default:
+            break;
         }
-      } else if (state.dacConnected && !state.dacActive && wasActive) {
-        _log.info('[LIBUSB] dacActive transitioned true→false — disabling libusb sink', tag: 'Audio');
-        await _hiResService.setUseLibusbSink(false);
-      } else if (!state.dacConnected && wasActive) {
-        _log.info('[LIBUSB] DAC disconnected — falling back to default/AAudio', tag: 'Audio');
-        await _hiResService.setUseLibusbSink(false);
-        if (_exclusiveModeEnabled) {
-          await _hiResService.setUseAaudioSink(true);
-        }
-      } else if (state.dacConnected) {
-        _log.info('[LIBUSB] DAC connected but idle (dacActive=${state.dacActive}, _libusbDacActive=$_libusbDacActive)',
-            tag: 'Audio');
-      }
-    });
+      });
+      _smtc!.enableSmtc();
+    } catch (e) {
+      _log.error('[AudioPlayerService] Failed to initialize SMTC: $e');
+    }
   }
 
   void _setupPlayerListeners() {
     _player.playerStateStream.listen((state) {
-      if (!_hiResActive) {
+      if (!_hiResManager.hiResActive) {
         _unifiedPlayerStateController.add(state);
       }
 
@@ -236,7 +222,7 @@ class AudioPlayerService {
     });
 
     _justAudioPositionSub = _player.positionStream.listen((position) {
-      if (!_hiResActive) {
+      if (!_hiResManager.hiResActive) {
         _unifiedPositionController.add(position);
       }
       final now = DateTime.now();
@@ -247,7 +233,7 @@ class AudioPlayerService {
     });
 
     _justAudioDurationSub = _player.durationStream.listen((duration) {
-      if (!_hiResActive) {
+      if (!_hiResManager.hiResActive) {
         _unifiedDurationController.add(duration);
       }
     });
@@ -255,11 +241,107 @@ class AudioPlayerService {
     if (Platform.isMacOS) _startCompletionCheckTimer();
   }
 
+  void _setupLibusbListener() {
+    _libusbStateSub = _usbDacManager.stateStream.listen((state) async {
+      if (_dacResumeInFlight) {
+        _log.info('[LIBUSB] re-entry suppressed — DAC re-plug already in flight',
+            tag: 'Audio');
+        return;
+      }
+      final wasActive = _libusbDacActive;
+      final wasConnected = _dacConnected;
+      _libusbDacActive = state.dacActive;
+      _dacConnected = state.dacConnected;
+
+      _log.info('[LIBUSB] stateStream: '
+          'dacConnected=${state.dacConnected}, '
+          'dacActive=${state.dacActive}, '
+          'wasActive=$wasActive, '
+          'wasConnected=$wasConnected, '
+          'autoDacEnabled=${state.autoDacEnabled}, '
+          'device="${state.deviceName}"',
+          tag: 'Audio');
+
+      if (state.dacActive && !wasActive) {
+        _log.info(
+            '[LIBUSB] >>> dacActive transitioned false→true — switching to LibusbAudioSink',
+            tag: 'Audio');
+
+        _dacResumeInFlight = true;
+        try {
+          await _hiResManager.hiResService.setUseAaudioSink(false);
+          await _hiResManager.hiResService.setUseLibusbSink(true);
+          await _hiResManager.hiResService.setBitPerfectMode(true);
+
+          final track = currentTrack;
+          if (track != null) {
+            final resumeMs = _lastSavedDacPositionMs > 0
+                ? _lastSavedDacPositionMs
+                : _player.playing || _hiResManager.hiResActive
+                    ? (_hiResManager.hiResActive
+                        ? _hiResManager.freezePositionMs()
+                        : _player.position.inMilliseconds)
+                    : 0;
+            _log.info(
+                '[LIBUSB] DAC re-plug — restarting track through libusb '
+                'at position ${resumeMs}ms',
+                tag: 'Audio');
+            if (resumeMs > 0 || _player.playing || _hiResManager.hiResActive) {
+              await _loadTrack(track, startPositionMs: resumeMs);
+              await play();
+            }
+            _lastSavedDacPositionMs = 0;
+          }
+        } finally {
+          _dacResumeInFlight = false;
+        }
+      } else if (!state.dacConnected && wasConnected) {
+        _log.info(
+            '[LIBUSB] DAC physically detached — stopping playback and falling back',
+            tag: 'Audio');
+        final frozenMs = _hiResManager.hiResActive
+            ? _hiResManager.freezePositionMs()
+            : _player.position.inMilliseconds;
+        if (frozenMs > 0) {
+          _lastSavedDacPositionMs = frozenMs;
+        }
+        _log.info(
+            '[LIBUSB] Audio frozen at ${frozenMs}ms on DAC detach '
+            '(saved ${_lastSavedDacPositionMs}ms for re-plug resume)',
+            tag: 'Audio');
+
+        await _hiResManager.hiResService.setUseLibusbSink(false);
+        if (_exclusiveModeEnabled) {
+          await _hiResManager.hiResService.setUseAaudioSink(true);
+        }
+
+        if (_hiResManager.hiResActive) {
+          await _hiResManager.stopHiResPlayback();
+        }
+        if (_player.playing) {
+          await _player.pause();
+        }
+      } else if (state.dacConnected && !state.dacActive && wasActive) {
+        _log.info(
+            '[LIBUSB] dacActive transitioned true→false (DAC still attached) — disabling libusb sink',
+            tag: 'Audio');
+        await _hiResManager.hiResService.setUseLibusbSink(false);
+      } else if (state.dacConnected) {
+        _log.info(
+            '[LIBUSB] DAC connected but idle (dacActive=${state.dacActive}, _libusbDacActive=$_libusbDacActive)',
+            tag: 'Audio');
+      }
+    });
+  }
+
+  // ── Playback State (via AudioHandler) ──
+
   void _updatePlaybackState() {
     if (_audioHandler == null) return;
 
-    final playing = _hiResActive ? _hiResService.isPlaying : _player.playing;
-    final processingState = _hiResActive
+    final playing =
+        _hiResManager.hiResActive ? _hiResManager.isPlaying : _player.playing;
+    final processingState = _hiResManager.hiResActive
         ? ProcessingState.ready
         : _player.processingState;
 
@@ -280,15 +362,19 @@ class AudioPlayerService {
         MediaControl.skipToNext,
       ],
       systemActions: const {
-        MediaAction.seek, MediaAction.seekForward, MediaAction.seekBackward,
+        MediaAction.seek,
+        MediaAction.seekForward,
+        MediaAction.seekBackward,
       },
       androidCompactActionIndices: const [0, 1, 2],
       processingState: effectiveState,
       playing: playing,
-      updatePosition: _hiResActive ? _lastHiResPosition : _player.position,
-      bufferedPosition:
-          _hiResActive ? _lastHiResBufferedPosition : _player.bufferedPosition,
-      speed: _hiResActive ? 1.0 : _player.speed,
+      updatePosition:
+          _hiResManager.hiResActive ? _hiResManager.position : _player.position,
+      bufferedPosition: _hiResManager.hiResActive
+          ? _hiResManager.bufferedPosition
+          : _player.bufferedPosition,
+      speed: _hiResManager.hiResActive ? 1.0 : _player.speed,
     ));
 
     if (Platform.isWindows && _smtc != null) {
@@ -345,19 +431,54 @@ class AudioPlayerService {
     _updatePlaybackState();
   }
 
-  Future<void> _loadTrack(AudioTrack track) async {
-    _log.info('_loadTrack: title="${track.title}"', tag: 'Audio');
+  // ── Track Loading ──
 
-    _currentTrackController.add(track);
+  Future<void> _loadTrack(AudioTrack track, {int startPositionMs = 0}) async {
+    _log.info(
+        '_loadTrack: title="${track.title}" startPos=${startPositionMs}ms',
+        tag: 'Audio');
+
+    _lastSavedDacPositionMs = 0;
+
     _trackLoadingController.add(true);
 
-    final useHiRes = await _shouldUseHiResForTrack(track);
+    final useHiRes = await _hiResManager.shouldUseHiResForTrack(track);
     if (useHiRes) {
-      await _loadHiResTrack(track);
+      await _updateMediaItem(
+        track,
+        privacyEnabled: _privacyEnabled,
+        blurCover: _privacyBlurCover,
+        maskTitle: _privacyMaskTitle,
+        customTitle: _privacyCustomTitle,
+      );
+      final formatInfo = await _hiResManager.loadHiResTrack(
+        track,
+        startPositionMs: startPositionMs,
+      );
+      // null + not active = fallback (recursive _loadTrack handled it)
+      if (formatInfo == null && !_hiResManager.hiResActive) {
+        return;
+      }
+      if (formatInfo != null) {
+        final rawInfo = await _detectAudioFormatDirect(track);
+        final decodedInfo = AudioFormatInfo(
+          codec: rawInfo?.codec ?? '',
+          sampleRate: formatInfo.sampleRate,
+          bitDepth: formatInfo.bitDepth,
+          channels: formatInfo.channels,
+        );
+        _gainManager.setLastAudioFormat(decodedInfo);
+        _audioFormatController.add(decodedInfo);
+      }
+      _isSwitchingTrack = false;
+      _trackLoadingController.add(false);
+      _updatePlaybackState();
       return;
     }
 
-    if (_hiResActive) await _stopHiResPlayback();
+    if (_hiResManager.hiResActive) {
+      await _hiResManager.stopHiResPlayback();
+    }
 
     _isSwitchingTrack = true;
     _updatePlaybackState();
@@ -397,6 +518,19 @@ class AudioPlayerService {
       }
 
       if (!loaded) await _player.setUrl(track.url);
+
+      if (startPositionMs > 0) {
+        try {
+          await _player.seek(Duration(milliseconds: startPositionMs));
+          _log.info(
+              '_loadTrack [just_audio]: restored position ${startPositionMs}ms',
+              tag: 'Audio');
+        } catch (e) {
+          _log.warning(
+              '_loadTrack [just_audio]: seek to ${startPositionMs}ms failed: $e',
+              tag: 'Audio');
+        }
+      }
     } catch (e) {
       _log.error('Error loading audio source: $e');
     } finally {
@@ -411,163 +545,23 @@ class AudioPlayerService {
             EqualizerService.instance.setAudioSessionId(sessionId);
           }
         } catch (e) {
-          _log.warning('Failed to set audio session ID for equalizer: $e', tag: 'Audio');
+          _log.warning(
+              'Failed to set audio session ID for equalizer: $e', tag: 'Audio');
         }
       }
-      _applyAudioGain(track);
+      _gainManager.applyAudioGain(track);
     }
   }
 
-  Future<bool> _shouldUseHiResForTrack(AudioTrack track) async {
-    if (!_hiResEnabled) return false;
-    if (_hiResService.isUsbRouted) return true;
-
-    final formatInfo = await _detectAudioFormatDirect(track);
-    if (formatInfo == null) return false;
-
-    final codec = formatInfo.codec.toUpperCase();
-    if (codec == 'FLAC' || codec == 'WAV' || codec == 'M4A') return true;
-    if (formatInfo.sampleRate != null) return formatInfo.sampleRate! > 48000;
-    return false;
-  }
-
-  Future<void> _loadHiResTrack(AudioTrack track) async {
-    _log.info('_loadHiResTrack: title="${track.title}"', tag: 'Audio');
-
-    await _stopHiResPlayback();
-    _hiResActive = true;
-    _hiResActiveController.add(true);
-
-    await _updateMediaItem(
-      track,
-      privacyEnabled: _privacyEnabled,
-      blurCover: _privacyBlurCover,
-      maskTitle: _privacyMaskTitle,
-      customTitle: _privacyCustomTitle,
-    );
-
-    final formatInfo = await _detectAudioFormatDirect(track);
-    _audioFormatController.add(formatInfo);
-
-    String playUrl = track.url;
-    if (playUrl.startsWith('file://')) {
-      playUrl = playUrl.substring(7).replaceAll('/', Platform.isWindows ? '\\' : '/');
-    }
-
-    final success = await _hiResService.play(
-      playUrl,
-      sampleRate: formatInfo?.sampleRate ?? 0,
-      bitDepth: formatInfo?.bitDepth ?? 0,
-    );
-
-    if (!success) {
-      _log.warning('Hi-Res playback failed, falling back to just_audio', tag: 'Audio');
-      _hiResActive = false;
-      _hiResActiveController.add(false);
-      final savedEnabled = _hiResEnabled;
-      _hiResEnabled = false;
-      await _loadTrack(track);
-      _hiResEnabled = savedEnabled;
-      return;
-    }
-
-    _nativePositionSub?.cancel();
-    _nativePositionSub = _hiResService.nativePositionStream.listen((posMs) {
-      if (!_hiResActive) return;
-      _lastHiResPosition = Duration(milliseconds: posMs);
-      _unifiedPositionController.add(_lastHiResPosition);
-    });
-
-    _nativeDurationSub?.cancel();
-    _nativeDurationSub = _hiResService.nativeDurationStream.listen((durMs) {
-      if (!_hiResActive) return;
-      if (durMs > 0) {
-        _lastHiResDuration = Duration(milliseconds: durMs);
-        _unifiedDurationController.add(_lastHiResDuration);
-      }
-    });
-
-    _nativeBufferedPositionSub?.cancel();
-    _nativeBufferedPositionSub =
-        _hiResService.nativeBufferedPositionStream.listen((bufPosMs) {
-      if (!_hiResActive) return;
-      _lastHiResBufferedPosition = Duration(milliseconds: bufPosMs);
-    });
-
-    _hiResPlaybackSub?.cancel();
-    _hiResPlaybackSub = _hiResService.playbackStateStream.listen((isPlaying) {
-      if (!_hiResActive) return;
-      _unifiedPlayerStateController.add(PlayerState(isPlaying, ProcessingState.ready));
-      _updatePlaybackState();
-    });
-
-    _trackEndedSub?.cancel();
-    _trackEndedSub = _hiResService.trackEndedStream.listen((_) {
-      if (!_hiResActive) return;
-      _handleTrackCompletion();
-    });
-
-    _hiResBufferingSub?.cancel();
-    _hiResBufferingSub = _hiResService.bufferingStream.listen((buffering) {
-      if (!_hiResActive) return;
-      _unifiedPlayerStateController.add(PlayerState(
-        _hiResService.isPlaying,
-        buffering ? ProcessingState.buffering : ProcessingState.ready,
-      ));
-    });
-
-    _hiResErrorSub?.cancel();
-    _hiResErrorSub = _hiResService.errorStream.listen((message) {
-      if (!_hiResActive) return;
-      _log.error('[HiRes] Player error: $message', tag: 'Audio');
-      _hiResActive = false;
-      _hiResActiveController.add(false);
-      final savedEnabled = _hiResEnabled;
-      _hiResEnabled = false;
-      _loadTrack(track).then((_) {
-        _hiResEnabled = savedEnabled;
-      });
-    });
-
-    _isSwitchingTrack = false;
-    _trackLoadingController.add(false);
-    _updatePlaybackState();
-  }
-
-  Future<void> _stopHiResPlayback() async {
-    _nativePositionSub?.cancel(); _nativePositionSub = null;
-    _nativeDurationSub?.cancel(); _nativeDurationSub = null;
-    _nativeBufferedPositionSub?.cancel(); _nativeBufferedPositionSub = null;
-    _hiResPlaybackSub?.cancel(); _hiResPlaybackSub = null;
-    _hiResBufferingSub?.cancel(); _hiResBufferingSub = null;
-    _hiResErrorSub?.cancel(); _hiResErrorSub = null;
-    _trackEndedSub?.cancel(); _trackEndedSub = null;
-
-    if (_hiResActive) {
-      await _hiResService.stop();
-      _hiResActive = false;
-      _hiResActiveController.add(false);
-      _lastHiResPosition = Duration.zero;
-      _lastHiResDuration = null;
-      _lastHiResBufferedPosition = Duration.zero;
-      _unifiedPositionController.add(Duration.zero);
-      _unifiedDurationController.add(null);
-    }
-  }
-
-  Future<void> _detectAudioFormat(AudioTrack track) async {
-    final info = await _detectAudioFormatDirect(track);
-    _lastAudioFormat = info;
-    _audioFormatController.add(info);
-  }
-
-  Future<AudioFormatInfo?> _detectAudioFormatDirect(AudioTrack track) async {
-    return AudioFormatGainService.detectFormatDirect(track);
-  }
+  // ── Playback Control ──
 
   Future<void> play() async {
-    if (_hiResActive) {
-      await _hiResService.resume();
+    if (_dacResumeInFlight) {
+      _log.info('play() deferred — DAC re-plug in flight', tag: 'Audio');
+      return;
+    }
+    if (_hiResManager.hiResActive) {
+      await _hiResManager.hiResService.resume();
       _updatePlaybackState();
       return;
     }
@@ -592,9 +586,13 @@ class AudioPlayerService {
   }
 
   Future<void> pause() async {
-    _cancelCrossfade();
-    if (_hiResActive) {
-      await _hiResService.pause();
+    _crossfadeManager.cancel();
+    if (_dacResumeInFlight) {
+      _log.info('pause() deferred — DAC re-plug in flight', tag: 'Audio');
+      return;
+    }
+    if (_hiResManager.hiResActive) {
+      await _hiResManager.hiResService.pause();
       _updatePlaybackState();
       return;
     }
@@ -603,9 +601,9 @@ class AudioPlayerService {
   }
 
   Future<void> stop() async {
-    _cancelCrossfade();
-    if (_hiResActive) {
-      await _stopHiResPlayback();
+    _crossfadeManager.cancel();
+    if (_hiResManager.hiResActive) {
+      await _hiResManager.stopHiResPlayback();
       await _player.stop();
       _updatePlaybackState();
       return;
@@ -615,11 +613,10 @@ class AudioPlayerService {
   }
 
   Future<void> seek(Duration position) async {
-    _cancelCrossfade();
-    if (_hiResActive) {
-      await _hiResService.seekTo(position.inMilliseconds);
-      _lastHiResPosition = position;
-      _unifiedPositionController.add(_lastHiResPosition);
+    _crossfadeManager.cancel();
+    if (_hiResManager.hiResActive) {
+      await _hiResManager.hiResService.seekTo(position.inMilliseconds);
+      _unifiedPositionController.add(position);
       _updatePlaybackState();
       return;
     }
@@ -630,8 +627,10 @@ class AudioPlayerService {
   }
 
   Future<void> seekForward(Duration duration) async {
-    final current = _hiResActive ? _lastHiResPosition : _player.position;
-    final total = _hiResActive ? _lastHiResDuration : _player.duration;
+    final current =
+        _hiResManager.hiResActive ? _hiResManager.position : _player.position;
+    final total =
+        _hiResManager.hiResActive ? _hiResManager.duration : _player.duration;
     if (total != null) {
       final newPos = current + duration;
       await seek(newPos > total ? total : newPos);
@@ -639,389 +638,275 @@ class AudioPlayerService {
   }
 
   Future<void> seekBackward(Duration duration) async {
-    final current = _hiResActive ? _lastHiResPosition : _player.position;
+    final current =
+        _hiResManager.hiResActive ? _hiResManager.position : _player.position;
     final newPos = current - duration;
     await seek(newPos < Duration.zero ? Duration.zero : newPos);
   }
 
-  Future<void> updateQueue(List<AudioTrack> tracks, {int startIndex = 0}) async {
-    _queue.clear();
-    _queue.addAll(tracks);
-    _currentIndex = startIndex.clamp(0, tracks.length - 1);
-    _queueController.add(List.from(_queue));
-    if (tracks.isNotEmpty && _currentIndex < tracks.length) {
-      await _loadTrack(tracks[_currentIndex]);
+  // ── Track Completion ──
+
+  Future<void> _handleTrackCompletion() async {
+    if (_crossfadeManager.isCrossfading) return;
+
+    if (_queueManager.appLoopMode == LoopMode.one) {
+      if (Platform.isMacOS) _completionHandled = false;
+      seek(Duration.zero);
+      play();
+      return;
+    }
+
+    final next = await _queueManager.handleCompletion();
+    if (next) {
+      if (_crossfadeManager.crossfadeDuration > Duration.zero &&
+          !_hiResManager.hiResActive) {
+        await _crossfadeManager.fadeIn();
+      }
+    } else {
+      if (_crossfadeManager.crossfadeDuration > Duration.zero &&
+          !_hiResManager.hiResActive) {
+        await _crossfadeManager.fadeOut();
+      }
+      pause();
+      await _player.setVolume(_gainManager.userBaseVolume);
     }
   }
 
+  // ── Audio Format Detection ──
+
+  Future<void> _detectAudioFormat(AudioTrack track) async {
+    final info = await _detectAudioFormatDirect(track);
+    _gainManager.setLastAudioFormat(info);
+    _audioFormatController.add(info);
+  }
+
+  Future<AudioFormatInfo?> _detectAudioFormatDirect(AudioTrack track) async {
+    return AudioFormatGainService.detectFormatDirect(track);
+  }
+
+  // ── Queue Operations (delegate to manager) ──
+
+  Future<void> updateQueue(List<AudioTrack> tracks, {int startIndex = 0}) async {
+    await _queueManager.updateQueue(tracks, startIndex: startIndex);
+  }
+
   Future<void> skipToNext() async {
-    _cancelCrossfade();
-    _cancelHiResNativeSubs();
-    if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
-      if (_crossfadeDuration > Duration.zero) {
-        await _crossfadeTo(_currentIndex + 1);
-      } else {
-        _currentIndex++;
-        await _loadTrack(_queue[_currentIndex]);
-        await play();
-      }
+    _crossfadeManager.cancel();
+    _hiResManager.cancelNativeSubs();
+
+    if (_crossfadeManager.crossfadeDuration > Duration.zero) {
+      await _crossfadeManager.crossfadeTo(() async {
+        await _queueManager.skipToNext();
+      });
     } else {
-      throw Exception('没有下一首可播放');
+      await _queueManager.skipToNext();
     }
   }
 
   Future<void> skipToPrevious() async {
-    _cancelCrossfade();
-    _cancelHiResNativeSubs();
-    if (_queue.isNotEmpty && _currentIndex > 0) {
-      if (_crossfadeDuration > Duration.zero) {
-        await _crossfadeTo(_currentIndex - 1);
-      } else {
-        _currentIndex--;
-        await _loadTrack(_queue[_currentIndex]);
-        await play();
-      }
+    _crossfadeManager.cancel();
+    _hiResManager.cancelNativeSubs();
+
+    if (_crossfadeManager.crossfadeDuration > Duration.zero) {
+      await _crossfadeManager.crossfadeTo(() async {
+        await _queueManager.skipToPrevious();
+      });
     } else {
-      throw Exception('没有上一首可播放');
+      await _queueManager.skipToPrevious();
     }
   }
 
   Future<void> skipToIndex(int index) async {
-    _cancelCrossfade();
-    _cancelHiResNativeSubs();
-    if (index >= 0 && index < _queue.length) {
-      if (_crossfadeDuration > Duration.zero && currentTrack != null) {
-        await _crossfadeTo(index);
-      } else {
-        _currentIndex = index;
-        await _loadTrack(_queue[_currentIndex]);
-        await play();
-      }
+    _crossfadeManager.cancel();
+    _hiResManager.cancelNativeSubs();
+
+    if (_crossfadeManager.crossfadeDuration > Duration.zero && currentTrack != null) {
+      await _crossfadeManager.crossfadeTo(() async {
+        await _queueManager.skipToIndex(index);
+      });
+    } else {
+      await _queueManager.skipToIndex(index);
     }
   }
 
   Future<void> removeTrackAt(int index) async {
-    if (index < 0 || index >= _queue.length) return;
-    final wasCurrent = index == _currentIndex;
-    final currentTrackId = (_queue.isNotEmpty && _currentIndex < _queue.length)
-        ? _queue[_currentIndex].id : null;
-
-    _queue.removeAt(index);
-    _queueController.add(List.from(_queue));
-
-    if (_queue.isEmpty) {
-      _currentIndex = 0;
-      await stop();
-      _currentTrackController.add(null);
-      return;
-    }
-
-    if (wasCurrent) {
-      if (_currentIndex >= _queue.length) _currentIndex = _queue.length - 1;
-      await _loadTrack(_queue[_currentIndex]);
-      await play();
-      return;
-    }
-
-    if (currentTrackId != null) {
-      final updatedIndex = _queue.indexWhere((track) => track.id == currentTrackId);
-      if (updatedIndex != -1) _currentIndex = updatedIndex;
-    }
+    await _queueManager.removeTrackAt(index);
   }
 
   Future<void> clearQueue() async {
-    _cancelCrossfade();
-    if (_hiResActive) {
-      _cancelHiResNativeSubs();
-      await _hiResService.stop();
-      _hiResActive = false;
-      _hiResActiveController.add(false);
+    _crossfadeManager.cancel();
+    if (_hiResManager.hiResActive) {
+      _hiResManager.cancelNativeSubs();
+      await _hiResManager.hiResService.stop();
     }
-    _queue.clear();
-    _currentIndex = 0;
-    _queueController.add(List.from(_queue));
+    await _queueManager.clearQueue();
     await stop();
-    _currentTrackController.add(null);
   }
 
   Future<void> moveTrack(int oldIndex, int newIndex) async {
-    if (oldIndex < 0 || oldIndex >= _queue.length) return;
-    if (newIndex < 0) {
-      newIndex = 0;
-    } else if (newIndex > _queue.length) {
-      newIndex = _queue.length;
-    }
-    if (newIndex > oldIndex) newIndex -= 1;
-    if (oldIndex == newIndex) return;
-
-    final currentTrackId = (_queue.isNotEmpty && _currentIndex < _queue.length)
-        ? _queue[_currentIndex].id : null;
-
-    final track = _queue.removeAt(oldIndex);
-    _queue.insert(newIndex, track);
-
-    if (currentTrackId != null) {
-      final updatedIndex = _queue.indexWhere((element) => element.id == currentTrackId);
-      if (updatedIndex != -1) _currentIndex = updatedIndex;
-    }
-    _queueController.add(List.from(_queue));
+    await _queueManager.moveTrack(oldIndex, newIndex);
   }
 
   Future<void> insertTracksAfterCurrent(List<AudioTrack> tracks) async {
-    _cancelCrossfade();
-    if (tracks.isEmpty) return;
-
-    final existingIds = _queue.map((t) => t.id).toSet();
-    final newTracks = tracks.where((t) => !existingIds.contains(t.id)).toList();
-
-    if (newTracks.isEmpty) {
-      if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
-        _currentIndex++;
-        await _loadTrack(_queue[_currentIndex]);
-        await play();
-      }
-      return;
-    }
-
-    if (_queue.isEmpty) {
-      await updateQueue(newTracks, startIndex: 0);
-      await play();
-      return;
-    }
-
-    if (_currentIndex >= _queue.length - 1) {
-      final indexMap = await appendTracks(newTracks);
-      final firstNew = newTracks.first;
-      final targetIdx = indexMap[firstNew.id];
-      if (targetIdx != null) {
-        _currentIndex = targetIdx;
-        await _loadTrack(_queue[_currentIndex]);
-        await play();
-      }
-      return;
-    }
-
-    final insertPos = _currentIndex + 1;
-    _queue.insertAll(insertPos, newTracks);
-    _queueController.add(List.from(_queue));
-    _currentIndex = insertPos;
-    await _loadTrack(_queue[_currentIndex]);
-    await play();
+    _crossfadeManager.cancel();
+    await _queueManager.insertTracksAfterCurrent(tracks);
   }
 
   Future<Map<String, int>> appendTracks(List<AudioTrack> tracks) async {
-    final indexMap = <String, int>{};
-    if (tracks.isEmpty) return indexMap;
-
-    if (_queue.isEmpty) {
-      await updateQueue(tracks);
-      for (var i = 0; i < _queue.length; i++) {
-        indexMap[_queue[i].id] = i;
-      }
-      return indexMap;
-    }
-
-    final existingIdx = <String, int>{};
-    for (var i = 0; i < _queue.length; i++) {
-      existingIdx[_queue[i].id] = i;
-    }
-
-    bool appended = false;
-    for (final track in tracks) {
-      final existing = existingIdx[track.id];
-      if (existing != null) { indexMap[track.id] = existing; continue; }
-      _queue.add(track);
-      indexMap[track.id] = _queue.length - 1;
-      appended = true;
-    }
-
-    if (appended) _queueController.add(List.from(_queue));
-
-    for (final track in tracks) {
-      indexMap[track.id] ??= existingIdx[track.id] ??
-          _queue.indexWhere((e) => e.id == track.id);
-    }
-    return indexMap;
+    return _queueManager.appendTracks(tracks);
   }
 
-  /// Cancel hi-res native subscriptions (position, duration, buffered).
-  void _cancelHiResNativeSubs() {
-    _nativePositionSub?.cancel(); _nativePositionSub = null;
-    _nativeDurationSub?.cancel(); _nativeDurationSub = null;
-    _nativeBufferedPositionSub?.cancel(); _nativeBufferedPositionSub = null;
-  }
+  // ── Crossfade ──
 
   Future<void> setCrossfadeDuration(Duration duration) async {
-    _crossfadeDuration = duration;
-    _log.info('Crossfade duration set to: ${duration.inMilliseconds}ms', tag: 'Audio');
+    await _crossfadeManager.setCrossfadeDuration(duration);
   }
 
-  Future<void> _fadeOut() async {
-    if (_crossfadeDuration <= Duration.zero || _crossfadeCancelled) return;
-    _crossfadeCancelled = false;
-    _isCrossfading = true;
-    _originalVolume = _player.volume;
+  // ── Audio Gain ──
 
-    final steps = (_crossfadeDuration.inMilliseconds / 50).round().clamp(1, 100);
-    final stepMs = (_crossfadeDuration.inMilliseconds / steps).round().clamp(10, 100);
-    final volStep = _originalVolume / steps;
-
-    for (int i = 1; i <= steps; i++) {
-      await Future.delayed(Duration(milliseconds: stepMs));
-      if (_crossfadeCancelled) return;
-      await _player.setVolume((_originalVolume - volStep * i).clamp(0.0, _originalVolume));
-    }
-    if (!_crossfadeCancelled) await _player.setVolume(0.0);
-  }
-
-  Future<void> _fadeIn() async {
-    if (_crossfadeDuration <= Duration.zero || _crossfadeCancelled) {
-      _isCrossfading = false; return;
-    }
-    _crossfadeCancelled = false;
-
-    final steps = (_crossfadeDuration.inMilliseconds / 50).round().clamp(1, 100);
-    final stepMs = (_crossfadeDuration.inMilliseconds / steps).round().clamp(10, 100);
-    final volStep = _originalVolume / steps;
-
-    await _player.setVolume(0.0);
-    for (int i = 1; i <= steps; i++) {
-      await Future.delayed(Duration(milliseconds: stepMs));
-      if (_crossfadeCancelled) return;
-      await _player.setVolume((volStep * i).clamp(0.0, _originalVolume));
-    }
-    if (!_crossfadeCancelled) await _player.setVolume(_originalVolume);
-    _isCrossfading = false;
-  }
-
-  Future<void> _crossfadeTo(int nextIndex) async {
-    if (_queue.isEmpty || nextIndex < 0 || nextIndex >= _queue.length) return;
-    _currentIndex = nextIndex;
-    if (_crossfadeDuration > Duration.zero) {
-      await _fadeOut();
-      if (_crossfadeCancelled) return;
-    }
-    await _loadTrack(_queue[_currentIndex]);
-    await play();
-    if (_crossfadeDuration > Duration.zero) await _fadeIn();
-  }
-
-  void _cancelCrossfade() {
-    if (_isCrossfading) {
-      _crossfadeCancelled = true;
-      _player.setVolume(_originalVolume);
-      _isCrossfading = false;
-    }
-  }
-
-  Future<void> _handleTrackCompletion() async {
-    if (_isCrossfading) return;
-
-    if (_appLoopMode == LoopMode.one) {
-      if (Platform.isMacOS) _completionHandled = false;
-      seek(Duration.zero);
-      play();
-    } else if (_currentIndex < _queue.length - 1) {
-      _currentIndex++;
-      await _loadTrack(_queue[_currentIndex]);
-      if (_crossfadeDuration > Duration.zero && !_hiResActive) {
-        _crossfadeCancelled = false; _isCrossfading = true;
-        _originalVolume = _player.volume;
-        await play(); await _fadeIn();
-      } else {
-        await play();
-      }
-    } else if (_appLoopMode == LoopMode.all && _queue.isNotEmpty) {
-      _currentIndex = 0;
-      await _loadTrack(_queue[0]);
-      if (_crossfadeDuration > Duration.zero && !_hiResActive) {
-        _crossfadeCancelled = false; _isCrossfading = true;
-        _originalVolume = _player.volume;
-        await play(); await _fadeIn();
-      } else {
-        await play();
-      }
-    } else {
-      if (_crossfadeDuration > Duration.zero && !_hiResActive) {
-        _crossfadeCancelled = false; _isCrossfading = true;
-        _originalVolume = _player.volume;
-        await _fadeOut();
-        if (!_crossfadeCancelled) { pause(); _player.setVolume(_originalVolume); }
-        _isCrossfading = false;
-      } else {
-        pause();
-      }
-    }
-  }
-
-  ReplayGainData? get currentReplayGain => _replayGainService.currentGain;
+  ReplayGainData? get currentReplayGain => _gainManager.currentReplayGain;
   double get currentVolumeNormalizationMultiplier =>
-      _volumeNormalizationService.currentMultiplier;
-  bool get replayGainActive =>
-      _replayGainService.enabled && _replayGainService.currentGain != null;
-  bool get volumeNormalizationActive => _volumeNormalizationService.enabled;
+      _gainManager.currentVolumeNormalizationMultiplier;
+  bool get replayGainActive => _gainManager.replayGainActive;
+  bool get volumeNormalizationActive => _gainManager.volumeNormalizationActive;
 
   Future<void> reapplyAudioGain() async {
-    if (_hiResActive) return;
-    if (!_replayGainService.enabled && !_volumeNormalizationService.enabled) return;
-    await setVolume(_userBaseVolume);
+    if (_hiResManager.hiResActive) return;
+    await _gainManager.reapplyAudioGain();
   }
 
   Future<void> setVolume(double volume) async {
-    _userBaseVolume = volume.clamp(0.0, 1.0);
     if (_exclusiveModeEnabled) {
-      await _player.setVolume(1.0);
+      await _gainManager.setDirectVolume(1.0);
       return;
     }
-    final effective = (_userBaseVolume * _calculateGainMultiplier()).clamp(0.0, 1.0);
-    await _player.setVolume(effective);
+    await _gainManager.setVolume(volume);
   }
 
   Future<void> setSpeed(double speed) async {
-    await _player.setSpeed(speed.clamp(0.5, 2.0));
+    await _gainManager.setSpeed(speed);
   }
 
-  double _calculateGainMultiplier() {
-    if (_exclusiveModeEnabled) return 1.0;
-    double m = 1.0;
-    if (_replayGainService.enabled) m *= _replayGainService.effectiveVolumeMultiplier;
-    if (_volumeNormalizationService.enabled) m *= _volumeNormalizationService.currentMultiplier;
-    return m;
-  }
+  // ── Exclusive Mode ──
 
-  Future<void> _applyAudioGain(AudioTrack track) async {
-    if (_exclusiveModeEnabled) return;
-    if (!_replayGainService.enabled && !_volumeNormalizationService.enabled) return;
+  Future<void> setExclusiveMode(bool enabled) async {
+    if (Platform.isAndroid) {
+      if (enabled) {
+        final success = await _exclusiveService.enable();
+        _exclusiveModeEnabled = success;
+        if (success) {
+          await _hiResManager.hiResService.setUseAaudioSink(true);
+          await _hiResManager.hiResService.setBitPerfectMode(true);
+          await _gainManager.setDirectVolume(1.0);
 
-    try {
-      String? filePath;
-      if (track.url.startsWith('file://')) {
-        filePath = track.url.substring(7);
-      } else if (track.hash != null && track.hash!.isNotEmpty) {
-        filePath = await CacheService.getCachedAudioFile(track.hash!);
-      }
-
-      ReplayGainData? gainData;
-      if (_replayGainService.enabled && filePath != null) {
-        gainData = await AudioFormatGainService.analyzeGain(filePath);
-        _replayGainService.setCurrentGain(gainData);
+          _log.info(
+              '[LIBUSB] Exclusive Mode ON — '
+              'initiating libusb USB DAC (jika ada perangkat fisik)',
+              tag: 'Audio');
+          await _usbDacManager.setAutoDacEnabled(true);
+          _autoEnabledLibusb = true;
+        }
       } else {
-        _replayGainService.setCurrentGain(null);
-      }
+        await _exclusiveService.disable();
+        _exclusiveModeEnabled = false;
+        await _hiResManager.hiResService.setUseAaudioSink(false);
+        await _hiResManager.hiResService.setBitPerfectMode(false);
 
-      if (_volumeNormalizationService.enabled) {
-        await _volumeNormalizationService.calculateMultiplier(
-          filePath,
-          bitDepth: _lastAudioFormat?.bitDepth,
-          replayGainPeak: gainData?.trackPeak,
-        );
+        if (_autoEnabledLibusb) {
+          _log.info(
+              '[LIBUSB] Exclusive Mode OFF — disabling auto-enabled USB DAC Routing',
+              tag: 'Audio');
+          await _usbDacManager.setAutoDacEnabled(false);
+          _autoEnabledLibusb = false;
+        }
       }
-
-      await setVolume(_userBaseVolume);
-    } catch (e) {
-      _log.error('Error applying gain: $e', tag: 'AudioGain');
+    } else if (Platform.isWindows || Platform.isMacOS) {
+      _exclusiveModeEnabled = enabled;
+      await MpvConfigService.configure();
+      if (enabled) await _gainManager.setDirectVolume(1.0);
     }
   }
+
+  bool get exclusiveModeEnabled => _exclusiveModeEnabled;
+
+  void setHiResEnabled(bool enabled) {
+    _hiResManager.setHiResEnabled(enabled && Platform.isAndroid);
+  }
+
+  Future<void> setRepeatMode(LoopMode mode) async {
+    await _queueManager.setRepeatMode(mode);
+    await _player.setLoopMode(LoopMode.off);
+  }
+
+  Future<void> setShuffleMode(bool enabled) async {
+    await _player.setShuffleModeEnabled(enabled);
+  }
+
+  // ── Privacy ──
+
+  Future<void> updatePrivacySettings({
+    required bool enabled,
+    required bool blurCover,
+    required bool maskTitle,
+    required String customTitle,
+  }) async {
+    _privacyEnabled = enabled;
+    _privacyBlurCover = blurCover;
+    _privacyMaskTitle = maskTitle;
+    _privacyCustomTitle = customTitle;
+    if (currentTrack != null) {
+      await _updateMediaItem(currentTrack!,
+          privacyEnabled: enabled,
+          blurCover: blurCover,
+          maskTitle: maskTitle,
+          customTitle: customTitle);
+    }
+  }
+
+  AudioHandler? get audioHandler => _audioHandler;
+
+  // ── Convenience Getters (from managers) ──
+
+  bool get libusbDacActive => _libusbDacActive;
+  UsbDacAudioManager get usbDacManager => _usbDacManager;
+
+  AudioFormatInfo? get lastAudioFormat => _gainManager.lastAudioFormat;
+
+  Duration get position =>
+      _hiResManager.hiResActive ? _hiResManager.position : _player.position;
+  Duration? get duration =>
+      _hiResManager.hiResActive ? _hiResManager.duration : _player.duration;
+  Duration get bufferedPosition => _hiResManager.hiResActive
+      ? _hiResManager.bufferedPosition
+      : _player.bufferedPosition;
+  bool get playing =>
+      _hiResManager.hiResActive ? _hiResManager.isPlaying : _player.playing;
+  PlayerState get playerState => _hiResManager.hiResActive
+      ? _hiResManager.playerState
+      : _player.playerState;
+
+  AudioTrack? get currentTrack => _queueManager.currentTrack;
+  List<AudioTrack> get queue => _queueManager.queue;
+  int get currentIndex => _queueManager.currentIndex;
+  bool get hiResActive => _hiResManager.hiResActive;
+  Stream<bool> get hiResActiveStream => _hiResManager.hiResActiveStream;
+  bool get hasNext => _queueManager.hasNext;
+  bool get hasPrevious => _queueManager.hasPrevious;
+
+  // ── Streams ──
+
+  Stream<PlayerState> get playerStateStream =>
+      _unifiedPlayerStateController.stream;
+  Stream<Duration> get positionStream => _unifiedPositionController.stream;
+  Stream<Duration?> get durationStream => _unifiedDurationController.stream;
+  Stream<List<AudioTrack>> get queueStream => _queueManager.queueStream;
+  Stream<AudioTrack?> get currentTrackStream =>
+      _queueManager.currentTrackStream;
+  Stream<bool> get trackLoadingStream => _trackLoadingController.stream;
+  Stream<AudioFormatInfo?> get audioFormatStream =>
+      _audioFormatController.stream;
+
+  // ── Platform-Specific ──
 
   Future<void> updateAudioSessionConfig(bool enablePassthrough) async {
     if (Platform.isWindows || Platform.isMacOS) {
@@ -1036,7 +921,8 @@ class AudioPlayerService {
       await session.configure(enablePassthrough
           ? const AudioSessionConfiguration(
               avAudioSessionCategory: AVAudioSessionCategory.playback,
-              avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.duckOthers,
+              avAudioSessionCategoryOptions:
+                  AVAudioSessionCategoryOptions.duckOthers,
               avAudioSessionMode: AVAudioSessionMode.moviePlayback,
               androidAudioAttributes: AndroidAudioAttributes(
                 contentType: AndroidAudioContentType.movie,
@@ -1048,7 +934,8 @@ class AudioPlayerService {
             )
           : const AudioSessionConfiguration(
               avAudioSessionCategory: AVAudioSessionCategory.playback,
-              avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.duckOthers,
+              avAudioSessionCategoryOptions:
+                  AVAudioSessionCategoryOptions.duckOthers,
               avAudioSessionMode: AVAudioSessionMode.defaultMode,
               androidAudioAttributes: AndroidAudioAttributes(
                 contentType: AndroidAudioContentType.music,
@@ -1063,75 +950,7 @@ class AudioPlayerService {
     }
   }
 
-  Future<void> setExclusiveMode(bool enabled) async {
-    if (Platform.isAndroid) {
-      if (enabled) {
-        final success = await _exclusiveService.enable();
-        _exclusiveModeEnabled = success;
-        if (success) {
-          await _hiResService.setUseAaudioSink(true);
-          await _hiResService.setBitPerfectMode(true);
-          await _player.setVolume(1.0);
-
-          _log.info('[LIBUSB] Exclusive Mode ON — '
-              'initiating libusb USB DAC (jika ada perangkat fisik)',
-              tag: 'Audio');
-          await _usbDacManager.setAutoDacEnabled(true);
-          _autoEnabledLibusb = true;
-        }
-      } else {
-        await _exclusiveService.disable();
-        _exclusiveModeEnabled = false;
-        await _hiResService.setUseAaudioSink(false);
-        await _hiResService.setBitPerfectMode(false);
-
-        if (_autoEnabledLibusb) {
-          _log.info('[LIBUSB] Exclusive Mode OFF — disabling auto-enabled USB DAC Routing',
-              tag: 'Audio');
-          await _usbDacManager.setAutoDacEnabled(false);
-          _autoEnabledLibusb = false;
-        }
-      }
-    } else if (Platform.isWindows || Platform.isMacOS) {
-      _exclusiveModeEnabled = enabled;
-      await MpvConfigService.configure();
-      if (enabled) await _player.setVolume(1.0);
-    } else {
-      return;
-    }
-  }
-
-  bool get exclusiveModeEnabled => _exclusiveModeEnabled;
-
-  void setHiResEnabled(bool enabled) {
-    _hiResEnabled = enabled && Platform.isAndroid;
-  }
-
-  Future<void> setRepeatMode(LoopMode mode) async {
-    _appLoopMode = mode;
-    await _player.setLoopMode(LoopMode.off);
-  }
-
-  Future<void> setShuffleMode(bool enabled) async {
-    await _player.setShuffleModeEnabled(enabled);
-  }
-
-  Future<void> updatePrivacySettings({
-    required bool enabled, required bool blurCover,
-    required bool maskTitle, required String customTitle,
-  }) async {
-    _privacyEnabled = enabled;
-    _privacyBlurCover = blurCover;
-    _privacyMaskTitle = maskTitle;
-    _privacyCustomTitle = customTitle;
-    if (currentTrack != null) {
-      await _updateMediaItem(currentTrack!,
-        privacyEnabled: enabled, blurCover: blurCover,
-        maskTitle: maskTitle, customTitle: customTitle);
-    }
-  }
-
-  AudioHandler? get audioHandler => _audioHandler;
+  // ── macOS Completion Check ──
 
   void _startCompletionCheckTimer() {
     if (!Platform.isMacOS) return;
@@ -1144,13 +963,16 @@ class AudioPlayerService {
           _handleTrackCompletion();
         } else if (_player.duration != null &&
             _player.duration! > Duration.zero &&
-            _player.position >= _player.duration! - const Duration(milliseconds: 50)) {
+            _player.position >=
+                _player.duration! - const Duration(milliseconds: 50)) {
           _completionHandled = true;
           _handleTrackCompletion();
         }
       }
     });
   }
+
+  // ── Temp File Management ──
 
   Future<void> _cleanupTempPlaybackFile() async {
     if (_tempPlaybackFilePath == null) return;
@@ -1165,8 +987,9 @@ class AudioPlayerService {
   }
 
   Future<String?> _prepareLocalPlaybackPath(String originalPath) async {
-    final shouldInspect = ['.wav', '.flac', '.m4a', '.aac', '.ogg', '.opus', '.mp3']
-        .any((ext) => originalPath.toLowerCase().endsWith(ext));
+    final shouldInspect = [
+      '.wav', '.flac', '.m4a', '.aac', '.ogg', '.opus', '.mp3'
+    ].any((ext) => originalPath.toLowerCase().endsWith(ext));
     if (!shouldInspect) return null;
 
     final file = File(originalPath);
@@ -1178,7 +1001,8 @@ class AudioPlayerService {
     bool hasLyric = false;
     for (final lrc in _lyricExtensions) {
       if (await File(p.join(dir.path, '$baseName$lrc')).exists()) {
-        hasLyric = true; break;
+        hasLyric = true;
+        break;
       }
     }
 
@@ -1201,42 +1025,17 @@ class AudioPlayerService {
 
   Future<Directory> _getTempAudioDirectory() async {
     if (_tempAudioDirectory != null) return _tempAudioDirectory!;
-    final dir = Directory(p.join(Directory.systemTemp.path, 'kikoflu_audio_temp'));
+    final dir = Directory(
+        p.join(Directory.systemTemp.path, 'kikoflu_audio_temp'));
     if (!await dir.exists()) await dir.create(recursive: true);
     _tempAudioDirectory = dir;
     return dir;
   }
 
-  Stream<PlayerState> get playerStateStream => _unifiedPlayerStateController.stream;
-  Stream<Duration> get positionStream => _unifiedPositionController.stream;
-  Stream<Duration?> get durationStream => _unifiedDurationController.stream;
-  Stream<List<AudioTrack>> get queueStream => _queueController.stream;
-  Stream<AudioTrack?> get currentTrackStream => _currentTrackController.stream;
-  Stream<bool> get trackLoadingStream => _trackLoadingController.stream;
-  Stream<AudioFormatInfo?> get audioFormatStream => _audioFormatController.stream;
-
-  Duration get position => _hiResActive ? _lastHiResPosition : _player.position;
-  Duration? get duration => _hiResActive ? _lastHiResDuration : _player.duration;
-  Duration get bufferedPosition =>
-      _hiResActive ? _lastHiResBufferedPosition : _player.bufferedPosition;
-  bool get playing => _hiResActive ? _hiResService.isPlaying : _player.playing;
-  PlayerState get playerState => _hiResActive
-      ? PlayerState(_hiResService.isPlaying, ProcessingState.ready)
-      : _player.playerState;
-
-  AudioTrack? get currentTrack =>
-      _queue.isNotEmpty && _currentIndex < _queue.length
-          ? _queue[_currentIndex] : null;
-
-  List<AudioTrack> get queue => List.unmodifiable(_queue);
-  int get currentIndex => _currentIndex;
-  bool get hiResActive => _hiResActive;
-  Stream<bool> get hiResActiveStream => _hiResActiveController.stream;
-  bool get hasNext => _currentIndex < _queue.length - 1;
-  bool get hasPrevious => _currentIndex > 0;
+  // ── Dispose ──
 
   Future<void> dispose() async {
-    _cancelCrossfade();
+    _crossfadeManager.cancel();
     _completionCheckTimer?.cancel();
     _smtcSubscription?.cancel();
     _smtcSubscription = null;
@@ -1244,14 +1043,13 @@ class AudioPlayerService {
     _justAudioDurationSub?.cancel();
     _libusbStateSub?.cancel();
     _libusbStateSub = null;
-    await _stopHiResPlayback();
+    await _hiResManager.stopHiResPlayback();
     await _cleanupTempPlaybackFile();
-    await _hiResActiveController.close();
+    _hiResManager.dispose();
+    _queueManager.dispose();
     await _unifiedPositionController.close();
     await _unifiedDurationController.close();
     await _unifiedPlayerStateController.close();
-    await _queueController.close();
-    await _currentTrackController.close();
     await _trackLoadingController.close();
     await _audioFormatController.close();
     await _player.dispose();

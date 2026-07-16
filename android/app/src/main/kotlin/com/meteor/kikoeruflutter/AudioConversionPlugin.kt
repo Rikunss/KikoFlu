@@ -32,13 +32,9 @@ class AudioConversionPlugin(private val flutterEngine: FlutterEngine) :
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "checkEncoder" -> {
-                // ffmpeg-kit audio variant includes all audio encoders (FLAC, ALAC, MP3, Opus, AAC)
-                // Always return true for all formats.
                 result.success(true)
             }
             "convertWav" -> {
-                // Conversion is handled by ffmpeg-kit on the Dart side.
-                // This path should never be reached, but return a clear error just in case.
                 result.error(
                     "DEPRECATED",
                     "WAV conversion is now handled by ffmpeg-kit (Dart side). " +

@@ -21,7 +21,6 @@ class NativePositionPusher(
     private var handler: Handler? = null
     @Volatile
     private var active: Boolean = false
-    // Tracks last pushed duration to avoid duplicate MethodChannel calls
     private var lastPushedDurationMs: Long = -1L
 
     /** Reference to the ExoPlayer to read position/duration from. */
@@ -53,24 +52,20 @@ class NativePositionPusher(
 
             val channel = channelRef()
 
-            // Push position — always, no guard needed
             val posMs = player.currentPosition.toInt()
             channel?.invokeMethod("onPositionChanged", posMs)
 
-            // Push buffered position — used by Dart-side StreamingSpeedTracker
             val bufPosMs = player.bufferedPosition.toInt()
             if (bufPosMs >= 0) {
                 channel?.invokeMethod("onBufferedPositionChanged", bufPosMs)
             }
 
-            // Push duration every tick — ExoPlayer eventually reports a valid value
             val durMs = player.duration
             if (durMs > 0 && durMs != androidx.media3.common.C.TIME_UNSET && durMs != lastPushedDurationMs) {
                 channel?.invokeMethod("onDurationChanged", durMs.toInt())
                 lastPushedDurationMs = durMs
             }
 
-            // Schedule next tick in 50ms (only if still active)
             if (active) {
                 handler?.postDelayed(this, 50)
             }
@@ -86,7 +81,6 @@ class NativePositionPusher(
             handler = Handler(Looper.getMainLooper())
         }
         handler?.removeCallbacks(runnable)
-        // Immediate first tick, then every 50ms
         handler?.post(runnable)
     }
 

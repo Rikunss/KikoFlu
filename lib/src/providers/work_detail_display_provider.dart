@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/log_service.dart';
 
 /// 作品详情页显示设置
 class WorkDetailDisplaySettings {
@@ -83,6 +84,7 @@ class WorkDetailDisplayNotifier
         showRecommendations: prefs.getBool(_keyRecommendations) ?? true,
       );
     } catch (e) {
+      LogService.instance.warning('[WorkDetailDisplay] Failed to load settings: $e', tag: 'Settings');
     }
   }
 
@@ -144,6 +146,7 @@ class WorkDetailDisplayNotifier
       await prefs.setBool(_keySubtitleTag, state.showSubtitleTag);
       await prefs.setBool(_keyRecommendations, state.showRecommendations);
     } catch (e) {
+      LogService.instance.warning('[WorkDetailDisplay] Failed to save settings: $e', tag: 'Settings');
     }
   }
 }

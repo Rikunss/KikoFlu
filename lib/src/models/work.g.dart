@@ -1,10 +1,6 @@
-// GENERATED CODE - DO NOT MODIFY BY HAND
 
 part of 'work.dart';
 
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
 
 Work _$WorkFromJson(Map<String, dynamic> json) => Work(
       id: (json['id'] as num).toInt(),

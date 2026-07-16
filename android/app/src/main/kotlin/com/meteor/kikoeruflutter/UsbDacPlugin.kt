@@ -57,7 +57,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
             }
         }
 
-        // ── Static JNI bridges (used by LibusbAudioSink) ──
         @JvmStatic private external fun nativeWritePcmFloatStaticImpl(
             ptr: Long, buffer: FloatArray, numFrames: Int
         ): Int
@@ -142,7 +141,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
         }
     }
 
-    // ── Native JNI methods (implemented in usb_dac_driver.cpp) ──
     private external fun nativeCreateDriver(): Long
     private external fun nativeInitDriver(
         nativePtr: Long, deviceFd: Int,
@@ -159,7 +157,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
     ): Int
     private external fun nativeIsActive(nativePtr: Long): Boolean
 
-    // ── State ──
     private var usbManager: UsbManager? = null
     private var nativeDriverPtr: Long = 0L
     private var channel: MethodChannel? = null
@@ -175,7 +172,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
     private var pendingPermissionResult: Result? = null
     private var pendingPermissionDeviceId: Int = -1
 
-    // ── Broadcast Receivers ──
 
     /** Receiver for USB permission grants/denials. */
     private val usbPermissionReceiver = object : BroadcastReceiver() {
@@ -205,10 +201,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
 
                 if (granted) {
                     Log.i(TAG, "[USB] Permission GRANTED for: $deviceName")
-                    // IMPORTANT: Jangan panggil connectToDevice() + nativeStartDriver() di sini!
-                    // libusb driver akan meng-claim USB interface, yang mencegah
-                    // decent-player UsbAudioSink mengakses device yang sama.
-                    // Cukup resolve permission — biarkan decent-player yang handle koneksi USB.
                     channel?.invokeMethod("onPermissionResult", mapOf(
                         "deviceId" to receivedDevice.deviceId,
                         "deviceName" to deviceName,
@@ -246,8 +238,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
                         Log.i(TAG, "[USB]   Fallback device found: ${fallbackDevice.productName} (deviceId=${fallbackDevice.deviceId})")
                         if (granted) {
                             Log.i(TAG, "[USB]   Fallback: treating as GRANTED")
-                            // Jangan panggil connectToDevice() + nativeStartDriver() —
-                            // decent-player UsbAudioSink yang akan handle USB connection.
                             channel?.invokeMethod("onPermissionResult", mapOf(
                                 "deviceId" to fallbackDevice.deviceId,
                                 "deviceName" to (fallbackDevice.productName ?: "USB DAC"),
@@ -310,11 +300,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
         this.channel = methodChannel
         usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
 
-        // ── Register USB Permission Receiver ──
-        // IMPORTANT: Uses RECEIVER_EXPORTED because UsbManager.requestPermission()
-        // fires the PendingIntent from the SYSTEM process. On Android 14+,
-        // RECEIVER_NOT_EXPORTED would BLOCK broadcasts from system-server,
-        // preventing the USB permission callback from ever being received.
         val permissionFilter = IntentFilter(ACTION_USB_PERMISSION)
         if (Build.VERSION.SDK_INT >= 34) {
             context.registerReceiver(usbPermissionReceiver, permissionFilter, Context.RECEIVER_EXPORTED)
@@ -323,8 +308,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
         }
         Log.i(TAG, "[USB] Permission receiver registered (exported) — action=$ACTION_USB_PERMISSION")
 
-        // ── Register Hotplug Receivers ──
-        // Also RECEIVER_EXPORTED because USB attach/detach broadcasts come from the system.
         val hotplugFilter = IntentFilter().apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
@@ -342,7 +325,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
         val audioDevices = findUsbAudioDevices()
         Log.i(TAG, "[USB] Device attached — found ${audioDevices.size} USB audio device(s)")
 
-        // Log detailed debug info for each device found
         for (dev in audioDevices) {
             val hasPerm = usbManager?.hasPermission(dev) ?: false
             val serialDesc = if (hasPerm) {
@@ -355,16 +337,10 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
                     ", hasPermission=$hasPerm, serial=$serialDesc)")
         }
 
-        // Notify Dart with the new device list — Dart side handles
-        // permission requesting via UsbDacAudioManager (when user enables
-        // USB DAC Routing in settings). We no longer auto-request permission
-        // here to avoid racing with the Dart-side flow.
         channel?.invokeMethod("onDeviceAttached", mapOf(
             "devices" to audioDevices.map { serializeDevice(it) }
         ))
 
-        // Note: Auto-reconnect is handled by UsbDacAudioManager on the Dart side.
-        // The Kotlin side only handles the hardware event notification.
     }
 
     /**
@@ -382,13 +358,10 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
 
     /** Called when a USB device is unplugged. */
     private fun handleDeviceDetached() {
-        // If this was our claimed device, clean up and notify
         if (claimedDevice != null) {
             Log.i(TAG, "Claimed device was detached — cleaning up")
-            // Single call with canReconnect=true (disconnectDevice fires onDeviceDisconnected)
             disconnectDevice(canReconnect = true)
         } else {
-            // Just notify Dart about the device list change
             val audioDevices = findUsbAudioDevices()
             channel?.invokeMethod("onDeviceAttached", mapOf(
                 "devices" to audioDevices.map { serializeDevice(it) }
@@ -457,8 +430,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
             }
         } ?: emptyList<Map<String, Any?>>()
 
-        // Serial number requires USB permission.
-        // Check hasPermission first — if not granted, skip gracefully.
         val serialNumber: String
         if (hasPermission) {
             serialNumber = try {
@@ -493,9 +464,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
      */
     private fun connectToDevice(device: UsbDevice, sampleRate: Int = 48000,
                                  channelCount: Int = 2, bitsPerSample: Int = 16) {
-        // Guard against duplicate connection attempts.
-        // The permission receiver (usbPermissionReceiver) may have already
-        // created the driver. Return early to avoid re-opening the device.
         if (nativeDriverPtr != 0L) {
             Log.w(TAG, "connectToDevice called but already connected (ptr=0x${nativeDriverPtr.toString(16)}) — returning early")
             channel?.invokeMethod("onDeviceConnected", mapOf(
@@ -518,14 +486,12 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
                 return
             }
 
-            // Find the audio streaming interface
             val audioInterface = (0 until device.interfaceCount)
                 .map { device.getInterface(it) }
                 .firstOrNull {
                     it.interfaceClass == USB_CLASS_AUDIO &&
                     it.interfaceSubclass == USB_SUBCLASS_AUDIO_STREAMING
                 } ?: run {
-                // Try any audio interface
                 (0 until device.interfaceCount)
                     .map { device.getInterface(it) }
                     .firstOrNull { it.interfaceClass == USB_CLASS_AUDIO }
@@ -537,7 +503,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
                 return
             }
 
-            // Claim the interface (required for isochronous transfer)
             val claimed = connection.claimInterface(audioInterface, true)
             if (!claimed) {
                 Log.e(TAG, "Failed to claim USB audio interface")
@@ -548,11 +513,9 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
             claimedDevice = device
             usbConnection = connection
 
-            // Get the file descriptor from the connection
             val fd = connection.fileDescriptor
             Log.i(TAG, "[USB-DRIVER] === connectToDevice: destroy old driver ===")
 
-            // Initialize native driver with the USB device FD
             destroyNativeDriver()
             Log.i(TAG, "[USB-DRIVER] === connectToDevice: STEP 1/2 — nativeCreateDriver() ===")
             val ptr = nativeCreateDriver()
@@ -604,7 +567,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
             usbConnection?.close()
         } catch (_: Exception) {}
 
-        // Capture device info BEFORE nulling references
         val name = claimedDevice?.productName ?: "USB DAC"
         val id = claimedDevice?.deviceId ?: 0
         claimedDevice = null
@@ -630,7 +592,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
         try {
             result.success(granted)
         } catch (e: IllegalStateException) {
-            // MethodChannel Result already resolved (e.g. Dart timed out)
             Log.w(TAG, "safeResolvePermissionResult: already resolved ($granted): ${e.message}")
         }
     }
@@ -646,7 +607,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
             "isSupported" -> {
-                // USB Host API requires Android 3.1+ (API 12+), which is always available
                 result.success(true)
             }
             "getDevices" -> {
@@ -666,20 +626,14 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
                     Log.i(TAG, "[USB]   hasPermission(device)=$hasPerm")
 
                     if (hasPerm) {
-                        // Permission already granted — resolve immediately without dialog
-                        // JANGAN panggil connectToDevice() + nativeStartDriver()!
-                        // Biarkan decent-player UsbAudioSink yang handle USB connection.
                         Log.i(TAG, "[USB]   Permission already granted — resolving immediately (skipping libusb connect)")
                         refreshDeviceList()
                         result.success(true)
                     } else {
-                        // Clear any stale pending result (safe: catches if already resolved)
                         safeResolvePermissionResult(false)
-                        // Store the new result — will be resolved when broadcast receiver fires
                         pendingPermissionResult = result
                         pendingPermissionDeviceId = deviceId
 
-                        // Request permission via explicit PendingIntent (Android 14+ requirement)
                         val permissionIntent = Intent(ACTION_USB_PERMISSION).apply {
                             `package` = context.packageName
                         }
@@ -691,10 +645,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
                         )
                         usbManager?.requestPermission(targetDevice, pendingPermissionIntent)
                         Log.i(TAG, "[USB]   Permission request sent via PendingIntent — awaiting user response")
-                        // ⚠️ result.success() is NOT called here!
-                        // The MethodChannel call stays pending until the broadcast receiver
-                        // fires (user taps Allow/Deny). This eliminates the race condition
-                        // where Dart called connect() before the user responded.
                     }
                 } else {
                     Log.e(TAG, "[USB]   Device #$deviceId not found in device list")
@@ -744,10 +694,6 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
             "start" -> {
                 Log.i(TAG, "[USB-STREAM] nativeStart() called from method channel 'start'")
                 if (nativeDriverPtr != 0L) {
-                    // Check if already streaming — the broadcast receiver may have already
-                    // started the driver after the user granted USB permission.
-                    // nativeStartDriver() returns false if called on an already-running driver,
-                    // which would make Dart think startup failed and never route audio to libusb.
                     if (nativeIsActive(nativeDriverPtr)) {
                         Log.i(TAG, "[USB-STREAM] nativeStart called but already active — returning true")
                         result.success(true)

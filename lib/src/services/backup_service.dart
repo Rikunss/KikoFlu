@@ -236,35 +236,45 @@ class BackupService {
           data[key] = {'t': 's', 'v': stringVal};
           continue;
         }
-      } catch (_) {}
+      } catch (_) {
+        _log.warning('[Backup] getString failed for key: $key');
+      }
       try {
         final intVal = prefs.getInt(key);
         if (intVal != null) {
           data[key] = {'t': 'i', 'v': intVal};
           continue;
         }
-      } catch (_) {}
+      } catch (_) {
+        _log.warning('[Backup] getInt failed for key: $key');
+      }
       try {
         final boolVal = prefs.getBool(key);
         if (boolVal != null) {
           data[key] = {'t': 'b', 'v': boolVal};
           continue;
         }
-      } catch (_) {}
+      } catch (_) {
+        _log.warning('[Backup] getBool failed for key: $key');
+      }
       try {
         final doubleVal = prefs.getDouble(key);
         if (doubleVal != null) {
           data[key] = {'t': 'd', 'v': doubleVal};
           continue;
         }
-      } catch (_) {}
+      } catch (_) {
+        _log.warning('[Backup] getDouble failed for key: $key');
+      }
       try {
         final listVal = prefs.getStringList(key);
         if (listVal != null) {
           data[key] = {'t': 'l', 'v': listVal};
           continue;
         }
-      } catch (_) {}
+      } catch (_) {
+        _log.warning('[Backup] getStringList failed for key: $key');
+      }
     }
 
     return const JsonEncoder.withIndent('  ').convert(data);

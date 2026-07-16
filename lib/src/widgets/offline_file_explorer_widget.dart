@@ -11,7 +11,6 @@ import '../services/log_service.dart';
 import '../services/download_path_service.dart';
 import '../services/download_service.dart';
 import '../services/translation_service.dart';
-import '../services/subtitle_library_service.dart';
 import '../models/audio_track.dart';
 import '../providers/audio_provider.dart';
 import '../providers/lyric_provider.dart';
@@ -480,6 +479,7 @@ class _OfflineFileExplorerWidgetState
         return await file.length();
       }
     } catch (e) {
+      LogService.instance.warning('[OfflineExplorer] Failed to get file size: $e', tag: 'Explorer');
     }
 
     return null;
@@ -560,6 +560,7 @@ class _OfflineFileExplorerWidgetState
         }
       }
     } catch (e) {
+      LogService.instance.warning('[OfflineExplorer] Failed to find cover: $e', tag: 'Explorer');
     }
 
     final audioFiles = _getAudioFilesFromSameDirectory(parentPath);

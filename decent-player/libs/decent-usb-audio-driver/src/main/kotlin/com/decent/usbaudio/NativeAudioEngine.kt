@@ -111,7 +111,6 @@ class NativeAudioEngine {
     fun getBitsPerSample(): Int =
         if (handle != 0L) nativeGetBitsPerSample(handle) else 0
 
-    // ── JNI declarations ───────────────────────────────────────────
 
     private external fun nativeCreateFromFd(fd: Int, usbHandle: Long): Long
     private external fun nativeStart(handle: Long): Boolean

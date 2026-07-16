@@ -85,13 +85,11 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
 
         try {
             if (isShowing) {
-                // 如果已经显示，只更新文本
                 floatingView?.updateText(text)
                 result.success(true)
                 return
             }
 
-            // 配置窗口参数
             val params = WindowManager.LayoutParams().apply {
                 width = WindowManager.LayoutParams.WRAP_CONTENT
                 height = WindowManager.LayoutParams.WRAP_CONTENT
@@ -101,7 +99,6 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
                     @Suppress("DEPRECATION")
                     WindowManager.LayoutParams.TYPE_PHONE
                 }
-                // 设置触摸模式
                 flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                         WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
@@ -111,7 +108,6 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
                 y = 100 // 距离顶部的距离
             }
 
-            // 创建悬浮窗视图（传入 windowManager 和 params 以支持拖动）
             floatingView = FloatingLyricView(
                 context,
                 windowManager!!,
@@ -122,7 +118,6 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
             }
             floatingView?.updateText(text)
 
-            // 添加到窗口
             windowManager?.addView(floatingView as android.view.View, params)
             isShowing = true
             result.success(true)
@@ -192,7 +187,6 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
     private fun updateStyle(call: MethodCall, result: Result) {
         try {
             val fontSize = call.argument<Double>("fontSize")
-            // Dart int is 64-bit, so it might be passed as Long
             val textColor = call.argument<Number>("textColor")?.toInt()
             val backgroundColor = call.argument<Number>("backgroundColor")?.toInt()
             val cornerRadius = call.argument<Double>("cornerRadius")
@@ -236,7 +230,6 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
             try {
                 windowManager?.removeView(floatingView as android.view.View)
             } catch (e: Exception) {
-                // 忽略错误
             }
             floatingView = null
             isShowing = false

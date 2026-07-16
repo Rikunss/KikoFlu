@@ -258,12 +258,24 @@ class HiResAudioService {
   ///
   /// [url] can be an http(s) URL or a file:// path.
   /// [sampleRate] and [bitDepth] are optional hints for the player.
-  Future<bool> play(String url, {int sampleRate = 0, int bitDepth = 0}) async {
+  /// [startPositionMs] — explicit start position in milliseconds.
+  ///   If > 0, used as the starting offset (e.g. DAC sink-switch restore).
+  ///   If 0, native prefers [last saved position] when the URL matches
+  ///   the previously played track; otherwise starts from 0.
+  ///   This makes DAC plug/reconnect cycles preserve position without
+  ///   requiring callers to manually seek after every sink change.
+  Future<bool> play(
+    String url, {
+    int sampleRate = 0,
+    int bitDepth = 0,
+    int startPositionMs = 0,
+  }) async {
     try {
       final result = await _channel.invokeMethod<bool>('play', {
         'url': url,
         'sampleRate': sampleRate,
         'bitDepth': bitDepth,
+        'startPositionMs': startPositionMs,
       });
       return result == true;
     } catch (e) {

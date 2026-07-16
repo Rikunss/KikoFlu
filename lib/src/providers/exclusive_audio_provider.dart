@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:audio_session/audio_session.dart';
 import '../services/exclusive_audio_service.dart';
 import '../services/hi_res_audio_service.dart';
+import '../services/log_service.dart';
 
 /// Stream provider that emits the exclusive audio mode state reactively.
 ///
@@ -125,7 +126,8 @@ final activeOutputDeviceProvider = StreamProvider<String>((ref) {
     session.becomingNoisyEventStream.listen((_) {
       if (!controller.isClosed) controller.add('speaker');
     });
-  }).catchError((_) {
+  }).catchError((Object e) {
+    LogService.instance.warning('[ExclusiveAudio] Failed to query output device: $e', tag: 'ExclusiveAudio');
   });
 
   ref.onDispose(() => controller.close());

@@ -1,11 +1,7 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
-
-import '../../models/download_task.dart';
 import '../../providers/settings_provider.dart';
-import '../../services/download_service.dart';
+import '../../services/log_service.dart';
 import '../../services/subtitle_library_service.dart';
 import '../../utils/file_icon_utils.dart';
 
@@ -152,6 +148,7 @@ Future<Set<String>> checkLibrarySubtitles({
       }
     }
   } catch (e) {
+    LogService.instance.warning('[Explorer] checkLibrarySubtitles failed: $e', tag: 'Explorer');
   }
   return subtitledAudioFiles;
 }

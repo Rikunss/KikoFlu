@@ -77,7 +77,6 @@ class UsbAudioSink(
             usbStartMediaTimeNeedsInit = true
             Log.i(TAG, "cleanupFinishedEngine: old engine cleared")
 
-            // Apply deferred USB reconfiguration (cross-rate transition)
             if (hasDeferredConfig) {
                 Log.i(TAG, "cleanupFinishedEngine: applying deferred config rate=$deferredRate")
                 configureUsbBitPerfect(deferredRate, deferredChannels, deferredEncoding)
@@ -94,7 +93,6 @@ class UsbAudioSink(
         if (nativeEngine?.isRunning == true) return  // already running
         val stream = usbAudioStream
         if (stream != null && stream.isAlive) {
-            // Clean up dead engine if exists
             val old = nativeEngine
             if (old != null && !old.isRunning) {
                 old.destroy()
@@ -105,11 +103,6 @@ class UsbAudioSink(
                 windowOffsetUs = -1L
                 usbStartMediaTimeNeedsInit = true
                 startNativeEngineIfFlac(stream)
-                // Engine starts paused with engineNeedsInitialSeek = true.
-                // Temporarily unblock LoadControl so ExoPlayer sends at least one
-                // handleBuffer — needed to capture presentationTimeUs and seek.
-                // Without this, the LoadControl blocks immediately and the engine
-                // stays paused forever (HTTP→local transition race).
                 if (nativeEngine != null) {
                     isNativeEngineActive = false
                 }
@@ -160,7 +153,12 @@ class UsbAudioSink(
      *  Prevents handleBuffer() from repeatedly calling configureUsbBitPerfect() after
      *  the DAC is unplugged, which would log spam and waste CPU. Reset when a new stream
      *  is successfully created in configureUsbBitPerfect() or reconnectUsbStreamIfNeeded(). */
-    @Volatile private var usbDeviceLost: Boolean = false
+    /** @return true when the USB device is confirmed gone (no device found on reconnect).
+     *  Used by [ExoPlayerManager] to decide whether to pause ExoPlayer on
+     *  ACTION_AUDIO_BECOMING_NOISY — when the device is lost but useDecentSink
+     *  hasn't been cleared yet, the broadcast should NOT be ignored. */
+    @Volatile var isDeviceLost: Boolean = false
+        private set
 
     /** Timestamp (SystemClock.elapsedRealtime) of the last reconnect attempt.
      *  Used together with [RECONNECT_COOLDOWN_MS] to rate-limit lazy USB stream
@@ -196,22 +194,14 @@ class UsbAudioSink(
         val enc = inputFormat.pcmEncoding
         if (enc != Format.NO_VALUE) currentEncoding = enc
 
-        // Always capture the actual sample rate and channel count so
-        // handleBuffer can create the USB stream lazily even when the
-        // bit-perfect path was skipped (e.g. HTTP MP3 placeholder
-        // format).
         val fmtSr = inputFormat.sampleRate.takeIf { it > 0 }
         val fmtCh = inputFormat.channelCount.takeIf { it > 0 }
         if (fmtSr != null) currentSampleRate = fmtSr
         if (fmtCh != null) currentChannelCount = fmtCh
 
-        // If native engine is still playing the SAME track AND the rate didn't change,
-        // don't touch it. This happens when ExoPlayer pre-buffers the next track ~10s
-        // before EOF. But if the track or rate changed, destroy and reconfigure.
         if (nativeEngine?.isRunning == true) {
             val trackChanged = currentTrackPath != activeEnginePath
             if (!trackChanged) {
-                // Same track, ExoPlayer pre-buffering — defer reconfiguration
                 if (inputFormat.sampleRate != currentSampleRate || inputFormat.channelCount != currentChannelCount) {
                     deferredRate = inputFormat.sampleRate
                     deferredChannels = inputFormat.channelCount
@@ -225,10 +215,8 @@ class UsbAudioSink(
                 muteDelegateIfNeeded()
                 return
             }
-            // Track changed (manual skip) — destroy engine and proceed
             Log.i(TAG, "configure: track changed, destroying engine")
         }
-        // Track changed or engine finished — destroy old engine
         val oldEngine = nativeEngine
         if (oldEngine != null) {
             oldEngine.stop()
@@ -255,17 +243,6 @@ class UsbAudioSink(
                 usbStartMediaTimeNeedsInit = true
                 if (config.forceRouteToSpeaker) forceMediaToSpeaker()
 
-                // ── Force delegate AudioTrack to use a safe sample rate ──
-                // Android AudioTrack only supports certain sample rates for the
-                // built-in speaker/headphone output (common max: 48000 Hz).
-                // Ultra-high sample rates like 352800 Hz thrown an
-                // IllegalStateException from AudioTrack.getMinBufferSize().
-                //
-                // The delegate is muted anyway (volume=0, routed to speaker)
-                // — its only purpose is to keep ExoPlayer's clock alive and
-                // prevent AudioFlinger from touching the USB DAC. The actual
-                // audio goes through the USB isochronous stream at the native
-                // source rate, which IS correct.
                 val delegateFormat = if (inputFormat.sampleRate > 48000) {
                     inputFormat.buildUpon().setSampleRate(48000).build()
                 } else {
@@ -287,10 +264,6 @@ class UsbAudioSink(
             Log.i(TAG, "configure: format not ready (fmtSr=$fmtSr fmtCh=$fmtCh) — fallback to delegate")
         }
 
-        // Bit-perfect not available yet (no device, no permission,
-        // or placeholder format). Create a delegate AudioTrack for
-        // ExoPlayer's clock. The USB stream is created lazily in
-        // handleBuffer once the device and actual format are known.
         super.configure(inputFormat, specifiedBufferSize, outputChannels)
 
         if (usbAudioStream != null && !config.bitPerfectEnabled) {
@@ -303,16 +276,13 @@ class UsbAudioSink(
         presentationTimeUs: Long,
         encodedAccessUnitCount: Int
     ): Boolean {
-        // USB DAC: if the stream doesn't exist yet, create it lazily.
-        // This handles the case where configure() was called with a
-        // placeholder format (sr=0 / ch=0) or the USB device wasn't
-        // available yet — by the time the first audio buffer arrives,
-        // the actual format should be known.
         if (config.bitPerfectEnabled && usbAudioStream?.isAlive != true) {
+            if (!reconnectAttempted) {
+                isDeviceLost = true
+                Log.i(TAG, "handleBuffer: stream dead — proactively set isDeviceLost=true")
+            }
             val ok = reconnectUsbStreamIfNeeded()
             if (!ok) {
-                // If format not yet known (configure() was never called),
-                // try to read it from the ExoPlayer's currentTracks.
                 if (currentSampleRate <= 0 || currentChannelCount <= 0) {
                     val tracks = attachedPlayer?.currentTracks
                     if (tracks != null) {
@@ -329,14 +299,9 @@ class UsbAudioSink(
                     }
                 }
                 if (currentSampleRate > 0 && currentChannelCount > 0) {
-                    // reconnect guarded by reconnectAttempted — if it's set
-                    // (previous failure), try a direct configureUsbBitPerfect
-                    // since the format is now known.
-                    if (usbAudioStream?.isAlive != true && !usbDeviceLost) {
+                    if (usbAudioStream?.isAlive != true && !isDeviceLost) {
                         if (lastReconnectAttemptMs > 0 &&
                             SystemClock.elapsedRealtime() - lastReconnectAttemptMs < RECONNECT_COOLDOWN_MS) {
-                            // Still within cooldown window — skip this attempt silently
-                            // to avoid log spam and excessive USB device-list scanning.
                         } else {
                             lastReconnectAttemptMs = SystemClock.elapsedRealtime()
                             Log.i(TAG, "handleBuffer: lazy USB stream init for ${currentSampleRate}Hz/${currentChannelCount}ch")
@@ -355,33 +320,20 @@ class UsbAudioSink(
         if (config.bitPerfectEnabled && stream?.isAlive == true) {
             muteDelegateIfNeeded()
 
-            // Fallback engine creation: if no engine and no streaming thread,
-            // try creating one now (path and USB rate should both be correct by this point)
             if (nativeEngine == null && usbStreamingThread == null) {
                 startNativeEngineIfFlac(stream)
-                // Engine starts paused. The usbStartMediaTimeNeedsInit block below
-                // will capture presentationTimeUs and seek to the correct position.
             }
 
-            // Capture media timeline offset from first buffer (needed for position tracking)
             if (usbStartMediaTimeNeedsInit) {
                 usbStartMediaTimeUs = maxOf(0L, presentationTimeUs)
                 usbStartMediaTimeNeedsInit = false
-                // Cancel startup safety timeout — handleBuffer arrived, engine will be
-                // properly seeked and resumed.
                 startupSafetyTimeout?.let { Handler(Looper.getMainLooper()).removeCallbacks(it) }
                 startupSafetyTimeout = null
-                // Save window offset once per track (not reset by flush/seek).
-                // windowOffset = ExoPlayer timeline position of track start (position 0).
-                // On fresh start: initialPlayerPosition=0 → offset = pts (correct).
-                // On restore at 158s: initialPlayerPosition=158s → offset = pts - 158s (correct).
                 if (windowOffsetUs < 0) {
                     windowOffsetUs = presentationTimeUs - initialPlayerPositionUs
                 }
                 Log.i(TAG, "startMediaTimeUs=$usbStartMediaTimeUs windowOffset=$windowOffsetUs initialPos=${initialPlayerPositionUs / 1000}ms")
 
-                // After a flush (seek) or initial start, seek the native engine
-                // to the correct position and resume it.
                 val engine = nativeEngine
                 if (engine != null && windowOffsetUs >= 0) {
                     val flacPositionUs = presentationTimeUs - windowOffsetUs
@@ -392,23 +344,17 @@ class UsbAudioSink(
                         Log.i(TAG, "Native engine seek to ${flacPositionUs / 1_000_000}s (playing=$isPlaying)")
                     }
                 }
-                // Re-block LoadControl now that we have the position.
-                // flush() temporarily unblocked it to allow this handleBuffer call.
                 if (nativeEngine?.isRunning == true) {
                     isNativeEngineActive = true
                 }
             }
 
-            // Native FLAC engine handles decode+USB directly — ignore ExoPlayer data.
             val engine = nativeEngine
             if (engine != null) {
                 if (engine.isRunning) {
                     buffer.position(buffer.limit())
                     return true
                 }
-                // Engine finished playing — clean up for next track.
-                // Lazy creation at the top of handleBuffer will create a new engine
-                // with the correct currentTrackPath on the next call.
                 Log.i(TAG, "Native engine finished — cleaning up for next track")
                 engine.destroy()
                 nativeEngine = null
@@ -416,16 +362,12 @@ class UsbAudioSink(
                 activeEnginePath = null
                 windowOffsetUs = -1L
                 usbStartMediaTimeNeedsInit = true
-                // Return true for this buffer — next handleBuffer will create new engine
                 buffer.position(buffer.limit())
                 return true
             }
 
             val thread = usbStreamingThread ?: return true
 
-            // Backpressure: if queue is nearly full, tell ExoPlayer to retry later.
-            // This paces the renderer to the USB DAC's consumption rate without
-            // depending on the delegate AudioTrack.
             if (thread.queueSize() >= QUEUE_BACKPRESSURE_THRESHOLD) {
                 return false
             }
@@ -456,7 +398,21 @@ class UsbAudioSink(
                 }
             }
 
-            // Advance buffer and return true — no delegate dependency.
+            buffer.position(buffer.limit())
+            return true
+        }
+
+        if (config.bitPerfectEnabled && isDeviceLost) {
+            if (!delegateMuted) {
+                delegateMuted = true
+                super.setVolume(0f)
+                Handler(Looper.getMainLooper()).post {
+                    if (attachedPlayer?.isPlaying == true) {
+                        Log.w(TAG, "Device lost — force-pausing ExoPlayer")
+                        attachedPlayer?.pause()
+                    }
+                }
+            }
             buffer.position(buffer.limit())
             return true
         }
@@ -465,7 +421,6 @@ class UsbAudioSink(
         return super.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount)
     }
 
-    // ── Position tracking via USB framesWritten ────────────────────────
 
     private var posLogCount = 0L
 
@@ -482,9 +437,6 @@ class UsbAudioSink(
                         "running=${engine?.isRunning} window=$windowOffsetUs enginePos=${engine?.getPositionUs()}")
             }
 
-            // Detect engine finished — advance to next track internally.
-            // ExoPlayer's renderer never reaches outputStreamEnded because
-            // LoadControl blocked loading, so we skip externally via the Player ref.
             if (engine != null && !engine.isRunning && !engineEndNotified) {
                 engineEndNotified = true
                 Log.i(TAG, "Engine finished — advancing to next track")
@@ -500,12 +452,10 @@ class UsbAudioSink(
                 }
             }
 
-            // Native engine: absolute FLAC position + window offset
             if (streamAlive && engineCreated && windowOffsetUs >= 0) {
                 return windowOffsetUs + engine!!.getPositionUs()
             }
 
-            // ExoPlayer pipeline fallback: relative framesWritten + startMediaTime
             if (streamAlive) {
                 if (usbStartMediaTimeNeedsInit) return AudioSink.CURRENT_POSITION_NOT_SET
                 val frames = usbAudioStream?.framesWritten ?: 0L
@@ -520,11 +470,7 @@ class UsbAudioSink(
     override fun isEnded(): Boolean {
         if (config.bitPerfectEnabled) {
             val engine = nativeEngine
-            // Engine still running → not ended
             if (engine != null && engine.isRunning) return false
-            // Engine exists but stopped → it finished (EOF). Signal ended directly.
-            // Cannot delegate to super because LoadControl blocked ExoPlayer's loading,
-            // so the delegate never reached end-of-stream on its own.
             if (engine != null && !engine.isRunning) return true
         }
         return super.isEnded()
@@ -532,7 +478,6 @@ class UsbAudioSink(
 
     override fun hasPendingData(): Boolean {
         if (config.bitPerfectEnabled) {
-            // Engine running → has pending data
             if (nativeEngine?.isRunning == true) return true
             if (usbStreamingThread?.hasPendingData() == true) return true
         }
@@ -541,8 +486,6 @@ class UsbAudioSink(
 
     override fun playToEndOfStream() {
         handledEndOfStream = true
-        // Always propagate to delegate — ExoPlayer needs this signal to
-        // detect end-of-stream and transition to the next track.
         super.playToEndOfStream()
     }
 
@@ -550,11 +493,6 @@ class UsbAudioSink(
         super.play()
         isPlaying = true
 
-        // USB DAC hot-plug reconnect: if the native stream was destroyed by
-        // detach, rebuild it before resuming engine/thread (otherwise writes
-        // fail with errno=25 on the stale fd).
-        // Reset the flag so a retry is attempted even if handleBuffer already
-        // tried and failed (USB may have been reconnected since then).
         reconnectAttempted = false
         reconnectUsbStreamIfNeeded()
 
@@ -562,20 +500,6 @@ class UsbAudioSink(
         usbStreamingThread?.resumeStreaming()
         Log.i(TAG, "play() needsSeek=$engineNeedsInitialSeek resumed=$resumed")
 
-        // ── Startup silence safety timeout ───────────────────────────────────
-        // If the native engine was just created (engineNeedsInitialSeek = true),
-        // it stays paused until handleBuffer() captures presentationTimeUs and
-        // seeks the engine to the correct position. Under normal operation,
-        // handleBuffer() arrives within milliseconds of play().
-        //
-        // However, if LoadControl blocks before the first buffer (e.g. race
-        // between onMediaItemTransition and renderer init), handleBuffer() may
-        // never arrive, leaving the engine paused forever → startup silence.
-        //
-        // Safety net: force-resume the engine after 500ms if no handleBuffer
-        // arrived. The position at resume may be slightly wrong (offset by the
-        // gap between ExoPlayer timeline and FLAC absolute position), but
-        // audible audio immediately is better than permanent silence.
         if (engineNeedsInitialSeek && nativeEngine?.isRunning == true) {
             startupSafetyTimeout?.let { Handler(Looper.getMainLooper()).removeCallbacks(it) }
             val safetyRunnable = Runnable {
@@ -593,7 +517,6 @@ class UsbAudioSink(
 
     override fun pause() {
         isPlaying = false
-        // Cancel startup safety timeout when user pauses before first buffer arrives
         startupSafetyTimeout?.let { Handler(Looper.getMainLooper()).removeCallbacks(it) }
         startupSafetyTimeout = null
         if (!engineNeedsInitialSeek) nativeEngine?.pause()
@@ -612,16 +535,10 @@ class UsbAudioSink(
 
     override fun flush() {
         super.flush()
-        // Native engine handles its own flush/seek internally
-        // ExoPlayer pipeline: flush queue + native stream
         usbStreamingThread?.flush()
         usbAudioStream?.flush()
         usbStartMediaTimeNeedsInit = true
         handledEndOfStream = false
-        // Temporarily unblock LoadControl so ExoPlayer loads at least one chunk
-        // after seek. handleBuffer will re-block once it captures presentationTimeUs.
-        // Without this, the LoadControl blocks ALL post-seek loading and the engine
-        // never knows where to seek to.
         if (nativeEngine?.isRunning == true) {
             isNativeEngineActive = false
         }
@@ -629,12 +546,8 @@ class UsbAudioSink(
 
     override fun reset() {
         super.reset()
-        // Cancel any pending startup safety timeout on reset
         startupSafetyTimeout?.let { Handler(Looper.getMainLooper()).removeCallbacks(it) }
         startupSafetyTimeout = null
-        // USB stream survives reset — configure() manages its lifecycle.
-        // ExoPlayer calls reset() frequently (track changes, seeks).
-        // Killing USB here causes audio to briefly route to the speaker.
     }
 
     override fun release() {
@@ -642,40 +555,34 @@ class UsbAudioSink(
         super.release()
     }
 
-    // ── USB bit-perfect configuration ───────────────────────────────
 
     private fun configureUsbBitPerfect(sampleRate: Int, channelCount: Int, encoding: Int) {
-        // NOTE: engine is NOT destroyed here. configure() returns early if engine
-        // is still running. If we reach here, the engine is already dead or null.
 
-        // Cache check — avoid needless USB stream recreation.
-        // Short-circuit when encoding changed (e.g. WAV 24-bit → MP3 16-bit
-        // at the same sample rate) so the USB stream is rebuilt for the new
-        // PCM format. Without this, the delegate AudioTrack may produce
-        // silence when the USB DAC interface is claimed by UsbAudioSink.
         if (sampleRate == currentSampleRate && channelCount == currentChannelCount
             && encoding == currentEncoding && usbAudioStream?.isAlive == true) {
             Log.d(TAG, "USB stream cached for rate=$sampleRate ch=$channelCount — reusing")
-            // Engine will be created lazily in handleBuffer when currentTrackPath is set
             return
         }
 
         if (usbAudioStream != null) releaseUsbStream()
 
-        val usbDevice = usbAudioDevice.findUsbAudioDevice() ?: return
+        val usbDevice = usbAudioDevice.findUsbAudioDevice()
+        if (usbDevice == null) {
+            Log.e(TAG, "configureUsbBitPerfect: no USB device found — marking as lost")
+            isDeviceLost = true
+            lastReconnectAttemptMs = SystemClock.elapsedRealtime()
+            return
+        }
         var deviceInfo = usbAudioDevice.openDevice(usbDevice)
         if (deviceInfo == null) {
-            Log.e(TAG, "Failed to open USB device")
+            Log.e(TAG, "Failed to open USB device — marking as lost")
+            isDeviceLost = true
+            lastReconnectAttemptMs = SystemClock.elapsedRealtime()
             return
         }
 
-        // Always use the DAC's highest supported bit depth (standard practice).
-        // Sources with lower bit depth are zero-padded in the LSBs.
         val bitDepth = deviceInfo.bestBitDepth
         val altSetting = deviceInfo.bestAltSetting
-        // Convert encoding constant to bit depth for accurate logging.
-        // For FLAC files, trackBitDepth is set by NativeAudioEngine.getBitsPerSample().
-        // For all other formats (WAV, etc.), derive from currentEncoding / encoding param.
         val sourceBitDepth = trackBitDepth.takeIf { it > 0 }
             ?: PcmUtils.bytesPerSample(currentEncoding) * 8
         Log.i(TAG, "Bit-perfect: source=${sourceBitDepth}bit → alt=$altSetting usb=${bitDepth}bit " +
@@ -693,29 +600,23 @@ class UsbAudioSink(
         )
 
         if (!stream.isReady) {
-            Log.e(TAG, "USB stream creation failed")
+            Log.e(TAG, "USB stream creation failed — marking as lost")
             stream.release()
+            isDeviceLost = true
+            lastReconnectAttemptMs = SystemClock.elapsedRealtime()
             return
         }
 
-        // ─── xHCI-verified transition sequence (from USB protocol analysis) ───
-        //
-        // 1. setAlt(0)       → xHCI Configure Endpoint (FREE old rings)
-        // 2. SET_CUR          → write new sample rate to Clock Source
-        // 3. GET_CUR          → verify clock accepted (CLOCK_VALID_CONTROL)
-        // 4. setAlt(0) AGAIN  → defensive reset after clock change
-        // 5. setAlt(N)        → xHCI Configure Endpoint (ALLOC new rings)
-        // 6. wait ~47ms       → DAC PLL lock time
-        // 7. start            → submit URBs
 
-        // Step 1: setAlt(0) — FREE old ISO rings
         if (!usbAudioDevice.setAltSetting(0)) {
             Log.w(TAG, "setAlt(0) failed — stale fd, reopening device...")
             usbAudioDevice.closeDevice()
             stream.release()
             deviceInfo = usbAudioDevice.openDevice(usbDevice)
             if (deviceInfo == null) {
-                Log.e(TAG, "Failed to reopen USB device")
+                Log.e(TAG, "Failed to reopen USB device — marking as lost")
+                isDeviceLost = true
+                lastReconnectAttemptMs = SystemClock.elapsedRealtime()
                 return
             }
             stream = UsbAudioStream(
@@ -737,41 +638,34 @@ class UsbAudioSink(
         }
         Log.i(TAG, "Step 1: setAlt(0) — old ISO ring freed")
 
-        // Step 2: SET_CUR — write new sample rate
         usbAudioDevice.setSampleRate(sampleRate)
 
-        // Step 3: GET_CUR(CLOCK_VALID_CONTROL) — verify clock is locked
         val clockValid = usbAudioDevice.readClockValid()
         Log.i(TAG, "Step 2-3: SET_CUR=$sampleRate, CLOCK_VALID=$clockValid")
 
-        // Step 4: setAlt(0) AGAIN — defensive reset after clock change
         usbAudioDevice.setAltSetting(0)
         Log.i(TAG, "Step 4: setAlt(0) again — defensive reset")
 
-        // Step 5: setAlt(N) — ALLOC new ISO rings
         val altResult = usbAudioDevice.setAltSetting(altSetting)
         Log.i(TAG, "Step 5: setAlt($altSetting): $altResult — new ISO ring allocated")
 
-        // Step 6: wait ~47ms — DAC PLL lock time
         Thread.sleep(50)
 
         if (!stream.start()) {
-            Log.e(TAG, "USB stream start failed")
+            Log.e(TAG, "USB stream start failed — marking as lost")
             stream.release()
+            isDeviceLost = true
+            lastReconnectAttemptMs = SystemClock.elapsedRealtime()
             return
         }
 
         usbAudioStream = stream
-        reconnectAttempted = false  // fresh stream — reset for next detach cycle
-        usbDeviceLost = false  // device is back online
+        reconnectAttempted = false  // fresh stream — reset for next detach cycle            isDeviceLost = false  // device is back online
         lastReconnectAttemptMs = 0L  // reset cooldown counter
         currentSampleRate = sampleRate
         currentChannelCount = channelCount
         muteDelegateIfNeeded()
 
-        // Try to create engine now (works for first track where onMediaItemTransition
-        // fired before configure). For subsequent tracks, createEngineIfNeeded() in
-        // onMediaItemTransition handles it (path is correct by then).
         startNativeEngineIfFlac(stream)
 
         Log.i(TAG, "USB bit-perfect stream ACTIVE: rate=$sampleRate ch=$channelCount " +
@@ -800,70 +694,60 @@ class UsbAudioSink(
      * @return true if the stream was successfully rebuilt, false otherwise.
      */
     private fun reconnectUsbStreamIfNeeded(): Boolean {
-        // Only attempt if bit-perfect is enabled and we have a known format
         if (!config.bitPerfectEnabled || currentSampleRate <= 0 || currentChannelCount <= 0) {
             return false
         }
 
-        // Stream is alive — no reconnect needed
         if (usbAudioStream?.isAlive == true) {
-            // Reset flags so future detach/reconnect cycles are detected
             reconnectAttempted = false
-            usbDeviceLost = false
+            isDeviceLost = false
             lastReconnectAttemptMs = 0L  // reset cooldown counter
             return false
         }
 
-        // Don't retry if we already tried for this disconnect episode
-        // BUT if more than 10 seconds have passed since the last attempt,
-        // retry anyway — the device may have been reconnected since then.
         if (reconnectAttempted) {
-            if (usbDeviceLost && lastReconnectAttemptMs > 0 &&
+            if (isDeviceLost && lastReconnectAttemptMs > 0 &&
                 SystemClock.elapsedRealtime() - lastReconnectAttemptMs > 10_000L) {
                 Log.i(TAG, "reconnectUsbStreamIfNeeded: 10s elapsed since last attempt — retrying")
                 reconnectAttempted = false
-                usbDeviceLost = false
+                isDeviceLost = false
             } else {
                 return false
             }
         }
         reconnectAttempted = true
 
-        // Check if a USB audio device is present and we have permission
         Log.i(TAG, "reconnectUsbStreamIfNeeded: stream dead — checking for USB device")
         val device = usbAudioDevice.findUsbAudioDevice()
         if (device == null) {
             Log.w(TAG, "reconnectUsbStreamIfNeeded: no USB device found, marking as lost")
             reconnectAttempted = true  // prevent repeated scanning on every buffer
-            usbDeviceLost = true
+            isDeviceLost = true
             lastReconnectAttemptMs = SystemClock.elapsedRealtime()
             return false
         }
         if (!usbAudioDevice.hasPermission(device)) {
             Log.w(TAG, "reconnectUsbStreamIfNeeded: USB device found but no permission")
-            // Don't set usbDeviceLost — user may grant permission later
             return false
         }
 
         Log.i(TAG, "reconnectUsbStreamIfNeeded: REBUILDING native USB stream for ${device.productName}")
 
-        // Release any stale stream (defensive — nativeHandle is already 0L)
         if (usbAudioStream != null) {
             releaseUsbStream()
         }
 
-        // Rebuild from scratch using the same format as the current track
         configureUsbBitPerfect(currentSampleRate, currentChannelCount, currentEncoding)
 
         val rebuilt = usbAudioStream?.isAlive == true
         if (rebuilt) {
             Log.i(TAG, "reconnectUsbStreamIfNeeded: ✓ stream rebuilt successfully")
-            // Reset flags so a future detach/reconnect cycle can re-trigger
             reconnectAttempted = false
-            usbDeviceLost = false
+            isDeviceLost = false
             lastReconnectAttemptMs = 0L  // reset cooldown counter
         } else {
-            Log.w(TAG, "reconnectUsbStreamIfNeeded: ✗ stream rebuild failed")
+            Log.w(TAG, "reconnectUsbStreamIfNeeded: ✗ stream rebuild failed — marking as lost")
+            isDeviceLost = true
             lastReconnectAttemptMs = SystemClock.elapsedRealtime()
         }
         return rebuilt
@@ -874,7 +758,6 @@ class UsbAudioSink(
     private fun startNativeEngineIfFlac(stream: UsbAudioStream) {
         if (nativeEngine != null) return  // already created (synchronized method)
 
-        // Stop existing streaming thread (mutually exclusive with native engine)
         usbStreamingThread?.stop()
         usbStreamingThread = null
 
@@ -888,19 +771,12 @@ class UsbAudioSink(
                 val created = engine.createFromFd(fd.fd, stream.nativeHandle)
                 fd.close()
                 if (created && engine.start()) {
-                    // Verify FLAC sample rate matches USB stream — prevents distortion
-                    // when ExoPlayer's queue and onMediaItemTransition disagree about
-                    // which track is playing (e.g., cross-album Recently Played lists).
                     if (engine.getSampleRate() != currentSampleRate) {
                         Log.w(TAG, "Rate mismatch: FLAC=${engine.getSampleRate()} USB=$currentSampleRate" +
                                 " — falling back to ExoPlayer pipeline")
                         engine.stop()
                         engine.destroy()
                     } else {
-                        // Thread starts paused (nativeStart sets paused=true).
-                        // handleBuffer will set the seek position and resume the
-                        // thread once presentationTimeUs is available — prevents
-                        // duplicate frame decode before seek.
                         nativeEngine = engine
                         isNativeEngineActive = true
                         engineNeedsInitialSeek = true
@@ -917,46 +793,35 @@ class UsbAudioSink(
             engine.destroy()
         }
 
-        // Fallback: ExoPlayer pipeline via streaming thread
         usbStreamingThread = UsbStreamingThread(stream).also { it.start() }
         Log.i(TAG, "Using ExoPlayer pipeline (non-FLAC or engine failed)")
     }
 
-    // ── USB stream release ──────────────────────────────────────────
 
     private fun releaseUsbStream() {
         val stream = usbAudioStream ?: return
         usbAudioStream = null
 
-        // Stop USB stream FIRST — sets ctx->running=false, which unblocks
-        // submitPcmToUrbs inside the native engine's decode thread.
-        // Without this, nativeEngine.stop() deadlocks on pthread_join.
         stream.stop()
 
-        // Now safe to stop native engine (decode thread can exit)
         nativeEngine?.stop()
         nativeEngine?.destroy()
         nativeEngine = null
         isNativeEngineActive = false
 
-        // Stop the streaming thread (drains queue, joins thread)
         usbStreamingThread?.stop()
         usbStreamingThread = null
 
-        // Drain ALL in-flight URBs — MUST complete before setAlt(0)
         val drained = stream.drainUrbs()
         Log.i(TAG, "USB stream drained $drained URBs")
 
-        // Release native context
         stream.release()
 
-        // Keep device connection open between tracks (standard practice)
         clearForcedRouting()
         unmuteDelegateIfNeeded()
         Log.i(TAG, "USB audio stream released (device kept open)")
     }
 
-    // ── Delegate volume management ──────────────────────────────────
 
     private fun muteDelegateIfNeeded() {
         if (!delegateMuted) { super.setVolume(0f); delegateMuted = true }
@@ -966,7 +831,6 @@ class UsbAudioSink(
         if (delegateMuted) { super.setVolume(pendingVolume); delegateMuted = false }
     }
 
-    // ── Audio routing helpers ───────────────────────────────────────
 
     private fun forceMediaToSpeaker() {
         try {
@@ -986,7 +850,6 @@ class UsbAudioSink(
         try { delegate.setPreferredDevice(null) } catch (_: Exception) {}
     }
 
-    // ── Player integration (attachToPlayer) ──────────────────────
 
     @Volatile private var attachedPlayer: Player? = null
     private var integrationListener: Player.Listener? = null
@@ -1002,13 +865,11 @@ class UsbAudioSink(
      * Must be called on the main thread, after [ExoPlayer.Builder.build].
      */
     fun attachToPlayer(player: Player) {
-        // Guard: already attached to this exact player instance — skip
         if (attachedPlayer === player) {
             Log.i(TAG, "attachToPlayer: already attached to this player — skipping")
             return
         }
 
-        // Detach from previous player if any
         val oldListener = integrationListener
         val oldPlayer = attachedPlayer
         if (oldListener != null && oldPlayer != null) {
@@ -1068,21 +929,6 @@ class UsbAudioSink(
 
             val uri = mediaItem.localConfiguration?.uri
 
-            // ── Idempotency guard ─────────────────────────────────────────────
-            // Skip re-processing when the same URI arrives while the current
-            // track is still actively playing. Prevents the infinite loop:
-            //   play() → onMediaItemTransition → seekTo(0)/createEngine
-            //   → another onMediaItemTransition → ...
-            //
-            // We use two checks:
-            //   1. URI matches last processed item (same track identity)
-            //   2. Native engine is running (local FLAC actively decoding)
-            //      OR player is in READY state (HTTP/ExoPlayer pipeline)
-            //
-            // Genuine repeat/loop (REASON_PLAYBACK_ENDED) is still allowed
-            // because the engine would have finished (not running) and the
-            // player transitions through IDLE → BUFFERING → READY.
-            // ──────────────────────────────────────────────────────────────────
             if (uri != null && uri == lastProcessedMediaUri) {
                 val engineRunning = nativeEngine?.isRunning == true
                 val playerReady = attachedPlayer?.playbackState == Player.STATE_READY
@@ -1093,30 +939,21 @@ class UsbAudioSink(
             }
             lastProcessedMediaUri = uri
 
-            // Capture player position BEFORE engine creation. On restore this is
-            // the saved position (e.g., 158s). On fresh start this is 0.
             initialPlayerPositionUs = (attachedPlayer?.currentPosition ?: 0L) * 1000L
             Log.i(TAG, "onMediaItemTransition: initialPlayerPos=${initialPlayerPositionUs / 1000}ms")
 
-            // 1. Clean up finished engine from previous track
             val engineFinished = cleanupFinishedEngine()
 
-            // 2. Resolve file path from URI
             val resolvedPath = resolveTrackPath(uri)
             currentTrackPath = resolvedPath
             Log.i(TAG, "onMediaItemTransition: uri=$uri path=$resolvedPath")
 
-            // 3. Capture audio format — needed for lazy USB stream creation
-            //    when AudioSink.configure() is not called by the renderer
-            //    (observed with FfmpegAudioRenderer for MP3 tracks).
             captureFormat()
 
-            // 4. Create engine if local FLAC
             if (resolvedPath != null) {
                 createEngineIfNeeded()
             }
 
-            // 5. If previous engine finished, reset position for new track
             if (engineFinished) {
                 attachedPlayer?.seekTo(0)
             }
@@ -1124,9 +961,6 @@ class UsbAudioSink(
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_READY) {
-                // Capture format again when player becomes ready — the
-                // audioFormat may not be available in onMediaItemTransition
-                // if the renderer hasn't initialized yet.
                 captureFormat()
             }
         }
@@ -1150,7 +984,6 @@ class UsbAudioSink(
                 null
             }
             null -> {
-                // Bare path string (no scheme) — common in local music players
                 val pathStr = uri.toString()
                 if (pathStr.startsWith("/")) pathStr else null
             }

@@ -28,7 +28,6 @@ internal class NativeEngineAwareLoadControl(
     private val isNativeEngineActive: () -> Boolean
 ) : LoadControl {
 
-    // ── Lifecycle (Media3 1.5.x — no playerId parameter) ──
 
     override fun onPrepared() =
         delegate.onPrepared()
@@ -39,7 +38,6 @@ internal class NativeEngineAwareLoadControl(
     override fun onReleased() =
         delegate.onReleased()
 
-    // ── Track selection ──
 
     @Suppress("DEPRECATION")
     override fun onTracksSelected(
@@ -56,12 +54,10 @@ internal class NativeEngineAwareLoadControl(
         trackSelections: Array<out ExoTrackSelection>
     ) = delegate.onTracksSelected(timeline, mediaPeriodId, renderers, trackGroups, trackSelections)
 
-    // ── Allocator (Media3 1.5.x — no playerId parameter) ──
 
     override fun getAllocator(): Allocator =
         delegate.getAllocator()
 
-    // ── Back buffer ──
 
     override fun getBackBufferDurationUs(): Long =
         delegate.getBackBufferDurationUs()
@@ -69,7 +65,6 @@ internal class NativeEngineAwareLoadControl(
     override fun retainBackBufferFromKeyframe(): Boolean =
         delegate.retainBackBufferFromKeyframe()
 
-    // ── Core: throttle loading when native engine active ──
 
     override fun shouldContinueLoading(parameters: LoadControl.Parameters): Boolean {
         if (isNativeEngineActive()) return false

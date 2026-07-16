@@ -42,7 +42,6 @@ class DecentDataSourceFactory(context: Context) : DataSource.Factory {
     private val cachedFactory: CacheDataSource.Factory
 
     init {
-        // Local disk cache — 500MB, LRU eviction
         val cacheDir = File(context.cacheDir, "decent_stream_cache")
         cache = SimpleCache(
             cacheDir,
@@ -50,13 +49,11 @@ class DecentDataSourceFactory(context: Context) : DataSource.Factory {
             StandaloneDatabaseProvider(context)
         )
 
-        // Upstream: routes SFTP to SftpDataSource, everything else to default
         upstreamFactory = RoutingDataSourceFactory(
             DefaultDataSource.Factory(context),
             SftpDataSource.Factory()
         )
 
-        // Cache wraps the upstream — all network reads are cached locally
         cachedFactory = CacheDataSource.Factory()
             .setCache(cache)
             .setUpstreamDataSourceFactory(upstreamFactory)

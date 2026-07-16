@@ -305,8 +305,11 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
         service.audioHandler
             ?.stop()
             .then((_) => service.clearQueue())
-            .catchError((_) {});
+            .catchError((e) {
+              LogService.instance.warning('[Main] Stop failed during detach: $e', tag: 'Main');
+            });
       } catch (e) {
+        LogService.instance.warning('[Main] Stop failed during detach: $e', tag: 'Main');
       }
     }
   }

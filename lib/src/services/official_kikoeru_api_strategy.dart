@@ -12,7 +12,6 @@ class OfficialKikoeruApiStrategy extends KikoeruApiStrategy {
   @override
   bool get isOfficial => true;
 
-  // ── Authentication ──
 
   @override
   Future<Map<String, dynamic>> login(String username, String password) async {
@@ -31,18 +30,13 @@ class OfficialKikoeruApiStrategy extends KikoeruApiStrategy {
   Future<Map<String, dynamic>> register(
       String username, String password) async {
     try {
-      // Step 1: Get recommender UUID
       String recommenderUuid = '766cc58d-7f1e-4958-9a93-913400f378dc';
 
-      // Temporarily clear token to get registration info
-      // savedConfig is declared OUTSIDE the inner try so that finally can use it
       final savedToken = config.token;
       final savedConfig = config;
       config = savedConfig.copyWith(token: null);
 
       try {
-        // We make a POST without the Bearer header (interceptor skips /api/auth/*)
-        // to get the recommender UUID (only works without auth).
         final recommenderResponse = await dio.post(
           '/api/recommender/recommend-for-user',
           data: {'keyword': ' ', 'page': 1, 'pageSize': 20},
@@ -61,7 +55,6 @@ class OfficialKikoeruApiStrategy extends KikoeruApiStrategy {
         config = savedConfig;
       }
 
-      // Step 2: Register with recommender UUID
       config = config.copyWith(token: null);
       final response = await dio.post(
         '/api/auth/reg',
@@ -94,7 +87,6 @@ class OfficialKikoeruApiStrategy extends KikoeruApiStrategy {
     }
   }
 
-  // ── Works ──
 
   @override
   Future<Map<String, dynamic>> getWorks({
@@ -289,7 +281,6 @@ class OfficialKikoeruApiStrategy extends KikoeruApiStrategy {
     }
   }
 
-  // ── Reviews ──
 
   @override
   Future<Map<String, dynamic>> getWorkReviews(int workId, {
@@ -371,7 +362,6 @@ class OfficialKikoeruApiStrategy extends KikoeruApiStrategy {
     }
   }
 
-  // ── Favorites ──
 
   @override
   Future<Map<String, dynamic>> getFavorites({

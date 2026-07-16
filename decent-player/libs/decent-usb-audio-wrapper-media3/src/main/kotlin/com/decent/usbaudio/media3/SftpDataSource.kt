@@ -35,7 +35,6 @@ class SftpDataSource : BaseDataSource(/* isNetwork = */ true) {
     private var opened: Boolean = false
     private var dataSpec: DataSpec? = null
 
-    // Cache for reuse across seeks
     private var cachedHost: String? = null
     private var cachedUser: String? = null
     private var cachedPass: String? = null
@@ -48,7 +47,6 @@ class SftpDataSource : BaseDataSource(/* isNetwork = */ true) {
         val decoded = java.net.URLDecoder.decode(rawUri, "UTF-8")
 
         try {
-            // Parse SFTP URI manually (java.net.URI rejects [] in paths)
             val withoutScheme = decoded.removePrefix("sftp://")
             val atIdx = withoutScheme.indexOf("@")
             val userInfoStr = withoutScheme.substring(0, atIdx)
@@ -61,7 +59,6 @@ class SftpDataSource : BaseDataSource(/* isNetwork = */ true) {
             val host = hostPort.substringBefore(":")
             val port = hostPort.substringAfter(":", "22").toIntOrNull() ?: 22
 
-            // Try to reuse cached session
             val needNewSession = session == null || !session!!.isConnected
                     || cachedHost != host || cachedUser != user
 
@@ -89,9 +86,7 @@ class SftpDataSource : BaseDataSource(/* isNetwork = */ true) {
 
             var ch = channel!!
 
-            // Resolve path (handle SFTP chroot)
             if (cachedPath == null || cachedPath != path) {
-                // Try path as-is first
                 var resolved = false
                 try {
                     ch.stat(path)
@@ -99,7 +94,6 @@ class SftpDataSource : BaseDataSource(/* isNetwork = */ true) {
                 } catch (_: Exception) {}
 
                 if (!resolved) {
-                    // Strip /home/user/ for chroot
                     val relative = path.replace(Regex("^/home/[^/]+/"), "/")
                     Log.w(TAG, "Absolute path failed, trying: $relative")
                     try {
@@ -119,16 +113,13 @@ class SftpDataSource : BaseDataSource(/* isNetwork = */ true) {
 
             val fileSize = cachedFileSize
 
-            // Close previous stream
             try { inputStream?.close() } catch (_: Exception) {}
             inputStream = null
 
-            // Try reusing channel first (fast path), reconnect if stale
             ch = channel!!
             try {
                 inputStream = ch.get(cachedPath, null, dataSpec.position)
             } catch (_: Exception) {
-                // Channel stale after interrupted read — reconnect
                 Log.w(TAG, "Channel stale, reconnecting...")
                 try { ch.disconnect() } catch (_: Exception) {}
                 val fresh = session!!.openChannel("sftp") as ChannelSftp
@@ -181,7 +172,6 @@ class SftpDataSource : BaseDataSource(/* isNetwork = */ true) {
                 opened = false
                 transferEnded()
             }
-            // Keep session/channel alive for seek reuse
         }
     }
 

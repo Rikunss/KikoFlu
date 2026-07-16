@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -62,6 +61,7 @@ class SubtitleLibraryPriorityNotifier
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_preferenceKey, state.value);
     } catch (e) {
+      LogService.instance.warning('[SubtitleLibPriority] Failed to save: $e', tag: 'Settings');
     }
   }
 }
@@ -289,6 +289,7 @@ class AudioFormatPreferenceNotifier
       final order = state.priority.map((format) => format.extension).toList();
       await prefs.setStringList(_preferenceKey, order);
     } catch (e) {
+      LogService.instance.warning('[AudioFormatPref] Failed to save: $e', tag: 'Settings');
     }
   }
 
@@ -399,6 +400,7 @@ class PrivacyModeSettingsNotifier extends StateNotifier<PrivacyModeSettings> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(key, value);
     } catch (e) {
+      LogService.instance.warning('[PrivacyMode] Failed to save preference: $e', tag: 'Settings');
     }
   }
 }
@@ -776,7 +778,9 @@ class ReplayGainNotifier extends StateNotifier<ReplayGainSettings> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_enabledKey, enabled);
-    } catch (e) {}
+    } catch (e) {
+      LogService.instance.warning('[ReplayGain] Failed to save enabled: $e', tag: 'Settings');
+    }
   }
 
   Future<void> setPreampDb(double db) async {
@@ -784,7 +788,9 @@ class ReplayGainNotifier extends StateNotifier<ReplayGainSettings> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble(_preampKey, state.preampDb);
-    } catch (e) {}
+    } catch (e) {
+      LogService.instance.warning('[ReplayGain] Failed to save preamp: $e', tag: 'Settings');
+    }
   }
 }
 
@@ -836,7 +842,9 @@ class VolumeNormalizationNotifier extends StateNotifier<VolumeNormalizationSetti
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_enabledKey, enabled);
-    } catch (e) {}
+    } catch (e) {
+      LogService.instance.warning('[VolumeNorm] Failed to save enabled: $e', tag: 'Settings');
+    }
   }
 
   Future<void> setTargetLevel(double db) async {
@@ -844,7 +852,9 @@ class VolumeNormalizationNotifier extends StateNotifier<VolumeNormalizationSetti
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble(_targetKey, state.targetLevelDb);
-    } catch (e) {}
+    } catch (e) {
+      LogService.instance.warning('[VolumeNorm] Failed to save target: $e', tag: 'Settings');
+    }
   }
 }
 

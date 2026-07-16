@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/log_service.dart';
 
 /// 搜索历史记录项
 class SearchHistoryItem {
@@ -114,6 +115,7 @@ class SearchHistoryNotifier extends StateNotifier<SearchHistoryState> {
       final jsonList = state.items.map((e) => e.toJson()).toList();
       await prefs.setString(_preferenceKey, json.encode(jsonList));
     } catch (e) {
+      LogService.instance.warning('[SearchHistory] Failed to save history: $e', tag: 'Settings');
     }
   }
 

@@ -33,7 +33,6 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
         }
     }
 
-    // ── Delegated managers ───────────────────────────────────────────────
     private val playerManager = ExoPlayerManager(context)
     private val usbRouter = UsbAudioRouter(context)
     private val positionPusher = NativePositionPusher { channel }
@@ -43,7 +42,6 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
     private var lastPlayUrl: String? = null
     private var lastPlayPositionMs: Long = 0L
 
-    // ── SharedPreferences for persisting USB routing state ──
     private val prefs: SharedPreferences = context.getSharedPreferences(
         "kikoeru_hires_prefs",
         Context.MODE_PRIVATE
@@ -57,17 +55,21 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
     fun attachChannel(methodChannel: MethodChannel) {
         this.channel = methodChannel
         usbRouter.attach(methodChannel, playerManager)
-        // Set up player callbacks once on attach (not on every play() call)
         setupPlayerCallbacks()
     }
 
-    // ── Public API called from MainActivity ──
 
     fun autoRouteToUsbDac(device: android.hardware.usb.UsbDevice) {
         usbRouter.autoRouteToUsbDac(device)
     }
 
     fun onUsbDeviceDetached() {
+        val pos = playerManager.exoPlayer?.currentPosition?.toLong() ?: 0L
+        if (pos > 0) {
+            android.util.Log.i("HiResAudio",
+                "USB DAC detached — saving position ${pos}ms before release")
+            lastPlayPositionMs = pos
+        }
         usbRouter.onUsbDeviceDetached()
     }
 
@@ -85,8 +87,6 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
 
     fun setUseLibusbSink(enabled: Boolean) {
         playerManager.setUseLibusbSink(enabled)
-        // Persist the user's preference so MainActivity can check
-        // before showing USB permission dialog on device attach/startup.
         prefs.edit().putBoolean(KEY_USB_LIBUSB_ROUTING, enabled).apply()
         android.util.Log.i("HiResAudio",
             "USB libusb routing preference saved: $enabled")
@@ -101,7 +101,6 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
         return prefs.getBoolean(KEY_USB_LIBUSB_ROUTING, false)
     }
 
-    // ── Player event callbacks — forward to MethodChannel ──
 
     private fun setupPlayerCallbacks() {
         playerManager.onPlaybackStateChanged = { playing ->
@@ -149,21 +148,28 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                 val url = call.argument<String>("url") ?: ""
                 val sampleRate = call.argument<Int>("sampleRate") ?: 0
                 val bitDepth = call.argument<Int>("bitDepth") ?: 0
+                val startPositionMs = call.argument<Int>("startPositionMs") ?: 0
 
                 if (url.isEmpty()) {
                     result.error("INVALID_ARGS", "url is required", null)
                     return
                 }
 
+                val positionToUse: Long = when {
+                    startPositionMs > 0 -> startPositionMs.toLong()
+                    lastPlayPositionMs > 0 && url == lastPlayUrl -> lastPlayPositionMs
+                    else -> 0L
+                }
+
                 playerManager.currentSampleRate = sampleRate
                 playerManager.currentBitDepth = bitDepth
                 lastPlayUrl = url
+                lastPlayPositionMs = positionToUse
                 positionPusher.resetDurationCache()
 
                 try {
                     setupPlayerCallbacks()
                     playerManager.releasePlayer()
-                    lastPlayPositionMs = 0L
                     val player = playerManager.getOrCreatePlayer()
 
                     val mediaItem = MediaItem.Builder()
@@ -175,6 +181,13 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                         android.util.Log.i("HiResAudio", "Target sample rate: ${sampleRate}Hz")
                     }
                     player.prepare()
+                    if (positionToUse > 0) {
+                        android.util.Log.i(
+                            "HiResAudio",
+                            "Starting from ${positionToUse}ms (explicit=$startPositionMs, saved=${lastPlayPositionMs})"
+                        )
+                        player.seekTo(positionToUse)
+                    }
                     player.play()
 
                     positionPusher.start()
@@ -185,12 +198,19 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
             }
             "pause" -> {
                 android.util.Log.i("HiResAudio", "→ Dart pause() called (exoPlayer=${playerManager.exoPlayer != null})")
+                val pos = playerManager.exoPlayer?.currentPosition?.toLong() ?: 0L
+                if (pos > 0) {
+                    lastPlayPositionMs = pos
+                }
                 positionPusher.stop()
                 playerManager.exoPlayer?.pause()
                 result.success(true)
             }
             "resume" -> {
-                android.util.Log.i("HiResAudio", "→ Dart resume() called (exoPlayer=${playerManager.exoPlayer != null}, lastPlayUrl=${lastPlayUrl != null})")
+                android.util.Log.i(
+                    "HiResAudio",
+                    "→ Dart resume() called (exoPlayer=${playerManager.exoPlayer != null}, lastPlayUrl=${lastPlayUrl != null}, lastPlayPositionMs=${lastPlayPositionMs}ms)"
+                )
                 if (playerManager.exoPlayer != null) {
                     playerManager.exoPlayer?.play()
                     positionPusher.start()
@@ -208,7 +228,10 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                         player.setMediaItem(mediaItem)
                         player.prepare()
                         if (lastPlayPositionMs > 0) {
-                            android.util.Log.i("HiResAudio", "Resuming from ${lastPlayPositionMs}ms")
+                            android.util.Log.i(
+                                "HiResAudio",
+                                "Resuming cold path from ${lastPlayPositionMs}ms"
+                            )
                             player.seekTo(lastPlayPositionMs)
                         }
                         player.play()
@@ -250,7 +273,6 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                 playerManager.currentSampleRate = call.argument<Int>("sampleRate") ?: 0
                 result.success(true)
             }
-            // ── USB DAC Bypass methods ──
             "getUsbAudioDevices" -> {
                 result.success(usbRouter.refreshUsbDevices())
             }
@@ -276,7 +298,6 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
             "isUsbRouted" -> {
                 result.success(usbRouter.isRoutingToUsbDac)
             }
-            // ── PreferredMixerAttributes methods (Android 14+) ──
             "setPreferredMixerAttributes" -> {
                 val deviceId = call.argument<Int>("deviceId") ?: -1
                 val sampleRate = call.argument<Int>("sampleRate") ?: 0
@@ -290,7 +311,6 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
             "getPreferredMixerAttributes" -> {
                 result.success(usbRouter.getMixerAttributes())
             }
-            // ── Hardware Sample Rate methods ──
             "getOutputSampleRate" -> {
                 val nativeRate = android.media.AudioTrack.getNativeOutputSampleRate(
                     android.media.AudioManager.STREAM_MUSIC
@@ -298,7 +318,6 @@ class HiResAudioPlugin private constructor(private val context: Context) : Metho
                 result.success(nativeRate)
             }
             "getHardwareSampleRate" -> {
-                // Query the active output device for its native sample rate
                 var hardwareRate = 0
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
                 val devices = audioManager?.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)

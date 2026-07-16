@@ -3,18 +3,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
 import '../models/download_task.dart';
 import '../utils/file_icon_utils.dart';
-import 'audio_conversion_service.dart';
 import 'cache_service.dart';
 import 'download_conversion_hook.dart';
 import 'download_cover_processor.dart';
-import 'download_path_service.dart';
 import 'download_task_persistence.dart';
 import 'log_service.dart';
-import 'storage_service.dart';
 import 'cookie_service.dart';
 
 final _log = LogService.instance;

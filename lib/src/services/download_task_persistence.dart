@@ -3,12 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/download_task.dart';
 import '../utils/file_icon_utils.dart';
-import 'cache_service.dart';
 import 'download_path_service.dart';
 import 'kikoeru_api_service.dart';
 import 'log_service.dart';

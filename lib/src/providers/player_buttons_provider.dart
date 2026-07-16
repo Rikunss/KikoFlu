@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/log_service.dart';
 
 /// 播放器按钮类型
 enum PlayerButtonType {
@@ -167,6 +168,7 @@ class PlayerButtonsConfigController extends StateNotifier<PlayerButtonsConfig> {
       final orderString = state.buttonOrder.map((type) => type.key).join(',');
       await prefs.setString(key, orderString);
     } catch (e) {
+      LogService.instance.warning('[PlayerButtons] Failed to save config: $e', tag: 'Settings');
     }
   }
 

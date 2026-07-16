@@ -14,8 +14,6 @@ import '../../services/hi_res_audio_service.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/exclusive_audio_service.dart';
 import '../../providers/exclusive_audio_provider.dart';
-import '../../providers/usb_dac_provider.dart';
-import '../../services/usb_dac_audio_manager.dart';
 
 /// Shows the redesigned Audio Information sheet with glassmorphism,
 /// staggered entry animations, and DraggableScrollableSheet.

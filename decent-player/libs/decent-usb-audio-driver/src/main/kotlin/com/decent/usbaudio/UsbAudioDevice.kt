@@ -66,7 +66,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
         for (device in usbManager.deviceList.values) {
             for (i in 0 until device.interfaceCount) {
                 val iface = device.getInterface(i)
-                // USB Audio Class: class=1 (Audio), subclass=2 (AudioStreaming)
                 if (iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO &&
                     iface.interfaceSubclass == 2) {
                     Log.i(TAG, "Found USB audio device: ${device.productName} " +
@@ -143,18 +142,15 @@ class UsbAudioDevice private constructor(private val context: Context) {
     private var cachedDeviceInfo: UsbAudioDeviceInfo? = null
 
     fun openDevice(device: UsbDevice): UsbAudioDeviceInfo? {
-        // Guard: must have USB permission for this device
         if (!usbManager.hasPermission(device)) {
             Log.e(TAG, "Cannot open device ${device.productName}: USB permission not granted")
             return null
         }
-        // Return cached info if already open with valid connection
         val cached = cachedDeviceInfo
         if (cached != null && connection != null) {
             Log.i(TAG, "Device already open, reusing fd=${cached.fd}")
             return cached
         }
-        // Close any stale connection before opening new
         closeDevice()
         val conn = usbManager.openDevice(device)
         if (conn == null) {
@@ -162,28 +158,24 @@ class UsbAudioDevice private constructor(private val context: Context) {
             return null
         }
 
-        // Find the AudioStreaming interface and its endpoints
         var streamingInterface: UsbInterface? = null
         var endpointOut = -1
         var endpointFeedback = -1
         var maxPacketSize = 0
         var altSettingCount = 0
 
-        // Count alternate settings for the streaming interface
         for (i in 0 until device.interfaceCount) {
             val iface = device.getInterface(i)
             if (iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO &&
                 iface.interfaceSubclass == 2) {
                 altSettingCount++
 
-                // Look for endpoints in non-zero alt settings
                 if (iface.endpointCount > 0 && streamingInterface == null) {
                     streamingInterface = iface
 
                     for (e in 0 until iface.endpointCount) {
                         val ep = iface.getEndpoint(e)
                         when {
-                            // Isochronous OUT endpoint (audio data)
                             ep.type == UsbConstants.USB_ENDPOINT_XFER_ISOC &&
                                     ep.direction == UsbConstants.USB_DIR_OUT -> {
                                 endpointOut = ep.address
@@ -191,7 +183,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
                                 Log.i(TAG, "Found ISO OUT endpoint: address=0x${ep.address.toString(16)}, " +
                                         "maxPacket=$maxPacketSize, interval=${ep.interval}")
                             }
-                            // Isochronous IN endpoint (feedback)
                             ep.type == UsbConstants.USB_ENDPOINT_XFER_ISOC &&
                                     ep.direction == UsbConstants.USB_DIR_IN -> {
                                 endpointFeedback = ep.address
@@ -210,7 +201,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
             return null
         }
 
-        // Claim the AudioControl interface (0) with force=true to disconnect kernel driver
         var audioControlInterfaceId = 0
         val controlInterface = (0 until device.interfaceCount)
                 .map { device.getInterface(it) }
@@ -222,9 +212,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
             Log.i(TAG, "Claimed AudioControl interface ${controlInterface.id} force=true: $claimed")
         }
 
-        // Claim the AudioStreaming interface with force=true to disconnect kernel driver (snd-usb-audio)
-        // NOTE: We claim the zero-bandwidth alt setting (alt=0). The actual streaming alt setting
-        // will be activated later via setInterface() which allocates USB bandwidth.
         val claimed = conn.claimInterface(streamingInterface, true)
         Log.i(TAG, "Claimed AudioStreaming interface ${streamingInterface.id} force=true: $claimed " +
                 "(alt=${streamingInterface.alternateSetting}, endpoints=${streamingInterface.endpointCount})")
@@ -235,7 +222,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
         }
         claimedInterface = streamingInterface
 
-        // Force alt=0 to stop any streaming left by kernel driver
         val zeroAlt = (0 until device.interfaceCount)
                 .map { device.getInterface(it) }
                 .firstOrNull { it.interfaceClass == UsbConstants.USB_CLASS_AUDIO &&
@@ -246,7 +232,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
         }
         Thread.sleep(100)
 
-        // Log all available alt settings for debugging
         for (i in 0 until device.interfaceCount) {
             val iface = device.getInterface(i)
             if (iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO && iface.interfaceSubclass == 2) {
@@ -266,13 +251,11 @@ class UsbAudioDevice private constructor(private val context: Context) {
         connection = conn
         currentDevice = device
 
-        // Auto-detect Clock Source ID and best alt setting from USB descriptors
         val clockSourceId = parseClockSourceId(conn)
         val (bestAlt, bestBits) = parseBestAltSetting(conn)
         Log.i(TAG, "Auto-detected: clockSourceId=0x${clockSourceId.toString(16)}, " +
                 "bestAlt=$bestAlt, bestBits=$bestBits")
 
-        // Full USB descriptor dump for debugging SET_CUR format
         dumpRawDescriptors(conn)
 
         val info = UsbAudioDeviceInfo(
@@ -304,17 +287,11 @@ class UsbAudioDevice private constructor(private val context: Context) {
 
         Log.i(TAG, "Performing REAL USBDEVFS_RESET on fd=$fd...")
 
-        // Real USB port reset via native ioctl — resets DAC clock state
         val ret = UsbAudioStream.nativeUsbReset(fd)
         Log.i(TAG, "USBDEVFS_RESET result: $ret")
 
-        // Reset releases all interface claims. The fd remains valid.
-        // Clear cache so openDevice re-claims, but KEEP the connection
-        // so the same fd is reused (native claims are on this fd).
         cachedDeviceInfo = null
         claimedInterface = null
-        // DO NOT close connection — the fd from reset+native claim must be reused
-        // The next openDevice() will see connection != null and skip re-opening
     }
 
     /**
@@ -339,18 +316,14 @@ class UsbAudioDevice private constructor(private val context: Context) {
 
             val bDescriptorType = raw[i + 1].toInt() and 0xFF
 
-            // Interface descriptor (0x04)
             if (bDescriptorType == 0x04 && bLength >= 9) {
                 val bInterfaceClass = raw[i + 5].toInt() and 0xFF
                 val bInterfaceSubClass = raw[i + 6].toInt() and 0xFF
-                // AudioControl = class 1, subclass 1
                 inAudioControl = (bInterfaceClass == 1 && bInterfaceSubClass == 1)
             }
 
-            // CS_INTERFACE descriptor (0x24) inside AudioControl
             if (inAudioControl && bDescriptorType == 0x24 && bLength >= 3) {
                 val bDescriptorSubtype = raw[i + 2].toInt() and 0xFF
-                // CLOCK_SOURCE = 0x0A
                 if (bDescriptorSubtype == 0x0A && bLength >= 5) {
                     val bClockID = raw[i + 3].toInt() and 0xFF
                     Log.i(TAG, "parseClockSourceId: found CLOCK_SOURCE bClockID=0x${bClockID.toString(16)}")
@@ -394,7 +367,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
 
             val bDescriptorType = raw[i + 1].toInt() and 0xFF
 
-            // Interface descriptor (0x04)
             if (bDescriptorType == 0x04 && bLength >= 9) {
                 val bInterfaceClass = raw[i + 5].toInt() and 0xFF
                 val bInterfaceSubClass = raw[i + 6].toInt() and 0xFF
@@ -403,7 +375,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
                 if (inAudioStreaming) currentAlt = bAlternateSetting
             }
 
-            // CS_INTERFACE (0x24) in AudioStreaming — Format Type I (subtype 0x02)
             if (inAudioStreaming && bDescriptorType == 0x24 && bLength >= 6) {
                 val bDescriptorSubtype = raw[i + 2].toInt() and 0xFF
                 if (bDescriptorSubtype == 0x02) {
@@ -442,14 +413,12 @@ class UsbAudioDevice private constructor(private val context: Context) {
             return Pair(info.bestAltSetting, info.bestBitDepth)
         }
 
-        // Exact match
         val exact = parsedAltSettings.firstOrNull { it.second == targetBitDepth }
         if (exact != null) {
             Log.i(TAG, "findAltSettingForBitDepth($targetBitDepth): exact match alt=${exact.first}")
             return exact
         }
 
-        // Next higher
         val higher = parsedAltSettings
                 .filter { it.second > targetBitDepth }
                 .minByOrNull { it.second }
@@ -458,7 +427,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
             return higher
         }
 
-        // Fallback to best
         val best = parsedAltSettings.maxByOrNull { it.second } ?: Pair(1, 16)
         Log.i(TAG, "findAltSettingForBitDepth($targetBitDepth): fallback to best alt=${best.first} bits=${best.second}")
         return best
@@ -503,14 +471,12 @@ class UsbAudioDevice private constructor(private val context: Context) {
 
         val uac2InterfaceId = info.audioControlInterfaceId
 
-        // ── Attempt 1: UAC2 (Clock Source entity) ──
         val data4 = ByteArray(4)
         data4[0] = (sampleRateHz and 0xFF).toByte()
         data4[1] = ((sampleRateHz shr 8) and 0xFF).toByte()
         data4[2] = ((sampleRateHz shr 16) and 0xFF).toByte()
         data4[3] = ((sampleRateHz shr 24) and 0xFF).toByte()
 
-        // Use auto-detected clock source ID from USB descriptors.
         val detectedId = info.clockSourceId
         val clockSourceIds = if (detectedId > 0) {
             intArrayOf(detectedId)
@@ -520,19 +486,11 @@ class UsbAudioDevice private constructor(private val context: Context) {
                     0x10, 0x11, 0x12, 0x20, 0x21, 0x22)
         }
 
-        // UAC2 correct wIndex: (ClockSourceEntityID << 8) | AudioControlInterfaceNumber
-        // The AudioControl interface number is stored during openDevice().
-        // For UAC2, CR (Control Request) recipient is INTERFACE (0x21/0xA1), and
-        // wIndex encodes the entity ID in the high byte and interface number in low byte.
         Log.i(TAG, "setSampleRate($sampleRateHz Hz): UAC2 attempt using " +
                 "interfaceId=$uac2InterfaceId, clockSourceIds=${clockSourceIds.joinToString(",") {"0x" + it.toString(16)}}, " +
                 "data4Bytes=[${data4.joinToString(",") {"0x%02X".format(it.toInt() and 0xFF)}}]")
 
         for (csId in clockSourceIds) {
-            // FIXED: wIndex = (entityId << 8) | audioControlInterfaceId
-            // Previously was (entityId << 8) | 0 which sent to interface 0 instead of the
-            // actual AudioControl interface. For TempoTec HD USB AUDIO, AudioControl is
-            // interface 1, not 0 — so wIndex was wrong (0x0100 instead of 0x0101).
             val wIndex = (csId shl 8) or uac2InterfaceId
             val ret = conn.controlTransfer(
                     0x21,    // bmRequestType: Host-to-Device, Class, Interface
@@ -552,14 +510,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
             }
         }
 
-        // ── Attempt 2: UAC1 fallback (only for UAC1 devices / no AudioControl) ──
-        // When audioControlInterfaceId > 0, we detected a real UAC2 device and the
-        // Clock Source entity SET_CUR above is the correct method. The UAC1 endpoint
-        // fallback is NOT used for UAC2 devices (verified: endpoint-based SET_CUR ACKs
-        // on TempoTec but doesn't actually lock the PLL at base rates 44.1k/48k).
-        //
-        // When audioControlInterfaceId == 0, it's a UAC1 device or no AudioControl
-        // interface was found — use endpoint-based SET_CUR as fallback.
         if (uac2InterfaceId == 0) {
             val data3 = ByteArray(3)
             data3[0] = (sampleRateHz and 0xFF).toByte()
@@ -585,10 +535,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
             }
             Log.w(TAG, "setSampleRate($sampleRateHz Hz): UAC1 endpoint fallback FAILED")
         } else {
-            // UAC2 device — UAC1 endpoint fallback NOT used.
-            // Confirmed working: UAC2 Clock Source SET_CUR with correct wIndex=0x101
-            // returns ret=4 and readClockValid=true for all rates including 44.1k/48k,
-            // so the endpoint-based fallback is unnecessary and potentially harmful.
             Log.w(TAG, "setSampleRate($sampleRateHz Hz): UAC2 all attempts failed " +
                     "(interfaceId=$uac2InterfaceId, csIds=" +
                     "${clockSourceIds.joinToString(",") {"0x" + it.toString(16)}}) — " +
@@ -619,7 +565,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
         val clockSourceIds = if (detectedId > 0) intArrayOf(detectedId)
                 else intArrayOf(0x05, 0x09, 0x0A, 0x0B, 0x0C, 0x28, 0x29)
         for (csId in clockSourceIds) {
-            // FIXED: wIndex = (entityId << 8) | audioControlInterfaceId
             val wIndex = (csId shl 8) or uac2InterfaceId
             val ret = conn.controlTransfer(
                     0xA1,    // bmRequestType: Device-to-Host, Class, Interface
@@ -672,7 +617,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
         val clockSourceIds = if (detectedId > 0) intArrayOf(detectedId)
                 else intArrayOf(0x05, 0x09, 0x0A, 0x0B, 0x0C, 0x28, 0x29)
         for (csId in clockSourceIds) {
-            // FIXED: wIndex = (entityId << 8) | audioControlInterfaceId
             val wIndex = (csId shl 8) or uac2InterfaceId
             val ret = conn.controlTransfer(
                     0xA1,    // bmRequestType: Device-to-Host, Class, Interface
@@ -809,7 +753,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
                         sb.append("[CS_IFACE] subtype=$subName ")
 
                         if (bDescriptorSubtype == 0x0A && bLength >= 5) {
-                            // CLOCK_SOURCE (UAC2)
                             val bClockID = raw[i + 3].toInt() and 0xFF
                             val bmAttributes = raw[i + 4].toInt() and 0xFF
                             sb.append("bClockID=0x${bClockID.toString(16)} ")
@@ -818,21 +761,14 @@ class UsbAudioDevice private constructor(private val context: Context) {
                                 val bmControls = (raw[i + 6].toInt() and 0xFF) shl 8 or (raw[i + 5].toInt() and 0xFF)
                                 sb.append(" controls=0x${bmControls.toString(16)}")
                             }
-                            // Per UAC2 spec, offset 8 is iClockSource (string index), NOT frequency.
-                            // dClockFrequency is not a standard field.
                         } else if (bDescriptorSubtype == 0x05 && inAudioControl && bLength >= 13) {
-                            // PROCESSING_UNIT: may contain clock source ID
                             val wProcessType = (raw[i + 5].toInt() and 0xFF) shl 8 or (raw[i + 4].toInt() and 0xFF)
                             sb.append("wProcessType=0x${wProcessType.toString(16)}")
                         } else if (bDescriptorSubtype == 0x02 && inAudioStreaming && bLength >= 6) {
-                            // FORMAT_TYPE
                             val bSubslotSize = raw[i + 4].toInt() and 0xFF
                             val bBitResolution = raw[i + 5].toInt() and 0xFF
                             sb.append("alt=$currentAlt subslot=$bSubslotSize bit=$bBitResolution")
 
-                            // Look for sample rates in the format descriptor
-                            // Audio Format Type I: bLength may include sample rate table
-                            // Usually: 6 bytes header + 1 byte bSamFreqType + N*3 bytes tSamFreq
                             if (bLength >= 7) {
                                 val bSamFreqType = raw[i + 6].toInt() and 0xFF
                                 sb.append(" freqCount=$bSamFreqType ")
@@ -853,7 +789,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
                                 }
                             }
                         } else if (bDescriptorSubtype == 0x01 && inAudioControl && bLength >= 9) {
-                            // AC_HEADER — tells us UAC version
                             val bcdADC = (raw[i + 4].toInt() and 0xFF) shl 8 or (raw[i + 3].toInt() and 0xFF)
                             val uacVer = when (bcdADC) {
                                 0x0100 -> "UAC 1.0"
@@ -866,7 +801,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
                                 val wTotalLength = (raw[i + 6].toInt() and 0xFF) shl 8 or (raw[i + 5].toInt() and 0xFF)
                                 sb.append(" wTotalLen=$wTotalLength")
                             }
-                            // Helpful hint for SET_CUR debugging
                             if (bcdADC == 0x0100) {
                                 sb.append(" ← UAC 1.0 DAC! UAC2 clock source SET_CUR will FAIL. Use UAC1 endpoint-based format.")
                             }
@@ -885,7 +819,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
                     Log.i(TAG, "[CS_ENDP] subtype=$subName len=$bLength: $hex")
                 }
                 else -> {
-                    // Skip other descriptor types
                 }
             }
 
@@ -903,7 +836,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
         val conn = connection ?: return false
         val device = currentDevice ?: return false
 
-        // Find the UsbInterface with the matching alt setting
         for (i in 0 until device.interfaceCount) {
             val iface = device.getInterface(i)
             if (iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO &&
@@ -919,7 +851,6 @@ class UsbAudioDevice private constructor(private val context: Context) {
         Log.w(TAG, "setAltSetting($altSetting): no matching UsbInterface found, " +
                 "trying all AudioStreaming interfaces...")
 
-        // Fallback: try any AudioStreaming interface with matching alt
         for (i in 0 until device.interfaceCount) {
             val iface = device.getInterface(i)
             if (iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO &&

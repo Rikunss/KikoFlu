@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/smart_playlist.dart';
 import '../services/storage_service.dart';
+import '../services/log_service.dart';
 import 'works_provider.dart';
 
 /// Provider for the layout type of smart playlist detail screens.
@@ -56,6 +57,7 @@ class SmartPlaylistsNotifier extends StateNotifier<List<SmartPlaylist>> {
       final jsonString = jsonEncode(state.map((p) => p.toJson()).toList());
       await StorageService.setString(_storageKey, jsonString);
     } catch (e) {
+      LogService.instance.warning('[SmartPlaylists] Failed to save: $e', tag: 'Settings');
     }
   }
 

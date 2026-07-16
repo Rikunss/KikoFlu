@@ -84,7 +84,6 @@ class KikoFluWidgetProvider : AppWidgetProvider() {
     ) {
         val views = RemoteViews(context.packageName, R.layout.widget_layout)
 
-        // Read widget state from home_widget shared prefs
         val prefs = context.getSharedPreferences(
             "home_widget_prefs",
             Context.MODE_PRIVATE
@@ -96,14 +95,12 @@ class KikoFluWidgetProvider : AppWidgetProvider() {
         views.setTextViewText(R.id.widget_track_title, title)
         views.setTextViewText(R.id.widget_track_artist, artist)
 
-        // Set play/pause icon
         if (isPlaying) {
             views.setImageViewResource(R.id.widget_play_pause, android.R.drawable.ic_media_pause)
         } else {
             views.setImageViewResource(R.id.widget_play_pause, android.R.drawable.ic_media_play)
         }
 
-        // Set up PendingIntents for control buttons
         val playPauseIntent = Intent(context, KikoFluWidgetProvider::class.java).apply {
             action = ACTION_PLAY_PAUSE
         }
@@ -143,7 +140,6 @@ class KikoFluWidgetProvider : AppWidgetProvider() {
             )
         )
 
-        // Open app on background tap
         val openIntent = Intent(context, KikoFluWidgetProvider::class.java).apply {
             action = ACTION_OPEN_APP
         }

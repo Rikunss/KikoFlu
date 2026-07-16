@@ -8269,4 +8269,150 @@ class SZhHant extends SZh {
 
   @override
   String get appLockAutoLockMinutes => '分鐘';
+
+  @override
+  String get importWork => 'Import';
+
+  @override
+  String get selectImportFolder => 'Select Folder to Import';
+
+  @override
+  String get importDialogTitle => 'Import Local Work';
+
+  @override
+  String importDialogMessage(Object path) {
+    return 'Import files from:\n$path';
+  }
+
+  @override
+  String get workNameTitle => 'Work Name';
+
+  @override
+  String get enterWorkName => 'Enter work name...';
+
+  @override
+  String get importAction => 'Import';
+
+  @override
+  String get importingWork => 'Importing work...';
+
+  @override
+  String get importComplete => 'Import complete';
+
+  @override
+  String importFailed(Object error) {
+    return 'Import failed: $error';
+  }
+
+  @override
+  String get importedWorkDeleteNotSupported =>
+      'Cannot delete files from imported works. Delete the source files directly.';
+
+  @override
+  String get importSingleFolder => 'Single Folder';
+
+  @override
+  String get importSingleFolderDesc => 'Pick one folder and set a custom title';
+
+  @override
+  String get importMultipleFolders => 'Multiple Folders';
+
+  @override
+  String get importMultipleFoldersDesc =>
+      'Each subfolder becomes one work (folder name = title)';
+
+  @override
+  String get selectImportFolderSingle => 'Select a folder to import';
+
+  @override
+  String get selectImportFolderMultiple =>
+      'Select a folder containing sub-works';
+
+  @override
+  String get importingMultipleWorks => 'Importing works...';
+
+  @override
+  String importMultipleComplete(Object count) {
+    return 'Imported $count works successfully';
+  }
+
+  @override
+  String importPartialComplete(Object count, Object total) {
+    return 'Imported $count/$total works';
+  }
+
+  @override
+  String get aiFeatures => 'AI Features';
+
+  @override
+  String get aiFeaturesSubtitle =>
+      'AI-powered transcription & lyrics generation';
+
+  @override
+  String get aiModelNotInstalled => 'AI Pack not installed';
+
+  @override
+  String get aiModelInstalled => 'AI Pack installed';
+
+  @override
+  String aiModelName(Object name) {
+    return 'Model: $name';
+  }
+
+  @override
+  String aiModelSize(Object size) {
+    return 'Size: $size';
+  }
+
+  @override
+  String get aiDownloadModel => 'Download Model';
+
+  @override
+  String aiDownloadProgress(Object percent) {
+    return 'Downloading... $percent%';
+  }
+
+  @override
+  String get aiDeleteModel => 'Delete Model';
+
+  @override
+  String get aiDeleteModelConfirm =>
+      'Are you sure you want to delete the AI model?';
+
+  @override
+  String get aiTranscribing => 'Transcribing...';
+
+  @override
+  String get aiTranscribeComplete => 'Transcription complete';
+
+  @override
+  String aiTranscribeFailed(Object error) {
+    return 'Transcription failed: $error';
+  }
+
+  @override
+  String get aiGenerateLyrics => 'Generate AI Lyrics';
+
+  @override
+  String get aiModelRequired =>
+      'AI model not installed. Please download it first in Settings → AI Features.';
+
+  @override
+  String get aiModelDownloadRequired => 'AI Pack Required';
+
+  @override
+  String aiModelDownloadRequiredDesc(Object size) {
+    return 'AI Pack is not installed. Download Whisper Base Q5 ($size) model to generate lyrics.';
+  }
+
+  @override
+  String get aiDownload => 'Download';
+
+  @override
+  String aiModelInstalledWithSize(Object name, Object size) {
+    return 'Installed: $name ($size)';
+  }
+
+  @override
+  String get aiStorageUsed => 'Storage Used';
 }

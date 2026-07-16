@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/log_service.dart';
 import '../services/cache_service.dart';
-import '../services/storage_service.dart';
 import '../services/cookie_service.dart';
 import '../../l10n/app_localizations.dart';
 import 'scrollable_appbar.dart';

@@ -21,18 +21,15 @@ import com.decent.usbaudio.UsbAudioDevice as DecentUsbAudioDevice
  */
 class UsbAudioRouter(private val context: Context) {
 
-    // USB DAC bypass (legacy AudioManager routing)
     var usbBypassEnabled: Boolean = false
     var isRoutingToUsbDac: Boolean = false
         private set
     private var audioManager: AudioManager? = null
     private val usbAudioDeviceList = mutableListOf<AudioDeviceInfo>()
 
-    // Last-played URL and position for auto-resume after USB replug
     var lastPlayUrl: String? = null
     var lastPlayPositionMs: Long = 0L
 
-    // PreferredMixerAttributes (Android 14+ API for bit-perfect USB audio)
     private var lastRoutedDevice: AudioDeviceInfo? = null
     @Volatile
     private var mixerAttributesApplied: Boolean = false
@@ -53,8 +50,6 @@ class UsbAudioRouter(private val context: Context) {
         this.channel = channel
         this.playerManager = playerManager
         registerUsbCallback()
-        // Emit initial device state so activeOutputDeviceProvider has a value
-        // immediately instead of showing 'loading'.
         channel.invokeMethod("onOutputDeviceChanged", mapOf(
             "activeDeviceType" to getActiveOutputDeviceType()
         ))
@@ -66,7 +61,6 @@ class UsbAudioRouter(private val context: Context) {
         this.playerManager = null
     }
 
-    // AudioDeviceCallback for USB hotplug detection
     private val usbDeviceCallback = object : AudioDeviceCallback() {
         override fun onAudioDevicesAdded(addedDevices: Array<AudioDeviceInfo>) {
             val usbDevices = addedDevices.filter {
@@ -79,13 +73,10 @@ class UsbAudioRouter(private val context: Context) {
                 channel?.invokeMethod("onUsbDevicesChanged", mapOf(
                     "devices" to serializeUsbDevices()
                 ))
-                // Auto-route if bypass is enabled and no current routing
                 if (usbBypassEnabled && !isRoutingToUsbDac) {
                     routeToUsbDevice(usbDevices.first())
                 }
             }
-            // Fire general output device change for ALL audio device changes
-            // (headphones, Bluetooth, USB, speaker changes, etc.)
             channel?.invokeMethod("onOutputDeviceChanged", mapOf(
                 "activeDeviceType" to getActiveOutputDeviceType()
             ))
@@ -450,7 +441,6 @@ class UsbAudioRouter(private val context: Context) {
         return false
     }
 
-    // ── PreferredMixerAttributes methods ──
 
     /**
      * Apply preferred mixer attributes for a specific USB device.
@@ -509,7 +499,6 @@ class UsbAudioRouter(private val context: Context) {
         clearUsbRouting()
     }
 
-    // ── Private helpers ──
 
     private fun ensureAudioManager() {
         if (audioManager == null) {

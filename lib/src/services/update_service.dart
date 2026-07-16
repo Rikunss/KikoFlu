@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'log_service.dart';
 
 /// Service to check for app updates from GitHub releases
 class UpdateService {
@@ -83,6 +84,7 @@ class UpdateService {
         );
       }
     } catch (e) {
+      LogService.instance.warning('[Update] Check failed silently: $e', tag: 'Update');
     }
     return null;
   }
@@ -105,6 +107,7 @@ class UpdateService {
       return _compareVersions(currentVersion, lastCheckedVersion) < 0 &&
           lastCheckedVersion != lastNotifiedVersion;
     } catch (e) {
+      LogService.instance.warning('[Update] shouldShowRedDot failed: $e', tag: 'Update');
       return false;
     }
   }
@@ -118,6 +121,7 @@ class UpdateService {
         await prefs.setString(_keyLastNotifiedVersion, lastCheckedVersion);
       }
     } catch (e) {
+      LogService.instance.warning('[Update] markAsNotified failed: $e', tag: 'Update');
     }
   }
 
@@ -149,6 +153,7 @@ class UpdateService {
       await prefs.remove(_keyLastNotifiedVersion);
       await prefs.remove(_keyLastCheckTime);
     } catch (e) {
+      LogService.instance.warning('[Update] markAsNotified failed: $e', tag: 'Update');
     }
   }
 }

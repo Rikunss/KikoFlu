@@ -327,6 +327,7 @@ class SubtitleLibraryService {
                 normalizedName: _computeNormalizedName(fileName),
               ));
             } catch (e) {
+              _log.warning('[SubtitleLib] Failed to process file in scan: ${entity.path}, $e', tag: 'SubtitleLibrary');
             }
           }
         }

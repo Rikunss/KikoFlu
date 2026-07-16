@@ -20,7 +20,6 @@ import '../providers/settings_provider.dart';
 import '../services/download_service.dart';
 import '../services/cache_service.dart';
 import '../services/translation_service.dart';
-import '../services/subtitle_library_service.dart';
 import '../utils/file_icon_utils.dart';
 import '../utils/snackbar_util.dart';
 import 'responsive_dialog.dart';

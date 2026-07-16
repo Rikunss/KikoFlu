@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/log_service.dart';
 
 /// "我的"界面标签页显示设置
 class MyTabsDisplaySettings {
@@ -81,6 +82,7 @@ class MyTabsDisplaySettingsNotifier
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(key, value);
     } catch (e) {
+      LogService.instance.warning('[MyTabsDisplay] Failed to save setting $key: $e', tag: 'Settings');
     }
   }
 }

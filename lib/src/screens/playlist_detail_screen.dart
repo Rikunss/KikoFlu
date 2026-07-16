@@ -5,7 +5,6 @@ import '../providers/playlist_detail_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/works_provider.dart';
 import '../models/work.dart';
-import '../services/storage_service.dart';
 import '../services/cookie_service.dart';
 import '../widgets/pagination_bar.dart';
 import '../widgets/scrollable_appbar.dart';

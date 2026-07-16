@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:gbk_codec/gbk_codec.dart';
 import 'package:charset/charset.dart';
+import '../services/log_service.dart';
 
 /// 文件编码检测和解码工具类
 /// 支持 UTF-8、UTF-16LE、UTF-16BE、GBK、Shift-JIS、Latin1 等编码
@@ -21,6 +22,7 @@ class EncodingUtils {
         }
         return (String.fromCharCodes(utf16Codes), 'UTF-16LE');
       } catch (e) {
+        LogService.instance.warning('[Encoding] UTF-16LE decode failed: $e', tag: 'Encoding');
       }
     }
 
@@ -36,6 +38,7 @@ class EncodingUtils {
         }
         return (String.fromCharCodes(utf16Codes), 'UTF-16BE');
       } catch (e) {
+        LogService.instance.warning('[Encoding] UTF-16BE decode failed: $e', tag: 'Encoding');
       }
     }
 
@@ -46,6 +49,7 @@ class EncodingUtils {
       try {
         return (utf8.decode(bytes.sublist(3)), 'UTF-8');
       } catch (e) {
+        LogService.instance.warning('[Encoding] UTF-8 BOM decode failed: $e', tag: 'Encoding');
       }
     }
 
@@ -53,6 +57,7 @@ class EncodingUtils {
       final decoded = utf8.decode(bytes, allowMalformed: false);
       return (decoded, 'UTF-8');
     } catch (e) {
+      LogService.instance.warning('[Encoding] UTF-8 decode failed: $e', tag: 'Encoding');
     }
 
     try {
@@ -65,6 +70,7 @@ class EncodingUtils {
         }
       }
     } catch (e) {
+      LogService.instance.warning('[Encoding] GBK decode failed: $e', tag: 'Encoding');
     }
 
     try {
@@ -77,6 +83,7 @@ class EncodingUtils {
         }
       }
     } catch (e) {
+      LogService.instance.warning('[Encoding] Shift-JIS decode failed: $e', tag: 'Encoding');
     }
 
     try {

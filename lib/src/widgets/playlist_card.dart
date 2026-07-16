@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/playlist.dart';
 import '../../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
-import '../services/storage_service.dart';
 import '../services/cookie_service.dart';
 import 'privacy_blur_cover.dart';
 

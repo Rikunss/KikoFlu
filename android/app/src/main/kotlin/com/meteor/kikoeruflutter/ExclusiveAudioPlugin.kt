@@ -35,7 +35,6 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
         @Volatile
         private var instance: ExclusiveAudioPlugin? = null
 
-        // Load the native AAudio library
         init {
             try {
                 System.loadLibrary("aaudio_exclusive")
@@ -50,7 +49,6 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
             }
         }
 
-        // ── Static JNI bridges (used by AaudioAudioSink) ──
         fun nativeCreatePlayerStatic(): Long = nativeCreatePlayerStaticImpl()
 
         fun nativeInitPlayerStatic(ptr: Long, sr: Int, ch: Int, bits: Int, deviceId: Int = 0): Boolean =
@@ -76,7 +74,6 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
 
         fun nativeResetFramesWritten(ptr: Long) = nativeResetFramesWrittenStaticImpl(ptr)
 
-        // Private native implementations (called by public statics)
         @JvmStatic private external fun nativeCreatePlayerStaticImpl(): Long
         @JvmStatic private external fun nativeInitPlayerStaticImpl(ptr: Long, sr: Int, ch: Int, bits: Int, deviceId: Int): Boolean
         @JvmStatic private external fun nativeStartPlayerStaticImpl(ptr: Long): Boolean
@@ -97,7 +94,6 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
         fun getAaudioDeviceId(): Int = instance?.aaudioDeviceId ?: 0
     }
 
-    // ── JNI external functions (implemented in jni_bridge.cpp) ──
     private external fun nativeCreatePlayer(): Long
     private external fun nativeInitPlayer(nativePtr: Long, sampleRate: Int, channels: Int, bitsPerSample: Int, deviceId: Int): Boolean
     private external fun nativeStartPlayer(nativePtr: Long): Boolean
@@ -107,17 +103,13 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
     private external fun nativeGetSampleRate(nativePtr: Long): Int
     private external fun nativeGetLatencyMs(nativePtr: Long): Double
 
-    // Native player state
     private var nativePlayerPtr: Long = 0L
     private var aaudioExclusiveGranted = false
     private var aaudioStreamActive = false
 
-    // USB DAC device ID for AAudio stream target
     @Volatile
     private var aaudioDeviceId: Int = 0
 
-    // Debounce: track when the last AAudio pre-check was performed
-    // to avoid rapid successive stream open/close cycles.
     private var lastPreCheckTimeMs: Long = 0L
 
     private var channel: MethodChannel? = null
@@ -128,12 +120,10 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
     private var originalMusicVolume = -1
     private var isAaudioAvailable = false
 
-    // Volume lock — periodically restore system volume
     private var volumeLockThread: Thread? = null
     @Volatile
     private var volumeLockRunning = false
 
-    // Broadcast receiver for volume changes
     private val volumeChangeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == "android.media.VOLUME_CHANGED_ACTION" && exclusiveModeEnabled) {
@@ -142,7 +132,6 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
         }
     }
 
-    // Audio device callback for USB hotplug — auto-detect and auto-target
     private val exclusiveDeviceCallback = object : AudioDeviceCallback() {
         override fun onAudioDevicesAdded(addedDevices: Array<AudioDeviceInfo>) {
             if (!exclusiveModeEnabled) return
@@ -155,7 +144,6 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
                 val name = device.productName ?: "USB DAC"
                 val id = device.id
                 android.util.Log.i("ExclusiveAudio", "USB DAC auto-detected: $name (#$id)")
-                // Auto-target AAudio to this USB DAC
                 setAaudioDeviceId(id)
                 channel?.invokeMethod("onUsbDeviceAttached", mapOf(
                     "deviceName" to name,
@@ -173,7 +161,6 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
             if (usbDevices.isNotEmpty()) {
                 val wasTargeted = usbDevices.any { it.id == aaudioDeviceId }
                 android.util.Log.i("ExclusiveAudio", "USB DAC detached: wasTargeted=$wasTargeted")
-                // Reset to default device if the removed device was our target
                 if (wasTargeted) {
                     setAaudioDeviceId(0)
                 }
@@ -208,28 +195,19 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
      * when multiple callers race to set the same device).
      */
     fun setAaudioDeviceId(deviceId: Int) {
-        // Skip if same device — prevents duplicate AAudio pre-checks
-        // when both auto-route and exclusive mode toggle race to set the same ID.
         if (deviceId == aaudioDeviceId) {
             android.util.Log.v("ExclusiveAudio", "setAaudioDeviceId: already set to #$deviceId, skipping")
             return
         }
         aaudioDeviceId = deviceId
         if (exclusiveModeEnabled) {
-            // Re-init the test AAudio stream with the new device ID
             initAaudioPlayer()
 
-            // Also recreate the AudioSink's native player with the new device ID
-            // so that actual playback content switches to the new USB DAC
-            // WITHOUT needing to restart ExoPlayer.
             AaudioAudioSink.currentSink?.recreateWithDeviceId(deviceId)
         }
     }
 
     private fun initAaudioPlayer() {
-        // Debounce: skip if called within 500ms of the last pre-check.
-        // Prevents rapid duplicate stream creation when multiple code paths
-        // (auto-target, bypass enable, exclusive toggle) fire in quick succession.
         val nowMs = System.currentTimeMillis()
         if (nowMs - lastPreCheckTimeMs < 500) {
             android.util.Log.v("ExclusiveAudio", "initAaudioPlayer: debounced (${nowMs - lastPreCheckTimeMs}ms since last)")
@@ -250,10 +228,6 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
                 return
             }
 
-            // Open a temporary test stream to check if exclusive mode is available.
-            // Always use FLOAT format for best compatibility with device sample rate.
-            // The stream is CLOSED immediately after detection — it does NOT coexist
-            // with the actual playback stream created by AaudioAudioSink.
             val testSuccess = nativeInitPlayer(nativePlayerPtr, 48000, 2, 32, aaudioDeviceId)
             if (testSuccess) {
                 aaudioExclusiveGranted = nativeIsExclusive(nativePlayerPtr)
@@ -263,8 +237,6 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
                 android.util.Log.i("ExclusiveAudio",
                     "[PRE-CHECK] AAudio test stream: exclusive=$aaudioExclusiveGranted, rate=${actualRate}Hz")
 
-                // Immediately close the test stream — this must happen BEFORE playback starts
-                // so the playback stream can be granted exclusive access.
                 nativeStopPlayer(nativePlayerPtr)
                 nativeDestroyPlayer(nativePlayerPtr)
                 nativePlayerPtr = 0L
@@ -392,7 +364,6 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
       * Only auto-targets if no device was already explicitly selected (deviceId == 0).
       */
     private fun autoTargetFirstUsbDevice() {
-        // Skip auto-target if a device was already explicitly selected
         if (aaudioDeviceId > 0) {
             android.util.Log.i("ExclusiveAudio", "Device already explicitly set (#$aaudioDeviceId), skipping auto-target")
             return
@@ -429,25 +400,19 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
     private fun enableExclusiveMode() {
         ensureAudioManager()
 
-        // Save current volume for restoration on disable
         originalMusicVolume = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: -1
 
-        // Check AAudio support
         isAaudioAvailable = checkAaudioSupport()
 
-        // Lock volume to max
         restoreMaxVolume()
         volumeLocked = true
 
-        // Start monitoring
         startVolumeLock()
         registerVolumeReceiver()
         registerAudioDeviceCallback()
 
-        // Auto-detect and target USB DAC if connected
         autoTargetFirstUsbDevice()
 
-        // Initialize AAudio native player (open exclusive stream)
         initAaudioPlayer()
         val aaudioActive = aaudioStreamActive
         val mixerBypassed = aaudioExclusiveGranted
@@ -471,15 +436,12 @@ class ExclusiveAudioPlugin private constructor(private val context: Context) : M
         exclusiveModeEnabled = false
         volumeLocked = false
 
-        // Stop monitoring
         stopVolumeLock()
         unregisterVolumeReceiver()
         unregisterAudioDeviceCallback()
 
-        // Destroy AAudio native player
         destroyAaudioPlayer()
 
-        // Restore original volume
         if (originalMusicVolume >= 0) {
             try {
                 audioManager?.setStreamVolume(

@@ -1,10 +1,6 @@
-// GENERATED CODE - DO NOT MODIFY BY HAND
 
 part of 'audio_track.dart';
 
-// **************************************************************************
-// JsonSerializableGenerator
-// **************************************************************************
 
 AudioTrack _$AudioTrackFromJson(Map<String, dynamic> json) => AudioTrack(
       id: json['id'] as String,
