@@ -13,7 +13,6 @@ import '../widgets/works_grid_view.dart';
 import '../widgets/sort_dialog.dart';
 import '../widgets/pagination_bar.dart';
 import '../widgets/global_audio_player_wrapper.dart';
-import '../widgets/download_fab.dart';
 import '../widgets/overscroll_next_page_detector.dart';
 
 class SearchResultScreen extends StatelessWidget {
@@ -158,7 +157,6 @@ class _SearchResultContentState extends ConsumerState<_SearchResultContent> {
 
     return GlobalAudioPlayerWrapper(
       child: Scaffold(
-        floatingActionButton: const DownloadFab(),
         appBar: AppBar(
           scrolledUnderElevation: 0,
           elevation: 0,

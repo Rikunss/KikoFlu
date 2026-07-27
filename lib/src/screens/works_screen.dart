@@ -17,7 +17,6 @@ import '../utils/responsive_grid_helper.dart';
 import '../utils/snackbar_util.dart';
 import '../widgets/scrollable_appbar.dart';
 import '../../l10n/app_localizations.dart';
-import '../widgets/download_fab.dart';
 import '../models/work.dart';
 import '../models/sort_options.dart';
 import '../utils/scroll_optimization.dart';
@@ -220,7 +219,6 @@ class _WorksScreenState extends ConsumerState<WorksScreen>
     final worksState = ref.watch(worksProvider);
 
     return Scaffold(
-      floatingActionButton: const DownloadFab(),
       appBar: const ScrollableAppBar(
         toolbarHeight: 56,
         flexibleSpace: SafeArea(

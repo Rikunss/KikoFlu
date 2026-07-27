@@ -10,6 +10,7 @@ import '../../../l10n/app_localizations.dart';
 import '../download_path_settings_screen.dart';
 import '../../services/cache_service.dart';
 import '../../services/download_path_service.dart';
+import '../../services/download_service.dart';
 import '../../services/audio_conversion_service.dart';
 import '../../services/log_service.dart';
 import '../../providers/settings_provider.dart';
@@ -93,6 +94,9 @@ class _DownloadsStorageScreenState
                     _buildDownloadPathCard(context, ref),
                     const SizedBox(height: 16),
 
+                    _buildConcurrentDownloadsCard(context, ref),
+                    const SizedBox(height: 16),
+
                     _buildStorageBreakdown(context),
                     const SizedBox(height: 16),
 
@@ -109,6 +113,146 @@ class _DownloadsStorageScreenState
             ]),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildConcurrentDownloadsCard(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final currentCount = ref.watch(concurrentDownloadsProvider);
+
+    return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
+                  child: Icon(Icons.downloading_rounded,
+                      color: colorScheme.primary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        S.of(context).maxConcurrentDownloads,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        S.of(context).maxConcurrentDownloadsSubtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Text(
+                  '1',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Expanded(
+                  child: Slider(
+                    value: currentCount.toDouble(),
+                    min: 1,
+                    max: 10,
+                    divisions: 9,
+                    label: '$currentCount',
+                    onChanged: (double value) {
+                      final count = value.round();
+                      ref
+                          .read(concurrentDownloadsProvider.notifier)
+                          .updateCount(count);
+                      DownloadService.instance.setMaxConcurrentDownloads(count);
+                    },
+                    onChangeEnd: (double value) {
+                      final count = value.round();
+                      if (context.mounted) {
+                        SnackBarUtil.showInfo(
+                          context,
+                          count == 1
+                              ? 'Downloads will process one at a time'
+                              : 'Up to $count files will download concurrently',
+                        );
+                      }
+                    },
+                  ),
+                ),
+                Text(
+                  '10',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            Center(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Current: $currentCount',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline,
+                      size: 16, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      currentCount == 1
+                          ? 'Downloads and conversions run one at a time — minimizes CPU load and battery usage'
+                          : 'Up to $currentCount downloads in parallel. Higher counts may increase CPU load during WAV conversion.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

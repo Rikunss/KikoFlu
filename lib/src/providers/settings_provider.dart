@@ -1086,3 +1086,42 @@ final showFpsOverlayProvider =
     StateNotifierProvider<FpsOverlayNotifier, bool>((ref) {
   return FpsOverlayNotifier();
 });
+
+/// Concurrent download count setting.
+class ConcurrentDownloadsNotifier extends StateNotifier<int> {
+  static const String preferenceKey = 'concurrent_downloads';
+  static const int defaultCount = 1;
+
+  ConcurrentDownloadsNotifier() : super(defaultCount) {
+    _loadPreference();
+  }
+
+  Future<void> _loadPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedValue = prefs.getInt(preferenceKey);
+      if (savedValue != null && savedValue >= 1 && savedValue <= 10) {
+        state = savedValue;
+      }
+    } catch (e) {
+      state = defaultCount;
+    }
+  }
+
+  Future<void> updateCount(int count) async {
+    if (count < 1 || count > 10) return;
+    state = count;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(preferenceKey, count);
+    } catch (e) {
+      LogService.instance.warning('[Settings] Failed to save concurrent downloads: $e', tag: 'Settings');
+    }
+  }
+}
+
+/// Concurrent download count provider.
+final concurrentDownloadsProvider =
+    StateNotifierProvider<ConcurrentDownloadsNotifier, int>((ref) {
+  return ConcurrentDownloadsNotifier();
+});

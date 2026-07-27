@@ -24,7 +24,6 @@ import '../widgets/work_bookmark_manager.dart';
 import '../widgets/review_progress_dialog.dart';
 import '../widgets/rating_detail_popup.dart';
 import '../services/translation_service.dart';
-import '../widgets/download_fab.dart';
 import '../providers/work_detail_display_provider.dart';
 import '../widgets/privacy_blur_cover.dart';
 import '../widgets/work_detail/tag_vote_dialog.dart';
@@ -500,7 +499,6 @@ class _WorkDetailScreenState extends ConsumerState<WorkDetailScreen> {
 
     return GlobalAudioPlayerWrapper(
       child: Scaffold(
-        floatingActionButton: const DownloadFab(),
         appBar: ScrollableAppBar(
           systemOverlayStyle: systemOverlayStyle,
           title: GestureDetector(

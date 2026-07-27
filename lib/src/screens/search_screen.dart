@@ -13,7 +13,6 @@ import '../utils/server_utils.dart';
 import '../utils/snackbar_util.dart';
 import '../utils/tag_localizer.dart';
 import '../widgets/scrollable_appbar.dart';
-import '../widgets/download_fab.dart';
 import 'search_result_screen.dart';
 
 class SearchCondition {
@@ -322,7 +321,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        floatingActionButton: const DownloadFab(),
         appBar: ScrollableAppBar(
           title:
               Text(S.of(context).search, style: const TextStyle(fontSize: 18)),

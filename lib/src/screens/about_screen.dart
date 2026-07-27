@@ -17,8 +17,10 @@ class AboutScreen extends ConsumerStatefulWidget {
 }
 
 class _AboutScreenState extends ConsumerState<AboutScreen> {
-  static final Uri _repoUri =
+  static final Uri _meteorSageRepo =
       Uri.parse('https://github.com/Meteor-Sage/Kikoeru-Flutter');
+  static final Uri _rikunssRepo =
+      Uri.parse('https://github.com/Rikunss/KikoFlu');
   late final Future<_AboutData> _aboutFuture;
 
   @override
@@ -127,10 +129,10 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
                 icon: Icons.link,
                 iconColor: cs.primary,
                 title: S.of(context).projectRepo,
-                subtitle: _repoUri.toString(),
-                trailing: Icon(Icons.open_in_new,
-                    size: 18, color: cs.onSurfaceVariant.withValues(alpha: 0.6)),
-                onTap: _openRepository,
+                subtitle: _rikunssRepo.toString(),
+                trailing: Icon(Icons.chevron_right,
+                    size: 24, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
+                onTap: _showRepositoryDialog,
               ),
               const SizedBox(height: 12),
               _buildInfoCard(
@@ -416,8 +418,48 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
     );
   }
 
-  Future<void> _openRepository() async {
-    await _openUrl(_repoUri.toString());
+  void _showRepositoryDialog() {
+    final s = S.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Project Repository'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.code),
+              title: const Text('Meteor-Sage / Kikoeru-Flutter'),
+              subtitle: const Text('Original repository'),
+              trailing: const Icon(Icons.open_in_new, size: 18),
+              contentPadding: EdgeInsets.zero,
+              onTap: () {
+                Navigator.pop(ctx);
+                _openUrl(_meteorSageRepo.toString());
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.fork_right),
+              title: const Text('Rikunss / KikoFlu'),
+              subtitle: const Text('Fork with additional features'),
+              trailing: const Icon(Icons.open_in_new, size: 18),
+              contentPadding: EdgeInsets.zero,
+              onTap: () {
+                Navigator.pop(ctx);
+                _openUrl(_rikunssRepo.toString());
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(s.cancel),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _openUrl(String urlString) async {

@@ -9,6 +9,7 @@ import '../models/work.dart';
 import '../services/download_service.dart';
 import '../utils/metadata_utils.dart';
 import '../utils/string_utils.dart';
+import 'settings/downloads_storage_screen.dart';
 
 /// Reusable delete confirmation dialog.
 Future<bool?> showDeleteConfirmDialog(
@@ -43,6 +44,16 @@ String _relativeTime(DateTime dt) {
   if (diff.inHours > 0) return '${diff.inHours}h ago';
   if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
   return 'just now';
+}
+
+/// Format bytes per second into a human-readable speed string.
+String _formatSpeed(double bytesPerSec) {
+  if (bytesPerSec <= 0) return '';
+  if (bytesPerSec < 1000) return '${bytesPerSec.toStringAsFixed(0)} B/s';
+  if (bytesPerSec < 1000 * 1000) {
+    return '${(bytesPerSec / 1000).toStringAsFixed(1)} KB/s';
+  }
+  return '${(bytesPerSec / (1000 * 1000)).toStringAsFixed(1)} MB/s';
 }
 
 /// Format icon & color for a file extension
@@ -91,6 +102,9 @@ enum _SourceFilter { all, downloaded, imported }
 /// Metadata filter type for downloads.
 enum _FilterType { all, circle, va, tag }
 
+/// Overflow menu actions for the AppBar.
+enum _OverflowAction { settings, sourceAll, sourceDownloaded, sourceImported, filterMetadata, clearMetaFilter }
+
 /// Work group — tasks grouped by workId
 class _WorkGroup {
   final int workId;
@@ -116,6 +130,25 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
 
   void _onSelectionChanged(bool isSelectionMode, int count) {
     setState(() { _isSelectionMode = isSelectionMode; _selectedCount = count; });
+  }
+
+  void _handleOverflowAction(_OverflowAction action) {
+    switch (action) {
+      case _OverflowAction.settings:
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const DownloadsStorageScreen()),
+        );
+      case _OverflowAction.sourceAll:
+        setState(() => _sourceFilter = _SourceFilter.all);
+      case _OverflowAction.sourceDownloaded:
+        setState(() => _sourceFilter = _SourceFilter.downloaded);
+      case _OverflowAction.sourceImported:
+        setState(() => _sourceFilter = _SourceFilter.imported);
+      case _OverflowAction.filterMetadata:
+        _listKey.currentState?.showMetadataFilterPicker(context);
+      case _OverflowAction.clearMetaFilter:
+        setState(() { _filterType = _FilterType.all; _filterValue = ''; });
+    }
   }
 
   @override
@@ -153,6 +186,91 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                 ),
               ]
             : [
+                PopupMenuButton<_OverflowAction>(
+                  icon: const Icon(Icons.more_vert),
+                  tooltip: 'More',
+                  onSelected: _handleOverflowAction,
+                  itemBuilder: (ctx) {
+                    final cs = Theme.of(ctx).colorScheme;
+                    return [
+                      PopupMenuItem<_OverflowAction>(
+                        value: _OverflowAction.settings,
+                        child: ListTile(
+                          leading: Icon(Icons.tune_rounded, size: 20, color: cs.onSurfaceVariant),
+                          title: const Text('Download Settings'),
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      PopupMenuItem<_OverflowAction>(
+                        value: _OverflowAction.sourceAll,
+                        child: ListTile(
+                          leading: Icon(
+                            _sourceFilter == _SourceFilter.all
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            size: 20,
+                            color: _sourceFilter == _SourceFilter.all ? cs.primary : null,
+                          ),
+                          title: const Text('All Sources'),
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
+                      ),
+                      PopupMenuItem<_OverflowAction>(
+                        value: _OverflowAction.sourceDownloaded,
+                        child: ListTile(
+                          leading: Icon(
+                            _sourceFilter == _SourceFilter.downloaded
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            size: 20,
+                            color: _sourceFilter == _SourceFilter.downloaded ? cs.primary : null,
+                          ),
+                          title: const Text('Downloaded Only'),
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
+                      ),
+                      PopupMenuItem<_OverflowAction>(
+                        value: _OverflowAction.sourceImported,
+                        child: ListTile(
+                          leading: Icon(
+                            _sourceFilter == _SourceFilter.imported
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            size: 20,
+                            color: _sourceFilter == _SourceFilter.imported ? cs.primary : null,
+                          ),
+                          title: const Text('Imported Only'),
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      PopupMenuItem<_OverflowAction>(
+                        value: _OverflowAction.filterMetadata,
+                        child: ListTile(
+                          leading: Icon(Icons.filter_alt_rounded, size: 20, color: cs.onSurfaceVariant),
+                          title: const Text('Filter by Metadata...'),
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
+                      ),
+                      if (_filterType != _FilterType.all)
+                        PopupMenuItem<_OverflowAction>(
+                          value: _OverflowAction.clearMetaFilter,
+                          child: ListTile(
+                            leading: Icon(Icons.filter_alt_off_rounded, size: 20, color: Colors.red.shade300),
+                            title: const Text('Clear Metadata Filter'),
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                          ),
+                        ),
+                    ];
+                  },
+                ),
                 IconButton(
                   icon: const Icon(Icons.checklist),
                   onPressed: () => _listKey.currentState?.enterSelectionMode(),
@@ -212,6 +330,7 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
   final Set<String> _selectedTaskIds = {};
   final Set<int> _selectedWorkIds = {};
   StreamSubscription<String>? _conversionSub;
+  StreamSubscription<String>? _resumeSub;
   StreamSubscription<List<DownloadTask>>? _tasksSub;
 
   @override
@@ -219,6 +338,21 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
     super.initState();
     _groups = _computeGroups(DownloadService.instance.tasks);
     _tasksSub = DownloadService.instance.tasksStream.listen(_onTasksChanged);
+    _resumeSub = DownloadService.instance.resumeEventStream.listen((event) {
+      if (!mounted) return;
+      final parts = event.split(':');
+      if (parts.isNotEmpty && parts[0] == 'fail') {
+        final fileName = parts.length > 1 ? parts[1].split('/').last : 'file';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$fileName — server unsupported resume, re-downloading'),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    });
+
     _conversionSub = DownloadService.instance.conversionStream.listen((event) {
       if (!mounted) return;
       final parts = event.split(':');
@@ -288,6 +422,7 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
   @override
   void dispose() {
     _conversionSub?.cancel();
+    _resumeSub?.cancel();
     _tasksSub?.cancel();
     super.dispose();
   }
@@ -476,6 +611,74 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
     };
   }
 
+  /// Show metadata filter picker (called from the overflow menu).
+  void showMetadataFilterPicker(BuildContext context) {
+    final grouped = _groupByWork(_filteredTasks(DownloadService.instance.tasks));
+    final options = _extractFilterOptions(grouped);
+    final hasOptions = options.values.any((list) => list.isNotEmpty);
+    if (!hasOptions) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No metadata available to filter')),
+      );
+      return;
+    }
+    // Show a dialog to pick filter type first
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(children: [
+                Text('Filter by...',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+              ]),
+            ),
+            const Divider(height: 1),
+            if (options['circles']!.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.business_rounded),
+                title: const Text('Circle'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showFilterPicker(_FilterType.circle, options['circles']!, 'Circle');
+                },
+              ),
+            if (options['vas']!.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.mic_rounded),
+                title: const Text('VA'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showFilterPicker(_FilterType.va, options['vas']!, 'VA');
+                },
+              ),
+            if (options['tags']!.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.label_rounded),
+                title: const Text('Tag'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showFilterPicker(_FilterType.tag, options['tags']!, 'Tag');
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Apply metadata filter (circle/VA/tag) to already-grouped works.
   List<_WorkGroup> _applyMetadataFilter(List<_WorkGroup> groups) {
     if (widget.filterType == _FilterType.all || widget.filterValue.isEmpty) {
@@ -573,141 +776,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
     );
   }
 
-  /// Filter bar — chips for Circle / VA / Tag filtering.
-  Widget _buildFilterBar(Map<int, List<DownloadTask>> grouped) {
-    final cs = Theme.of(context).colorScheme;
-    final options = _extractFilterOptions(grouped);
-    final hasActiveFilter = widget.filterType != _FilterType.all;
-
-    final hasOptions = options.values.any((list) => list.isNotEmpty);
-    if (!hasOptions && !hasActiveFilter) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
-        ),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _buildFilterChip(
-              label: 'All',
-              icon: Icons.filter_alt_off_rounded,
-              isSelected: !hasActiveFilter,
-              onTap: () => widget.onFilterTypeChanged(_FilterType.all, ''),
-              cs: cs,
-            ),
-            const SizedBox(width: 6),
-
-            if (options['circles']!.isNotEmpty)
-              _buildFilterDropdownChip(
-                label: 'Circle',
-                icon: Icons.business_rounded,
-                type: _FilterType.circle,
-                options: options['circles']!,
-                cs: cs,
-              ),
-
-            if (options['vas']!.isNotEmpty)
-              _buildFilterDropdownChip(
-                label: 'VA',
-                icon: Icons.mic_rounded,
-                type: _FilterType.va,
-                options: options['vas']!,
-                cs: cs,
-              ),
-
-            if (options['tags']!.isNotEmpty)
-              _buildFilterDropdownChip(
-                label: 'Tag',
-                icon: Icons.label_rounded,
-                type: _FilterType.tag,
-                options: options['tags']!,
-                cs: cs,
-              ),
-
-            if (hasActiveFilter) ...[
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: cs.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  widget.filterValue,
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.onPrimaryContainer),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Simple filter chip (for "All").
-  Widget _buildFilterChip({
-    required String label,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required ColorScheme cs,
-  }) {
-    return ActionChip(
-      avatar: Icon(icon, size: 14,
-        color: isSelected ? cs.primary : cs.onSurfaceVariant),
-      label: Text(label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-          color: isSelected ? cs.primary : cs.onSurfaceVariant,
-        ),
-      ),
-      backgroundColor: isSelected
-          ? cs.primaryContainer.withValues(alpha: 0.4)
-          : cs.surfaceContainerHighest.withValues(alpha: 0.6),
-      side: BorderSide(color: cs.outlineVariant.withAlpha(80)),
-      onPressed: onTap,
-    );
-  }
-
-  /// Dropdown filter chip (Circle / VA / Tag) — opens bottom sheet on tap.
-  Widget _buildFilterDropdownChip({
-    required String label,
-    required IconData icon,
-    required _FilterType type,
-    required List<String> options,
-    required ColorScheme cs,
-  }) {
-    final isActive = widget.filterType == type;
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: ActionChip(
-        avatar: Icon(icon, size: 14,
-          color: isActive ? cs.onPrimaryContainer : cs.onSurfaceVariant),
-        label: Text(
-          isActive ? widget.filterValue : label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-            color: isActive ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-          ),
-        ),
-        side: isActive
-            ? BorderSide(color: cs.primary, width: 1)
-            : BorderSide(color: cs.outlineVariant.withAlpha(80)),
-        backgroundColor: isActive ? cs.primaryContainer : cs.surfaceContainerHighest.withAlpha(120),
-        onPressed: () => _showFilterPicker(type, options, label),
-      ),
-    );
-  }
-
   /// Show a bottom sheet to pick a filter value.
   void _showFilterPicker(_FilterType type, List<String> options, String label) {
     final s = S.of(context);
@@ -764,55 +832,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
     );
   }
 
-  /// Build source filter tabs — similar to local_downloads_screen.
-  Widget _buildSourceTabs({
-    required ColorScheme cs,
-    required int importedCount,
-    required int downloadedCount,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
-        ),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _SourceTabChip(
-              icon: Icons.all_inclusive_rounded,
-              label: 'All',
-              count: downloadedCount + importedCount,
-              isSelected: widget.sourceFilter == _SourceFilter.all,
-              onTap: () => widget.onSourceFilterChanged(_SourceFilter.all),
-              cs: cs,
-            ),
-            const SizedBox(width: 6),
-            _SourceTabChip(
-              icon: Icons.cloud_download_rounded,
-              label: 'Downloaded',
-              count: downloadedCount,
-              isSelected: widget.sourceFilter == _SourceFilter.downloaded,
-              onTap: () => widget.onSourceFilterChanged(_SourceFilter.downloaded),
-              cs: cs,
-            ),
-            const SizedBox(width: 6),
-            _SourceTabChip(
-              icon: Icons.folder_rounded,
-              label: 'Imported',
-              count: importedCount,
-              isSelected: widget.sourceFilter == _SourceFilter.imported,
-              onTap: () => widget.onSourceFilterChanged(_SourceFilter.imported),
-              cs: cs,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -823,18 +842,8 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
     final activeCount = allTasks.where((t) => t.status == DownloadStatus.downloading || t.status == DownloadStatus.converting || t.status == DownloadStatus.pending).length;
     final failedCount = allTasks.where((t) => t.status == DownloadStatus.failed).length;
 
-    final importedCount = allTasks.where((t) => _isImported(t)).length;
-    final downloadedCount = allTasks.length - importedCount;
-
     return Column(
       children: [
-        _SummaryStats(
-          activeCount: activeCount,
-          doneCount: doneCount,
-          failedCount: failedCount,
-          totalCount: totalCount,
-        ),
-
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: SingleChildScrollView(
@@ -852,12 +861,6 @@ class _DownloadTaskListState extends State<_DownloadTaskList> {
             ),
           ),
         ),
-
-        _buildSourceTabs(cs: cs, importedCount: importedCount, downloadedCount: downloadedCount),
-
-        _buildFilterBar(Map<int, List<DownloadTask>>.fromEntries(
-          _groups.map((g) => MapEntry(g.workId, g.tasks)),
-        )),
 
         Expanded(
           child: _isLoading && allTasks.isEmpty
@@ -1297,143 +1300,7 @@ class _ShimmerCard extends StatelessWidget {
   }
 }
 
-/// ===================================================================
-/// Summary Stats Card
-/// ===================================================================
-class _SummaryStats extends StatelessWidget {
-  final int activeCount, doneCount, failedCount, totalCount;
 
-  const _SummaryStats({required this.activeCount, required this.doneCount, required this.failedCount, required this.totalCount});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    if (totalCount == 0) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              _StatItem(icon: Icons.downloading, value: '$activeCount', label: 'Active', color: cs.primary),
-              _StatItem(icon: Icons.check_circle, value: '$doneCount', label: 'Done', color: Colors.green),
-              _StatItem(icon: Icons.error_outline, value: '$failedCount', label: 'Failed', color: Colors.red),
-              _StatItem(icon: Icons.inbox, value: '$totalCount', label: 'Total', color: cs.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatItem extends StatelessWidget {
-  final IconData icon;
-  final String value, label;
-  final Color color;
-
-  const _StatItem({required this.icon, required this.value, required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(height: 2),
-          Text(value, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: color)),
-          Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-        ],
-      ),
-    );
-  }
-}
-
-/// ===================================================================
-/// Source Tab Chip
-/// ===================================================================
-class _SourceTabChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final int count;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final ColorScheme cs;
-
-  const _SourceTabChip({
-    required this.icon,
-    required this.label,
-    required this.count,
-    required this.isSelected,
-    required this.onTap,
-    required this.cs,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? cs.primaryContainer
-              : cs.surfaceContainerHighest.withAlpha(150),
-          borderRadius: BorderRadius.circular(12),
-          border: isSelected
-              ? Border.all(color: cs.primary.withAlpha(60), width: 1)
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-            ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 6),
-            if (count > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? cs.primary.withAlpha(30)
-                      : cs.surfaceContainerHighest.withAlpha(180),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected
-                        ? cs.onPrimaryContainer
-                        : cs.onSurfaceVariant,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 /// ===================================================================
 /// Filter Chip
@@ -1686,7 +1553,6 @@ class _TaskTile extends StatelessWidget {
     final isPending = task.status == DownloadStatus.pending;
     final isCompleted = task.status == DownloadStatus.completed;
 
-    final ext = task.fileName.split('.').last.toUpperCase();
     final icon = _fileIcon(task.fileName);
     final iconColor = _fileColor(task.fileName, cs);
 
@@ -1732,18 +1598,6 @@ class _TaskTile extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (ext.isNotEmpty && !isPending)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: iconColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                ext,
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: iconColor, letterSpacing: 0.5),
-                              ),
-                            ),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -1823,6 +1677,18 @@ class _TaskTile extends StatelessWidget {
                                   : 'Downloading...',
                               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                             ),
+                            if (task.totalBytes != null && task.totalBytes! > 0) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                _formatSpeed(
+                                    DownloadService.instance.getDownloadSpeed(task.id)),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: cs.primary,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ],
@@ -1860,22 +1726,6 @@ class _TaskTile extends StatelessWidget {
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: (isConverting ? Colors.orange : cs.primary).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '${(task.progress * 100).round()}%',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: isConverting ? Colors.orange : cs.primary,
                                   ),
                                 ),
                               ),
@@ -1917,7 +1767,7 @@ class _TaskTile extends StatelessWidget {
                       ),
                     ],
                   ),
-                if (isCompleted || isPending)
+                if (isPending)
                   IconButton(
                     icon: Icon(Icons.delete_outline, size: 18, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
                     onPressed: onDelete,

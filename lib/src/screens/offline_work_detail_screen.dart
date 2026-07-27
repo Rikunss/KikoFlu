@@ -25,7 +25,6 @@ import '../widgets/va_chip.dart';
 import '../widgets/circle_chip.dart';
 import '../widgets/offline_file_explorer_widget.dart';
 import '../widgets/global_audio_player_wrapper.dart';
-import '../widgets/download_fab.dart';
 import '../utils/string_utils.dart';
 import '../widgets/privacy_blur_cover.dart';
 import '../widgets/image_gallery_screen.dart';
@@ -426,7 +425,6 @@ class _OfflineWorkDetailScreenState
       value: systemOverlayStyle,
       child: GlobalAudioPlayerWrapper(
         child: Scaffold(
-          floatingActionButton: const DownloadFab(),
           appBar: ScrollableAppBar(
             systemOverlayStyle: systemOverlayStyle,
             actions: [

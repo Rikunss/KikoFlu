@@ -5,7 +5,8 @@ import '../models/download_task.dart';
 import '../screens/downloads_screen.dart';
 
 /// 下载任务浮动按钮
-/// 只在有活跃下载任务时显示
+/// 始终显示，以提供下载列表入口。
+/// 有活跃下载任务时，显示带数字的徽章。
 class DownloadFab extends StatelessWidget {
   const DownloadFab({super.key});
 
@@ -23,17 +24,13 @@ class DownloadFab extends StatelessWidget {
       stream: DownloadService.instance.tasksStream,
       builder: (context, snapshot) {
         final tasks = snapshot.data ?? [];
-        final activeCount = tasks.where((t) =>
+        final badgeCount = tasks.where((t) =>
             t.status == DownloadStatus.downloading ||
             t.status == DownloadStatus.pending).length;
 
-        if (activeCount == 0) {
-          return const SizedBox.shrink();
-        }
-
         return Badge(
-          isLabelVisible: true,
-          label: Text('$activeCount'),
+          isLabelVisible: badgeCount > 0,
+          label: Text('$badgeCount'),
           child: FloatingActionButton(
             onPressed: () => _navigateToDownloads(context),
             tooltip: S.of(context).downloadTasks,

@@ -6,9 +6,9 @@ import 'log_service.dart';
 /// Service to check for app updates from GitHub releases
 class UpdateService {
   static const String _githubApiUrl =
-      'https://api.github.com/repos/Meteor-Sage/KikoFlu/releases/latest';
+      'https://api.github.com/repos/Rikunss/KikoFlu/releases/latest';
   static const String _releasePageUrl =
-      'https://github.com/Meteor-Sage/KikoFlu/releases/latest';
+      'https://github.com/Rikunss/KikoFlu/releases/latest';
 
   static const String _keyLastCheckedVersion = 'last_checked_version';
   static const String _keyLastNotifiedVersion = 'last_notified_version';

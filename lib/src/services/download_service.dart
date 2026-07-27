@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/download_task.dart';
 import '../utils/file_icon_utils.dart';
@@ -14,6 +15,29 @@ import 'log_service.dart';
 import 'cookie_service.dart';
 
 final _log = LogService.instance;
+
+/// Tracks bytes and time to compute real-time download speed.
+class _SpeedTracker {
+  int lastBytes;
+  int lastTimeMs;
+  double speedBytesPerSec;
+
+  _SpeedTracker({required this.lastBytes, required this.lastTimeMs})
+      : speedBytesPerSec = 0;
+
+  /// Update with the latest received bytes and compute speed.
+  void update(int receivedBytes, int currentTimeMs) {
+    final timeDiff = currentTimeMs - lastTimeMs;
+    if (timeDiff > 0) {
+      final bytesDiff = receivedBytes - lastBytes;
+      if (bytesDiff >= 0) {
+        speedBytesPerSec = bytesDiff / (timeDiff / 1000.0);
+      }
+    }
+    lastBytes = receivedBytes;
+    lastTimeMs = currentTimeMs;
+  }
+}
 
 /// Orchestrates all download operations.
 ///
@@ -40,9 +64,12 @@ class DownloadService {
   final DownloadConversionHook conversionHook;
 
   final Map<String, CancelToken> _cancelTokens = {};
+  final Map<String, _SpeedTracker> _speedTrackers = {};
   final Dio _dio = Dio();
+  final StreamController<String> _resumeEventController =
+      StreamController<String>.broadcast();
 
-  static const int _maxConcurrentDownloads = 20;
+  int _maxConcurrentDownloads = 1;
   int _activeDownloadCount = 0;
   bool _isProcessingQueue = false;
 
@@ -51,6 +78,9 @@ class DownloadService {
 
   /// Stream of conversion events.
   Stream<String> get conversionStream => conversionHook.conversionStream;
+
+  /// Stream of resume events (e.g., when server doesn't support resume).
+  Stream<String> get resumeEventStream => _resumeEventController.stream;
 
   /// Stream of workIds whose covers are being processed.
   Stream<Set<int>> get processingCoversStream =>
@@ -65,6 +95,13 @@ class DownloadService {
   /// Whether any tasks are currently downloading.
   bool get hasActiveDownloads => persistence.hasActiveDownloads;
 
+  /// Current max concurrent download limit.
+  int get maxConcurrentDownloads => _maxConcurrentDownloads;
+
+  /// Get the real-time download speed (bytes/sec) for a task.
+  double getDownloadSpeed(String taskId) =>
+      _speedTrackers[taskId]?.speedBytesPerSec ?? 0;
+
   /// Mark a work's cover as being processed.
   void addProcessingCover(int workId) =>
       coverProcessor.addProcessingCover(workId);
@@ -77,8 +114,29 @@ class DownloadService {
   static int naturalCompare(String a, String b) =>
       DownloadTaskPersistence.naturalCompare(a, b);
 
+  /// Load max concurrent download count from SharedPreferences.
+  Future<void> _loadConcurrentSetting() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedValue = prefs.getInt('concurrent_downloads');
+      if (savedValue != null && savedValue >= 1 && savedValue <= 10) {
+        _maxConcurrentDownloads = savedValue;
+      }
+    } catch (_) {
+      _maxConcurrentDownloads = 1;
+    }
+  }
+
+  /// Update max concurrent downloads (called from settings UI).
+  void setMaxConcurrentDownloads(int count) {
+    if (count >= 1 && count <= 10) {
+      _maxConcurrentDownloads = count;
+    }
+  }
+
   /// Lightweight init: only load tasks from SharedPreferences.
   Future<void> initialize() async {
+    await _loadConcurrentSetting();
     await persistence.loadTasks();
     for (final task in persistence.tasks) {
       if (task.status == DownloadStatus.downloading) {
@@ -266,6 +324,16 @@ class DownloadService {
         tag: 'Download');
     await file.parent.create(recursive: true);
 
+    // Check for existing partial download (resume support)
+    int resumeOffset = 0;
+    if (await tempFile.exists()) {
+      resumeOffset = await tempFile.length();
+      if (resumeOffset > 0) {
+        _log.info('发现未完成的下载: $resumeOffset bytes, 尝试断点续传',
+            tag: 'Download');
+      }
+    }
+
     final cancelToken = CancelToken();
     _cancelTokens[task.id] = cancelToken;
 
@@ -290,6 +358,7 @@ class DownloadService {
             );
             persistence.updateTask(completedTask, immediate: true);
             _cancelTokens.remove(task.id);
+            _speedTrackers.remove(task.id);
             return;
           }
         }
@@ -299,45 +368,133 @@ class DownloadService {
       const updateInterval = 500;
       int? firstReportedTotal;
 
+      // Initialize speed tracker for this task
+      _speedTrackers[task.id] = _SpeedTracker(
+        lastBytes: resumeOffset,
+        lastTimeMs: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      // Set cookies for all subsequent requests
       _dio.options.headers.addAll(CookieService.serverCookieHeaders);
       _log.info('开始网络下载: ${task.fileName}, url=${task.downloadUrl}',
           tag: 'Download');
 
-      await _dio.download(
-        task.downloadUrl,
-        tempFilePath,
-        cancelToken: cancelToken,
-        onReceiveProgress: (received, total) {
-          if (total != -1) {
-            if (firstReportedTotal == null) {
-              firstReportedTotal = total;
-              if (task.totalBytes != null &&
-                  task.totalBytes! > 0 &&
-                  task.totalBytes != total) {
+      bool resumed = false;
+      if (resumeOffset > 0) {
+        try {
+          final Response<ResponseBody> rs = await _dio.get<ResponseBody>(
+            task.downloadUrl,
+            options: Options(
+              responseType: ResponseType.stream,
+              headers: {'Range': 'bytes=$resumeOffset-'},
+            ),
+            cancelToken: cancelToken,
+          );
+
+          if (rs.statusCode == 206) {
+            final body = rs.data!;
+            final raf = await tempFile.open(mode: FileMode.append);
+            try {
+              int totalReceived = resumeOffset;
+              int? totalSize;
+              final contentRange = rs.headers.value('content-range');
+              if (contentRange != null) {
+                final match =
+                    RegExp(r'/(\d+)$').firstMatch(contentRange);
+                if (match != null) {
+                  totalSize = int.tryParse(match.group(1)!);
+                }
+              }
+
+              await for (final chunk in body.stream) {
+                if (cancelToken.isCancelled) break;
+                await raf.writeFrom(chunk);
+                totalReceived += chunk.length;
+
+                final now = DateTime.now().millisecondsSinceEpoch;
+                _speedTrackers[task.id]?.update(totalReceived, now);
+
+                if (now - lastUpdateTime > updateInterval) {
+                  lastUpdateTime = now;
+                  persistence.updateTask(task.copyWith(
+                    status: DownloadStatus.downloading,
+                    downloadedBytes: totalReceived,
+                    totalBytes: totalSize ?? totalReceived,
+                  ));
+                }
+              }
+              resumed = true;
+              _log.info('断点续传完成: ${task.fileName}', tag: 'Download');
+            } finally {
+              await raf.close();
+            }
+          } else {
+            _log.info(
+                '服务器不支持断点续传(status ${rs.statusCode}), 重新下载',
+                tag: 'Download');
+            _resumeEventController.add(
+                'fail:${task.fileName}:Server returned ${rs.statusCode}, not 206');
+          }
+        } catch (e) {
+          if (e is DioException && e.type == DioExceptionType.cancel) {
+            rethrow;
+          }
+          _log.warning('断点续传失败: $e, 重新下载', tag: 'Download');
+          _resumeEventController.add(
+              'fail:${task.fileName}:$e');
+        }
+
+        // If resume didn't work, clean up and fall through to full download
+        if (!resumed) {
+          if (await tempFile.exists()) {
+            await tempFile.delete();
+          }
+          resumeOffset = 0;
+        }
+      }
+
+      if (!resumed) {
+        await _dio.download(
+          task.downloadUrl,
+          tempFilePath,
+          cancelToken: cancelToken,
+          onReceiveProgress: (received, total) {
+            if (total != -1) {
+              if (firstReportedTotal == null) {
+                firstReportedTotal = total;
+                if (task.totalBytes != null &&
+                    task.totalBytes! > 0 &&
+                    task.totalBytes != total) {
+                  _log.warning(
+                    '服务器报告的文件大小($total)与任务记录的大小(${task.totalBytes})不一致: ${task.fileName}',
+                    tag: 'Download',
+                  );
+                }
+              } else if (firstReportedTotal != total) {
                 _log.warning(
-                  '服务器报告的文件大小($total)与任务记录的大小(${task.totalBytes})不一致: ${task.fileName}',
+                  '下载过程中文件总大小发生变化: $firstReportedTotal -> $total (${task.fileName})',
                   tag: 'Download',
                 );
+                firstReportedTotal = total;
               }
-            } else if (firstReportedTotal != total) {
-              _log.warning(
-                '下载过程中文件总大小发生变化: $firstReportedTotal -> $total (${task.fileName})',
-                tag: 'Download',
-              );
-              firstReportedTotal = total;
+              final now = DateTime.now().millisecondsSinceEpoch;
+
+              // Update download speed
+              _speedTrackers[task.id]?.update(received, now);
+
+              if (now - lastUpdateTime > updateInterval ||
+                  received == total) {
+                lastUpdateTime = now;
+                persistence.updateTask(task.copyWith(
+                  status: DownloadStatus.downloading,
+                  downloadedBytes: received,
+                  totalBytes: total,
+                ));
+              }
             }
-            final now = DateTime.now().millisecondsSinceEpoch;
-            if (now - lastUpdateTime > updateInterval || received == total) {
-              lastUpdateTime = now;
-              persistence.updateTask(task.copyWith(
-                status: DownloadStatus.downloading,
-                downloadedBytes: received,
-                totalBytes: total,
-              ));
-            }
-          }
-        },
-      );
+          },
+        );
+      }
 
       await tempFile.rename(filePath);
       _log.info('下载完成: ${task.fileName}', tag: 'Download');
@@ -372,6 +529,7 @@ class DownloadService {
       }
       persistence.updateTask(updatedTask, immediate: true);
       _cancelTokens.remove(task.id);
+      _speedTrackers.remove(task.id);
     } catch (e) {
       if (e is DioException && e.type == DioExceptionType.cancel) {
         _log.info('下载已取消: ${task.fileName}', tag: 'Download');
@@ -403,6 +561,7 @@ class DownloadService {
             immediate: true);
       }
       _cancelTokens.remove(task.id);
+      _speedTrackers.remove(task.id);
     }
   }
 
@@ -773,6 +932,7 @@ class DownloadService {
       token.cancel();
     }
     _cancelTokens.clear();
+    await _resumeEventController.close();
     await persistence.dispose();
     conversionHook.dispose();
     coverProcessor.dispose();

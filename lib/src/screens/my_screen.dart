@@ -106,15 +106,14 @@ class _MyScreenState extends ConsumerState<MyScreen>
         stream: DownloadService.instance.tasksStream,
         builder: (context, snapshot) {
           final tasks = snapshot.data ?? [];
-          final activeCount = tasks.where((t) =>
+          final badgeCount = tasks.where((t) =>
               t.status == DownloadStatus.downloading ||
               t.status == DownloadStatus.pending).length;
-          if (activeCount == 0) return const SizedBox.shrink();
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Badge(
-              isLabelVisible: true,
-              label: Text('$activeCount'),
+              isLabelVisible: badgeCount > 0,
+              label: Text('$badgeCount'),
               child: FloatingActionButton(
                 onPressed: _navigateToDownloads,
                 tooltip: S.of(context).downloadTasks,
