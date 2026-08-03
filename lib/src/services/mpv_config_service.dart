@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../providers/windows_usb_dac_provider.dart';
 import '../utils/platform_utils.dart';
 import 'log_service.dart';
 
@@ -13,7 +14,8 @@ final _log = LogService.instance;
 class MpvConfigService {
   MpvConfigService._();
 
-  /// Configure mpv.conf based on user preferences (e.g., audio passthrough).
+  /// Configure mpv.conf based on user preferences (e.g., audio passthrough,
+  /// Windows USB DAC exclusive routing).
   ///
   /// Creates the mpv config directory and writes the appropriate config file.
   /// This must be called before any audio playback starts.
@@ -23,6 +25,11 @@ class MpvConfigService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final passthrough = prefs.getBool('audio_passthrough_enabled') ?? false;
+      final usbDacEnabled =
+          prefs.getBool(WindowsUsbDacNotifier.enabledKey) ?? false;
+      final usbDacDeviceId = prefs.getString(
+        WindowsUsbDacNotifier.deviceIdKey,
+      );
 
       final configDir = await _getConfigDir();
 
@@ -35,12 +42,39 @@ class MpvConfigService {
       setEnv('MPV_HOME', configDir.path);
       _log.info('Set MPV_HOME to: ${configDir.path}', tag: 'Audio');
 
-      if (passthrough) {
-        await configFile.writeAsString(_passthroughConfig(configDir.path));
-        _log.info('Updated mpv.conf: Exclusive Mode ENABLED (Forced)', tag: 'Audio');
+      if (Platform.isWindows) {
+        final useExclusive = passthrough || usbDacEnabled;
+        if (useExclusive) {
+          await configFile.writeAsString(_windowsExclusiveConfig(
+            configDir.path,
+            usbDacDeviceId: usbDacEnabled ? usbDacDeviceId : null,
+          ));
+          _log.info(
+            'Updated mpv.conf: Windows WASAPI exclusive mode '
+            '(passthrough=$passthrough, usbDac=$usbDacEnabled, '
+            'device="$usbDacDeviceId")',
+            tag: 'Audio',
+          );
+        } else {
+          await configFile.writeAsString(_normalConfig(configDir.path));
+          _log.info('Updated mpv.conf: Video Disabled', tag: 'Audio');
+        }
+      } else if (Platform.isMacOS) {
+        if (passthrough) {
+          await configFile.writeAsString(_macPassthroughConfig(configDir.path));
+          _log.info('Updated mpv.conf: Exclusive Mode ENABLED (Forced)', tag: 'Audio');
+        } else {
+          await configFile.writeAsString(_normalConfig(configDir.path));
+          _log.info('Updated mpv.conf: Video Disabled', tag: 'Audio');
+        }
       } else {
-        await configFile.writeAsString(_normalConfig(configDir.path));
-        _log.info('Updated mpv.conf: Video Disabled', tag: 'Audio');
+        if (passthrough) {
+          await configFile.writeAsString(_linuxPassthroughConfig(configDir.path));
+          _log.info('Updated mpv.conf: Passthrough ENABLED', tag: 'Audio');
+        } else {
+          await configFile.writeAsString(_normalConfig(configDir.path));
+          _log.info('Updated mpv.conf: Video Disabled', tag: 'Audio');
+        }
       }
     } catch (e) {
       _log.error('Error configuring mpv: $e', tag: 'Audio');
@@ -59,26 +93,29 @@ class MpvConfigService {
     }
   }
 
-  /// Config content for audio passthrough mode.
-  static String _passthroughConfig(String configDirPath) {
-    if (Platform.isWindows) {
-      return '''ao=wasapi
+  /// Windows config with WASAPI exclusive mode.
+  /// When [usbDacDeviceId] is provided (mpv wasapi id), audio is routed to
+  /// that device — used for bit-perfect USB DAC output.
+  static String _windowsExclusiveConfig(
+    String configDirPath, {
+    String? usbDacDeviceId,
+  }) {
+    final deviceLine = (usbDacDeviceId != null && usbDacDeviceId.isNotEmpty)
+        ? 'audio-device=wasapi/$usbDacDeviceId\n'
+        : '';
+    return '''ao=wasapi
 audio-exclusive=yes
-audio-spdif=ac3,dts,eac3
-log-file=mpv_debug.log
-msg-level=all=v
-video=no
-sub-auto=no
-''';
-    } else if (Platform.isLinux) {
-      return '''audio-spdif=ac3,dts,eac3
+${deviceLine}audio-spdif=ac3,dts,eac3
 log-file=${p.join(configDirPath, 'mpv_debug.log')}
 msg-level=all=v
 video=no
 sub-auto=no
 ''';
-    } else {
-      return '''ao=coreaudio
+  }
+
+  /// macOS config for audio passthrough mode.
+  static String _macPassthroughConfig(String configDirPath) {
+    return '''ao=coreaudio
 audio-exclusive=yes
 audio-spdif=ac3,dts,eac3
 log-file=${p.join(configDirPath, 'mpv_debug.log')}
@@ -86,13 +123,22 @@ msg-level=all=v
 video=no
 sub-auto=no
 ''';
-    }
+  }
+
+  /// Linux config for audio passthrough mode.
+  static String _linuxPassthroughConfig(String configDirPath) {
+    return '''audio-spdif=ac3,dts,eac3
+log-file=${p.join(configDirPath, 'mpv_debug.log')}
+msg-level=all=v
+video=no
+sub-auto=no
+''';
   }
 
   /// Config content for normal mode (video disabled).
   static String _normalConfig(String configDirPath) {
     if (Platform.isWindows) {
-      return '''log-file=mpv_debug.log
+      return '''log-file=${p.join(configDirPath, 'mpv_debug.log')}
 msg-level=all=v
 video=no
 sub-auto=no

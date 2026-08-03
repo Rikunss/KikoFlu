@@ -689,10 +689,10 @@ class PlaybackScreen extends ConsumerWidget {
             if (confirmed != true) return;
           }
 
-          ref.read(audioPassthroughProvider.notifier).toggle(value);
+          await ref.read(audioPassthroughProvider.notifier).toggle(value);
 
           if (Platform.isWindows || Platform.isMacOS) {
-            AudioPlayerService.instance.setExclusiveMode(value);
+            await AudioPlayerService.instance.setExclusiveMode(value);
           }
 
           if (context.mounted) {

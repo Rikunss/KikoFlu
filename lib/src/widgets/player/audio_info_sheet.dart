@@ -9,6 +9,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../providers/audio_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../providers/windows_usb_dac_provider.dart';
 import '../../services/equalizer_service.dart';
 import '../../services/hi_res_audio_service.dart';
 import '../../services/audio_player_service.dart';
@@ -618,6 +619,30 @@ class _AudioChainSectionCard extends ConsumerWidget {
         const _ChainFlowSection(),
         Consumer(
           builder: (context, ref, child) {
+            // Windows: show the WASAPI device selected in the USB DAC settings.
+            if (Platform.isWindows) {
+              final winSettings = ref.watch(windowsUsbDacProvider);
+              final winName = winSettings.enabled
+                  ? (winSettings.deviceName ?? '')
+                  : '';
+              if (winName.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                child: Row(
+                  children: [
+                    Icon(Icons.usb, size: 13, color: cs.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Text('USB DAC',
+                        style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: _ModernChip(
+                          winName, cs.primaryContainer, cs.onPrimaryContainer),
+                    ),
+                  ],
+                ),
+              );
+            }
             final dacNameAsync = ref.watch(activeUsbDacNameProvider);
             final name = dacNameAsync.when(
               data: (n) => n,
@@ -708,6 +733,9 @@ class _ChainFlowSection extends ConsumerWidget {
       error: (_, __) => '',
     );
     final bitPerfectSettings = ref.watch(bitPerfectPlaybackProvider);
+    final windowsSettings = Platform.isWindows
+        ? ref.watch(windowsUsbDacProvider)
+        : null;
 
     final bool isUsbDacRouted =
         hiResRouting.routed || (bitPerfectSettings.enabled && usbDacNameValue.isNotEmpty);
@@ -767,8 +795,12 @@ class _ChainFlowSection extends ConsumerWidget {
         _ => activeDeviceType.isNotEmpty ? activeDeviceType : 'Built-in Speaker',
       };
     } else if (Platform.isWindows) {
+      final winName = (windowsSettings?.enabled ?? false) &&
+              (windowsSettings?.deviceName?.isNotEmpty ?? false)
+          ? windowsSettings!.deviceName!
+          : null;
       deviceName = isExclusiveOnWindows
-          ? 'WASAPI Exclusive Device'
+          ? (winName ?? 'WASAPI Exclusive Device')
           : activeDeviceType.isNotEmpty
               ? activeDeviceType == 'wired_headphones' ? 'Headphones' : activeDeviceType
               : 'Default Output';
@@ -788,8 +820,8 @@ class _ChainFlowSection extends ConsumerWidget {
       child: _ChainFlowVisual(
         stages: [
           _ChainStage(label: 'Engine', value: decoder, active: decoder != 'Idle', accent: cs.primary),
-          _ChainStage(label: 'Path', value: output, active: isUsbDacRouted, accent: const Color(0xFF4CAF50)),
-          _ChainStage(label: 'Device', value: deviceName, active: isUsbDacRouted, accent: cs.tertiary),
+          _ChainStage(label: 'Path', value: output, active: isUsbDacRouted || isExclusiveOnWindows, accent: const Color(0xFF4CAF50)),
+          _ChainStage(label: 'Device', value: deviceName, active: isUsbDacRouted || isExclusiveOnWindows, accent: cs.tertiary),
         ],
         cs: cs,
         tt: tt,
@@ -1595,13 +1627,13 @@ class _BitPerfectIndicator extends ConsumerWidget {
                 : 'NO · Android Mixer';
       }
     } else if (Platform.isWindows) {
-      active = state.enabled;
-      bitPerfectLabel = state.enabled
+      active = AudioPlayerService.instance.exclusiveModeEnabled;
+      bitPerfectLabel = active
           ? 'YES · WASAPI Exclusive'
           : 'NO · WASAPI Shared';
     } else if (Platform.isMacOS) {
-      active = state.enabled;
-      bitPerfectLabel = state.enabled
+      active = AudioPlayerService.instance.exclusiveModeEnabled;
+      bitPerfectLabel = active
           ? 'YES · CoreAudio Exclusive'
           : 'NO · Core Audio';
     } else if (Platform.isLinux) {

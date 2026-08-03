@@ -4,9 +4,11 @@ import 'package:just_audio/just_audio.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smtc_windows/smtc_windows.dart';
 
 import '../models/audio_track.dart';
+import '../providers/windows_usb_dac_provider.dart';
 import 'cache_service.dart';
 import 'equalizer_service.dart';
 import '../utils/image_blur_util.dart';
@@ -120,6 +122,12 @@ class AudioPlayerService {
 
     _setupPlayerListeners();
     _setupLibusbListener();
+
+    // Restore the WASAPI exclusive flag from persisted settings so the
+    // audio info UI reflects the actual mpv output config after restart.
+    if (Platform.isWindows) {
+      await _syncWindowsExclusiveFlag();
+    }
   }
 
   void _initManagers() {
@@ -820,7 +828,21 @@ class AudioPlayerService {
           _autoEnabledLibusb = false;
         }
       }
-    } else if (Platform.isWindows || Platform.isMacOS) {
+    } else if (Platform.isWindows) {
+      _exclusiveModeEnabled = enabled;
+      // USB DAC exclusive routing also forces WASAPI exclusive regardless of
+      // the passthrough toggle, so keep the flag accurate.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        if (prefs.getBool(WindowsUsbDacNotifier.enabledKey) ?? false) {
+          _exclusiveModeEnabled = true;
+        }
+      } catch (e) {
+        _log.warning('Failed to read USB DAC pref: $e', tag: 'Audio');
+      }
+      await MpvConfigService.configure();
+      if (_exclusiveModeEnabled) await _gainManager.setDirectVolume(1.0);
+    } else if (Platform.isMacOS) {
       _exclusiveModeEnabled = enabled;
       await MpvConfigService.configure();
       if (enabled) await _gainManager.setDirectVolume(1.0);
@@ -828,6 +850,36 @@ class AudioPlayerService {
   }
 
   bool get exclusiveModeEnabled => _exclusiveModeEnabled;
+
+  /// Recomputes [_exclusiveModeEnabled] from the persisted Windows audio
+  /// routing settings (passthrough OR USB DAC exclusive routing). The mpv
+  /// config is written from the same preferences, so this keeps the UI in
+  /// sync with what mpv will actually do on the next player instance.
+  Future<void> _syncWindowsExclusiveFlag() async {
+    if (!Platform.isWindows) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final passthrough = prefs.getBool('audio_passthrough_enabled') ?? false;
+      final usbDac =
+          prefs.getBool(WindowsUsbDacNotifier.enabledKey) ?? false;
+      _exclusiveModeEnabled = passthrough || usbDac;
+    } catch (e) {
+      _log.warning('Failed to sync Windows exclusive flag: $e', tag: 'Audio');
+    }
+  }
+
+  /// Re-apply the mpv output configuration (Windows WASAPI exclusive mode /
+  /// USB DAC device routing). Call this after the Windows USB DAC target
+  /// device changes so the next mpv instance picks up the new device.
+  ///
+  /// Note: mpv reads `mpv.conf` when a player is created, so a running player
+  /// keeps its previous device until playback is restarted.
+  Future<void> reconfigureWindowsAudioOutput() async {
+    if (!Platform.isWindows) return;
+    await _syncWindowsExclusiveFlag();
+    await MpvConfigService.configure();
+    if (_exclusiveModeEnabled) await _gainManager.setDirectVolume(1.0);
+  }
 
   void setHiResEnabled(bool enabled) {
     _hiResManager.setHiResEnabled(enabled && Platform.isAndroid);
@@ -909,7 +961,12 @@ class AudioPlayerService {
   // ── Platform-Specific ──
 
   Future<void> updateAudioSessionConfig(bool enablePassthrough) async {
-    if (Platform.isWindows || Platform.isMacOS) {
+    if (Platform.isWindows) {
+      await _syncWindowsExclusiveFlag();
+      await MpvConfigService.configure();
+      return;
+    }
+    if (Platform.isMacOS) {
       await MpvConfigService.configure();
       return;
     }
