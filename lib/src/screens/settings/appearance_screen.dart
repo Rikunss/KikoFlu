@@ -383,6 +383,7 @@ class AppearanceScreen extends ConsumerWidget {
         'en' => s.languageEn,
         'ja' => s.languageJa,
         'ru' => s.languageRu,
+        'id' => s.languageId,
         _ => currentLocale.languageCode,
       };
     }
@@ -424,6 +425,7 @@ class AppearanceScreen extends ConsumerWidget {
       (s.languageEn, const Locale('en')),
       (s.languageJa, const Locale('ja')),
       (s.languageRu, const Locale('ru')),
+      (s.languageId, const Locale('id')),
     ];
 
     showDialog(

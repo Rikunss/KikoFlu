@@ -1,4 +1,4 @@
-package com.meteor.kikoeruflutter
+package com.kikoflu.edge
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -40,7 +40,7 @@ class UsbDacPlugin(private val context: Context) : MethodCallHandler {
         private const val TAG = "UsbDacPlugin"
 
         /** Custom action for USB permission broadcast (not a standard UsbManager constant). */
-        private const val ACTION_USB_PERMISSION = "com.meteor.kikoeruflutter.USB_PERMISSION"
+        private const val ACTION_USB_PERMISSION = "com.kikoflu.edge.USB_PERMISSION"
 
         /** USB Audio Class (UAC) interface class code */
         private const val USB_CLASS_AUDIO = 0x01

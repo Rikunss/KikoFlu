@@ -1,6 +1,8 @@
 {
   "@@locale": "ja",
   "appTitle": "KikoFlu Edge",
+  "announcement": "お知らせ",
+  "dontShowAgain": "今後表示しない",
   "navHome": "ホーム",
   "navSearch": "検索",
   "navMy": "マイ",
@@ -331,6 +333,7 @@
   "languageEn": "English",
   "languageJa": "日本語",
   "languageRu": "Русский",
+  "languageId": "インドネシア語",
   "themeModeDark": "ダークモード",
   "themeModeTrueBlack": "トゥルーブラック",
   "themeModeLight": "ライトモード",

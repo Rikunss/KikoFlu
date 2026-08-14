@@ -13,7 +13,7 @@ extern "C" {
  * @return opaque handle (>0) on success, 0 on failure
  */
 JNIEXPORT jlong JNICALL
-Java_com_meteor_kikoeruflutter_Mp3Encoder_nativeInit(
+Java_com_kikoflu_edge_Mp3Encoder_nativeInit(
     JNIEnv* env, jobject obj, jint sampleRate, jint channels, jint bitrate) {
 
     lame_global_flags* lame = lame_init();
@@ -47,7 +47,7 @@ Java_com_meteor_kikoeruflutter_Mp3Encoder_nativeInit(
  * @return        MP3 bytes (may be empty if encoder needs more data)
  */
 JNIEXPORT jbyteArray JNICALL
-Java_com_meteor_kikoeruflutter_Mp3Encoder_nativeEncode(
+Java_com_kikoflu_edge_Mp3Encoder_nativeEncode(
     JNIEnv* env, jobject obj, jlong handle, jshortArray pcm) {
 
     lame_global_flags* lame = reinterpret_cast<lame_global_flags*>(handle);
@@ -85,7 +85,7 @@ Java_com_meteor_kikoeruflutter_Mp3Encoder_nativeEncode(
  * @return  MP3 bytes (may be empty)
  */
 JNIEXPORT jbyteArray JNICALL
-Java_com_meteor_kikoeruflutter_Mp3Encoder_nativeFlush(
+Java_com_kikoflu_edge_Mp3Encoder_nativeFlush(
     JNIEnv* env, jobject obj, jlong handle) {
 
     lame_global_flags* lame = reinterpret_cast<lame_global_flags*>(handle);
@@ -109,7 +109,7 @@ Java_com_meteor_kikoeruflutter_Mp3Encoder_nativeFlush(
  * Release the LAME encoder.
  */
 JNIEXPORT void JNICALL
-Java_com_meteor_kikoeruflutter_Mp3Encoder_nativeClose(
+Java_com_kikoflu_edge_Mp3Encoder_nativeClose(
     JNIEnv* env, jobject obj, jlong handle) {
 
     lame_global_flags* lame = reinterpret_cast<lame_global_flags*>(handle);

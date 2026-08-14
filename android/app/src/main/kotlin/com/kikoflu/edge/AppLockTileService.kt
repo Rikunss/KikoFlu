@@ -1,4 +1,4 @@
-package com.meteor.kikoeruflutter
+package com.kikoflu.edge
 
 import android.content.Intent
 import android.content.SharedPreferences
@@ -20,7 +20,7 @@ import androidx.annotation.RequiresApi
 class AppLockTileService : TileService() {
 
     companion object {
-        const val ACTION_TOGGLE = "com.meteor.kikoeruflutter.APP_LOCK_TOGGLE"
+        const val ACTION_TOGGLE = "com.kikoflu.edge.APP_LOCK_TOGGLE"
         const val EXTRA_ENABLED = "enabled"
 
         private const val KEY_ENABLED = "app_lock_enabled"

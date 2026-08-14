@@ -3,7 +3,7 @@ description: A cross-platform Flutter app for browsing and playing Kikoeru serve
 
 publish_to: 'none'
 
-version: 3.2.1
+version: 3.2.2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -85,7 +85,6 @@ dependencies:
   flutter_cache_manager: ^3.4.1
   image: ^4.3.0
   blurhash_dart: ^1.2.1
-  home_widget: ^0.9.3
   flutter_secure_storage: ^9.2.4
 
   # FFmpeg (Android) — bundles static FFmpeg binaries for audio conversion
@@ -94,6 +93,8 @@ dependencies:
   whisper_ggml_plus: ^1.5.2
   whisper_ggml_plus_ffmpeg: ^1.0.0
   wakelock_plus: ^1.5.2
+  firebase_core: ^4.13.0
+  firebase_analytics: ^12.4.6
 dependency_overrides:
   # Local fork of audio_service with null-safety fixes for Android destroy sequence.
   # The upstream plugin crashes with NullPointerException when AudioService.instance

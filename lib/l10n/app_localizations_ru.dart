@@ -12,6 +12,12 @@ class SRu extends S {
   String get appTitle => 'KikoFlu Edge';
 
   @override
+  String get announcement => 'Объявление';
+
+  @override
+  String get dontShowAgain => 'Больше не показывать';
+
+  @override
   String get navHome => 'Главная';
 
   @override
@@ -1086,6 +1092,9 @@ class SRu extends S {
 
   @override
   String get languageRu => 'Русский';
+
+  @override
+  String get languageId => 'Bahasa Indonesia';
 
   @override
   String get themeModeDark => 'Тёмный режим';

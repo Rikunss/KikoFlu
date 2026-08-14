@@ -1,6 +1,6 @@
 {
   "name": "KikoFlu Source",
-  "identifier": "com.meteor.kikoeruflutter.AltStore",
+  "identifier": "com.kikoflu.edge.AltStore",
   "subtitle": "KikoFlu AltStore Source",
   "description": "AltStore source for KikoFlu - A cross-platform Kikoeru client",
   "iconURL": "https://raw.githubusercontent.com/pa-jesusf/KikoFlu/main/assets/icons/app_icon_opaque.png",
@@ -10,7 +10,7 @@
   "apps": [
     {
       "name": "KikoFlu Edge",
-      "bundleIdentifier": "com.meteor.kikoeruflutter",
+      "bundleIdentifier": "com.kikoflu.edge",
       "developerName": "Meteor-Sage, Rikunss",
       "subtitle": "Kikoeru Client",
       "localizedDescription": "A cross-platform client for browsing and playing Kikoeru server content. Features include background playback, subtitle system, offline download, multi-language support, and more.",

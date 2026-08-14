@@ -168,34 +168,96 @@ class AudioConversionService {
     }
   }
 
+  /// Resolve symlinks so the real executable path is used. WinGet installs
+  /// ffmpeg behind a symlink in `%LOCALAPPDATA%\Microsoft\WinGet\Links`, and
+  /// Windows refuses to execute binaries reached through such untrusted
+  /// mount points (ProcessException from Process.start).
+  static Future<String> _resolveCommandPath(String path) async {
+    try {
+      final resolved = await File(path).resolveSymbolicLinks();
+      if (resolved.isNotEmpty) return resolved;
+    } catch (_) {
+      // Keep the original path if resolution fails.
+    }
+    return path;
+  }
+
+  static const List<String> _knownFfmpegPaths = [
+    r'C:\ffmpeg\bin\ffmpeg.exe',
+    r'C:\Program Files\ffmpeg\bin\ffmpeg.exe',
+    r'C:\ProgramData\chocolatey\bin\ffmpeg.exe',
+    r'C:\Program Files\chocolatey\bin\ffmpeg.exe',
+  ];
+
+  /// Look for ffmpeg inside WinGet's package folders (real path, no symlink).
+  static Future<String?> _findInWinGetPackages() async {
+    try {
+      final localAppData = Platform.environment['LOCALAPPDATA'];
+      if (localAppData == null || localAppData.isEmpty) return null;
+      final base = Directory('$localAppData\\Microsoft\\WinGet\\Packages');
+      if (!await base.exists()) return null;
+      await for (final sub in base.list()) {
+        if (sub is! Directory) continue;
+        // Either <package>/bin or <package>/<version>/bin.
+        final candidates = <String>[sub.path];
+        await for (final child in sub.list()) {
+          if (child is Directory) candidates.add(child.path);
+        }
+        for (final dir in candidates) {
+          final bin = Directory('$dir\\bin');
+          if (!await bin.exists()) continue;
+          await for (final f in bin.list()) {
+            if (f is File && f.path.toLowerCase().endsWith('ffmpeg.exe')) {
+              return f.path;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<String?> _findFfmpeg() async {
+    // 1. PATH lookup, then resolve symlinks to the real executable.
+    const candidates = ['ffmpeg', 'ffmpeg.exe'];
+    for (final cmd in candidates) {
+      try {
+        if (Platform.isWindows) {
+          final result = await Process.run('where', [cmd], runInShell: true);
+          if (result.exitCode == 0 &&
+              (result.stdout as String).trim().isNotEmpty) {
+            final path =
+                (result.stdout as String).trim().split('\n').first.trim();
+            return _resolveCommandPath(path);
+          }
+        } else {
+          final result = await Process.run('which', [cmd], runInShell: true);
+          if (result.exitCode == 0 &&
+              (result.stdout as String).trim().isNotEmpty) {
+            return (result.stdout as String).trim();
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Common install locations as fallback when not on PATH.
+    if (Platform.isWindows) {
+      for (final known in _knownFfmpegPaths) {
+        if (await File(known).exists()) return known;
+      }
+      final winGet = await _findInWinGetPackages();
+      if (winGet != null) return winGet;
+    }
+    return null;
+  }
+
   Future<String?> _convertDesktop(
     String input,
     String output,
     WavConversionFormat format,
     void Function(double progress, {String? eta})? onProgress,
   ) async {
-    const candidates = ['ffmpeg', 'ffmpeg.exe'];
-    String? ffmpegPath;
-
-    for (final cmd in candidates) {
-      try {
-        if (Platform.isWindows) {
-          final result = await Process.run('where', [cmd], runInShell: true);
-          if (result.exitCode == 0 && (result.stdout as String).trim().isNotEmpty) {
-            ffmpegPath = (result.stdout as String).trim().split('\n').first.trim();
-            break;
-          }
-        } else {
-          final result = await Process.run('which', [cmd], runInShell: true);
-          if (result.exitCode == 0 && (result.stdout as String).trim().isNotEmpty) {
-            ffmpegPath = (result.stdout as String).trim();
-            break;
-          }
-        }
-      } catch (_) {
-        continue;
-      }
-    }
+    final ffmpegPath = await _findFfmpeg();
 
     if (ffmpegPath == null) {
       _log.warning(
@@ -208,7 +270,18 @@ class AudioConversionService {
     final args = _ffmpegArgsFor(format.value, input, output);
     _log.info('[AudioConversion] ffmpeg: $ffmpegPath ${args.join(' ')}', tag: 'AudioConv');
 
-    final process = await Process.start(ffmpegPath, args, runInShell: true);
+    // Run without a shell (Dart quotes the executable path itself) and always
+    // drain stdout/stderr: ffmpeg writes a lot of output, and if the pipes are
+    // never read their buffers fill up, blocking ffmpeg forever.
+    final process = await Process.start(ffmpegPath, args);
+    final stdoutBuf = StringBuffer();
+    final stderrBuf = StringBuffer();
+    process.stdout
+        .transform(const SystemEncoding().decoder)
+        .listen(stdoutBuf.write);
+    process.stderr
+        .transform(const SystemEncoding().decoder)
+        .listen(stderrBuf.write);
     final exitCode = await process.exitCode;
 
     if (exitCode == 0 && await File(output).exists()) {
@@ -232,7 +305,14 @@ class AudioConversionService {
 
       return output;
     } else {
-      _log.error('[AudioConversion] ffmpeg failed (exit $exitCode)', tag: 'AudioConv');
+      final errLines = stderrBuf.toString().trim().split('\n');
+      final errTail = errLines.length > 8
+          ? errLines.sublist(errLines.length - 8).join('\n')
+          : errLines.join('\n');
+      _log.error(
+        '[AudioConversion] ffmpeg failed (exit $exitCode):\n$errTail',
+        tag: 'AudioConv',
+      );
       return null;
     }
   }

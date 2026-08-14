@@ -1,4 +1,4 @@
-package com.meteor.kikoeruflutter
+package com.kikoflu.edge
 
 import android.content.Context
 import android.media.audiofx.Equalizer

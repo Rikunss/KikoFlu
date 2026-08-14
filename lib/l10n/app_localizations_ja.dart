@@ -12,6 +12,12 @@ class SJa extends S {
   String get appTitle => 'KikoFlu Edge';
 
   @override
+  String get announcement => 'お知らせ';
+
+  @override
+  String get dontShowAgain => '今後表示しない';
+
+  @override
   String get navHome => 'ホーム';
 
   @override
@@ -1061,6 +1067,9 @@ class SJa extends S {
 
   @override
   String get languageRu => 'Русский';
+
+  @override
+  String get languageId => 'インドネシア語';
 
   @override
   String get themeModeDark => 'ダークモード';

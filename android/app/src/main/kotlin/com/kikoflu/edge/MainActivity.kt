@@ -1,4 +1,4 @@
-package com.meteor.kikoeruflutter
+package com.kikoflu.edge
 
 import android.content.BroadcastReceiver
 import android.content.ComponentName
@@ -25,12 +25,7 @@ class MainActivity : AudioServiceActivity() {
     private var usbDacPlugin: UsbDacPlugin? = null
     
     companion object {
-        const val WIDGET_CHANNEL = "com.kikoeru.flutter/home_widget_actions"
-        const val ACTION_TOGGLE_PLAYBACK = "togglePlayback"
-        const val ACTION_SKIP_NEXT = "skipNext"
-        const val ACTION_SKIP_PREV = "skipPrev"
     }
-    private var widgetChannel: MethodChannel? = null
     private var appLockTileChannel: MethodChannel? = null
     private var tileReceiver: BroadcastReceiver? = null
     private var usbReceiver: BroadcastReceiver? = null
@@ -40,18 +35,9 @@ class MainActivity : AudioServiceActivity() {
         registerUsbReceiver()
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        handleWidgetIntent(intent)
-    }
-
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        
-        widgetChannel = MethodChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            WIDGET_CHANNEL
-        )
+
         
         floatingLyricPlugin = FloatingLyricPlugin.getInstance(this)
         val channel = MethodChannel(
@@ -111,8 +97,6 @@ class MainActivity : AudioServiceActivity() {
             }
         }
         registerTileReceiver()
-
-        handleWidgetIntent(intent)
 
         checkForExistingUsbDacOnStartup()
     }
@@ -295,24 +279,6 @@ class MainActivity : AudioServiceActivity() {
             registerReceiver(usbReceiver, filter, Context.RECEIVER_EXPORTED)
         } else {
             registerReceiver(usbReceiver, filter)
-        }
-    }
-
-    private fun handleWidgetIntent(intent: Intent) {
-        val channel = widgetChannel ?: return
-        when (intent.action) {
-            KikoFluWidgetProvider.ACTION_PLAY_PAUSE,
-            "com.meteor.kikoeruflutter.TOGGLE_PLAYBACK" -> {
-                channel.invokeMethod(ACTION_TOGGLE_PLAYBACK, null)
-            }
-            KikoFluWidgetProvider.ACTION_NEXT,
-            "com.meteor.kikoeruflutter.SKIP_NEXT" -> {
-                channel.invokeMethod(ACTION_SKIP_NEXT, null)
-            }
-            KikoFluWidgetProvider.ACTION_PREV,
-            "com.meteor.kikoeruflutter.SKIP_PREV" -> {
-                channel.invokeMethod(ACTION_SKIP_PREV, null)
-            }
         }
     }
 

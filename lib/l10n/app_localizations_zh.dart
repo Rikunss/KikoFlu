@@ -12,6 +12,12 @@ class SZh extends S {
   String get appTitle => 'KikoFlu Edge';
 
   @override
+  String get announcement => '公告';
+
+  @override
+  String get dontShowAgain => '不再显示';
+
+  @override
   String get navHome => '主页';
 
   @override
@@ -1059,6 +1065,9 @@ class SZh extends S {
 
   @override
   String get languageRu => 'Русский';
+
+  @override
+  String get languageId => '印度尼西亚语';
 
   @override
   String get themeModeDark => '深色模式';
@@ -4217,6 +4226,12 @@ class SZhHant extends SZh {
   String get appTitle => 'KikoFlu Edge';
 
   @override
+  String get announcement => '公告';
+
+  @override
+  String get dontShowAgain => '不再顯示';
+
+  @override
   String get navHome => '首頁';
 
   @override
@@ -5264,6 +5279,9 @@ class SZhHant extends SZh {
 
   @override
   String get languageRu => 'Русский';
+
+  @override
+  String get languageId => '印尼語';
 
   @override
   String get themeModeDark => '深色模式';

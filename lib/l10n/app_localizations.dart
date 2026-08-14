@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'app_localizations_en.dart';
+import 'app_localizations_id.dart';
 import 'app_localizations_ja.dart';
 import 'app_localizations_ru.dart';
 import 'app_localizations_zh.dart';
@@ -96,6 +97,7 @@ abstract class S {
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
+    Locale('id'),
     Locale('ja'),
     Locale('ru'),
     Locale('zh'),
@@ -107,6 +109,18 @@ abstract class S {
   /// In en, this message translates to:
   /// **'KikoFlu Edge'**
   String get appTitle;
+
+  /// No description provided for @announcement.
+  ///
+  /// In en, this message translates to:
+  /// **'Announcement'**
+  String get announcement;
+
+  /// No description provided for @dontShowAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t show again'**
+  String get dontShowAgain;
 
   /// No description provided for @navHome.
   ///
@@ -2087,6 +2101,12 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Русский'**
   String get languageRu;
+
+  /// No description provided for @languageId.
+  ///
+  /// In en, this message translates to:
+  /// **'Bahasa Indonesia'**
+  String get languageId;
 
   /// No description provided for @themeModeDark.
   ///
@@ -7787,7 +7807,7 @@ class _SDelegate extends LocalizationsDelegate<S> {
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['en', 'ja', 'ru', 'zh'].contains(locale.languageCode);
+      <String>['en', 'id', 'ja', 'ru', 'zh'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_SDelegate old) => false;
@@ -7810,6 +7830,8 @@ S lookupS(Locale locale) {
   switch (locale.languageCode) {
     case 'en':
       return SEn();
+    case 'id':
+      return SId();
     case 'ja':
       return SJa();
     case 'ru':

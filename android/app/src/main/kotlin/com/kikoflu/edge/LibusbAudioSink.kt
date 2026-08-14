@@ -1,4 +1,4 @@
-package com.meteor.kikoeruflutter
+package com.kikoflu.edge
 
 import android.util.Log
 import androidx.media3.common.C

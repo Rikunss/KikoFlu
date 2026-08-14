@@ -130,38 +130,38 @@ private:
 extern "C" {
     // Native JNI for UsbDacPlugin.kt
     JNIEXPORT jlong JNICALL
-    Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeCreateDriver(JNIEnv*, jobject);
+    Java_com_kikoflu_edge_UsbDacPlugin_nativeCreateDriver(JNIEnv*, jobject);
 
     JNIEXPORT jboolean JNICALL
-    Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeInitDriver(
+    Java_com_kikoflu_edge_UsbDacPlugin_nativeInitDriver(
         JNIEnv*, jobject, jlong native_ptr,
         jint device_fd, jint sample_rate,
         jint channel_count, jint bits_per_sample);
 
     JNIEXPORT jboolean JNICALL
-    Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeStartDriver(
+    Java_com_kikoflu_edge_UsbDacPlugin_nativeStartDriver(
         JNIEnv*, jobject, jlong native_ptr);
 
     JNIEXPORT void JNICALL
-    Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeStopDriver(
+    Java_com_kikoflu_edge_UsbDacPlugin_nativeStopDriver(
         JNIEnv*, jobject, jlong native_ptr);
 
     JNIEXPORT void JNICALL
-    Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeDestroyDriver(
+    Java_com_kikoflu_edge_UsbDacPlugin_nativeDestroyDriver(
         JNIEnv*, jobject, jlong native_ptr);
 
     JNIEXPORT jint JNICALL
-    Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeWritePcmFloat(
+    Java_com_kikoflu_edge_UsbDacPlugin_nativeWritePcmFloat(
         JNIEnv*, jobject, jlong native_ptr,
         jfloatArray buffer, jint num_frames);
 
     JNIEXPORT jint JNICALL
-    Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeWritePcmI16(
+    Java_com_kikoflu_edge_UsbDacPlugin_nativeWritePcmI16(
         JNIEnv*, jobject, jlong native_ptr,
         jshortArray buffer, jint num_frames);
 
     JNIEXPORT jboolean JNICALL
-    Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeIsActive(
+    Java_com_kikoflu_edge_UsbDacPlugin_nativeIsActive(
         JNIEnv*, jobject, jlong native_ptr);
 }
 

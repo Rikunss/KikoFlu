@@ -12,6 +12,12 @@ class SEn extends S {
   String get appTitle => 'KikoFlu Edge';
 
   @override
+  String get announcement => 'Announcement';
+
+  @override
+  String get dontShowAgain => 'Don\'t show again';
+
+  @override
   String get navHome => 'Home';
 
   @override
@@ -1085,6 +1091,9 @@ class SEn extends S {
 
   @override
   String get languageRu => 'Русский';
+
+  @override
+  String get languageId => 'Bahasa Indonesia';
 
   @override
   String get themeModeDark => 'Dark Mode';

@@ -16,6 +16,7 @@ import 'src/widgets/desktop_floating_lyric.dart';
 import 'src/utils/theme.dart';
 import 'src/utils/global_keys.dart';
 import 'src/utils/platform_utils.dart';
+import 'src/services/analytics_service.dart';
 import 'src/services/audio_player_service.dart';
 import 'src/services/usb_dac_audio_manager.dart';
 import 'src/services/hi_res_audio_service.dart';
@@ -26,7 +27,6 @@ import 'src/services/batch_transcription_notification_service.dart';
 import 'src/services/conversion_notification_service.dart';
 import 'src/services/download_service.dart';
 import 'src/services/floating_lyric_service.dart';
-import 'src/services/home_widget_service.dart';
 import 'src/services/mpv_config_service.dart';
 import 'src/services/playback_history_service.dart';
 import 'src/services/progress_sync_service.dart';
@@ -85,6 +85,7 @@ void main(List<String> args) {
     }
 
     await ThemeSettingsNotifier.preload();
+    await AnalyticsService.instance.initialize();
     final splashSeed = await SplashApp.loadSavedSeedColor();
 
     await AppBootstrap.initEssential(isDesktop: isDesktop);
@@ -161,8 +162,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     _initProgressSync();
     ref.read(audioPlayerControllerProvider.notifier).initialize();
     _checkForUpdatesSilently();
-    _initHomeWidget();
-    _setupWidgetActionHandler();
     _initUsbDacManager();
     _initConversionNotifications();
     _initAiDownloadNotifications();
@@ -327,32 +326,6 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     if (!Platform.isAndroid) return;
     UsbDacAudioManager.instance.initialize().catchError((e) {
       debugPrint('[Main] USB DAC manager init failed: $e');
-    });
-  }
-
-  void _initHomeWidget() {
-    if (!Platform.isAndroid) return;
-    HomeWidgetService.instance.init();
-  }
-
-  void _setupWidgetActionHandler() {
-    if (!Platform.isAndroid) return;
-
-    const widgetChannel = MethodChannel('com.kikoeru.flutter/home_widget_actions');
-    widgetChannel.setMethodCallHandler((call) async {
-      final controller = ref.read(audioPlayerControllerProvider.notifier);
-      switch (call.method) {
-        case 'togglePlayback':
-          if (controller.isPlaying) {
-            await controller.pause();
-          } else {
-            await controller.play();
-          }
-        case 'skipNext':
-          await controller.skipToNext();
-        case 'skipPrev':
-          await controller.skipToPrevious();
-      }
     });
   }
 

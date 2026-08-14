@@ -2,6 +2,9 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
+    // START: FlutterFire Configuration
+    id("com.google.gms.google-services")
+    // END: FlutterFire Configuration
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
@@ -16,8 +19,9 @@ val releaseKeystoreFile = keystoreProperties.getProperty("storeFile")?.let(rootP
 val hasReleaseKeystore = releaseKeystoreFile?.exists() == true
 
 android {
-    namespace = "com.meteor.kikoeruflutter"
+    namespace = "com.kikoflu.edge"
     compileSdk = flutter.compileSdkVersion
+    buildToolsVersion = "36.0.0"
     ndkVersion = "29.0.13113456"
 
     compileOptions {
@@ -32,7 +36,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.meteor.kikoeruflutter"
+        applicationId = "com.kikoflu.edge"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 29

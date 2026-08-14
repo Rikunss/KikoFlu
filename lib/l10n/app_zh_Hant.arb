@@ -1,6 +1,8 @@
 {
   "@@locale": "zh_Hant",
   "appTitle": "KikoFlu Edge",
+  "announcement": "公告",
+  "dontShowAgain": "不再顯示",
   "navHome": "首頁",
   "navSearch": "搜尋",
   "navMy": "我的",
@@ -331,6 +333,7 @@
   "languageEn": "English",
   "languageJa": "日本語",
   "languageRu": "Русский",
+  "languageId": "印尼語",
   "themeModeDark": "深色模式",
   "themeModeTrueBlack": "純黑模式",
   "themeModeLight": "淺色模式",

@@ -9,7 +9,6 @@ import '../services/log_service.dart';
 import '../services/audio_player_service.dart';
 import '../services/playback_history_service.dart';
 import '../services/progress_sync_service.dart';
-import '../services/home_widget_service.dart';
 import '../utils/audio_format_parser.dart';
 import 'settings_provider.dart';
 import 'history_provider.dart';
@@ -207,10 +206,6 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
       if (track?.workId != null) {
         ProgressSyncService.instance.onTrackStarted(track!.workId!);
       }
-      HomeWidgetService.instance.updateTrackState(
-        track: track,
-        isPlaying: _service.playing,
-      );
     });
   }
 
@@ -272,12 +267,10 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
 
   Future<void> play() async {
     await _service.play();
-    _updateWidget();
   }
 
   Future<void> pause() async {
     await _service.pause();
-    _updateWidget();
     PlaybackHistoryService.instance.onPaused();
     await ProgressSyncService.instance.onPaused();
   }
@@ -405,13 +398,6 @@ class AudioPlayerController extends StateNotifier<AudioPlayerState> {
   Stream<PlayerState> get playerStateStream => _service.playerStateStream;
   Stream<AudioTrack?> get currentTrackStream => _service.currentTrackStream;
 
-  /// Update the Android home screen widget with current track state.
-  void _updateWidget() {
-    HomeWidgetService.instance.updateTrackState(
-      track: _service.currentTrack,
-      isPlaying: _service.playing,
-    );
-  }
 }
 
 class AudioPlayerState {

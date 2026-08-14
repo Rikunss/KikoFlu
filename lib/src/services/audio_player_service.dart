@@ -9,6 +9,7 @@ import 'package:smtc_windows/smtc_windows.dart';
 
 import '../models/audio_track.dart';
 import '../providers/windows_usb_dac_provider.dart';
+import 'analytics_service.dart';
 import 'cache_service.dart';
 import 'equalizer_service.dart';
 import '../utils/image_blur_util.dart';
@@ -445,6 +446,10 @@ class AudioPlayerService {
     _log.info(
         '_loadTrack: title="${track.title}" startPos=${startPositionMs}ms',
         tag: 'Audio');
+
+    unawaited(AnalyticsService.instance.logEvent('track_play', parameters: {
+      if (track.workId != null) 'work_id': track.workId!,
+    }));
 
     _lastSavedDacPositionMs = 0;
 

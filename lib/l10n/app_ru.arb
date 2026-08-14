@@ -1,6 +1,8 @@
 {
   "@@locale": "ru",
   "appTitle": "KikoFlu Edge",
+  "announcement": "Объявление",
+  "dontShowAgain": "Больше не показывать",
   "navHome": "Главная",
   "navSearch": "Поиск",
   "navMy": "Моё",
@@ -331,6 +333,7 @@
   "languageEn": "English",
   "languageJa": "日本語",
   "languageRu": "Русский",
+  "languageId": "Bahasa Indonesia",
   "themeModeDark": "Тёмный режим",
   "themeModeTrueBlack": "Абсолютно чёрный",
   "themeModeLight": "Светлый режим",

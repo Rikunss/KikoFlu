@@ -111,13 +111,5 @@
             </intent-filter>
         </service>
 
-        <!-- Home Screen Widget -->
-        <receiver
-            android:name=".HomeWidgetBroadcastReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="home_widget.action.RECEIVER" />
-            </intent-filter>
-        </receiver>
     </application>
 </manifest>

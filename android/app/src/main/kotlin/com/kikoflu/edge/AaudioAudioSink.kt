@@ -1,4 +1,4 @@
-package com.meteor.kikoeruflutter
+package com.kikoflu.edge
 
 import android.util.Log
 import androidx.media3.common.C
@@ -234,7 +234,7 @@ class AaudioAudioSink(
         val trace = Thread.currentThread().stackTrace
         for (e in trace.take(25)) {
             val line = e.toString()
-            if (line.contains("com.meteor.kikoeruflutter") ||
+            if (line.contains("com.kikoflu.edge") ||
                 line.contains("androidx.media3") ||
                 line.contains("ExoPlayerImplInternal")) {
                 sb.appendLine("[STACK]   at $line")
@@ -266,7 +266,7 @@ class AaudioAudioSink(
         val trace = Thread.currentThread().stackTrace
         for (e in trace.take(25)) {
             val line = e.toString()
-            if (line.contains("com.meteor.kikoeruflutter") ||
+            if (line.contains("com.kikoflu.edge") ||
                 line.contains("androidx.media3") ||
                 line.contains("ExoPlayerImplInternal") ||
                 line.contains("MediaCodecAudioRenderer")) {
@@ -292,7 +292,7 @@ class AaudioAudioSink(
         val trace = Thread.currentThread().stackTrace
         for (e in trace.take(25)) {
             val line = e.toString()
-            if (line.contains("com.meteor.kikoeruflutter") ||
+            if (line.contains("com.kikoflu.edge") ||
                 line.contains("androidx.media3") ||
                 line.contains("ExoPlayerImplInternal") ||
                 line.contains("MediaCodecAudioRenderer")) {
@@ -515,7 +515,7 @@ class AaudioAudioSink(
         val trace = Thread.currentThread().stackTrace
         for (e in trace.take(25)) {
             val line = e.toString()
-            if (line.contains("com.meteor.kikoeruflutter") ||
+            if (line.contains("com.kikoflu.edge") ||
                 line.contains("androidx.media3") ||
                 line.contains("ExoPlayerImplInternal") ||
                 line.contains("MediaCodecAudioRenderer")) {

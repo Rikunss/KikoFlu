@@ -118,9 +118,11 @@ class _SplashBodyState extends State<SplashBody>
       ),
     );
 
+    // Starts after the subtitle slide finishes (0.50) so the dots never
+    // overlap the "Kikoeru Client" text while it is still moving.
     _spinnerFade = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.35, 0.55, curve: Curves.easeOut),
+      curve: const Interval(0.55, 0.75, curve: Curves.easeOut),
     );
 
     _bottomFade = CurvedAnimation(
@@ -236,52 +238,7 @@ class _SplashBodyState extends State<SplashBody>
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                AnimatedBuilder(
-                  animation: _controller,
-                  builder: (context, child) {
-                    final scaleValue = _controller.status == AnimationStatus.forward &&
-                            _controller.value < 0.35
-                        ? _iconScale.value
-                        : _controller.status == AnimationStatus.completed ||
-                                _controller.status == AnimationStatus.reverse
-                            ? 1.0 + (_controller.value * 0.03)
-                            : 1.0;
-                    return FadeTransition(
-                      opacity: _iconFade,
-                      child: Transform.scale(
-                        scale: scaleValue,
-                        child: Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: colorScheme.primary.withValues(alpha: 0.25),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: Image.asset(
-                              'assets/icons/app_icon_opaque.png',
-                              width: 100,
-                              height: 100,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Icon(
-                                Icons.audiotrack,
-                                size: 100,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                _buildAnimatedIcon(100, 24, 24, const Offset(0, 8), colorScheme),
 
                 const SizedBox(height: 24),
 
@@ -314,7 +271,7 @@ class _SplashBodyState extends State<SplashBody>
                   ),
                 ),
 
-                const SizedBox(height: 48),
+                const SizedBox(height: 56),
 
                 FadeTransition(
                   opacity: _spinnerFade,
@@ -346,98 +303,112 @@ class _SplashBodyState extends State<SplashBody>
     );
   }
 
+  Widget _buildAnimatedIcon(
+    double size,
+    double radius,
+    double blur,
+    Offset shadowOffset,
+    ColorScheme colorScheme,
+  ) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final scaleValue = _controller.status == AnimationStatus.forward &&
+                _controller.value < 0.35
+            ? _iconScale.value
+            : _controller.status == AnimationStatus.completed ||
+                    _controller.status == AnimationStatus.reverse
+                ? 1.0 + (_controller.value * 0.03)
+                : 1.0;
+        return FadeTransition(
+          opacity: _iconFade,
+          child: Transform.scale(
+            scale: scaleValue,
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(radius),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.primary.withValues(alpha: 0.25),
+                    blurRadius: blur,
+                    offset: shadowOffset,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(radius),
+                child: Image.asset(
+                  'assets/icons/app_icon_opaque.png',
+                  width: size,
+                  height: size,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Icon(
+                    Icons.audiotrack,
+                    size: size,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildLandscapeLayout(ThemeData theme, ColorScheme colorScheme) {
-    return Row(
+    return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            final scaleValue = _controller.status == AnimationStatus.forward &&
-                    _controller.value < 0.35
-                ? _iconScale.value
-                : _controller.status == AnimationStatus.completed ||
-                        _controller.status == AnimationStatus.reverse
-                    ? 1.0 + (_controller.value * 0.03)
-                    : 1.0;
-            return FadeTransition(
-              opacity: _iconFade,
-              child: Transform.scale(
-                scale: scaleValue,
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.primary.withValues(alpha: 0.25),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _buildAnimatedIcon(80, 20, 20, const Offset(0, 6), colorScheme),
+            const SizedBox(width: 32),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FadeTransition(
+                  opacity: _titleFade,
+                  child: Text(
+                    'KikoFlu Edge',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Image.asset(
-                      'assets/icons/app_icon_opaque.png',
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Icon(
-                        Icons.audiotrack,
-                        size: 80,
-                        color: colorScheme.primary,
+                ),
+                const SizedBox(height: 4),
+                FadeTransition(
+                  opacity: _subtitleFade,
+                  child: Transform.translate(
+                    offset: Offset(0, _subtitleSlide.value),
+                    child: Text(
+                      'Kikoeru Client',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        letterSpacing: _subtitleLetterSpacing.value,
                       ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
-        ),
-
-        const SizedBox(width: 32),
-
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            FadeTransition(
-              opacity: _titleFade,
-              child: Text(
-                'KikoFlu Edge',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            FadeTransition(
-              opacity: _subtitleFade,
-              child: Transform.translate(
-                offset: Offset(0, _subtitleSlide.value),
-                child: Text(
-                  'Kikoeru Client',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    letterSpacing: _subtitleLetterSpacing.value,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            FadeTransition(
-              opacity: _spinnerFade,
-              child: _AnimatedDotsLoader(
-                primaryColor: colorScheme.primary,
-                tertiaryColor: colorScheme.tertiary,
-                secondaryColor: colorScheme.secondary,
-              ),
+              ],
             ),
           ],
+        ),
+        const SizedBox(height: 56),
+        FadeTransition(
+          opacity: _spinnerFade,
+          child: _AnimatedDotsLoader(
+            primaryColor: colorScheme.primary,
+            tertiaryColor: colorScheme.tertiary,
+            secondaryColor: colorScheme.secondary,
+          ),
         ),
       ],
     );

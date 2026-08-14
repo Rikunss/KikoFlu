@@ -32,7 +32,7 @@ extern "C" {
 #endif
 
 JNIEXPORT jlong JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeCreatePlayer(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeCreatePlayer(
     JNIEnv* env, jobject /* thiz */) {
     LOGI("nativeCreatePlayer()");
     auto* player = new AaudioExclusivePlayer();
@@ -40,7 +40,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeCreatePlayer(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeInitPlayer(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeInitPlayer(
     JNIEnv* env, jobject /* thiz */,
     jlong native_ptr, jint sample_rate, jint channel_count, jint bits_per_sample, jint device_id) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
@@ -49,7 +49,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeInitPlayer(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeStartPlayer(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeStartPlayer(
     JNIEnv* env, jobject /* thiz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player == nullptr) return JNI_FALSE;
@@ -57,14 +57,14 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeStartPlayer(
 }
 
 JNIEXPORT void JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeStopPlayer(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeStopPlayer(
     JNIEnv* env, jobject /* thiz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player != nullptr) player->stop();
 }
 
 JNIEXPORT void JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeDestroyPlayer(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeDestroyPlayer(
     JNIEnv* env, jobject /* thiz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player != nullptr) {
@@ -74,7 +74,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeDestroyPlayer(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeIsExclusive(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeIsExclusive(
     JNIEnv* env, jobject /* thiz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player == nullptr) return JNI_FALSE;
@@ -82,7 +82,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeIsExclusive(
 }
 
 JNIEXPORT jint JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeGetSampleRate(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeGetSampleRate(
     JNIEnv* env, jobject /* thiz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player == nullptr) return 0;
@@ -90,7 +90,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeGetSampleRate(
 }
 
 JNIEXPORT jdouble JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeGetLatencyMs(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeGetLatencyMs(
     JNIEnv* env, jobject /* thiz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player == nullptr) return 0.0;
@@ -101,7 +101,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeGetLatencyMs(
 // These use JNI global convention: ClassName_methodName for @JvmStatic methods
 
 JNIEXPORT jlong JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeCreatePlayerStaticImpl(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeCreatePlayerStaticImpl(
     JNIEnv* env, jclass /* clazz */) {
     LOGI("nativeCreatePlayerStaticImpl()");
     auto* player = new AaudioExclusivePlayer();
@@ -109,7 +109,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeCreatePlayerStaticImpl
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeInitPlayerStaticImpl(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeInitPlayerStaticImpl(
     JNIEnv* env, jclass /* clazz */,
     jlong native_ptr, jint sample_rate, jint channel_count, jint bits_per_sample, jint device_id) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
@@ -118,7 +118,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeInitPlayerStaticImpl(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeStartPlayerStaticImpl(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeStartPlayerStaticImpl(
     JNIEnv* env, jclass /* clazz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player == nullptr) return JNI_FALSE;
@@ -126,14 +126,14 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeStartPlayerStaticImpl(
 }
 
 JNIEXPORT void JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeStopPlayerStaticImpl(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeStopPlayerStaticImpl(
     JNIEnv* env, jclass /* clazz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player != nullptr) player->stop();
 }
 
 JNIEXPORT void JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeDestroyPlayerStaticImpl(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeDestroyPlayerStaticImpl(
     JNIEnv* env, jclass /* clazz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player != nullptr) {
@@ -143,7 +143,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeDestroyPlayerStaticImp
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeIsExclusiveStaticImpl(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeIsExclusiveStaticImpl(
     JNIEnv* env, jclass /* clazz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player == nullptr) return JNI_FALSE;
@@ -151,7 +151,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeIsExclusiveStaticImpl(
 }
 
 JNIEXPORT jint JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeGetSampleRateStaticImpl(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeGetSampleRateStaticImpl(
     JNIEnv* env, jclass /* clazz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player == nullptr) return 0;
@@ -159,7 +159,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeGetSampleRateStaticImp
 }
 
 JNIEXPORT jint JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeWritePcmFloatStaticImpl(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeWritePcmFloatStaticImpl(
     JNIEnv* env, jclass /* clazz */, jlong native_ptr,
     jfloatArray buffer, jint num_frames) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
@@ -177,7 +177,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeWritePcmFloatStaticImp
 }
 
 JNIEXPORT jint JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeWritePcmI16StaticImpl(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeWritePcmI16StaticImpl(
     JNIEnv* env, jclass /* clazz */, jlong native_ptr,
     jshortArray buffer, jint num_frames) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
@@ -195,7 +195,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeWritePcmI16StaticImpl(
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeGetFramesWrittenStaticImpl(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeGetFramesWrittenStaticImpl(
     JNIEnv* env, jclass /* clazz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player == nullptr) return 0;
@@ -203,7 +203,7 @@ Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeGetFramesWrittenStatic
 }
 
 JNIEXPORT void JNICALL
-Java_com_meteor_kikoeruflutter_ExclusiveAudioPlugin_nativeResetFramesWrittenStaticImpl(
+Java_com_kikoflu_edge_ExclusiveAudioPlugin_nativeResetFramesWrittenStaticImpl(
     JNIEnv* env, jclass /* clazz */, jlong native_ptr) {
     auto* player = reinterpret_cast<AaudioExclusivePlayer*>(native_ptr);
     if (player != nullptr) player->resetTotalFramesWritten();

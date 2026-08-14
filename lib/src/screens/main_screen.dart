@@ -16,6 +16,9 @@ import 'search_screen.dart';
 import 'my_screen.dart';
 import 'settings_screen.dart';
 import '../providers/settings_provider.dart';
+import '../services/analytics_service.dart';
+import '../services/information_popup_service.dart';
+import '../widgets/information_popup_dialog.dart';
 
 /// Pop-up toast that appears when network is lost.
 /// Animates in with a scale bounce, stays 5 seconds,
@@ -252,6 +255,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _maybeShowInformationPopup();
     _screens = const [
       WorksScreen(key: PageStorageKey('works_screen')),
       SearchScreen(key: PageStorageKey('search_screen')),
@@ -266,6 +270,24 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         ),
       );
     });
+  }
+
+  Future<void> _maybeShowInformationPopup() async {
+    try {
+      final popup = await InformationPopupService().getActivePopup();
+      if (popup == null || !mounted) return;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        InformationPopupDialog.show(context, popup);
+        unawaited(AnalyticsService.instance.logEvent(
+          'information_popup_shown',
+          parameters: {'popup_id': popup.id},
+        ));
+      });
+    } catch (_) {
+      // Failed to load popup — skip it.
+    }
   }
 
   List<_NavItem> _buildNavItems(BuildContext context, bool showUpdateBadge) {

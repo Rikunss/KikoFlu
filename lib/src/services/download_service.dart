@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/download_task.dart';
 import '../utils/file_icon_utils.dart';
+import 'analytics_service.dart';
 import 'cache_service.dart';
 import 'download_conversion_hook.dart';
 import 'download_cover_processor.dart';
@@ -528,6 +529,11 @@ class DownloadService {
         );
       }
       persistence.updateTask(updatedTask, immediate: true);
+      unawaited(AnalyticsService.instance.logEvent('download_completed',
+          parameters: {
+        'work_id': task.workId,
+        if (convertedPath != null) 'format': convertedPath.split('.').last,
+      }));
       _cancelTokens.remove(task.id);
       _speedTrackers.remove(task.id);
     } catch (e) {

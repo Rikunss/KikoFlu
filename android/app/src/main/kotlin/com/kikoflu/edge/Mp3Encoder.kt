@@ -1,4 +1,4 @@
-package com.meteor.kikoeruflutter
+package com.kikoflu.edge
 
 /**
  * Kotlin wrapper for the LAME MP3 encoder JNI library.

@@ -1,5 +1,5 @@
 # Konfigurasi
-$package = "com.meteor.kikoeruflutter"
+$package = "com.kikoflu.edge"
 $output = "C:\Users\023 OFF~1\Desktop\kikoflu_debug.log"
 Write-Host "=== KikoFlu Log Capture ===" -ForegroundColor Cyan
 Write-Host "Package: $package"

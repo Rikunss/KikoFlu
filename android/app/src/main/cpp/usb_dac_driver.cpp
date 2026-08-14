@@ -1151,7 +1151,7 @@ std::string UsbDacDriver::getStatusString() const { return pImpl_->getStatusStri
 extern "C" {
 
 JNIEXPORT jlong JNICALL
-Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeCreateDriver(
+Java_com_kikoflu_edge_UsbDacPlugin_nativeCreateDriver(
     JNIEnv* env, jobject /* thiz */) {
     LOGI("nativeCreateDriver()");
     auto* driver = new UsbDacDriver();
@@ -1159,7 +1159,7 @@ Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeCreateDriver(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeInitDriver(
+Java_com_kikoflu_edge_UsbDacPlugin_nativeInitDriver(
     JNIEnv* env, jobject /* thiz */,
     jlong native_ptr, jint device_fd, jint sample_rate,
     jint channel_count, jint bits_per_sample) {
@@ -1170,7 +1170,7 @@ Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeInitDriver(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeStartDriver(
+Java_com_kikoflu_edge_UsbDacPlugin_nativeStartDriver(
     JNIEnv* env, jobject /* thiz */, jlong native_ptr) {
     auto* driver = reinterpret_cast<UsbDacDriver*>(native_ptr);
     if (driver == nullptr) return JNI_FALSE;
@@ -1178,14 +1178,14 @@ Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeStartDriver(
 }
 
 JNIEXPORT void JNICALL
-Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeStopDriver(
+Java_com_kikoflu_edge_UsbDacPlugin_nativeStopDriver(
     JNIEnv* env, jobject /* thiz */, jlong native_ptr) {
     auto* driver = reinterpret_cast<UsbDacDriver*>(native_ptr);
     if (driver != nullptr) driver->stop();
 }
 
 JNIEXPORT void JNICALL
-Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeDestroyDriver(
+Java_com_kikoflu_edge_UsbDacPlugin_nativeDestroyDriver(
     JNIEnv* env, jobject /* thiz */, jlong native_ptr) {
     auto* driver = reinterpret_cast<UsbDacDriver*>(native_ptr);
     if (driver != nullptr) {
@@ -1195,7 +1195,7 @@ Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeDestroyDriver(
 }
 
 JNIEXPORT jint JNICALL
-Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeWritePcmFloat(
+Java_com_kikoflu_edge_UsbDacPlugin_nativeWritePcmFloat(
     JNIEnv* env, jobject /* thiz */,
     jlong native_ptr, jfloatArray buffer, jint num_frames) {
     auto* driver = reinterpret_cast<UsbDacDriver*>(native_ptr);
@@ -1213,7 +1213,7 @@ Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeWritePcmFloat(
 }
 
 JNIEXPORT jint JNICALL
-Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeWritePcmI16(
+Java_com_kikoflu_edge_UsbDacPlugin_nativeWritePcmI16(
     JNIEnv* env, jobject /* thiz */,
     jlong native_ptr, jshortArray buffer, jint num_frames) {
     auto* driver = reinterpret_cast<UsbDacDriver*>(native_ptr);
@@ -1232,7 +1232,7 @@ Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeWritePcmI16(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeIsActive(
+Java_com_kikoflu_edge_UsbDacPlugin_nativeIsActive(
     JNIEnv* env, jobject /* thiz */, jlong native_ptr) {
     auto* driver = reinterpret_cast<UsbDacDriver*>(native_ptr);
     if (driver == nullptr) return JNI_FALSE;
@@ -1245,7 +1245,7 @@ Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeIsActive(
 // method directly on the containing class (UsbDacPlugin).
 
 JNIEXPORT jint JNICALL
-Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeWritePcmFloatStaticImpl(
+Java_com_kikoflu_edge_UsbDacPlugin_nativeWritePcmFloatStaticImpl(
     JNIEnv* env, jclass /* clazz */, jlong native_ptr,
     jfloatArray buffer, jint num_frames) {
     auto* driver = reinterpret_cast<UsbDacDriver*>(native_ptr);
@@ -1284,7 +1284,7 @@ Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeWritePcmFloatStaticImpl(
 }
 
 JNIEXPORT jint JNICALL
-Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeWritePcmI16StaticImpl(
+Java_com_kikoflu_edge_UsbDacPlugin_nativeWritePcmI16StaticImpl(
     JNIEnv* env, jclass /* clazz */, jlong native_ptr,
     jshortArray buffer, jint num_frames) {
     auto* driver = reinterpret_cast<UsbDacDriver*>(native_ptr);
@@ -1324,7 +1324,7 @@ Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeWritePcmI16StaticImpl(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_meteor_kikoeruflutter_UsbDacPlugin_nativeIsActiveStaticImpl(
+Java_com_kikoflu_edge_UsbDacPlugin_nativeIsActiveStaticImpl(
     JNIEnv* env, jclass /* clazz */, jlong native_ptr) {
     auto* driver = reinterpret_cast<UsbDacDriver*>(native_ptr);
     if (driver == nullptr) {
