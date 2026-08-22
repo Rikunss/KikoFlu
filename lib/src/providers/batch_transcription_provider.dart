@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:path/path.dart' as p;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -8,6 +9,7 @@ import 'package:whisper_ggml_plus/whisper_ggml_plus.dart';
 import '../models/work.dart';
 import '../services/ai_model_service.dart';
 import '../services/batch_transcription_notification_service.dart';
+import '../services/download_path_service.dart';
 import '../services/log_service.dart';
 
 final _log = LogService.instance;
@@ -65,6 +67,9 @@ class BatchTranscriptionState {
   /// Number of failed files.
   final int failedCount;
 
+  /// Elapsed seconds since batch started.
+  final int elapsedSeconds;
+
   const BatchTranscriptionState({
     this.status = BatchJobStatus.idle,
     this.workId,
@@ -72,6 +77,7 @@ class BatchTranscriptionState {
     this.currentIndex = -1,
     this.doneCount = 0,
     this.failedCount = 0,
+    this.elapsedSeconds = 0,
   });
 
   int get totalFiles => files.length;
@@ -88,6 +94,7 @@ class BatchTranscriptionState {
     int? currentIndex,
     int? doneCount,
     int? failedCount,
+    int? elapsedSeconds,
   }) {
     return BatchTranscriptionState(
       status: status ?? this.status,
@@ -96,6 +103,7 @@ class BatchTranscriptionState {
       currentIndex: currentIndex ?? this.currentIndex,
       doneCount: doneCount ?? this.doneCount,
       failedCount: failedCount ?? this.failedCount,
+      elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
     );
   }
 }
@@ -112,6 +120,7 @@ class BatchTranscriptionNotifier
   final Ref _ref;
   Completer<void>? _batchCompleter;
   bool _cancelled = false;
+  Timer? _elapsedTimer;
 
   BatchTranscriptionNotifier(this._ref) : super(const BatchTranscriptionState());
 
@@ -151,6 +160,16 @@ class BatchTranscriptionNotifier
 
     _batchCompleter = Completer<void>();
 
+    // Start elapsed timer.
+    _elapsedTimer?.cancel();
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (state.status == BatchJobStatus.running) {
+        state = state.copyWith(
+          elapsedSeconds: state.elapsedSeconds + 1,
+        );
+      }
+    });
+
     try {
       await WakelockPlus.enable();
     } catch (e) {
@@ -182,6 +201,7 @@ class BatchTranscriptionNotifier
           currentIndex: i,
           totalFiles: state.totalFiles,
           currentFile: batchFile.displayName,
+          elapsedSeconds: state.elapsedSeconds,
         );
       } catch (e) {
         LogService.instance.warning('[BatchTranscriptionNotifier] error: $e', tag: 'BatchTranscription');
@@ -262,6 +282,8 @@ class BatchTranscriptionNotifier
       }
     }
 
+    _elapsedTimer?.cancel();
+
     try {
       await WakelockPlus.disable();
     } catch (e) {
@@ -328,7 +350,15 @@ class BatchTranscriptionHelper {
 
     if (work.children == null || work.children!.isEmpty) return files;
 
-    final basePath = localImportPath;
+    // For imported works, use localImportPath.
+    // For downloaded works, resolve from the download directory.
+    String basePath;
+    if (localImportPath != null && localImportPath.isNotEmpty) {
+      basePath = localImportPath;
+    } else {
+      final downloadDir = await DownloadPathService.getDownloadDirectory();
+      basePath = p.join(downloadDir.path, work.id.toString());
+    }
 
     void walkFiles(List<AudioFile> children, String parentPath) {
       for (final child in children) {
@@ -341,9 +371,7 @@ class BatchTranscriptionHelper {
           final relativePath = parentPath.isEmpty
               ? child.title
               : '$parentPath/${child.title}';
-          final fullPath = basePath != null
-              ? '$basePath/$relativePath'
-              : relativePath;
+          final fullPath = p.join(basePath, relativePath);
           files.add((path: fullPath, title: child.title));
         }
       }

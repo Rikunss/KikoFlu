@@ -17,15 +17,26 @@ class InformationPopupService {
   /// Never throws — all failures return null.
   Future<InformationPopup?> getActivePopup() async {
     try {
-      if (!_remoteConfig.isConfigured) return null;
+      if (!_remoteConfig.isConfigured) {
+        print('[InfoPopup] Skipped: Firebase not configured');
+        return null;
+      }
 
       final raw =
           await _remoteConfig.getString(FirebaseConfig.informationPopupParam);
+      print('[InfoPopup] Raw value length: ${raw.length}');
+      print('[InfoPopup] Raw value preview: ${raw.substring(0, raw.length > 200 ? 200 : raw.length)}');
       if (raw.isEmpty) return null;
 
       final popup = InformationPopup.fromJson(raw);
-      if (popup == null) return null;
-      if (!popup.isActiveOn(DateTime.now())) return null;
+      if (popup == null) {
+        print('[InfoPopup] JSON parse returned null!');
+        return null;
+      }
+      if (!popup.isActiveOn(DateTime.now())) {
+        print('[InfoPopup] Popup not active (startDate/endDate check failed)');
+        return null;
+      }
 
       final prefs = await SharedPreferences.getInstance();
       final dismissed = prefs.getBool('$_dismissPrefix${popup.id}') ?? false;

@@ -311,12 +311,12 @@ class _OfflineWorkDetailScreenState
     final work = widget.work;
     final localImportPath = widget.localImportPath ?? work.localImportPath;
 
-    final files = await BatchTranscriptionHelper.collectAudioFiles(
+    final allFiles = await BatchTranscriptionHelper.collectAudioFiles(
       work: work,
       localImportPath: localImportPath,
     );
 
-    if (files.isEmpty) {
+    if (allFiles.isEmpty) {
       if (mounted) {
         SnackBarUtil.showInfo(
           context,
@@ -326,8 +326,15 @@ class _OfflineWorkDetailScreenState
       return;
     }
 
-    final anyExist = await BatchTranscriptionHelper.anyFilesExist(files: files);
-    if (!anyExist) {
+    // Filter: only include files that actually exist on disk.
+    final files = <({String path, String title})>[];
+    for (final f in allFiles) {
+      if (await File(f.path).exists()) {
+        files.add(f);
+      }
+    }
+
+    if (files.isEmpty) {
       if (mounted) {
         SnackBarUtil.showInfo(
           context,

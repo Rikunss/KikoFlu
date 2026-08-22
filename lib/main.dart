@@ -37,6 +37,8 @@ import 'src/services/usb_dac_service.dart';
 import 'src/services/equalizer_service.dart';
 import 'src/services/app_lock_service.dart';
 import 'src/services/screen_state_service.dart';
+import 'src/services/remote_config_service.dart';
+import 'src/services/fcm_service.dart';
 import 'src/services/subtitle_library_file_watcher.dart';
 import 'src/screens/lock_screen.dart';
 import 'src/models/work.dart';
@@ -89,6 +91,14 @@ void main(List<String> args) {
 
     await ThemeSettingsNotifier.preload();
     await AnalyticsService.instance.initialize();
+    
+    // Initialize FCM for push notifications (Android/iOS only)
+    if (Platform.isAndroid || Platform.isIOS) {
+      FcmService.instance.initialize().catchError((e) {
+        LogService.instance.warning('[Main] FCM init failed: $e', tag: 'Main');
+      });
+    }
+    
     final splashSeed = await SplashApp.loadSavedSeedColor();
 
     await AppBootstrap.initEssential(isDesktop: isDesktop);
@@ -260,6 +270,7 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     UsbDacService.instance.dispose();
     UsbDacAudioManager.instance.dispose();
     FloatingLyricService.instance.dispose();
+    FcmService.instance.dispose();
     BookmarkService.instance.dispose();
     EqualizerService.instance.dispose();
     PlaybackHistoryService.instance.dispose();
@@ -303,6 +314,8 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
           AppLockService.instance.notifyAppForegrounded()) {
         setState(() {});
       }
+      // Schedule remote config refresh on next fetch
+      RemoteConfigService().scheduleForceRefresh();
     }
 
     if (state == AppLifecycleState.detached && Platform.isAndroid) {

@@ -63,13 +63,18 @@ class BatchTranscriptionNotificationService {
     required int currentIndex,
     required int totalFiles,
     required String currentFile,
+    int elapsedSeconds = 0,
   }) async {
     if (!Platform.isAndroid || !_initialized) return;
+
+    final m = elapsedSeconds ~/ 60;
+    final s = elapsedSeconds % 60;
+    final elapsed = '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
 
     await _plugin.show(
       _notificationId,
       'AI Transcribing Batch',
-      'File ${currentIndex + 1}/$totalFiles — $currentFile',
+      'File ${currentIndex + 1}/$totalFiles · $elapsed — $currentFile',
       NotificationDetails(
         android: AndroidNotificationDetails(
           _channelId,

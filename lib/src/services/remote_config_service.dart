@@ -8,7 +8,16 @@ import '../config/firebase_config.dart';
 import 'log_service.dart';
 
 class RemoteConfigService {
-  RemoteConfigService({Dio? dio}) : _dio = dio ?? Dio();
+  static RemoteConfigService? _instance;
+  static RemoteConfigService get instance => _instance ??= RemoteConfigService._();
+
+  RemoteConfigService._({Dio? dio}) : _dio = dio ?? Dio();
+
+  /// For backward compatibility: RemoteConfigService() returns the same singleton.
+  factory RemoteConfigService({Dio? dio}) {
+    _instance ??= RemoteConfigService._(dio: dio);
+    return _instance!;
+  }
 
   static const String _installationsBase =
       'https://firebaseinstallations.googleapis.com/v1';
@@ -23,9 +32,18 @@ class RemoteConfigService {
 
   static const Duration _minFetchInterval = Duration(minutes: 5);
 
+  /// Whether a force refresh is pending (e.g. after app resume).
+  bool _forceRefreshPending = false;
+
   final Dio _dio;
 
   bool get isConfigured => FirebaseConfig.isConfigured;
+
+  /// Schedule a force refresh on next fetchEntries() call.
+  /// Call this when app resumes from background or on pull-to-refresh.
+  void scheduleForceRefresh() {
+    _forceRefreshPending = true;
+  }
 
   Future<Map<String, String>> fetchEntries({bool force = false}) async {
     if (!isConfigured) {
@@ -38,7 +56,17 @@ class RemoteConfigService {
 
     final prefs = await SharedPreferences.getInstance();
 
-    if (!force) {
+    // Check if force refresh is pending
+    final shouldForce = force || _forceRefreshPending;
+    if (_forceRefreshPending) {
+      _forceRefreshPending = false;
+      LogService.instance.debug(
+        '[RemoteConfig] Force refresh triggered',
+        tag: 'RemoteConfig',
+      );
+    }
+
+    if (!shouldForce) {
       final lastFetch = prefs.getInt(_keyLastFetchTime) ?? 0;
       final now = DateTime.now().millisecondsSinceEpoch;
       if (now - lastFetch < _minFetchInterval.inMilliseconds) {

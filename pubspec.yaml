@@ -3,7 +3,7 @@ description: A cross-platform Flutter app for browsing and playing Kikoeru serve
 
 publish_to: 'none'
 
-version: 3.2.2
+version: 3.3.0
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -95,6 +95,7 @@ dependencies:
   wakelock_plus: ^1.5.2
   firebase_core: ^4.13.0
   firebase_analytics: ^12.4.6
+  firebase_messaging: ^16.5.0
 dependency_overrides:
   # Local fork of audio_service with null-safety fixes for Android destroy sequence.
   # The upstream plugin crashes with NullPointerException when AudioService.instance

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/log_service.dart';
@@ -415,6 +416,12 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   /// Guards against double-clicking the "Generate AI Lyrics" button.
   bool _isTranscribing = false;
 
+  /// Transcription progress state.
+  int _transcriptionElapsed = 0;
+  Timer? _transcriptionTimer;
+  String _transcriptionModelName = '';
+  bool _transcriptionCancelled = false;
+
   /// Returns the local file path for AI transcription, or null if streamed.
   String? _getLocalAudioPath(AudioTrack? track) {
     final url = track?.url;
@@ -487,7 +494,29 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
     if (config == null || !mounted) return;
 
+    _transcriptionCancelled = false;
+    final modelConfig = getConfigByModelName(config.model.name);
+    _transcriptionModelName = modelConfig?.displayName ?? config.model.name;
+    _transcriptionElapsed = 0;
+
     setState(() => _isTranscribing = true);
+
+    // Start elapsed timer.
+    _transcriptionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _isTranscribing) {
+        setState(() => _transcriptionElapsed++);
+      }
+    });
+
+    // Start notification.
+    try {
+      await _initTranscriptionNotification();
+      await _showTranscriptionNotification(
+        title: track.title,
+        stage: 'Loading model...',
+      );
+    } catch (_) {}
+
     try {
       final lrcPath = await aiService.generateLrc(
         audioPath,
@@ -496,6 +525,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
         threads: config.threads,
         splitOnWord: config.splitOnWord,
       );
+      if (_transcriptionCancelled) return;
       if (mounted) {
         if (lrcPath != null) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -507,6 +537,13 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
           ref
               .read(lyricControllerProvider.notifier)
               .loadLyricFromLocalFile(lrcPath);
+          await _showTranscriptionNotification(
+            title: track.title,
+            stage: 'Completed ✓',
+            complete: true,
+          );
+          await Future.delayed(const Duration(seconds: 3));
+          await _dismissTranscriptionNotification();
         }
       }
     } catch (e) {
@@ -518,12 +555,103 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
           ),
         );
       }
+      await _showTranscriptionNotification(
+        title: track.title,
+        stage: 'Failed: $e',
+        complete: true,
+      );
     } finally {
+      _transcriptionTimer?.cancel();
       if (mounted) {
         setState(() => _isTranscribing = false);
       }
     }
   }
+
+  // ── Single-file transcription notification ──────────────────────────
+
+  static const _notifChannelId = 'single_transcription';
+  static const _notifId = 1004;
+  final FlutterLocalNotificationsPlugin _notifPlugin =
+      FlutterLocalNotificationsPlugin();
+  bool _notifInitialized = false;
+
+  Future<void> _initTranscriptionNotification() async {
+    if (_notifInitialized) return;
+    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const ios = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    await _notifPlugin.initialize(
+      const InitializationSettings(android: android, iOS: ios),
+    );
+    try {
+      final androidPlugin = _notifPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.requestNotificationsPermission();
+    } catch (_) {}
+    _notifInitialized = true;
+  }
+
+  Future<void> _showTranscriptionNotification({
+    required String title,
+    required String stage,
+    bool complete = false,
+  }) async {
+    if (!_notifInitialized) return;
+    final elapsed = _formatElapsed(_transcriptionElapsed);
+    await _notifPlugin.show(
+      _notifId,
+      '🤖 Transcribing: $title',
+      '$stage · $elapsed',
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _notifChannelId,
+          'Single Transcription',
+          channelDescription: 'Shows single file AI transcription progress',
+          importance: Importance.low,
+          priority: Priority.low,
+          showProgress: !complete,
+          indeterminate: complete ? false : true,
+          ongoing: !complete,
+          autoCancel: complete,
+          onlyAlertOnce: true,
+          playSound: false,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _dismissTranscriptionNotification() async {
+    if (!_notifInitialized) return;
+    await _notifPlugin.cancel(_notifId);
+  }
+
+  String _formatElapsed(int seconds) {
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  void _cancelTranscription() {
+    _transcriptionCancelled = true;
+    _transcriptionTimer?.cancel();
+    _dismissTranscriptionNotification();
+    if (mounted) {
+      setState(() => _isTranscribing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transcription cancelled'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  // ── Landscape layout helpers ──────────────────────────────────────
 
   /// In landscape mode, only drags started on the cover/controls side (left ~40%)
   /// should trigger dismiss — the right side (lyrics) must remain scrollable.
@@ -874,6 +1002,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   void dispose() {
     _seekCompletionSub?.cancel();
     _dismissCtrl.dispose();
+    _transcriptionTimer?.cancel();
     StreamingSpeedTracker.instance.stop();
     super.dispose();
   }
@@ -1234,90 +1363,94 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
           ),
 
           if (!_showLyricView) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(track.title,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (track.workId != null)
-                      _buildFavoriteButton(track.workId!),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                if (track.artist != null)
-                  Text(track.artist!,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.white.withValues(alpha: 0.8),
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              const SizedBox(height: 4),
-              Consumer(
-                builder: (context, ref, child) {
-                  final audioFormat = ref.watch(audioFormatInfoProvider);
-                  final dacNameAsync = ref.watch(activeUsbDacNameProvider);
-                  final exclusiveStateAsync = ref.watch(exclusiveAudioStateProvider);
-                  final showUsbBadge = Platform.isAndroid &&
-                      exclusiveStateAsync.when(
-                        data: (s) => s.enabled,
-                        loading: () => false,
-                        error: (_, __) => false,
-                      ) &&
-                      dacNameAsync.when(
-                        data: (n) => n.isNotEmpty,
-                        loading: () => false,
-                        error: (_, __) => false,
-                      );
-                  final dacName = dacNameAsync.when(
-                    data: (n) => n,
-                    loading: () => '',
-                    error: (_, __) => '',
-                  );
-                  return Row(
+            if (_isTranscribing)
+              _buildTranscriptionProgress(track, cs, theme)
+            else ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(children: [
+                  Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _AudioInfoBadgeInPlayer(audioFormatAsync: audioFormat),
-                      const SizedBox(width: 6),
-                      const _OutputDevicePill(),
-                      const SizedBox(width: 6),
-                      const _StreamingSpeedBadge(),
-                      if (showUsbBadge) const SizedBox(width: 6),
-                      if (showUsbBadge) _UsbDacBadgeInPlayer(dacName: dacName),
+                      Flexible(
+                        child: Text(track.title,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (track.workId != null)
+                        _buildFavoriteButton(track.workId!),
                     ],
-                  );
-                },
+                  ),
+                  const SizedBox(height: 4),
+                  if (track.artist != null)
+                    Text(track.artist!,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                const SizedBox(height: 4),
+                Consumer(
+                  builder: (context, ref, child) {
+                    final audioFormat = ref.watch(audioFormatInfoProvider);
+                    final dacNameAsync = ref.watch(activeUsbDacNameProvider);
+                    final exclusiveStateAsync = ref.watch(exclusiveAudioStateProvider);
+                    final showUsbBadge = Platform.isAndroid &&
+                        exclusiveStateAsync.when(
+                          data: (s) => s.enabled,
+                          loading: () => false,
+                          error: (_, __) => false,
+                        ) &&
+                        dacNameAsync.when(
+                          data: (n) => n.isNotEmpty,
+                          loading: () => false,
+                          error: (_, __) => false,
+                        );
+                    final dacName = dacNameAsync.when(
+                      data: (n) => n,
+                      loading: () => '',
+                      error: (_, __) => '',
+                    );
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _AudioInfoBadgeInPlayer(audioFormatAsync: audioFormat),
+                        const SizedBox(width: 6),
+                        const _OutputDevicePill(),
+                        const SizedBox(width: 6),
+                        const _StreamingSpeedBadge(),
+                        if (showUsbBadge) const SizedBox(width: 6),
+                        if (showUsbBadge) _UsbDacBadgeInPlayer(dacName: dacName),
+                      ],
+                    );
+                  },
+                ),
+                ]),
               ),
-              ]),
-            ),
-            const SizedBox(height: 8),
-            Consumer(builder: (context, ref, child) {
-              final hasLyrics = ref.watch(
-                lyricControllerProvider.select((s) => s.lyrics.isNotEmpty),
-              );
-              return GestureDetector(
-                onTap: hasLyrics
-                    ? () => setState(() => _showLyricView = true)
-                    : null,
-                child: LyricDisplay(albumName: track.album),
-              );
-            }),
+              const SizedBox(height: 8),
+              Consumer(builder: (context, ref, child) {
+                final hasLyrics = ref.watch(
+                  lyricControllerProvider.select((s) => s.lyrics.isNotEmpty),
+                );
+                return GestureDetector(
+                  onTap: hasLyrics
+                      ? () => setState(() => _showLyricView = true)
+                      : null,
+                  child: LyricDisplay(albumName: track.album),
+                );
+              }),
+            ],
           ],
 
           const SizedBox(height: 8),
@@ -1583,7 +1716,9 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
               Container(width: 1, color: Colors.white.withValues(alpha: 0.15)),
               Expanded(
                 flex: 3,
-                child: Consumer(builder: (context, ref, child) {
+                child: _isTranscribing
+                    ? _buildTranscriptionProgressLandscape(cs)
+                    : Consumer(builder: (context, ref, child) {
                   final isEmpty = ref.watch(
                     lyricControllerProvider.select((s) => s.lyrics.isEmpty),
                   );
@@ -1655,6 +1790,137 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       error: (error, stack) => Center(
         child: Text(S.of(context).errorWithMessage(error.toString()),
           style: const TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
+  /// Build the transcription progress widget (replaces lyrics area).
+  Widget _buildTranscriptionProgress(
+      AudioTrack track, ColorScheme cs, ThemeData theme) {
+    final elapsed = _formatElapsed(_transcriptionElapsed);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Title
+          Text(
+            track.title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 16),
+
+          // AI icon + status
+          Icon(Icons.auto_awesome,
+              size: 32, color: cs.primary.withValues(alpha: 0.9)),
+          const SizedBox(height: 12),
+          Text(
+            'Generating AI Lyrics...',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
+          ),
+          const SizedBox(height: 6),
+
+          // Model + time
+          Text(
+            '$_transcriptionModelName · $elapsed',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.white.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Progress bar (indeterminate)
+          SizedBox(
+            width: 200,
+            child: LinearProgressIndicator(
+              minHeight: 4,
+              backgroundColor: Colors.white.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation(cs.primary),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Cancel button
+          OutlinedButton.icon(
+            onPressed: _cancelTranscription,
+            icon: const Icon(Icons.stop, size: 16),
+            label: const Text('Cancel'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white.withValues(alpha: 0.8),
+              side: BorderSide(
+                color: Colors.white.withValues(alpha: 0.3),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 10,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Landscape transcription progress (replaces lyrics area).
+  Widget _buildTranscriptionProgressLandscape(ColorScheme cs) {
+    final elapsed = _formatElapsed(_transcriptionElapsed);
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.auto_awesome,
+              size: 40, color: cs.primary.withValues(alpha: 0.9)),
+          const SizedBox(height: 16),
+          Text(
+            'Generating AI Lyrics...',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$_transcriptionModelName · $elapsed',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.white.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: 220,
+            child: LinearProgressIndicator(
+              minHeight: 4,
+              backgroundColor: Colors.white.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation(cs.primary),
+            ),
+          ),
+          const SizedBox(height: 20),
+          OutlinedButton.icon(
+            onPressed: _cancelTranscription,
+            icon: const Icon(Icons.stop, size: 16),
+            label: const Text('Cancel'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white.withValues(alpha: 0.8),
+              side: BorderSide(
+                color: Colors.white.withValues(alpha: 0.3),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

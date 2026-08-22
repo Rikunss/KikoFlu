@@ -9,6 +9,8 @@ class InformationPopup {
   final String imageUrl;
   final String buttonText;
   final String buttonUrl;
+  final String buttonText2;
+  final String buttonUrl2;
   final DateTime? startDate;
   final DateTime? endDate;
 
@@ -20,6 +22,8 @@ class InformationPopup {
     this.imageUrl = '',
     this.buttonText = '',
     this.buttonUrl = '',
+    this.buttonText2 = '',
+    this.buttonUrl2 = '',
     this.startDate,
     this.endDate,
   });
@@ -45,6 +49,8 @@ class InformationPopup {
         imageUrl: decoded['imageUrl'] as String? ?? '',
         buttonText: decoded['buttonText'] as String? ?? '',
         buttonUrl: decoded['buttonUrl'] as String? ?? '',
+        buttonText2: decoded['buttonText2'] as String? ?? '',
+        buttonUrl2: decoded['buttonUrl2'] as String? ?? '',
         startDate: _parseDate(decoded['startDate']),
         endDate: _parseDate(decoded['endDate']),
       );

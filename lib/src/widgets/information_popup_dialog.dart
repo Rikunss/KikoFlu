@@ -30,6 +30,7 @@ class _InformationPopupDialogState extends State<InformationPopupDialog> {
   final InformationPopupService _service = InformationPopupService();
   bool _dontShowAgain = false;
   bool _openingUrl = false;
+  bool _openingUrl2 = false;
 
   Future<void> _openAction() async {
     final url = widget.popup.buttonUrl.trim();
@@ -62,6 +63,37 @@ class _InformationPopupDialogState extends State<InformationPopupDialog> {
     }
   }
 
+  Future<void> _openAction2() async {
+    final url = widget.popup.buttonUrl2.trim();
+    if (url.isEmpty || _openingUrl2) return;
+
+    setState(() => _openingUrl2 = true);
+    try {
+      final uri = Uri.tryParse(url);
+      if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+        final launched = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (!launched && mounted) {
+          SnackBarUtil.showError(
+            context,
+            S.of(context).cannotOpenLink,
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarUtil.showError(
+          context,
+          S.of(context).openLinkFailed(e.toString()),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _openingUrl2 = false);
+    }
+  }
+
   void _close() {
     Navigator.of(context).pop(_dontShowAgain);
   }
@@ -75,6 +107,8 @@ class _InformationPopupDialogState extends State<InformationPopupDialog> {
     final hasImage = widget.popup.imageUrl.isNotEmpty;
     final hasAction =
         widget.popup.buttonText.isNotEmpty && widget.popup.buttonUrl.isNotEmpty;
+    final hasAction2 =
+        widget.popup.buttonText2.isNotEmpty && widget.popup.buttonUrl2.isNotEmpty;
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -175,25 +209,75 @@ class _InformationPopupDialogState extends State<InformationPopupDialog> {
                 ),
               ),
 
-              if (hasAction)
+              if (hasAction || hasAction2)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-                  child: FilledButton(
-                    onPressed: _openingUrl ? null : _openAction,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(46),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: _openingUrl
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(widget.popup.buttonText),
-                  ),
+                  child: hasAction2
+                      ? Row(
+                          children: [
+                            if (hasAction)
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: _openingUrl ? null : _openAction,
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(46),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                  child: _openingUrl
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : Text(widget.popup.buttonText),
+                                ),
+                              ),
+                            if (hasAction) const SizedBox(width: 8),
+                            if (hasAction2)
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: _openingUrl2 ? null : _openAction2,
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(46),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                  child: _openingUrl2
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : Text(widget.popup.buttonText2),
+                                ),
+                              ),
+                          ],
+                        )
+                      : FilledButton(
+                          onPressed: _openingUrl ? null : _openAction,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(46),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: _openingUrl
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(widget.popup.buttonText),
+                        ),
                 ),
 
               Padding(

@@ -230,6 +230,12 @@ class _BatchTranscriptionSheetState
     );
   }
 
+  String _formatElapsed(int seconds) {
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
   Widget _buildOverallProgress(
       BatchTranscriptionState state, ColorScheme cs, TextTheme tt) {
     final progress = state.totalFiles > 0
@@ -250,6 +256,13 @@ class _BatchTranscriptionSheetState
               children: [
                 Text('Files', style: tt.labelMedium),
                 const Spacer(),
+                if (state.status == BatchJobStatus.running)
+                  Text(
+                    '${_formatElapsed(state.elapsedSeconds)} elapsed',
+                    style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                if (state.status == BatchJobStatus.running)
+                  const SizedBox(width: 8),
                 Text(
                   '${state.doneCount + state.failedCount}/${state.totalFiles}',
                   style: tt.titleSmall?.copyWith(fontWeight: FontWeight.bold),
