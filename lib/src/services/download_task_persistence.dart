@@ -333,7 +333,7 @@ class DownloadTaskPersistence {
             downloadUrl: taskJson['downloadUrl'] as String,
             status: DownloadStatus.completed,
             totalBytes: taskJson['totalBytes'] as int?,
-            downloadedBytes: taskJson['downloadedBytes'] as int?,
+            downloadedBytes: (taskJson['downloadedBytes'] as int?) ?? 0,
             createdAt: DateTime.fromMillisecondsSinceEpoch(
                 taskJson['createdAt'] as int),
             completedAt: taskJson['completedAt'] != null

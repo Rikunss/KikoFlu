@@ -100,5 +100,18 @@ logs
 nul
 /Output/
 *.obj
+*.bak
 /KikoFlu-windows.zip
 test_scroll/
+
+# Flutter logs
+flutter_log.txt
+
+# Firebase options (contains API keys)
+lib/firebase_options.dart
+
+# CMake build cache
+**/.cxx/
+
+# Kotlin build cache
+**/.kotlin/
