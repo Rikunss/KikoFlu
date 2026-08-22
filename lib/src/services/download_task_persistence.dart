@@ -385,7 +385,8 @@ class DownloadTaskPersistence {
           final fileName = entity.path.split(Platform.pathSeparator).last;
           if (fileName == 'work_metadata.json' ||
               fileName == 'cover.jpg' ||
-              fileName.endsWith('.downloading')) {
+              fileName.endsWith('.downloading') ||
+              fileName.endsWith('.lrc')) {
             continue;
           }
           final fullName =
@@ -797,7 +798,8 @@ Future<_ScanResult> _scanDownloadDirectoryInBackground(
           final fileName = entity.path.split(Platform.pathSeparator).last;
           if (fileName == 'work_metadata.json' ||
               fileName == 'cover.jpg' ||
-              fileName.endsWith('.downloading')) {
+              fileName.endsWith('.downloading') ||
+              fileName.endsWith('.lrc')) {
             continue;
           }
           final fullFileName = relativePath.isEmpty
