@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:dio/dio.dart';
 
@@ -280,9 +281,12 @@ class DownloadTaskPersistence {
 
   /// Fully sync tasks with disk. Scans the filesystem, removes tasks for
   /// missing files, adds new files as completed tasks.
+  ///
+  /// The heavy file I/O is offloaded to a background Isolate to prevent
+  /// UI freezes during the scan.
   Future<void> reloadMetadataFromDisk() async {
     try {
-      _log.info('开始从硬盘同步任务...', tag: 'Download');
+      _log.info('开始从硬盘同步任务 (background)...', tag: 'Download');
       final downloadDir = await getDownloadDirectory();
       if (!await downloadDir.exists()) {
         _log.warning('下载目录不存在，清空所有已完成任务', tag: 'Download');
@@ -292,141 +296,62 @@ class DownloadTaskPersistence {
         return;
       }
 
-      final workFolders = <int, Directory>{};
-      await for (final entity in downloadDir.list()) {
-        if (entity is Directory) {
-          final workIdStr = entity.path.split(Platform.pathSeparator).last;
-          final workId = int.tryParse(workIdStr);
-          if (workId != null) {
-            workFolders[workId] = entity;
-          }
-        }
-      }
+      // Prepare current tasks as JSON for Isolate transfer
+      final currentTasksJson = _tasks.map((t) => t.toJson()).toList();
 
-      _log.info('发现 ${workFolders.length} 个作品文件夹', tag: 'Download');
+      // Run heavy I/O in background Isolate
+      final result = await Isolate.run(
+        () => _scanDownloadDirectoryInBackground(
+          downloadDir.path,
+          currentTasksJson,
+        ),
+      );
 
-      final tasksToRemove = <String>[];
-      for (final task in _tasks) {
-        if (task.status == DownloadStatus.completed) {
-          final workDir = workFolders[task.workId];
-          if (workDir == null) {
-            tasksToRemove.add(task.id);
-            _log.warning('作品文件夹不存在，删除任务: ${task.workTitle}',
-                tag: 'Download');
-          } else {
-            final file = File('${workDir.path}/${task.fileName}');
-            bool fileExists = await file.exists();
-            if (!fileExists) {
-              final meta = await loadWorkMetadata(task.workId);
-              final importPath = meta?['local_import_path'] as String?;
-              if (importPath != null && importPath.isNotEmpty) {
-                final sourceFile = File('$importPath/${task.fileName}');
-                fileExists = await sourceFile.exists();
-              }
-            }
-            if (!fileExists) {
-              tasksToRemove.add(task.id);
-              _log.warning('文件不存在，删除任务: ${task.fileName}',
-                  tag: 'Download');
-            }
-          }
-        }
-      }
-      if (tasksToRemove.isNotEmpty) {
-        _tasks.removeWhere((t) => tasksToRemove.contains(t.id));
+      _log.info('发现 ${result.scannedFolders} 个作品文件夹', tag: 'Download');
+
+      // Apply results from Isolate
+      if (result.tasksToRemove.isNotEmpty) {
+        _tasks.removeWhere((t) => result.tasksToRemove.contains(t.id));
         _log.info(
-            '删除了 ${tasksToRemove.length} 个不存在的任务', tag: 'Download');
+            '删除了 ${result.tasksToRemove.length} 个不存在的任务', tag: 'Download');
       }
 
-      await _upgradeOldWorkFolders(workFolders);
-
-      for (final entry in workFolders.entries) {
-        try {
-          await syncFileTreeWithDisk(entry.key, entry.value);
-        } catch (e) {
-          _log.error('同步文件树失败 RJ${entry.key}: $e', tag: 'Download');
-        }
-      }
-
-      final newTasks = <DownloadTask>[];
-      for (final entry in workFolders.entries) {
-        final workId = entry.key;
-        final workDir = entry.value;
-        final metadata = await loadWorkMetadata(workId);
-        final workTitle = metadata?['title'] as String? ?? 'RJ$workId';
-
-        Future<void> scanDirectory(
-            Directory dir, String relativePath) async {
-          final entities = await dir.list(followLinks: false).toList();
-          entities.sort((a, b) {
-            final aName = a.path.split(Platform.pathSeparator).last;
-            final bName = b.path.split(Platform.pathSeparator).last;
-            return naturalCompare(aName, bName);
-          });
-          for (final entity in entities) {
-            if (entity is File) {
-              final fileName =
-                  entity.path.split(Platform.pathSeparator).last;
-              if (fileName == 'work_metadata.json' ||
-                  fileName == 'cover.jpg' ||
-                  fileName.endsWith('.downloading')) {
-                continue;
-              }
-              final fullFileName = relativePath.isEmpty
-                  ? fileName
-                  : '$relativePath/$fileName';
-              final existingTask = _tasks.firstWhere(
-                (t) =>
-                    t.workId == workId && t.fileName == fullFileName,
-                orElse: () => DownloadTask(
-                  id: '',
-                  workId: 0,
-                  workTitle: '',
-                  fileName: '',
-                  downloadUrl: '',
-                  createdAt: DateTime.now(),
-                ),
-              );
-              if (existingTask.id.isEmpty) {
-                final newTask = DownloadTask(
-                  id:
-                      '${workId}_${fullFileName}_${DateTime.now().millisecondsSinceEpoch}',
-                  workId: workId,
-                  workTitle: workTitle,
-                  fileName: fullFileName,
-                  downloadUrl: '',
-                  status: DownloadStatus.completed,
-                  totalBytes: await entity.length(),
-                  downloadedBytes: await entity.length(),
-                  createdAt: entity.statSync().modified,
-                  completedAt: entity.statSync().modified,
-                  workMetadata: metadata,
-                );
-                newTasks.add(newTask);
-                _log.info('发现新文件: $fullFileName ($workTitle)',
-                    tag: 'Download');
-              }
-            } else if (entity is Directory) {
-              final dirName =
-                  entity.path.split(Platform.pathSeparator).last;
-              final subPath = relativePath.isEmpty
-                  ? dirName
-                  : '$relativePath/$dirName';
-              await scanDirectory(entity, subPath);
-            }
+      // Convert new tasks from JSON
+      if (result.newTasks.isNotEmpty) {
+        for (final taskJson in result.newTasks) {
+          final workId = taskJson['workId'] as int;
+          Map<String, dynamic>? metadata;
+          final metadataJson = taskJson['workMetadataJson'] as String?;
+          if (metadataJson != null) {
+            metadata = jsonDecode(metadataJson) as Map<String, dynamic>;
           }
+          final newTask = DownloadTask(
+            id: taskJson['id'] as String,
+            workId: workId,
+            workTitle: taskJson['workTitle'] as String,
+            fileName: taskJson['fileName'] as String,
+            downloadUrl: taskJson['downloadUrl'] as String,
+            status: DownloadStatus.completed,
+            totalBytes: taskJson['totalBytes'] as int?,
+            downloadedBytes: taskJson['downloadedBytes'] as int?,
+            createdAt: DateTime.fromMillisecondsSinceEpoch(
+                taskJson['createdAt'] as int),
+            completedAt: taskJson['completedAt'] != null
+                ? DateTime.fromMillisecondsSinceEpoch(
+                    taskJson['completedAt'] as int)
+                : null,
+            workMetadata: metadata,
+          );
+          _tasks.add(newTask);
         }
-        await scanDirectory(workDir, '');
-      }
-      if (newTasks.isNotEmpty) {
-        _tasks.addAll(newTasks);
-        _log.info('添加了 ${newTasks.length} 个新任务', tag: 'Download');
+        _log.info('添加了 ${result.newTasks.length} 个新任务', tag: 'Download');
       }
 
+      // Update metadata for existing tasks
       for (var i = 0; i < _tasks.length; i++) {
         final task = _tasks[i];
         if (task.status == DownloadStatus.completed) {
-          final metadata = await loadWorkMetadata(task.workId);
+          final metadata = result.workMetadata[task.workId];
           if (metadata != null) {
             _tasks[i] = task.copyWith(workMetadata: metadata);
           }
@@ -436,7 +361,7 @@ class DownloadTaskPersistence {
       _tasksController.add(List.from(_tasks));
       await _saveTasks();
       _log.info(
-          '同步完成：删除 ${tasksToRemove.length} 个，新增 ${newTasks.length} 个',
+          '同步完成：删除 ${result.tasksToRemove.length} 个，新增 ${result.newTasks.length} 个',
           tag: 'Download');
     } catch (e) {
       _log.error('从硬盘同步任务失败: $e', tag: 'Download');
@@ -744,4 +669,200 @@ class DownloadTaskPersistence {
     }
     await _tasksController.close();
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Top-level functions for background Isolate operations
+// ═══════════════════════════════════════════════════════════════════
+
+/// Data transfer object for Isolate communication.
+class _ScanResult {
+  final List<Map<String, dynamic>> existingTasks;
+  final List<Map<String, dynamic>> newTasks;
+  final List<String> tasksToRemove;
+  final Map<int, Map<String, dynamic>?> workMetadata;
+  final int scannedFolders;
+
+  const _ScanResult({
+    required this.existingTasks,
+    required this.newTasks,
+    required this.tasksToRemove,
+    required this.workMetadata,
+    required this.scannedFolders,
+  });
+}
+
+/// Top-level function that runs in a background Isolate.
+/// Scans the download directory and returns results.
+Future<_ScanResult> _scanDownloadDirectoryInBackground(
+  String downloadDirPath,
+  List<Map<String, dynamic>> currentTasksJson,
+) async {
+  final downloadDir = Directory(downloadDirPath);
+  if (!await downloadDir.exists()) {
+    return _ScanResult(
+      existingTasks: currentTasksJson,
+      newTasks: [],
+      tasksToRemove: [],
+      workMetadata: {},
+      scannedFolders: 0,
+    );
+  }
+
+  // 1. Collect work folders
+  final workFolders = <int, Directory>{};
+  await for (final entity in downloadDir.list()) {
+    if (entity is Directory) {
+      final workIdStr = entity.path.split(Platform.pathSeparator).last;
+      final workId = int.tryParse(workIdStr);
+      if (workId != null) {
+        workFolders[workId] = entity;
+      }
+    }
+  }
+
+  // 2. Load metadata for all work folders
+  final workMetadata = <int, Map<String, dynamic>?>{};
+  for (final entry in workFolders.entries) {
+    final metadataFile = File('${entry.value.path}/work_metadata.json');
+    if (await metadataFile.exists()) {
+      try {
+        final content = await metadataFile.readAsString();
+        final metadata = jsonDecode(content) as Map<String, dynamic>;
+        // Migrate cover path if needed
+        if (metadata.containsKey('localCoverPath')) {
+          final coverPath = metadata['localCoverPath'] as String?;
+          if (coverPath != null && coverPath.contains(Platform.pathSeparator)) {
+            metadata['localCoverPath'] = 'cover.jpg';
+            await metadataFile.writeAsString(jsonEncode(metadata));
+          }
+        }
+        workMetadata[entry.key] = metadata;
+      } catch (e) {
+        workMetadata[entry.key] = null;
+      }
+    } else {
+      workMetadata[entry.key] = null;
+    }
+  }
+
+  // 3. Check which existing tasks still have files on disk
+  final tasksToRemove = <String>[];
+  final existingTasks = <Map<String, dynamic>>[];
+  for (final taskJson in currentTasksJson) {
+    final status = taskJson['status'] as String? ?? '';
+    final workId = taskJson['workId'] as int? ?? 0;
+    final fileName = taskJson['fileName'] as String? ?? '';
+    if (status == 'completed') {
+      final workDir = workFolders[workId];
+      if (workDir == null) {
+        tasksToRemove.add(taskJson['id'] as String? ?? '');
+      } else {
+        final file = File('${workDir.path}/$fileName');
+        bool fileExists = await file.exists();
+        if (!fileExists) {
+          // Check local import path
+          final meta = workMetadata[workId];
+          final importPath = meta?['local_import_path'] as String?;
+          if (importPath != null && importPath.isNotEmpty) {
+            final sourceFile = File('$importPath/$fileName');
+            fileExists = await sourceFile.exists();
+          }
+        }
+        if (!fileExists) {
+          tasksToRemove.add(taskJson['id'] as String? ?? '');
+        }
+      }
+    }
+    existingTasks.add(taskJson);
+  }
+
+  // 4. Scan for new files on disk
+  final newTasks = <Map<String, dynamic>>[];
+  for (final entry in workFolders.entries) {
+    final workId = entry.key;
+    final workDir = entry.value;
+    final metadata = workMetadata[workId];
+    final workTitle = metadata?['title'] as String? ?? 'RJ$workId';
+
+    Future<void> scanDirectory(Directory dir, String relativePath) async {
+      final entities = await dir.list(followLinks: false).toList();
+      entities.sort((a, b) {
+        final aName = a.path.split(Platform.pathSeparator).last;
+        final bName = b.path.split(Platform.pathSeparator).last;
+        return _naturalCompare(aName, bName);
+      });
+      for (final entity in entities) {
+        if (entity is File) {
+          final fileName = entity.path.split(Platform.pathSeparator).last;
+          if (fileName == 'work_metadata.json' ||
+              fileName == 'cover.jpg' ||
+              fileName.endsWith('.downloading')) {
+            continue;
+          }
+          final fullFileName = relativePath.isEmpty
+              ? fileName
+              : '$relativePath/$fileName';
+          // Check if this file already has a task
+          final hasTask = existingTasks.any((t) =>
+              t['workId'] == workId && t['fileName'] == fullFileName);
+          if (!hasTask) {
+            final stat = await entity.stat();
+            final length = await entity.length();
+            newTasks.add({
+              'id': '${workId}_${fullFileName}_${DateTime.now().millisecondsSinceEpoch}',
+              'workId': workId,
+              'workTitle': workTitle,
+              'fileName': fullFileName,
+              'downloadUrl': '',
+              'status': 'completed',
+              'totalBytes': length,
+              'downloadedBytes': length,
+              'createdAt': stat.modified.millisecondsSinceEpoch,
+              'completedAt': stat.modified.millisecondsSinceEpoch,
+              'workMetadataJson': metadata != null ? jsonEncode(metadata) : null,
+            });
+          }
+        } else if (entity is Directory) {
+          final dirName = entity.path.split(Platform.pathSeparator).last;
+          final subPath = relativePath.isEmpty ? dirName : '$relativePath/$dirName';
+          await scanDirectory(entity, subPath);
+        }
+      }
+    }
+    await scanDirectory(workDir, '');
+  }
+
+  return _ScanResult(
+    existingTasks: existingTasks,
+    newTasks: newTasks,
+    tasksToRemove: tasksToRemove,
+    workMetadata: workMetadata,
+    scannedFolders: workFolders.length,
+  );
+}
+
+/// Natural sort comparator for file names.
+int _naturalCompare(String a, String b) {
+  final pattern = RegExp(r'(\d+|[^\d]+)');
+  final aParts = pattern
+      .allMatches(a.toLowerCase())
+      .map((m) => m.group(1)!)
+      .toList();
+  final bParts = pattern
+      .allMatches(b.toLowerCase())
+      .map((m) => m.group(1)!)
+      .toList();
+  final len = aParts.length < bParts.length ? aParts.length : bParts.length;
+  for (int i = 0; i < len; i++) {
+    final aNum = int.tryParse(aParts[i]);
+    final bNum = int.tryParse(bParts[i]);
+    if (aNum != null && bNum != null) {
+      if (aNum != bNum) return aNum.compareTo(bNum);
+    } else {
+      final cmp = aParts[i].compareTo(bParts[i]);
+      if (cmp != 0) return cmp;
+    }
+  }
+  return aParts.length.compareTo(bParts.length);
 }

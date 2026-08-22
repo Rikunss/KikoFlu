@@ -805,30 +805,33 @@ class CacheService {
 
   /// Returns a breakdown of cache sizes by category in bytes.
   /// Keys: 'audio', 'image', 'other', 'total'
+  ///
+  /// Heavy file I/O is offloaded to a background Isolate.
   static Future<Map<String, int>> getCacheBreakdown() async {
     try {
-      final audioSize = await _getAudioCacheSize();
-      final imageSize = await _getImageCacheSize();
+      final cacheDirPath = (await _getCacheDirectory()).path;
+      final audioCacheDirPath = (await _getAudioCacheDirectory()).path;
+      final appCacheDirPath = (await getApplicationCacheDirectory()).path;
+
+      final fileResult = await Isolate.run(() {
+        return _doCacheBreakdownIo(
+          cacheDirPath: cacheDirPath,
+          audioCacheDirPath: audioCacheDirPath,
+          appCacheDirPath: appCacheDirPath,
+        );
+      });
+
       final prefsSize = await _getSharedPreferencesCacheSize();
 
-      int otherSize = 0;
-      final cacheDir = await _getCacheDirectory();
-      if (await cacheDir.exists()) {
-        int mainSize = 0;
-        await for (final entity in cacheDir.list(recursive: true)) {
-          if (entity is File) {
-            mainSize += await entity.length();
-          }
-        }
-        otherSize = mainSize;
-      }
-
-      final total = audioSize + imageSize + otherSize + prefsSize;
+      final total = fileResult['audio']! +
+          fileResult['image']! +
+          fileResult['other']! +
+          prefsSize;
 
       return {
-        'audio': audioSize,
-        'image': imageSize,
-        'other': otherSize + prefsSize,
+        'audio': fileResult['audio']!,
+        'image': fileResult['image']!,
+        'other': fileResult['other']! + prefsSize,
         'total': total,
       };
     } catch (e) {
@@ -1024,4 +1027,62 @@ class _FileEntry {
     required this.size,
     required this.modified,
   });
+}
+
+/// Top-level function for cache breakdown calculation in Isolate.
+/// Scans directories and returns sizes by category.
+Map<String, int> _doCacheBreakdownIo({
+  required String cacheDirPath,
+  required String audioCacheDirPath,
+  required String appCacheDirPath,
+}) {
+  int audioSize = 0;
+  int imageSize = 0;
+  int otherSize = 0;
+
+  // Scan audio cache directory
+  final audioCacheDir = Directory(audioCacheDirPath);
+  if (audioCacheDir.existsSync()) {
+    for (final entity in audioCacheDir.listSync(recursive: true)) {
+      if (entity is File) {
+        audioSize += entity.lengthSync();
+      }
+    }
+  }
+
+  // Scan just_audio cache
+  final justAudioDir = Directory('$appCacheDirPath/just_audio_cache');
+  if (justAudioDir.existsSync()) {
+    for (final entity in justAudioDir.listSync(recursive: true)) {
+      if (entity is File) {
+        audioSize += entity.lengthSync();
+      }
+    }
+  }
+
+  // Scan image cache
+  final imageCacheDir = Directory('$appCacheDirPath/libCachedImageData');
+  if (imageCacheDir.existsSync()) {
+    for (final entity in imageCacheDir.listSync(recursive: true)) {
+      if (entity is File) {
+        imageSize += entity.lengthSync();
+      }
+    }
+  }
+
+  // Scan other cache (kikoeru_cache)
+  final cacheDir = Directory(cacheDirPath);
+  if (cacheDir.existsSync()) {
+    for (final entity in cacheDir.listSync(recursive: true)) {
+      if (entity is File) {
+        otherSize += entity.lengthSync();
+      }
+    }
+  }
+
+  return {
+    'audio': audioSize,
+    'image': imageSize,
+    'other': otherSize,
+  };
 }

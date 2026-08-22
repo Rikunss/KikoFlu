@@ -32,6 +32,9 @@ import 'src/services/playback_history_service.dart';
 import 'src/services/progress_sync_service.dart';
 import 'src/services/listening_stats_service.dart';
 import 'src/services/bookmark_service.dart';
+import 'src/services/exclusive_audio_service.dart';
+import 'src/services/usb_dac_service.dart';
+import 'src/services/equalizer_service.dart';
 import 'src/services/app_lock_service.dart';
 import 'src/services/screen_state_service.dart';
 import 'src/services/subtitle_library_file_watcher.dart';
@@ -253,18 +256,22 @@ class _KikoeruAppState extends ConsumerState<KikoeruApp>
     AudioPlayerService.instance.dispose();
     HiResAudioService.instance.dispose();
     StreamingSpeedTracker.instance.dispose();
+    ExclusiveAudioService.instance.dispose();
+    UsbDacService.instance.dispose();
+    UsbDacAudioManager.instance.dispose();
+    FloatingLyricService.instance.dispose();
+    BookmarkService.instance.dispose();
+    EqualizerService.instance.dispose();
+    PlaybackHistoryService.instance.dispose();
     ListeningStatsService.instance.unsubscribeFromHistoryUpdates();
-    PlaybackHistoryService.instance.detach();
     LogService.instance.flush();
     super.dispose();
   }
 
   /// Called when the operating system notifies the app of memory pressure.
   /// Clears Flutter's in-memory image cache to free decoded image data.
-  /// This is especially important after increasing [ImageCache.maximumSize]
-  /// to 500 images (100 MB) — on low-end devices, the larger cache could
-  /// otherwise contribute to Out-Of-Memory (OOM) kills when background apps
-  /// consume additional memory.
+  /// On low-end devices, a large image cache could contribute to
+  /// Out-Of-Memory (OOM) kills when background apps consume additional memory.
   @override
   void didHaveMemoryPressure() {
     super.didHaveMemoryPressure();

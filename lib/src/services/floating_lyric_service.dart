@@ -315,4 +315,10 @@ class FloatingLyricService {
       return false;
     }
   }
+
+  /// 释放资源
+  void dispose() {
+    _onCloseController.close();
+    _onTouchEnabledChangedController.close();
+  }
 }

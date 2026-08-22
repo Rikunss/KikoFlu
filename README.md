@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/icons/app_icon_opaque.png" alt="KikoFlu" width="120" height="120">
 
-  # KikoFlu
+  # KikoFlu Edge
 
   A cross-platform doujin voice client for self-hosted Kikoeru servers and online services.
   Built with Flutter — supports Android, Windows, macOS, Linux, iOS.

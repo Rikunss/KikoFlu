@@ -53,8 +53,8 @@ class AppBootstrap {
 
     await BlurHashService.instance.init();
 
-    PaintingBinding.instance.imageCache.maximumSize = 300;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = 50 << 20;
+    PaintingBinding.instance.imageCache.maximumSize = 150;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 30 << 20;  // 30 MB
   }
 
   /// Konfigurasi system UI overlay style dan orientasi.

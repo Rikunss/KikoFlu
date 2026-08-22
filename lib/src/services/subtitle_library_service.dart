@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:isolate';
 import 'package:file_picker/file_picker.dart';
 import 'package:archive/archive.dart';
 import 'package:flutter/widgets.dart';
@@ -282,10 +283,24 @@ class SubtitleLibraryService {
   }
 
   /// 重建数据库（清空后重新扫描文件系统）
+  ///
+  /// Heavy file I/O is offloaded to a background Isolate to prevent
+  /// UI freezes during the scan.
   static Future<void> _rebuildDatabase(Directory libraryDir) async {
     await SubtitleDatabase.instance.clear();
-    final records = <SubtitleFileRecord>[];
-    await _scanDirectoryForRecords(libraryDir, libraryDir.path, records);
+
+    // Run heavy directory scanning in background Isolate
+    final recordsJson = await Isolate.run(() {
+      return _scanDirectoryForRecordsInBackground(
+        libraryDir.path,
+      );
+    });
+
+    // Convert JSON back to records on main thread
+    final records = recordsJson
+        .map((json) => SubtitleFileRecord.fromMap(json))
+        .toList();
+
     if (records.isNotEmpty) {
       await SubtitleDatabase.instance.insertFiles(records);
     }
@@ -1995,4 +2010,138 @@ class _ImportStats {
   int sizeErrorCount = 0;
   int depthErrorCount = 0;
   int decodeErrorCount = 0;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Top-level functions for background Isolate operations
+// ═══════════════════════════════════════════════════════════════════
+
+const int _maxPathLength = 240;
+
+/// Top-level function that runs in a background Isolate.
+/// Scans the subtitle library directory and returns file records as JSON.
+List<Map<String, dynamic>> _scanDirectoryForRecordsInBackground(
+  String rootPath,
+) {
+  final records = <Map<String, dynamic>>[];
+  final rootDir = Directory(rootPath);
+
+  if (!rootDir.existsSync()) return records;
+
+  _scanDirectoryRecursive(rootDir, rootPath, records);
+  return records;
+}
+
+/// Recursive directory scanner for Isolate.
+void _scanDirectoryRecursive(
+  Directory dir,
+  String rootPath,
+  List<Map<String, dynamic>> records,
+) {
+  try {
+    if (dir.path.length > _maxPathLength) return;
+
+    final entities = dir.listSync(followLinks: false);
+    for (final entity in entities) {
+      if (entity is Directory) {
+        final folderName = entity.path.split(Platform.pathSeparator).last;
+        if (folderName.startsWith('.')) continue;
+        _scanDirectoryRecursive(entity, rootPath, records);
+      } else if (entity is File) {
+        final fileName = entity.path.split(Platform.pathSeparator).last;
+        if (_isLyricFile(fileName)) {
+          try {
+            final stat = entity.statSync();
+            final relativePath = _toRelativePath(
+                entity.path.substring(rootPath.length + 1));
+            final category = _extractCategory(relativePath);
+            final workId = _extractWorkId(relativePath);
+
+            records.add({
+              'file_name': fileName,
+              'relative_path': relativePath,
+              'category': category,
+              'work_id': workId,
+              'file_size': stat.size,
+              'modified_at': stat.modified.toIso8601String(),
+              'normalized_name': _computeNormalizedNameForIsolate(fileName),
+            });
+          } catch (e) {
+            // Skip files that can't be stat'd
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // Skip directories that can't be accessed
+  }
+}
+
+/// Check if a file is a lyric/subtitle file (Isolate-safe version).
+bool _isLyricFile(String fileName) {
+  final lower = fileName.toLowerCase();
+  return lower.endsWith('.vtt') ||
+      lower.endsWith('.srt') ||
+      lower.endsWith('.lrc') ||
+      lower.endsWith('.txt') ||
+      lower.endsWith('.ass') ||
+      lower.endsWith('.ssa');
+}
+
+/// Convert platform path separator to / (Isolate-safe version).
+String _toRelativePath(String raw) {
+  return Platform.isWindows ? raw.replaceAll('\\', '/') : raw;
+}
+
+/// Extract category from relative path (Isolate-safe version).
+String _extractCategory(String relativePath) {
+  final firstSlash = relativePath.indexOf('/');
+  if (firstSlash > 0) {
+    return relativePath.substring(0, firstSlash);
+  }
+  return '';
+}
+
+/// Extract workId from relative path (Isolate-safe version).
+final _workIdRegex = RegExp(r'[RrBbVv][Jj]0*(\d+)');
+
+int? _extractWorkId(String relativePath) {
+  final parts = relativePath.split('/');
+  if (parts.length < 2) return null;
+  final match = _workIdRegex.firstMatch(parts[1]);
+  if (match != null) {
+    return int.tryParse(match.group(1)!);
+  }
+  return null;
+}
+
+/// Compute normalized name for matching (Isolate-safe version).
+String _computeNormalizedNameForIsolate(String fileName) {
+  final textExtensions = ['.vtt', '.srt', '.txt', '.lrc'];
+  String baseName = fileName.toLowerCase();
+  for (final ext in textExtensions) {
+    if (baseName.endsWith(ext)) {
+      baseName = baseName.substring(0, baseName.length - ext.length);
+      break;
+    }
+  }
+  // Remove audio extensions
+  final audioExtensions = [
+    '.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.opus', '.wma', '.mp4', '.m4b',
+  ];
+  for (final ext in audioExtensions) {
+    if (baseName.endsWith(ext)) {
+      baseName = baseName.substring(0, baseName.length - ext.length);
+      break;
+    }
+  }
+  // Normalize
+  var result = baseName;
+  result = result.replaceAll(RegExp(r'\（.*?\）'), '');
+  result = result.replaceAll(RegExp(r'\(.*?\)'), '');
+  result = result.replaceAll(RegExp(r'\[.*?\]'), '');
+  result = result.replaceAll(RegExp(r'【.*?】'), '');
+  result = result.replaceAll(
+      RegExp(r'[^\w\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff]'), '');
+  return result.trim();
 }
