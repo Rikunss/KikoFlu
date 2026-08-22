@@ -28,7 +28,7 @@
 - 📊 **Listening Stats** — Comprehensive dashboard with trends and history breakdown
 - 🔍 **Advanced Search** — Multi-tag/exclude-tag filtering with multi-dimensional sorting
 - 📁 **Custom File Picker** — Built-in file manager with breadcrumb nav, search, hidden files toggle
-- 🌐 **i18n** — 简体中文 / 繁體中文 / English / 日本語 / Русский
+- 🌐 **i18n** — 简体中文 / 繁體中文 / English / 日本語 / Русский / Indonesian
 - 📱 **Android** — Floating lyrics, home screen widget, keep-screen-on, progress sync
 
 ## Download
@@ -74,4 +74,4 @@ flutter pub get
 ## Contact
 
 - **Issues**: [GitHub Issues](https://github.com/Rikunss/KikoFlu/issues)
-- **Community**: [Telegram](https://t.me/+PrkiN-pZrXs4ZTU1)
+- **Community**: [Telegram](https://t.me/+_hM6nLD2VPM2NTRl)
