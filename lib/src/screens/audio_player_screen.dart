@@ -501,10 +501,14 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
     setState(() => _isTranscribing = true);
 
-    // Start elapsed timer.
+    // Start elapsed timer + update notification.
     _transcriptionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted && _isTranscribing) {
         setState(() => _transcriptionElapsed++);
+        _showTranscriptionNotification(
+          title: track.title,
+          stage: 'Transcribing...',
+        );
       }
     });
 

@@ -10,6 +10,7 @@ import 'package:whisper_ggml_plus/whisper_ggml_plus.dart';
 import 'package:whisper_ggml_plus_ffmpeg/whisper_ggml_plus_ffmpeg.dart';
 
 import 'log_service.dart';
+import 'subtitle_database.dart';
 import 'subtitle_library_service.dart';
 
 final _log = LogService.instance;
@@ -535,6 +536,24 @@ class AIModelService {
 
       final outputPath = p.join(outputDir.path, lrcFileName);
       await File(outputPath).writeAsString(lrcContent, encoding: utf8);
+
+      // Insert record into subtitle library database so _findLyricInLibrary
+      // can find it on next app launch.
+      try {
+        final relativePath = p.join(relativeDir, lrcFileName);
+        final fileLength = await File(outputPath).length();
+        await SubtitleDatabase.instance.insertFile(SubtitleFileRecord(
+          fileName: lrcFileName,
+          relativePath: relativePath,
+          category: 'lrc',
+          workId: workId,
+          fileSize: fileLength,
+          modifiedAt: DateTime.now().toIso8601String(),
+          normalizedName: baseName.toLowerCase(),
+        ));
+      } catch (e) {
+        _log.warning('Failed to insert LRC into subtitle database: $e', tag: 'AI');
+      }
 
       _log.info('LRC saved to: $outputPath', tag: 'AI');
       return outputPath;

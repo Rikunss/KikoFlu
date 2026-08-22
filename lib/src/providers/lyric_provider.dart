@@ -813,6 +813,38 @@ class LyricController extends StateNotifier<LyricState> {
     return absolutePath;
   }
 
+  /// Load lyrics directly from subtitle library for a track
+  /// (used when file list is not available, e.g. downloaded works).
+  Future<void> loadLyricFromLibrary(AudioTrack track) async {
+    final myGen = ++_currentLoadGeneration;
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      LogService.instance.debug(
+          '[Lyric] Direct library lookup: track="${track.title}", workId=${track.workId}',
+          tag: 'Playback');
+
+      final libraryLyricPath = await _findLyricInLibrary(track);
+      if (_isStale(myGen)) return;
+
+      if (libraryLyricPath != null) {
+        LogService.instance.debug('[Lyric] Found in library: $libraryLyricPath', tag: 'Playback');
+        await loadLyricFromLocalFile(libraryLyricPath, generation: myGen);
+        return;
+      }
+
+      LogService.instance.debug('[Lyric] No lyrics found in library for: ${track.title}', tag: 'Playback');
+      if (!_isStale(myGen)) {
+        state = LyricState(lyrics: [], isLoading: false);
+      }
+    } catch (e) {
+      LogService.instance.error('[Lyric] Library lookup failed: $e', tag: 'Playback');
+      if (!_isStale(myGen)) {
+        state = state.copyWith(isLoading: false, error: e.toString());
+      }
+    }
+  }
+
   Future<void> loadLyricFromLocalFile(String filePath, {int? generation}) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -1031,12 +1063,18 @@ final lyricAutoLoaderProvider = Provider<void>((ref) {
   final fileListState = ref.watch(fileListControllerProvider);
 
   currentTrack.whenData((track) {
-    if (track != null && fileListState.files.isNotEmpty) {
-      Future.microtask(() {
-        ref.read(lyricControllerProvider.notifier).loadLyricForTrack(
-              track,
-              fileListState.files,
-            );
+    if (track != null) {
+      Future.microtask(() async {
+        final notifier = ref.read(lyricControllerProvider.notifier);
+        if (fileListState.files.isNotEmpty) {
+          await notifier.loadLyricForTrack(
+            track,
+            fileListState.files,
+          );
+        } else {
+          // No file list (e.g. downloaded work) — try subtitle library directly.
+          await notifier.loadLyricFromLibrary(track);
+        }
       });
     } else if (track == null) {
       ref.read(lyricControllerProvider.notifier).clearLyrics();
