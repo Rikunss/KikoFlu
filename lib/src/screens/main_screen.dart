@@ -91,8 +91,9 @@ class _OfflineToastState extends ConsumerState<_OfflineToast>
     }
 
     final cs = Theme.of(context).colorScheme;
-    final topPadding = MediaQuery.of(context).padding.top;
-    final screenW = MediaQuery.of(context).size.width;
+    final mq = MediaQuery.of(context);
+    final topPadding = mq.padding.top;
+    final screenW = mq.size.width;
 
     const double cardMaxW = 420;
     final horizMargin = screenW > cardMaxW + 48
@@ -348,7 +349,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
     if (isLandscape) {
       final colorScheme = Theme.of(context).colorScheme;
-      final mq = MediaQuery.of(context);
+      final mqPadding = MediaQuery.paddingOf(context);
+      final mqSize = MediaQuery.sizeOf(context);
 
       Widget navRail = SizedBox(
         width: 72,
@@ -468,9 +470,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   child: SingleChildScrollView(
                     child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      minHeight: mq.size.height -
-                          mq.padding.top -
-                          mq.padding.bottom,
+                      minHeight: mqSize.height -
+                          mqPadding.top -
+                          mqPadding.bottom,
                     ),
                       child: IntrinsicHeight(
                         child: navRail,

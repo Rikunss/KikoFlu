@@ -480,8 +480,9 @@ class _FullLyricDisplayState extends ConsumerState<FullLyricDisplay> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
-    final mediaQueryHeight = MediaQuery.of(context).size.height;
-    final paddingTop = MediaQuery.of(context).padding.top;
+    final mq = MediaQuery.of(context);
+    final mediaQueryHeight = mq.size.height;
+    final paddingTop = mq.padding.top;
 
     final displayLyrics = lyricState.displayLyrics;
     _autoTranslateEnabled = autoTranslateEnabled;

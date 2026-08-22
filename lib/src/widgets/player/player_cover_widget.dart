@@ -55,8 +55,8 @@ class PlayerCoverWidget extends StatelessWidget {
           tag: 'audio_player_artwork_${track.id}',              child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: isLandscape
-                  ? MediaQuery.of(context).size.width * 0.35
-                  : MediaQuery.of(context).size.width - 48,
+                  ? MediaQuery.sizeOf(context).width * 0.35
+                  : MediaQuery.sizeOf(context).width - 48,
             ),
             child: AspectRatio(
               aspectRatio: 1,
