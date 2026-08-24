@@ -527,6 +527,19 @@ class DownloadService {
           totalBytes: await convertedFile.length(),
           downloadedBytes: await convertedFile.length(),
         );
+        // Delete original WAV file after successful conversion to save storage
+        final originalWav = File(filePath);
+        if (await originalWav.exists()) {
+          try {
+            await originalWav.delete();
+            _log.info('Deleted original WAV after conversion: $filePath', tag: 'Download');
+          } catch (e) {
+            _log.warning('Failed to delete original WAV: $e', tag: 'Download');
+          }
+        }
+        // Update work_metadata.json children to reflect new filename
+        // so OfflineFileExplorerWidget can find the converted file on disk.
+        await _updateMetadataFileName(task.workId, task.fileName, newFileName);
       }
       persistence.updateTask(updatedTask, immediate: true);
       unawaited(AnalyticsService.instance.logEvent('download_completed',
@@ -676,6 +689,51 @@ class DownloadService {
     } catch (e) {
       _log.error('删除文件失败: $e', tag: 'Download');
       rethrow;
+    }
+  }
+
+  /// Update the file name in work_metadata.json children after WAV→FLAC conversion
+  /// so that OfflineFileExplorerWidget can find the converted file on disk.
+  /// Also updates the in-memory task.workMetadata so getWorkMetadata returns fresh data.
+  Future<void> _updateMetadataFileName(
+      int workId, String oldFileName, String newFileName) async {
+    try {
+      final meta = await persistence.getWorkMetadata(workId);
+      if (meta == null) return;
+
+      bool updated = false;
+      void updateChildren(List<dynamic> children) {
+        for (final child in children) {
+          if (child is Map<String, dynamic>) {
+            if (child['type'] == 'folder') {
+              final sub = child['children'];
+              if (sub is List) updateChildren(sub);
+            } else if (child['title'] == oldFileName) {
+              child['title'] = newFileName;
+              updated = true;
+            }
+          }
+        }
+      }
+
+      final children = meta['children'];
+      if (children is List) updateChildren(children);
+
+      if (updated) {
+        // Update disk
+        final workDir = await persistence.getWorkDownloadDirectory(workId);
+        final metadataFile = File('$workDir/work_metadata.json');
+        await metadataFile.writeAsString(jsonEncode(meta));
+        // Update in-memory task workMetadata so getWorkMetadata returns fresh data
+        for (var i = 0; i < persistence.length; i++) {
+          if (persistence[i].workId == workId && persistence[i].workMetadata != null) {
+            persistence[i] = persistence[i].copyWith(workMetadata: Map<String, dynamic>.from(meta));
+          }
+        }
+        _log.info('Updated metadata (disk + memory): $oldFileName → $newFileName', tag: 'Download');
+      }
+    } catch (e) {
+      _log.warning('Failed to update metadata fileName: $e', tag: 'Download');
     }
   }
 

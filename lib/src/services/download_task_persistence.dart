@@ -833,6 +833,58 @@ Future<_ScanResult> _scanDownloadDirectoryInBackground(
       }
     }
     await scanDirectory(workDir, '');
+
+    // 5. Fix metadata children for converted files (e.g. WAV→FLAC)
+    // When auto-convert renames a file, the metadata children entry
+    // still references the old name, causing OfflineFileExplorerWidget
+    // to show 'no files'.
+    if (metadata != null) {
+      final children = metadata['children'];
+      if (children is List) {
+        bool metaUpdated = false;
+        void fixChildren(List<dynamic> items, String parentPath) {
+          for (final item in items) {
+            if (item is! Map<String, dynamic>) continue;
+            if (item['type'] == 'folder') {
+              final sub = item['children'];
+              final folderPath = parentPath.isEmpty
+                  ? (item['title'] as String? ?? '')
+                  : '$parentPath/${item['title']}';
+              if (sub is List) fixChildren(sub, folderPath);
+            } else {
+              final title = item['title'] as String?;
+              if (title == null) continue;
+              final relPath = parentPath.isEmpty ? title : '$parentPath/$title';
+              final file = File('${workDir.path}/$relPath');
+              if (!file.existsSync()) {
+                // File not found - look for converted version
+                final dotIdx = title.lastIndexOf('.');
+                if (dotIdx > 0) {
+                  final stem = title.substring(0, dotIdx);
+                  final dir = file.parent;
+                  if (dir.existsSync()) {
+                    for (final f in dir.listSync().whereType<File>()) {
+                      final fName = f.path.split(Platform.pathSeparator).last;
+                      if (fName.startsWith(stem) &&
+                          !fName.endsWith('.downloading') &&
+                          fName != title) {
+                        item['title'] = fName;
+                        metaUpdated = true;
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        fixChildren(children, '');
+        if (metaUpdated) {
+          metadata['children'] = children;
+        }
+      }
+    }
   }
 
   return _ScanResult(
