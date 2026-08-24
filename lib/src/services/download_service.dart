@@ -702,6 +702,7 @@ class DownloadService {
       if (meta == null) return;
 
       bool updated = false;
+      final workDirPath = await persistence.getWorkDownloadDirectory(workId);
       void updateChildren(List<dynamic> children) {
         for (final child in children) {
           if (child is Map<String, dynamic>) {
@@ -710,6 +711,13 @@ class DownloadService {
               if (sub is List) updateChildren(sub);
             } else if (child['title'] == oldFileName) {
               child['title'] = newFileName;
+              // Also update size to match converted file
+              try {
+                final convertedFile = File('$workDirPath/$newFileName');
+                if (convertedFile.existsSync()) {
+                  child['size'] = convertedFile.lengthSync();
+                }
+              } catch (_) {}
               updated = true;
             }
           }
@@ -721,8 +729,7 @@ class DownloadService {
 
       if (updated) {
         // Update disk
-        final workDir = await persistence.getWorkDownloadDirectory(workId);
-        final metadataFile = File('$workDir/work_metadata.json');
+        final metadataFile = File('$workDirPath/work_metadata.json');
         await metadataFile.writeAsString(jsonEncode(meta));
         // Update in-memory task workMetadata so getWorkMetadata returns fresh data
         for (var i = 0; i < persistence.length; i++) {

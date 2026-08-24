@@ -22,8 +22,6 @@ final _log = LogService.instance;
 enum WavConversionFormat {
   none('Keep WAV', 'none', '.wav'),
   flac('FLAC', 'flac', '.flac'),
-  opus('Opus', 'opus', '.opus'),
-  mp3('MP3', 'mp3', '.mp3'),
   alac('ALAC', 'alac', '.m4a'),
   aac('AAC', 'aac', '.m4a');
 
@@ -70,9 +68,7 @@ class AudioConversionService {
   bool isFormatSupportedOnPlatform(WavConversionFormat format) {
     if (format == WavConversionFormat.none) return true;
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) return true;
-    if (Platform.isAndroid) {
-      return format == WavConversionFormat.opus ? false : true;
-    }
+    if (Platform.isAndroid) return true;  // FLAC, ALAC, AAC all supported
     if (Platform.isIOS) {
       return format == WavConversionFormat.alac || format == WavConversionFormat.aac;
     }
@@ -81,22 +77,19 @@ class AudioConversionService {
 
   /// Check if a specific encoder is available on Android at runtime.
   /// With bundled ffmpeg-kit (min variant), only built-in FFmpeg encoders
-  /// (FLAC, ALAC, AAC) are available — MP3 (libmp3lame) and Opus (libopus)
-  /// require the audio variant.
+  /// (FLAC, ALAC, AAC) are available.
   Future<bool> checkEncoderAvailability(WavConversionFormat format) async {
     if (!Platform.isAndroid) return true;
     if (format == WavConversionFormat.none) return true;
-    final available = format != WavConversionFormat.opus;
-    _encoderCache[format.value] = available;
-    return available;
+    // All remaining formats (FLAC, ALAC, AAC) use built-in encoders
+    _encoderCache[format.value] = true;
+    return true;
   }
 
   /// Check all platform-appropriate encoders and cache results.
   Future<void> checkAllEncoders() async {
     if (Platform.isAndroid) {
       await checkEncoderAvailability(WavConversionFormat.flac);
-      await checkEncoderAvailability(WavConversionFormat.opus);
-      await checkEncoderAvailability(WavConversionFormat.mp3);
       await checkEncoderAvailability(WavConversionFormat.alac);
       await checkEncoderAvailability(WavConversionFormat.aac);
     }
@@ -155,10 +148,6 @@ class AudioConversionService {
     switch (formatName) {
       case 'flac':
         return ['-i', input, '-compression_level', '8', '-f', 'flac', '-y', output];
-      case 'opus':
-        return ['-i', input, '-c:a', 'libopus', '-b:a', '128k', '-y', output];
-      case 'mp3':
-        return ['-i', input, '-c:a', 'mp3', '-b:a', '320k', '-y', output];
       case 'alac':
         return ['-i', input, '-c:a', 'alac', '-f', 'mp4', '-y', output];
       case 'aac':

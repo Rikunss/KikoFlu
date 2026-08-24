@@ -67,6 +67,13 @@ class DownloadConversionHook {
         return ConversionResult(originalFileName: task.fileName);
       }
 
+      // Check if encoder is available on this platform before attempting conversion
+      final encoderAvailable = await AudioConversionService.instance.checkEncoderAvailability(format);
+      if (!encoderAvailable) {
+        _log.warning('Encoder not available for ${format.displayName} on this platform, skipping conversion', tag: 'Download');
+        return ConversionResult(originalFileName: task.fileName);
+      }
+
       final currentTask = findTask(task.id);
       onUpdate(currentTask.copyWith(status: DownloadStatus.converting));
 

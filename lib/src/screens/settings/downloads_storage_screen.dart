@@ -500,10 +500,6 @@ class _DownloadsStorageScreenState
         return Icons.block_rounded;
       case WavConversionFormat.flac:
         return Icons.waves_rounded;
-      case WavConversionFormat.opus:
-        return Icons.graphic_eq_rounded;
-      case WavConversionFormat.mp3:
-        return Icons.audiotrack_rounded;
       case WavConversionFormat.alac:
         return Icons.apple_rounded;
       case WavConversionFormat.aac:
@@ -519,14 +515,10 @@ class _DownloadsStorageScreenState
         return 'Keep original WAV file';
       case WavConversionFormat.flac:
         return 'Lossless, ~40-60% smaller than WAV';
-      case WavConversionFormat.opus:
-        return 'Best compression, ~80-90% smaller';
-      case WavConversionFormat.mp3:
-        return 'Universal compatibility, ~80-90% smaller';
       case WavConversionFormat.alac:
         return 'Apple Lossless, same quality as FLAC';
       case WavConversionFormat.aac:
-        return 'Efficient lossy, best for iOS';
+        return 'Efficient lossy, ~80-90% smaller';
     }
   }
 

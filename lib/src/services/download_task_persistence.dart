@@ -869,6 +869,10 @@ Future<_ScanResult> _scanDownloadDirectoryInBackground(
                           !fName.endsWith('.downloading') &&
                           fName != title) {
                         item['title'] = fName;
+                        // Update size to match converted file
+                        try {
+                          item['size'] = f.lengthSync();
+                        } catch (_) {}
                         metaUpdated = true;
                         break;
                       }
