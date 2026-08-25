@@ -51,6 +51,15 @@ rm -rf ios/Pods ios/Podfile.lock
 title "Flutter pub get"
 flutter pub get
 
+# ── Fix audio_session module (Xcode 16+ ScanDependencies can't find @import audio_session) ──
+GENERATED_REGISTRANT="ios/Runner/GeneratedPluginRegistrant.m"
+if [ -f "$GENERATED_REGISTRANT" ]; then
+  if grep -q '@import audio_session;' "$GENERATED_REGISTRANT"; then
+    sed -i '' 's|@import audio_session;|#import <audio_session/AudioSessionPlugin.h>|' "$GENERATED_REGISTRANT"
+    echo "  Patched GeneratedPluginRegistrant.m: replaced @import audio_session with #import"
+  fi
+fi
+
 # ── CocoaPods ──
 title "Installing CocoaPods"
 cd ios
