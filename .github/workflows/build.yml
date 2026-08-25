@@ -88,32 +88,34 @@ jobs:
         shell: pwsh
         continue-on-error: true
 
-      - name: Patch ggml CMakeLists.txt to fix install path
+      - name: Patch ggml CMakeLists.txt in pub cache (fix install path)
         continue-on-error: true
         shell: pwsh
         run: |
           # ggml uses $<TARGET_FILE_DIR:...>/lib in install() which doesn't
           # evaluate correctly in cmake_install.cmake — replace with 'lib'.
-          # GHA runners have writable pub cache, so Set-Content should work.
-          # The broken install() with $<TARGET_FILE_DIR:...>/lib is in ggml/src/CMakeLists.txt
-          $files = @(
-            "windows/flutter/ephemeral/.plugin_symlinks/whisper_ggml_plus/macos/Classes/whisper/ggml/src/CMakeLists.txt",
-            "windows/flutter/ephemeral/.plugin_symlinks/whisper_ggml_plus/macos/Classes/whisper/ggml/CMakeLists.txt"
-          )
-          $patched = $false
-          foreach ($file in $files) {
-            if (Test-Path $file) {
-              $content = Get-Content $file -Raw
-              $replaced = $content -replace '\$<TARGET_FILE_DIR:[^>]+>/lib', 'lib'
-              if ($content -ne $replaced) {
-                Set-Content -Path $file -Value $replaced
-                Write-Host "Patched: $file"
-                $patched = $true
+          # Patch pub cache directly (not symlinks, which flutter build recreates).
+          $pubCache = Join-Path $env:LOCALAPPDATA "Pub\Cache\hosted\pub.dev"
+          $ggmlPkg = Get-ChildItem $pubCache -Directory | Where-Object { $_.Name -like 'whisper_ggml_plus-*' } | Select-Object -First 1
+          if ($ggmlPkg) {
+            $files = @(
+              Join-Path $ggmlPkg.FullName "macos\Classes\whisper\ggml\src\CMakeLists.txt",
+              Join-Path $ggmlPkg.FullName "macos\Classes\whisper\ggml\CMakeLists.txt"
+            )
+            foreach ($file in $files) {
+              if (Test-Path $file) {
+                $content = Get-Content $file -Raw
+                $replaced = $content -replace '\$<TARGET_FILE_DIR:[^>]+>/lib', 'lib'
+                if ($content -ne $replaced) {
+                  Set-Content -Path $file -Value $replaced
+                  Write-Host "Patched: $file"
+                } else {
+                  Write-Host "Already patched: $file"
+                }
               }
             }
-          }
-          if (-not $patched) {
-            Write-Host "No generator expression found — already patched or using fallback cmake --install"
+          } else {
+            Write-Host "whisper_ggml_plus not found in pub cache — skipping"
           }
 
       - name: Patch smtc_windows CMakeLists.txt in pub cache (fix junction tar extraction)
