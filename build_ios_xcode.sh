@@ -54,10 +54,11 @@ flutter pub get
 # ── Fix audio_session module (Xcode 16+ ScanDependencies can't find @import audio_session) ──
 GENERATED_REGISTRANT="ios/Runner/GeneratedPluginRegistrant.m"
 if [ -f "$GENERATED_REGISTRANT" ]; then
-  if grep -q '@import audio_session;' "$GENERATED_REGISTRANT"; then
-    sed -i '' 's|@import audio_session;|#import <audio_session/AudioSessionPlugin.h>|' "$GENERATED_REGISTRANT"
-    echo "  Patched GeneratedPluginRegistrant.m: replaced @import audio_session with #import"
-  fi
+  # Comment out @import audio_session and its registration — audio_session is pure Dart,
+  # no native iOS module exists. Keeping the import causes 'Module not found' on Xcode 16+.
+  sed -i '' '/@import audio_session;/s|^|// |' "$GENERATED_REGISTRANT"
+  sed -i '' '/\[AudioSessionPlugin registerWithRegistry/s|^|// |' "$GENERATED_REGISTRANT"
+  echo "  Patched GeneratedPluginRegistrant.m: commented out audio_session import and registration"
 fi
 
 # ── CocoaPods ──
