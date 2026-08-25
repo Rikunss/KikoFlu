@@ -420,6 +420,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     );
   }
 
+
+
   Widget _buildPermissionsCard(
     BuildContext context,
     ColorScheme colorScheme,
