@@ -116,27 +116,34 @@ jobs:
             Write-Host "No generator expression found — already patched or using fallback cmake --install"
           }
 
-      - name: Patch smtc_windows CMakeLists.txt to fix symlink tar extraction
+      - name: Fix smtc_windows symlink (CMake cannot extract tar through symlinks)
         continue-on-error: true
         shell: pwsh
         run: |
-          # smtc_windows CMakeLists.txt extracts a .tar.gz via CMAKE_CURRENT_SOURCE_DIR
-          # which resolves through .plugin_symlinks — CMake cannot extract through symlinks on GHA.
-          # Fix: replace CMAKE_CURRENT_SOURCE_DIR with a resolved real path.
-          $file = "windows/flutter/ephemeral/.plugin_symlinks/smtc_windows/windows/CMakeLists.txt"
-          if (Test-Path $file) {
-            $realPath = (Resolve-Path $file).Path
-            $realDir = Split-Path $realPath -Parent
-            $content = Get-Content $file -Raw
-            $replaced = $content -replace [regex]::Escape('${CMAKE_CURRENT_SOURCE_DIR}'), $realDir.Replace('\', '/')
-            if ($content -ne $replaced) {
-              Set-Content -Path $file -Value $replaced
-              Write-Host "Patched smtc_windows CMakeLists.txt: resolved symlink to $realDir"
+          # On GHA Windows, .plugin_symlinks/smtc_windows is a junction.
+          # CMake's tar extraction fails when CMAKE_CURRENT_SOURCE_DIR goes through a junction.
+          # Fix: replace the junction with the real directory.
+          $link = "windows/flutter/ephemeral/.plugin_symlinks/smtc_windows"
+          if (Test-Path $link) {
+            $item = Get-Item $link
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+              # Find the real package in pub cache dynamically
+              $pubCache = Join-Path $env:LOCALAPPDATA "Pub\Cache\hosted\pub.dev"
+              $smtcPkg = Get-ChildItem $pubCache -Directory | Where-Object { $_.Name -like 'smtc_windows-*' } | Select-Object -First 1
+              if ($smtcPkg) {
+                $target = $smtcPkg.FullName
+                Write-Host "Found smtc_windows at: $target"
+                Remove-Item $link -Force  # Remove junction (not -Recurse, just the link)
+                Copy-Item -Path $target -Destination $link -Recurse -Force
+                Write-Host "Junction replaced with real directory"
+              } else {
+                Write-Host "smtc_windows not found in pub cache — skipping"
+              }
             } else {
-              Write-Host "smtc_windows already patched or no symlink issue"
+              Write-Host "Not a junction, skipping"
             }
           } else {
-            Write-Host "smtc_windows CMakeLists.txt not found — skipping"
+            Write-Host "smtc_windows not found — skipping"
           }
 
       - name: Build Windows Release
