@@ -28,7 +28,7 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  use_frameworks!
+  use_frameworks! :linkage => :static
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
@@ -51,6 +51,9 @@ post_install do |installer|
       config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''
       # Allow non-modular includes in framework modules (fixes Xcode 16 ScanDependencies)
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      # Force module generation for all pods (fixes 'Module not found' on CI)
+      config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
+      config.build_settings['DEFINES_MODULE'] = 'YES'
     end
   end
 end
