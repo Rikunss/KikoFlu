@@ -14,8 +14,8 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 
 /**
- * 悬浮字幕插件
- * 负责管理悬浮窗的显示、隐藏和更新
+ * Floating lyric plugin
+ * Manages overlay window show/hide/update
  */
 class FloatingLyricPlugin private constructor(private val context: Context) : MethodCallHandler {
     companion object {
@@ -34,7 +34,6 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
     private var windowManager: WindowManager? = null
     private var floatingView: FloatingLyricView? = null
     private var isShowing = false
-    private var touchEnabled = true
     private var channel: MethodChannel? = null
 
     init {
@@ -67,10 +66,6 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
             "updateStyle" -> {
                 updateStyle(call, result)
             }
-            "setTouchEnabled" -> {
-                val enabled = call.argument<Boolean>("enabled") ?: true
-                setTouchEnabled(enabled, result)
-            }
             else -> {
                 result.notImplemented()
             }
@@ -79,7 +74,7 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
 
     private fun show(text: String, result: Result) {
         if (!hasPermission()) {
-            result.error("NO_PERMISSION", "没有悬浮窗权限", null)
+            result.error("NO_PERMISSION", "No overlay permission", null)
             return
         }
 
@@ -104,17 +99,18 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                 format = PixelFormat.TRANSLUCENT
                 gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                x = 0 // 水平居中
-                y = 100 // 距离顶部的距离
+                x = 0
+                y = 100
             }
 
             floatingView = FloatingLyricView(
                 context,
                 windowManager!!,
-                params,
-                touchEnabled
-            ) { enabled ->
-                handleTouchEnabledChanged(enabled)
+                params
+            ) {
+                // Long press close callback
+                hide(null)
+                channel?.invokeMethod("onClose", null)
             }
             floatingView?.updateText(text)
 
@@ -122,20 +118,20 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
             isShowing = true
             result.success(true)
         } catch (e: Exception) {
-            result.error("SHOW_FAILED", "显示悬浮窗失败: ${e.message}", null)
+            result.error("SHOW_FAILED", "Failed to show overlay: ${e.message}", null)
         }
     }
 
-    private fun hide(result: Result) {
+    private fun hide(result: Result?) {
         try {
             if (isShowing && floatingView != null) {
                 windowManager?.removeView(floatingView as android.view.View)
                 floatingView = null
                 isShowing = false
             }
-            result.success(true)
+            result?.success(true)
         } catch (e: Exception) {
-            result.error("HIDE_FAILED", "隐藏悬浮窗失败: ${e.message}", null)
+            result?.error("HIDE_FAILED", "Failed to hide overlay: ${e.message}", null)
         }
     }
 
@@ -148,7 +144,7 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
                 result.success(false)
             }
         } catch (e: Exception) {
-            result.error("UPDATE_FAILED", "更新文本失败: ${e.message}", null)
+            result.error("UPDATE_FAILED", "Failed to update text: ${e.message}", null)
         }
     }
 
@@ -175,12 +171,12 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 context.startActivity(intent)
-                result.success(false) // 返回 false 表示需要用户手动授权
+                result.success(false)
             } else {
                 result.success(true)
             }
         } catch (e: Exception) {
-            result.error("REQUEST_FAILED", "请求权限失败: ${e.message}", null)
+            result.error("REQUEST_FAILED", "Failed to request permission: ${e.message}", null)
         }
     }
 
@@ -203,28 +199,10 @@ class FloatingLyricPlugin private constructor(private val context: Context) : Me
             )
             result.success(true)
         } catch (e: Exception) {
-            result.error("UPDATE_STYLE_FAILED", "更新样式失败: ${e.message}", null)
+            result.error("UPDATE_STYLE_FAILED", "Failed to update style: ${e.message}", null)
         }
     }
 
-    private fun setTouchEnabled(enabled: Boolean, result: Result) {
-        try {
-            touchEnabled = enabled
-            floatingView?.touchEnabled = enabled
-            result.success(true)
-        } catch (e: Exception) {
-            result.error("SET_TOUCH_FAILED", "设置触摸模式失败: ${e.message}", null)
-        }
-    }
-
-    private fun handleTouchEnabledChanged(enabled: Boolean) {
-        touchEnabled = enabled
-        channel?.invokeMethod("onTouchEnabledChanged", mapOf("enabled" to enabled))
-    }
-
-    /**
-     * 清理资源
-     */
     fun cleanup() {
         if (isShowing) {
             try {

@@ -8,26 +8,22 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
-import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.TextView
 
 /**
- * 悬浮字幕视图
- * 美观、简洁、现代化的设计，支持拖动
+ * Floating lyric view
+ * Supports drag and long-press to close
  */
 class FloatingLyricView(
     context: Context,
     private val windowManager: WindowManager,
     private val layoutParams: WindowManager.LayoutParams,
-    initialTouchEnabled: Boolean,
-    private val onTouchEnabledChanged: (Boolean) -> Unit
+    private val onClose: () -> Unit
 ) : FrameLayout(context) {
     private val textView: TextView
-    private val lockIndicator: ImageView
     
     private var initialX: Int = 0
     private var initialY: Int = 0
@@ -35,21 +31,16 @@ class FloatingLyricView(
     private var initialTouchY: Float = 0f
     private var isDragging = false
     private var longPressTriggered = false
-    private val dragThreshold = 10f // 拖动阈值，避免点击误触发
+    private val dragThreshold = 10f
     private val longPressTimeout = ViewConfiguration.getLongPressTimeout().toLong()
 
     private val longPressRunnable = Runnable {
         longPressTriggered = true
-        touchEnabled = !touchEnabled
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-        onTouchEnabledChanged(touchEnabled)
+        onClose()
     }
 
-    var touchEnabled: Boolean = initialTouchEnabled
-        set(value) {
-            field = value
-            updateLockIndicator()
-        }
+    var touchEnabled: Boolean = true
 
     private var currentBackgroundColor: Int = Color.parseColor("#F2000000")
     private var currentCornerRadius: Float = 16f
@@ -65,39 +56,22 @@ class FloatingLyricView(
             dpToPx(20f).toInt(),
             dpToPx(10f).toInt()
         )
-        elevation = dpToPx(12f) // 增加阴影深度
+        elevation = dpToPx(12f)
 
         textView = TextView(context).apply {
             textSize = 16f
             setTextColor(Color.WHITE)
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL) // 使用常规字重
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             gravity = Gravity.CENTER
             maxLines = 6
             ellipsize = android.text.TextUtils.TruncateAt.END
-            letterSpacing = 0.02f // 增加字间距，更易阅读
+            letterSpacing = 0.02f
         }
 
         addView(textView, LayoutParams(
             LayoutParams.WRAP_CONTENT,
             LayoutParams.WRAP_CONTENT
         ))
-
-        lockIndicator = ImageView(context).apply {
-            setImageResource(android.R.drawable.ic_lock_lock)
-            setColorFilter(Color.WHITE)
-            alpha = 0.7f
-        }
-
-        addView(lockIndicator, LayoutParams(
-            dpToPx(10f).toInt(),
-            dpToPx(10f).toInt(),
-            Gravity.END or Gravity.TOP
-        ).apply {
-            topMargin = -dpToPx(8f).toInt()
-            rightMargin = -dpToPx(16f).toInt()
-        })
-
-        updateLockIndicator()
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -120,12 +94,10 @@ class FloatingLyricView(
                 
                 if (!isDragging && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
                     removeCallbacks(longPressRunnable)
-                    if (touchEnabled) {
-                        isDragging = true
-                    }
+                    isDragging = true
                 }
                 
-                if (isDragging && touchEnabled) {
+                if (isDragging) {
                     layoutParams.x = initialX + dx.toInt()
                     layoutParams.y = initialY + dy.toInt()
                     
@@ -153,20 +125,10 @@ class FloatingLyricView(
         return true
     }
 
-    private fun updateLockIndicator() {
-        lockIndicator.visibility = if (touchEnabled) View.GONE else View.VISIBLE
-    }
-
-    /**
-     * 更新显示的文本
-     */
     fun updateText(text: String) {
         textView.text = text
     }
 
-    /**
-     * 更新背景
-     */
     private fun updateBackground() {
         val drawable = GradientDrawable().apply {
             setColor(currentBackgroundColor)
@@ -175,9 +137,6 @@ class FloatingLyricView(
         background = drawable
     }
 
-    /**
-     * 更新样式
-     */
     fun updateStyle(
         fontSize: Float?,
         textColor: Int?,
@@ -214,9 +173,6 @@ class FloatingLyricView(
         }
     }
 
-    /**
-     * dp 转 px
-     */
     private fun dpToPx(dp: Float): Float {
         return TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,

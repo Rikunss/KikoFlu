@@ -28,12 +28,16 @@ class _DesktopFloatingLyricState extends State<DesktopFloatingLyric>
   double _cornerRadius = 8.0;
   double _paddingHorizontal = 16.0;
   double _paddingVertical = 8.0;
+  String _fontFamily = '';
+  FontWeight _fontWeight = FontWeight.bold;
+  bool _shadowEnabled = true;
+  double _shadowBlur = 3.0;
+  Color _shadowColor = const Color(0xCC000000);
 
   @override
   void initState() {
     super.initState();
     windowManager.addListener(this);
-
     _initWindow();
 
     if (widget.arguments != null) {
@@ -62,6 +66,24 @@ class _DesktopFloatingLyricState extends State<DesktopFloatingLyric>
     }
     if (args.containsKey('paddingVertical')) {
       _paddingVertical = (args['paddingVertical'] as num).toDouble();
+    }
+    if (args.containsKey('fontFamily')) {
+      _fontFamily = args['fontFamily'] as String? ?? '';
+    }
+    if (args.containsKey('fontWeight')) {
+      final idx = args['fontWeight'] as int?;
+      if (idx != null && idx < FontWeight.values.length) {
+        _fontWeight = FontWeight.values[idx];
+      }
+    }
+    if (args.containsKey('shadowEnabled')) {
+      _shadowEnabled = args['shadowEnabled'] as bool? ?? true;
+    }
+    if (args.containsKey('shadowBlur')) {
+      _shadowBlur = (args['shadowBlur'] as num?)?.toDouble() ?? 3.0;
+    }
+    if (args.containsKey('shadowColor')) {
+      _shadowColor = Color(args['shadowColor'] as int);
     }
   }
 
@@ -110,53 +132,115 @@ class _DesktopFloatingLyricState extends State<DesktopFloatingLyric>
     }
   }
 
+  Future<void> _closeWindow() async {
+    try {
+      final controller = await WindowController.fromCurrentEngine();
+      await controller.invokeMethod('close');
+    } catch (_) {
+      await windowManager.close();
+    }
+  }
+
+  void _showCloseDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Close Floating Lyric?'),
+        content: const Text('This will hide the floating lyric window.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _closeWindow();
+            },
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       color: Colors.transparent,
+      theme: ThemeData(useMaterial3: true),
       home: Scaffold(
         backgroundColor: Colors.transparent,
-        body: GestureDetector(
-          onPanStart: (_) => windowManager.startDragging(),
-          child: Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.transparent,
-            child: Center(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _backgroundColor,
-                  borderRadius: BorderRadius.circular(_cornerRadius),
-                ),
-                padding: EdgeInsets.symmetric(
-                  horizontal: _paddingHorizontal,
-                  vertical: _paddingVertical,
-                ),
-                child: Text(
-                  _text,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: _fontSize,
-                    fontWeight: FontWeight.bold,
-                    color: _textColor,
-                    shadows: [
-                      Shadow(
-                        offset: const Offset(1.0, 1.0),
-                        blurRadius: 3.0,
-                        color: Colors.black.withValues(alpha: 0.8),
+        body: Column(
+          children: [
+            // Main lyric area - drag to move, long press to close
+            Expanded(
+              child: GestureDetector(
+                onLongPress: _showCloseDialog,
+                onPanStart: (_) => windowManager.startDragging(),
+                child: Center(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _backgroundColor,
+                      borderRadius: BorderRadius.circular(_cornerRadius),
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: _paddingHorizontal,
+                      vertical: _paddingVertical,
+                    ),
+                    child: Text(
+                      _text,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: _fontSize,
+                        fontWeight: _fontWeight,
+                        fontFamily: _fontFamily.isNotEmpty ? _fontFamily : null,
+                        color: _textColor,
+                        shadows: _shadowEnabled
+                            ? [
+                                Shadow(
+                                  offset: const Offset(1.0, 1.0),
+                                  blurRadius: _shadowBlur,
+                                  color: _shadowColor,
+                                ),
+                                Shadow(
+                                  offset: const Offset(-1.0, -1.0),
+                                  blurRadius: _shadowBlur,
+                                  color: _shadowColor,
+                                ),
+                              ]
+                            : null,
                       ),
-                      Shadow(
-                        offset: const Offset(-1.0, -1.0),
-                        blurRadius: 3.0,
-                        color: Colors.black.withValues(alpha: 0.8),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+
+            // Bottom handle - tap to close
+            GestureDetector(
+              onTap: _closeWindow,
+              child: Container(
+                height: 20,
+                color: Colors.transparent,
+                child: Center(
+                  child: Tooltip(
+                    message: 'Tap to close',
+                    child: Container(
+                      width: 40,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(1.5),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

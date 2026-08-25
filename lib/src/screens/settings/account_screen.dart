@@ -365,20 +365,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
             ),
           ],
 
-          if (Platform.isAndroid && floatingLyricEnabled) ...[
-            const Divider(height: 1, indent: 72),
-            _buildPlatformSwitch(
-              context,
-              Icons.lock_outline_rounded,
-              s.floatingLyricTouch,
-              ref.watch(floatingLyricTouchEnabledProvider),
-              (val) {
-                ref
-                    .read(floatingLyricTouchEnabledProvider.notifier)
-                    .setEnabled(val);
-              },
-            ),
-          ],
+
 
           if (Platform.isIOS && floatingLyricEnabled) ...[
             const Divider(height: 1, indent: 72),

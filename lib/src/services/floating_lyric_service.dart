@@ -232,6 +232,12 @@ class FloatingLyricService {
     double? cornerRadius,
     double? paddingHorizontal,
     double? paddingVertical,
+    String? fontFamily,
+    int? fontWeight,
+    bool? shadowEnabled,
+    double? shadowBlur,
+    int? shadowColor,
+    bool? showCloseButton,
   }) async {
     if (!isSupported) {
       return false;
@@ -242,10 +248,14 @@ class FloatingLyricService {
     if (textColor != null) params['textColor'] = textColor;
     if (backgroundColor != null) params['backgroundColor'] = backgroundColor;
     if (cornerRadius != null) params['cornerRadius'] = cornerRadius;
-    if (paddingHorizontal != null) {
-      params['paddingHorizontal'] = paddingHorizontal;
-    }
+    if (paddingHorizontal != null) params['paddingHorizontal'] = paddingHorizontal;
     if (paddingVertical != null) params['paddingVertical'] = paddingVertical;
+    if (fontFamily != null && fontFamily.isNotEmpty) params['fontFamily'] = fontFamily;
+    if (fontWeight != null) params['fontWeight'] = fontWeight;
+    if (shadowEnabled != null) params['shadowEnabled'] = shadowEnabled;
+    if (shadowBlur != null) params['shadowBlur'] = shadowBlur;
+    if (shadowColor != null) params['shadowColor'] = shadowColor;
+    if (showCloseButton != null) params['showCloseButton'] = showCloseButton;
 
     if (Platform.isWindows) {
       if (_windowId != null) {

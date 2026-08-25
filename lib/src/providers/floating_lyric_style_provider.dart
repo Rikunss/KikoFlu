@@ -5,7 +5,14 @@ import '../services/floating_lyric_service.dart';
 import '../utils/theme.dart';
 import 'theme_provider.dart';
 
-/// 悬浮字幕样式设置
+/// Transparency mode for the floating lyric overlay
+enum TransparencyMode {
+  pill,   // Background wraps text with padding (default)
+  overlay, // Transparent background, only text with shadow
+  card,    // Full-width background with larger padding
+}
+
+/// Floating lyric style settings
 class FloatingLyricStyle {
   final double fontSize;
   final double opacity;
@@ -14,6 +21,13 @@ class FloatingLyricStyle {
   final double cornerRadius;
   final double paddingHorizontal;
   final double paddingVertical;
+  final String fontFamily;
+  final FontWeight fontWeight;
+  final bool shadowEnabled;
+  final double shadowBlur;
+  final TransparencyMode transparencyMode;
+  final bool showCloseButton;
+  final Color shadowColor;
 
   const FloatingLyricStyle({
     this.fontSize = 14.0,
@@ -23,6 +37,13 @@ class FloatingLyricStyle {
     this.cornerRadius = 16.0,
     this.paddingHorizontal = 20.0,
     this.paddingVertical = 10.0,
+    this.fontFamily = '',
+    this.fontWeight = FontWeight.bold,
+    this.shadowEnabled = true,
+    this.shadowBlur = 3.0,
+    this.transparencyMode = TransparencyMode.pill,
+    this.showCloseButton = false,
+    this.shadowColor = const Color(0xCC000000),
   });
 
   FloatingLyricStyle copyWith({
@@ -33,6 +54,13 @@ class FloatingLyricStyle {
     double? cornerRadius,
     double? paddingHorizontal,
     double? paddingVertical,
+    String? fontFamily,
+    FontWeight? fontWeight,
+    bool? shadowEnabled,
+    double? shadowBlur,
+    TransparencyMode? transparencyMode,
+    bool? showCloseButton,
+    Color? shadowColor,
   }) {
     return FloatingLyricStyle(
       fontSize: fontSize ?? this.fontSize,
@@ -42,6 +70,13 @@ class FloatingLyricStyle {
       cornerRadius: cornerRadius ?? this.cornerRadius,
       paddingHorizontal: paddingHorizontal ?? this.paddingHorizontal,
       paddingVertical: paddingVertical ?? this.paddingVertical,
+      fontFamily: fontFamily ?? this.fontFamily,
+      fontWeight: fontWeight ?? this.fontWeight,
+      shadowEnabled: shadowEnabled ?? this.shadowEnabled,
+      shadowBlur: shadowBlur ?? this.shadowBlur,
+      transparencyMode: transparencyMode ?? this.transparencyMode,
+      showCloseButton: showCloseButton ?? this.showCloseButton,
+      shadowColor: shadowColor ?? this.shadowColor,
     );
   }
 
@@ -54,6 +89,13 @@ class FloatingLyricStyle {
       'cornerRadius': cornerRadius,
       'paddingHorizontal': paddingHorizontal,
       'paddingVertical': paddingVertical,
+      'fontFamily': fontFamily,
+      'fontWeight': fontWeight.index,
+      'shadowEnabled': shadowEnabled,
+      'shadowBlur': shadowBlur,
+      'transparencyMode': transparencyMode.index,
+      'showCloseButton': showCloseButton,
+      'shadowColor': shadowColor.toARGB32(),
     };
   }
 
@@ -67,22 +109,53 @@ class FloatingLyricStyle {
       cornerRadius: map['cornerRadius']?.toDouble() ?? 16.0,
       paddingHorizontal: map['paddingHorizontal']?.toDouble() ?? 20.0,
       paddingVertical: map['paddingVertical']?.toDouble() ?? 10.0,
+      fontFamily: map['fontFamily'] as String? ?? '',
+      fontWeight: FontWeight.values[(map['fontWeight'] as int?) ?? 6], // bold default
+      shadowEnabled: map['shadowEnabled'] as bool? ?? true,
+      shadowBlur: map['shadowBlur']?.toDouble() ?? 3.0,
+      transparencyMode: TransparencyMode.values[(map['transparencyMode'] as int?) ?? 0],
+      showCloseButton: map['showCloseButton'] as bool? ?? false,
+      shadowColor: Color(map['shadowColor'] ?? const Color(0xCC000000).toARGB32()),
     );
   }
 
   Color get backgroundColorWithOpacity {
+    if (transparencyMode == TransparencyMode.overlay) {
+      return Colors.transparent;
+    }
     return backgroundColor.withValues(alpha: opacity);
   }
 
   int get textColorArgb => textColor.toARGB32();
 
   int get backgroundColorArgb {
-    final color = backgroundColor.withValues(alpha: opacity);
+    final color = backgroundColorWithOpacity;
     return color.toARGB32();
+  }
+
+  double get effectivePaddingHorizontal {
+    if (transparencyMode == TransparencyMode.card) {
+      return paddingHorizontal + 8;
+    }
+    return paddingHorizontal;
+  }
+
+  double get effectivePaddingVertical {
+    if (transparencyMode == TransparencyMode.card) {
+      return paddingVertical + 6;
+    }
+    return paddingVertical;
+  }
+
+  double get effectiveCornerRadius {
+    if (transparencyMode == TransparencyMode.card) {
+      return cornerRadius + 4;
+    }
+    return cornerRadius;
   }
 }
 
-/// 悬浮字幕样式 Provider
+/// Floating lyric style Provider
 final floatingLyricStyleProvider =
     StateNotifierProvider<FloatingLyricStyleNotifier, FloatingLyricStyle>(
         (ref) {
@@ -174,6 +247,21 @@ class FloatingLyricStyleNotifier extends StateNotifier<FloatingLyricStyle>
         prefs.getDouble('${_keyPrefix}paddingHorizontal') ?? 20.0;
     final paddingVertical =
         prefs.getDouble('${_keyPrefix}paddingVertical') ?? 10.0;
+    final fontFamily = prefs.getString('${_keyPrefix}fontFamily') ?? '';
+    final fontWeightIdx = prefs.getInt('${_keyPrefix}fontWeight');
+    final fontWeight = fontWeightIdx != null && fontWeightIdx < FontWeight.values.length
+        ? FontWeight.values[fontWeightIdx]
+        : FontWeight.bold;
+    final shadowEnabled = prefs.getBool('${_keyPrefix}shadowEnabled') ?? true;
+    final shadowBlur = prefs.getDouble('${_keyPrefix}shadowBlur') ?? 3.0;
+    final transparencyModeIdx = prefs.getInt('${_keyPrefix}transparencyMode');
+    final transparencyMode = transparencyModeIdx != null && transparencyModeIdx < TransparencyMode.values.length
+        ? TransparencyMode.values[transparencyModeIdx]
+        : TransparencyMode.pill;
+    final showCloseButton = prefs.getBool('${_keyPrefix}showCloseButton') ?? false;
+    final shadowColor = prefs.containsKey('${_keyPrefix}shadowColor')
+        ? Color(prefs.getInt('${_keyPrefix}shadowColor')!)
+        : const Color(0xCC000000);
 
     state = FloatingLyricStyle(
       fontSize: fontSize,
@@ -183,6 +271,13 @@ class FloatingLyricStyleNotifier extends StateNotifier<FloatingLyricStyle>
       cornerRadius: cornerRadius,
       paddingHorizontal: paddingHorizontal,
       paddingVertical: paddingVertical,
+      fontFamily: fontFamily,
+      fontWeight: fontWeight,
+      shadowEnabled: shadowEnabled,
+      shadowBlur: shadowBlur,
+      transparencyMode: transparencyMode,
+      showCloseButton: showCloseButton,
+      shadowColor: shadowColor,
     );
 
     _applyStyle();
@@ -202,6 +297,13 @@ class FloatingLyricStyleNotifier extends StateNotifier<FloatingLyricStyle>
         '${_keyPrefix}paddingHorizontal', state.paddingHorizontal);
     await prefs.setDouble(
         '${_keyPrefix}paddingVertical', state.paddingVertical);
+    await prefs.setString('${_keyPrefix}fontFamily', state.fontFamily);
+    await prefs.setInt('${_keyPrefix}fontWeight', state.fontWeight.index);
+    await prefs.setBool('${_keyPrefix}shadowEnabled', state.shadowEnabled);
+    await prefs.setDouble('${_keyPrefix}shadowBlur', state.shadowBlur);
+    await prefs.setInt('${_keyPrefix}transparencyMode', state.transparencyMode.index);
+    await prefs.setBool('${_keyPrefix}showCloseButton', state.showCloseButton);
+    await prefs.setInt('${_keyPrefix}shadowColor', state.shadowColor.toARGB32());
   }
 
   void applyStyle() {
@@ -209,9 +311,15 @@ class FloatingLyricStyleNotifier extends StateNotifier<FloatingLyricStyle>
       fontSize: state.fontSize,
       textColor: state.textColorArgb,
       backgroundColor: state.backgroundColorArgb,
-      cornerRadius: state.cornerRadius,
-      paddingHorizontal: state.paddingHorizontal,
-      paddingVertical: state.paddingVertical,
+      cornerRadius: state.effectiveCornerRadius,
+      paddingHorizontal: state.effectivePaddingHorizontal,
+      paddingVertical: state.effectivePaddingVertical,
+      fontFamily: state.fontFamily,
+      fontWeight: state.fontWeight.index,
+      shadowEnabled: state.shadowEnabled,
+      shadowBlur: state.shadowBlur,
+      shadowColor: state.shadowColor.toARGB32(),
+      showCloseButton: state.showCloseButton,
     );
   }
 
@@ -259,7 +367,49 @@ class FloatingLyricStyleNotifier extends StateNotifier<FloatingLyricStyle>
     _applyStyle();
   }
 
-  /// 重置为默认样式
+  Future<void> updateFontFamily(String family) async {
+    state = state.copyWith(fontFamily: family);
+    await _save();
+    _applyStyle();
+  }
+
+  Future<void> updateFontWeight(FontWeight weight) async {
+    state = state.copyWith(fontWeight: weight);
+    await _save();
+    _applyStyle();
+  }
+
+  Future<void> updateShadowEnabled(bool enabled) async {
+    state = state.copyWith(shadowEnabled: enabled);
+    await _save();
+    _applyStyle();
+  }
+
+  Future<void> updateShadowBlur(double blur) async {
+    state = state.copyWith(shadowBlur: blur);
+    await _save();
+    _applyStyle();
+  }
+
+  Future<void> updateShadowColor(Color color) async {
+    state = state.copyWith(shadowColor: color);
+    await _save();
+    _applyStyle();
+  }
+
+  Future<void> updateTransparencyMode(TransparencyMode mode) async {
+    state = state.copyWith(transparencyMode: mode);
+    await _save();
+    _applyStyle();
+  }
+
+  Future<void> updateShowCloseButton(bool show) async {
+    state = state.copyWith(showCloseButton: show);
+    await _save();
+    _applyStyle();
+  }
+
+  /// Reset to default style
   Future<void> reset() async {
     final themeSettings = ref.read(themeSettingsProvider);
     final isDark = themeSettings.themeMode == AppThemeMode.dark ||
@@ -279,11 +429,18 @@ class FloatingLyricStyleNotifier extends StateNotifier<FloatingLyricStyle>
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('${_keyPrefix}textColor');
     await prefs.remove('${_keyPrefix}backgroundColor');
+    await prefs.remove('${_keyPrefix}fontFamily');
+    await prefs.remove('${_keyPrefix}fontWeight');
+    await prefs.remove('${_keyPrefix}shadowEnabled');
+    await prefs.remove('${_keyPrefix}shadowBlur');
+    await prefs.remove('${_keyPrefix}transparencyMode');
+    await prefs.remove('${_keyPrefix}showCloseButton');
+    await prefs.remove('${_keyPrefix}shadowColor');
 
     _applyStyle();
   }
 
-  /// 应用预设样式
+  /// Apply preset style
   Future<void> applyPreset(FloatingLyricStylePreset preset,
       [BuildContext? context]) async {
     state = preset.getStyle(context);
@@ -302,7 +459,7 @@ class FloatingLyricStyleNotifier extends StateNotifier<FloatingLyricStyle>
   }
 }
 
-/// 预设样式
+/// Preset styles
 enum FloatingLyricStylePreset {
   dynamic,
   classic,
@@ -316,34 +473,61 @@ extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
   String get name {
     switch (this) {
       case FloatingLyricStylePreset.dynamic:
-        return '动态';
+        return 'Dynamic';
       case FloatingLyricStylePreset.classic:
-        return '经典';
+        return 'Classic';
       case FloatingLyricStylePreset.modern:
-        return '现代';
+        return 'Modern';
       case FloatingLyricStylePreset.minimal:
-        return '极简';
+        return 'Minimal';
       case FloatingLyricStylePreset.vibrant:
-        return '鲜艳';
+        return 'Vibrant';
       case FloatingLyricStylePreset.elegant:
-        return '优雅';
+        return 'Elegant';
     }
   }
 
   String get description {
     switch (this) {
       case FloatingLyricStylePreset.dynamic:
-        return '跟随系统主题，自动取色';
+        return 'Follows system theme colors';
       case FloatingLyricStylePreset.classic:
-        return '黑底白字，经典耐看';
+        return 'Black background, white text';
       case FloatingLyricStylePreset.modern:
-        return '渐变背景，时尚现代';
+        return 'Dark blue, modern style';
       case FloatingLyricStylePreset.minimal:
-        return '轻透明，简约优雅';
+        return 'Light & transparent';
       case FloatingLyricStylePreset.vibrant:
-        return '色彩鲜明，活力四射';
+        return 'Bold pink, vibrant';
       case FloatingLyricStylePreset.elegant:
-        return '深蓝底，高雅气质';
+        return 'Deep blue, elegant';
+    }
+  }
+
+  /// Preview colors for the preset chip
+  Color get previewBg {
+    switch (this) {
+      case FloatingLyricStylePreset.dynamic:
+        return const Color(0xFF2196F3);
+      case FloatingLyricStylePreset.classic:
+        return Colors.black;
+      case FloatingLyricStylePreset.modern:
+        return const Color(0xFF1A237E);
+      case FloatingLyricStylePreset.minimal:
+        return const Color(0xFFF5F5F5);
+      case FloatingLyricStylePreset.vibrant:
+        return const Color(0xFFE91E63);
+      case FloatingLyricStylePreset.elegant:
+        return const Color(0xFF0D47A1);
+    }
+  }
+
+  Color get previewTextColor {
+    switch (this) {
+      case FloatingLyricStylePreset.minimal:
+        return const Color(0xFF212121);
+      default:
+        return Colors.white;
     }
   }
 
@@ -363,6 +547,11 @@ extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
             cornerRadius: 16.0,
             paddingHorizontal: 20.0,
             paddingVertical: 10.0,
+            fontWeight: FontWeight.bold,
+            shadowEnabled: true,
+            shadowBlur: 3.0,
+            transparencyMode: TransparencyMode.pill,
+            showCloseButton: false,
           );
         }
         return const FloatingLyricStyle(
@@ -383,6 +572,10 @@ extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
           cornerRadius: 16.0,
           paddingHorizontal: 20.0,
           paddingVertical: 10.0,
+          fontWeight: FontWeight.bold,
+          shadowEnabled: true,
+          shadowBlur: 2.0,
+          transparencyMode: TransparencyMode.pill,
         );
       case FloatingLyricStylePreset.modern:
         return const FloatingLyricStyle(
@@ -393,6 +586,10 @@ extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
           cornerRadius: 20.0,
           paddingHorizontal: 24.0,
           paddingVertical: 12.0,
+          fontWeight: FontWeight.w600,
+          shadowEnabled: true,
+          shadowBlur: 4.0,
+          transparencyMode: TransparencyMode.pill,
         );
       case FloatingLyricStylePreset.minimal:
         return const FloatingLyricStyle(
@@ -403,6 +600,10 @@ extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
           cornerRadius: 12.0,
           paddingHorizontal: 16.0,
           paddingVertical: 8.0,
+          fontWeight: FontWeight.w500,
+          shadowEnabled: false,
+          shadowBlur: 0,
+          transparencyMode: TransparencyMode.pill,
         );
       case FloatingLyricStylePreset.vibrant:
         return const FloatingLyricStyle(
@@ -413,6 +614,10 @@ extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
           cornerRadius: 18.0,
           paddingHorizontal: 22.0,
           paddingVertical: 11.0,
+          fontWeight: FontWeight.bold,
+          shadowEnabled: true,
+          shadowBlur: 3.0,
+          transparencyMode: TransparencyMode.pill,
         );
       case FloatingLyricStylePreset.elegant:
         return const FloatingLyricStyle(
@@ -423,6 +628,10 @@ extension FloatingLyricStylePresetExtension on FloatingLyricStylePreset {
           cornerRadius: 16.0,
           paddingHorizontal: 20.0,
           paddingVertical: 10.0,
+          fontWeight: FontWeight.w600,
+          shadowEnabled: true,
+          shadowBlur: 3.0,
+          transparencyMode: TransparencyMode.pill,
         );
     }
   }
