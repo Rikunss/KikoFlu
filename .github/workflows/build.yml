@@ -116,34 +116,33 @@ jobs:
             Write-Host "No generator expression found — already patched or using fallback cmake --install"
           }
 
-      - name: Fix smtc_windows symlink (CMake cannot extract tar through symlinks)
+      - name: Patch smtc_windows CMakeLists.txt in pub cache (fix junction tar extraction)
         continue-on-error: true
         shell: pwsh
         run: |
           # On GHA Windows, .plugin_symlinks/smtc_windows is a junction.
-          # CMake's tar extraction fails when CMAKE_CURRENT_SOURCE_DIR goes through a junction.
-          # Fix: replace the junction with the real directory.
-          $link = "windows/flutter/ephemeral/.plugin_symlinks/smtc_windows"
-          if (Test-Path $link) {
-            $item = Get-Item $link
-            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-              # Find the real package in pub cache dynamically
-              $pubCache = Join-Path $env:LOCALAPPDATA "Pub\Cache\hosted\pub.dev"
-              $smtcPkg = Get-ChildItem $pubCache -Directory | Where-Object { $_.Name -like 'smtc_windows-*' } | Select-Object -First 1
-              if ($smtcPkg) {
-                $target = $smtcPkg.FullName
-                Write-Host "Found smtc_windows at: $target"
-                Remove-Item $link -Force  # Remove junction (not -Recurse, just the link)
-                Copy-Item -Path $target -Destination $link -Recurse -Force
-                Write-Host "Junction replaced with real directory"
+          # CMake cannot extract tar.gz when CMAKE_CURRENT_SOURCE_DIR goes through a junction.
+          # Fix: patch the CMakeLists.txt in the REAL pub cache (before Flutter creates symlinks).
+          $pubCache = Join-Path $env:LOCALAPPDATA "Pub\Cache\hosted\pub.dev"
+          $smtcPkg = Get-ChildItem $pubCache -Directory | Where-Object { $_.Name -like 'smtc_windows-*' } | Select-Object -First 1
+          if ($smtcPkg) {
+            $cmakeFile = Join-Path $smtcPkg.FullName "windows\CMakeLists.txt"
+            if (Test-Path $cmakeFile) {
+              $realDir = $smtcPkg.FullName.Replace('\', '/')
+              $content = Get-Content $cmakeFile -Raw
+              # Replace ${CMAKE_CURRENT_SOURCE_DIR} with the real pub cache path
+              $replaced = $content -replace '\$\{CMAKE_CURRENT_SOURCE_DIR\}', $realDir
+              if ($content -ne $replaced) {
+                Set-Content -Path $cmakeFile -Value $replaced -NoNewline
+                Write-Host "Patched smtc_windows CMakeLists.txt: CMAKE_CURRENT_SOURCE_DIR -> $realDir"
               } else {
-                Write-Host "smtc_windows not found in pub cache — skipping"
+                Write-Host "Already patched or no match found"
               }
             } else {
-              Write-Host "Not a junction, skipping"
+              Write-Host "CMakeLists.txt not found at $cmakeFile"
             }
           } else {
-            Write-Host "smtc_windows not found — skipping"
+            Write-Host "smtc_windows not found in pub cache — skipping"
           }
 
       - name: Build Windows Release
