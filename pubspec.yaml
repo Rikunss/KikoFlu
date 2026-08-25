@@ -78,7 +78,7 @@ dependencies:
   package_info_plus: ^9.0.0
   window_manager: ^0.4.3
   desktop_multi_window: ^0.3.0
-  audio_session: ^0.1.25
+  audio_session: ^0.2.0
   ffi: ^2.1.4
   http: ^1.6.0
   sqlite3: ^3.3.2
