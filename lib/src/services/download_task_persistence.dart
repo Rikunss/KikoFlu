@@ -15,6 +15,23 @@ import 'cookie_service.dart';
 
 final _log = LogService.instance;
 
+/// Identity of a downloaded file inside a work folder.
+///
+/// Compares names ignoring the path separator style, duplicated separators,
+/// surrounding whitespace and letter casing. A file system may hand back the
+/// name in a slightly different form than the one the download stored (e.g.
+/// `\` instead of `/`, `A.mp3` instead of `a.MP3`), and that difference used
+/// to make the disk sync register the same file a second time.
+String _fileIdentity(String fileName) {
+  return fileName
+      .replaceAll('\\', '/')
+      .split('/')
+      .where((part) => part.isNotEmpty && part != '.')
+      .join('/')
+      .trim()
+      .toLowerCase();
+}
+
 /// Manages all download task data: in-memory task list, persistence to
 /// SharedPreferences, disk metadata (work_metadata.json), disk sync,
 /// file tree management, and natural sort utilities.
@@ -28,6 +45,10 @@ class DownloadTaskPersistence {
 
   Timer? _saveTimer;
   bool _needsSave = false;
+
+  /// Completed once [loadTasks] has run at least once, used to make the
+  /// startup disk sync wait for the saved tasks instead of racing them.
+  Completer<void>? _loadGate;
 
   static const String _tasksKey = 'download_tasks';
 
@@ -144,6 +165,15 @@ class DownloadTaskPersistence {
 
   /// Load tasks from SharedPreferences.
   Future<void> loadTasks() async {
+    final gate = _loadGate ??= Completer<void>();
+    try {
+      await _loadTasksFromPrefs();
+    } finally {
+      if (!gate.isCompleted) gate.complete();
+    }
+  }
+
+  Future<void> _loadTasksFromPrefs() async {
     try {
       final prefs = await StorageService.getPrefs();
       final tasksJson = prefs.getString(_tasksKey);
@@ -154,9 +184,84 @@ class DownloadTaskPersistence {
           tasksList.map((json) => DownloadTask.fromJson(json)).toList(),
         );
       }
+      // Lists saved by an older build may already hold duplicates.
+      _collapseDuplicateTasks();
     } catch (e) {
       _log.error('加载下载任务失败: $e', tag: 'Download');
     }
+  }
+
+  /// Make sure the saved tasks are in memory before touching them.
+  ///
+  /// The startup disk sync used to run before [loadTasks] finished (see
+  /// `main.dart`), so it compared the files on disk against an empty task list
+  /// and registered every file a second time.
+  Future<void> _ensureTasksLoaded() async {
+    final gate = _loadGate;
+    if (gate != null) {
+      await gate.future;
+      return;
+    }
+    await loadTasks();
+  }
+
+  /// Drop duplicate entries that point at the same file of the same work.
+  ///
+  /// Keeps the most useful record — the one that still knows its hash (needed
+  /// to locate the file for playback), then the completed one, then the
+  /// oldest — and removes the rest. Files on disk are never touched.
+  void _collapseDuplicateTasks({bool notify = true}) {
+    final keptIndexByIdentity = <String, int>{};
+    final removedIndexes = <int>{};
+
+    for (var i = 0; i < _tasks.length; i++) {
+      final task = _tasks[i];
+      final key = '${task.workId}\u0000${_fileIdentity(task.fileName)}';
+      final keptIndex = keptIndexByIdentity[key];
+      if (keptIndex == null) {
+        keptIndexByIdentity[key] = i;
+        continue;
+      }
+      if (_isBetterDuplicate(task, _tasks[keptIndex])) {
+        keptIndexByIdentity[key] = i;
+        removedIndexes.add(keptIndex);
+      } else {
+        removedIndexes.add(i);
+      }
+    }
+
+    if (removedIndexes.isEmpty) return;
+
+    final kept = <DownloadTask>[];
+    for (var i = 0; i < _tasks.length; i++) {
+      if (!removedIndexes.contains(i)) kept.add(_tasks[i]);
+    }
+    _tasks
+      ..clear()
+      ..addAll(kept);
+
+    _log.info(
+      '已合并 ${removedIndexes.length} 个重复的下载记录（同一作品同一文件）',
+      tag: 'Download',
+    );
+    if (notify) {
+      _tasksController.add(List.from(_tasks));
+      _scheduleDelayedSave();
+    }
+  }
+
+  /// Whether [candidate] should replace [current] when both describe the same
+  /// file of the same work.
+  static bool _isBetterDuplicate(DownloadTask candidate, DownloadTask current) {
+    final candidateHasHash = candidate.hash?.isNotEmpty ?? false;
+    final currentHasHash = current.hash?.isNotEmpty ?? false;
+    if (candidateHasHash != currentHasHash) return candidateHasHash;
+
+    final candidateCompleted = candidate.status == DownloadStatus.completed;
+    final currentCompleted = current.status == DownloadStatus.completed;
+    if (candidateCompleted != currentCompleted) return candidateCompleted;
+
+    return candidate.createdAt.isBefore(current.createdAt);
   }
 
   /// Get the download root directory.
@@ -287,6 +392,11 @@ class DownloadTaskPersistence {
   Future<void> reloadMetadataFromDisk() async {
     try {
       _log.info('开始从硬盘同步任务 (background)...', tag: 'Download');
+
+      // Never scan before the saved tasks are in memory, otherwise every file
+      // on disk looks like it has no task yet and gets registered twice.
+      await _ensureTasksLoaded();
+
       final downloadDir = await getDownloadDirectory();
       if (!await downloadDir.exists()) {
         _log.warning('下载目录不存在，清空所有已完成任务', tag: 'Download');
@@ -318,8 +428,25 @@ class DownloadTaskPersistence {
 
       // Convert new tasks from JSON
       if (result.newTasks.isNotEmpty) {
+        // The snapshot the scan worked on may be older than the current list
+        // (it is prepared before the scan runs), so re-check every entry
+        // against the live tasks before adding a duplicate.
+        final knownIdentities = <String>{
+          for (final task in _tasks)
+            '${task.workId}\u0000${_fileIdentity(task.fileName)}',
+        };
+        final addedIdentities = <String>{};
+        var addedCount = 0;
+
         for (final taskJson in result.newTasks) {
           final workId = taskJson['workId'] as int;
+          final fileName = taskJson['fileName'] as String;
+          final identity = '$workId\u0000${_fileIdentity(fileName)}';
+          if (knownIdentities.contains(identity) ||
+              addedIdentities.contains(identity)) {
+            continue;
+          }
+
           Map<String, dynamic>? metadata;
           final metadataJson = taskJson['workMetadataJson'] as String?;
           if (metadataJson != null) {
@@ -329,7 +456,7 @@ class DownloadTaskPersistence {
             id: taskJson['id'] as String,
             workId: workId,
             workTitle: taskJson['workTitle'] as String,
-            fileName: taskJson['fileName'] as String,
+            fileName: fileName,
             downloadUrl: taskJson['downloadUrl'] as String,
             status: DownloadStatus.completed,
             totalBytes: taskJson['totalBytes'] as int?,
@@ -343,9 +470,14 @@ class DownloadTaskPersistence {
             workMetadata: metadata,
           );
           _tasks.add(newTask);
+          addedIdentities.add(identity);
+          addedCount++;
         }
-        _log.info('添加了 ${result.newTasks.length} 个新任务', tag: 'Download');
+        _log.info('添加了 $addedCount 个新任务', tag: 'Download');
       }
+
+      // Heal lists that already carry duplicates from an older build.
+      _collapseDuplicateTasks(notify: false);
 
       // Update metadata for existing tasks
       for (var i = 0; i < _tasks.length; i++) {
@@ -780,11 +912,23 @@ Future<_ScanResult> _scanDownloadDirectoryInBackground(
 
   // 4. Scan for new files on disk
   final newTasks = <Map<String, dynamic>>[];
+  final removedIds = tasksToRemove.toSet();
   for (final entry in workFolders.entries) {
     final workId = entry.key;
     final workDir = entry.value;
     final metadata = workMetadata[workId];
     final workTitle = metadata?['title'] as String? ?? 'RJ$workId';
+
+    // Files this work already has a task for, compared by file identity so a
+    // slightly different spelling from the file system does not look "new".
+    // Tasks whose file could not be found are excluded: those files must be
+    // picked up again below.
+    final knownFiles = <String>{
+      for (final task in existingTasks)
+        if (task['workId'] == workId &&
+            !removedIds.contains(task['id'] as String? ?? ''))
+          _fileIdentity(task['fileName'] as String? ?? ''),
+    };
 
     Future<void> scanDirectory(Directory dir, String relativePath) async {
       final entities = await dir.list(followLinks: false).toList();
@@ -806,9 +950,9 @@ Future<_ScanResult> _scanDownloadDirectoryInBackground(
               ? fileName
               : '$relativePath/$fileName';
           // Check if this file already has a task
-          final hasTask = existingTasks.any((t) =>
-              t['workId'] == workId && t['fileName'] == fullFileName);
-          if (!hasTask) {
+          final identity = _fileIdentity(fullFileName);
+          if (!knownFiles.contains(identity)) {
+            knownFiles.add(identity);
             final stat = await entity.stat();
             final length = await entity.length();
             newTasks.add({
